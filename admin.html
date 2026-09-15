@@ -8057,11 +8057,24 @@ function renderQuickCapture(container, r, text, preset){
     addOpt('__new_speaker__', '＋ 新建嘉宾…');
     personSel.addEventListener('change', function(){
       newNameWrap.style.display = (personSel.value === '__new__' || personSel.value === '__new_speaker__') ? 'block' : 'none';
-      if(personSel.value === '__new_speaker__') newNameInput.placeholder = '新嘉宾姓名（保存时创建到嘉宾资源池）';
+      if(personSel.value === '__new_speaker__'){
+        newNameInput.placeholder = '新嘉宾姓名（保存时创建到嘉宾资源池）';
+        if(!newNameInput.value && p.person_name) newNameInput.value = p.person_name;
+      }
       else if(personSel.value === '__new__') newNameInput.placeholder = '新客户姓名（保存时自动创建客户）';
     });
+    // AI 判定为嘉宾但未命中嘉宾池（如该人已有客户档案）：预选"新建嘉宾"并预填姓名，客户/增员选项保留可改选
+    if(p.person_type_hint === 'speaker' && !(match.status === 'matched' && match.person_type === 'speaker')){
+      personSel.value = '__new_speaker__';
+      newNameWrap.style.display = 'block';
+      if(p.person_name) newNameInput.value = p.person_name;
+      newNameInput.placeholder = '新嘉宾姓名（保存时创建到嘉宾资源池）';
+    }
     if(p.person_name){
-      var hint = match.status === 'none' ? '（未在现有名单匹配到，可新建或在上方选择）' : (match.status === 'ambiguous' ? '（有多个相似对象，请在上方选择）' : '（已匹配到现有对象）');
+      var hint = match.status === 'none' ? '（未在现有名单匹配到，可新建或在上方选择）'
+        : (match.status === 'ambiguous' ? '（有多个相似对象，请在上方选择）'
+        : (personSel.value === '__new_speaker__' && match.status === 'matched' ? '（已匹配到' + qcLabel(match.person_type) + match.person_name + '；嘉宾身份优先，如需按客户归档可改选上方选项）'
+        : '（已匹配到现有对象）'));
       personLine.appendChild(el('div', {style:'font-size:12px;color:#6b7280;margin-top:6px;'}, '原话称呼：' + p.person_name + '　' + hint));
     }
   }
