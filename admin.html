@@ -5568,6 +5568,8 @@ function speakerCard(s){
       el('strong', {}, esc(s.name || '')),
       s.organization ? el('span', {style:'margin-left:8px;font-size:13px;color:var(--muted)'}, esc(s.organization) + (s.position ? ' · ' + esc(s.position) : '')) : null,
       el('span', {style:'font-size:11px;color:#fff;background:'+si.color+';padding:1px 6px;border-radius:8px;margin-left:8px'}, si.label),
+      s.linked_customer ? el('span', {style:'font-size:11px;color:#fff;background:#2563eb;padding:1px 6px;border-radius:8px;margin-left:6px', title:'已关联客户档案'}, '客户') : null,
+      s.linked_recruit ? el('span', {style:'font-size:11px;color:#fff;background:#d97706;padding:1px 6px;border-radius:8px;margin-left:6px', title:'已关联增员候选人'}, '增员') : null,
       s.status === 'inactive' ? el('span', {style:'font-size:11px;color:#6b7280;border:1px solid #ddd;padding:0 4px;border-radius:4px;margin-left:6px'}, '已停用') : null,
     ]),
     el('div', {}, [
@@ -8043,15 +8045,21 @@ function renderQuickCapture(container, r, text, preset){
     personLine.appendChild(el('div', {style:'font-size:12px;color:#059669;margin-top:6px;'}, '✓ 将保存到该候选人的增员跟进记录（' + (p.person_name ? '原话称呼：' + p.person_name + '，' : '') + '若对象不符请关闭后从对应页面进入）'));
   } else {
     addOpt('', '— 请选择关联对象 —');
+    var qcLabel = function(t){ return t === 'recruit' ? '增员对象：' : (t === 'speaker' ? '嘉宾：' : '客户：'); };
     if(match.status === 'matched'){
       var mv = match.person_type + '|' + match.person_id + '|' + (match.cid != null ? match.cid : '') + '|' + match.person_name;
-      addOpt(mv, (match.person_type === 'recruit' ? '增员对象：' : '客户：') + match.person_name + (match.stage ? ('（' + match.stage + '）') : ''), true);
+      addOpt(mv, qcLabel(match.person_type) + match.person_name + (match.stage ? ('（' + match.stage + '）') : ''), true);
     }
     (match.candidates || []).forEach(function(c){
-      addOpt(c.type + '|' + c.id + '|' + (c.cid != null ? c.cid : '') + '|' + c.name, (c.type === 'recruit' ? '增员对象：' : '客户：') + c.name + (c.stage ? ('（' + c.stage + '）') : ''));
+      addOpt(c.type + '|' + c.id + '|' + (c.cid != null ? c.cid : '') + '|' + c.name, qcLabel(c.type) + c.name + (c.stage ? ('（' + c.stage + '）') : ''));
     });
     addOpt('__new__', '＋ 新建客户…');
-    personSel.addEventListener('change', function(){ newNameWrap.style.display = (personSel.value === '__new__') ? 'block' : 'none'; });
+    addOpt('__new_speaker__', '＋ 新建嘉宾…');
+    personSel.addEventListener('change', function(){
+      newNameWrap.style.display = (personSel.value === '__new__' || personSel.value === '__new_speaker__') ? 'block' : 'none';
+      if(personSel.value === '__new_speaker__') newNameInput.placeholder = '新嘉宾姓名（保存时创建到嘉宾资源池）';
+      else if(personSel.value === '__new__') newNameInput.placeholder = '新客户姓名（保存时自动创建客户）';
+    });
     if(p.person_name){
       var hint = match.status === 'none' ? '（未在现有名单匹配到，可新建或在上方选择）' : (match.status === 'ambiguous' ? '（有多个相似对象，请在上方选择）' : '（已匹配到现有对象）');
       personLine.appendChild(el('div', {style:'font-size:12px;color:#6b7280;margin-top:6px;'}, '原话称呼：' + p.person_name + '　' + hint));
@@ -8121,13 +8129,14 @@ function renderQuickCapture(container, r, text, preset){
   var saveBtn = el('button', {class:'btn btn-primary', style:'width:100%;'}, '✓ 确认并保存');
   saveBtn.onclick = async function(){
     var target = personSel.value;
-    var isNew = (target === '__new__');
+    var isNewCustomer = (target === '__new__');
+    var isNewSpeaker = (target === '__new_speaker__');
     var personType = '', personId = null, cid = null, personName = '';
-    if(isNew){
+    if(isNewCustomer || isNewSpeaker){
       personName = newNameInput.value.trim();
-      if(!personName){ toast('请填写新客户姓名，或选择已有对象', 'err'); return; }
+      if(!personName){ toast('请填写姓名，或选择已有对象', 'err'); return; }
     }else if(!target){
-      toast('请选择关联对象（或新建客户）', 'err'); return;
+      toast('请选择关联对象（或新建客户/嘉宾）', 'err'); return;
     }else{
       var parts = target.split('|');
       personType = parts[0]; personId = parts[1]; cid = parts[2] || null; personName = parts.slice(3).join('|');
@@ -8137,12 +8146,21 @@ function renderQuickCapture(container, r, text, preset){
       var fdate = p.interaction_date || today;
       var summary = (p.facts || []).join('；');
       var nextDate = dateInput.value || null;
-      if(isNew){
+      if(isNewCustomer){
         var cr = await callFn('customers', {action:'create', data:{customer_name:personName, source:'快速记录'}});
         if(cr && cr.error) throw new Error(cr.error);
         cid = cr.id; personType = 'customer';
       }
-      if(personType === 'recruit'){
+      if(isNewSpeaker || personType === 'speaker'){
+        // 嘉宾路径：新建到嘉宾资源池；已有嘉宾更新联系记录（对齐"采纳嘉宾建议"写法）
+        var spData = { last_contact_date: fdate, last_contact_note: '【快速记录】' + text };
+        if(nextDate) spData.next_contact_date = nextDate;
+        if(p.activity) spData.notes = '活动：' + p.activity;
+        var spr = isNewSpeaker
+          ? await callFn('activity_speakers', {action:'create', data:Object.assign({name:personName, source:'快速记录'}, spData)})
+          : await callFn('activity_speakers', {action:'update', id:parseInt(personId, 10), data:spData});
+        if(spr && spr.error) throw new Error(spr.error);
+      }else if(personType === 'recruit'){
         var rr2 = await callFn('recruit_followups', {action:'create', data:{
           candidate_id: parseInt(personId, 10), followup_date: fdate, followup_notes: '【快速记录】' + text,
           interaction_summary: summary || null, next_action: p.next_action || null, next_action_date: nextDate,
@@ -8158,7 +8176,7 @@ function renderQuickCapture(container, r, text, preset){
         }});
         if(fr && fr.error) throw new Error(fr.error);
       }
-      toast('已保存为跟进记录', 'ok');
+      toast(isNewSpeaker || personType === 'speaker' ? '已保存到嘉宾资源' : '已保存为跟进记录', 'ok');
       var ov = saveBtn.closest ? saveBtn.closest('.modal-overlay') : null;
       if(ov) ov.remove();
       // 从详情页进入：保存后刷新对应详情，让新跟进/下一步立即显示

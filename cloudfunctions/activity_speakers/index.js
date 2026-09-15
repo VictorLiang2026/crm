@@ -2,8 +2,8 @@
  * activity_speakers — 活动嘉宾资源池（v1.7.3 Activity Speaker Pool）
  *
  * actions:
- *   list    {keyword?, status?, stage?}                        → { rows:[嘉宾全字段] }   （姓名/机构/专业/主题 模糊 + 状态/阶段筛选）
- *   get     {id}                                               → { speaker }
+ *   list    {keyword?, status?, stage?}                        → { rows:[嘉宾全字段 + linked_customer/linked_recruit] }   （姓名/机构/专业/主题 模糊 + 状态/阶段筛选）
+ *   get     {id}                                               → { speaker }  （含 linked_customer/linked_recruit）
  *   create  {data:{name, ...}}                                 → { id }
  *   update  {id, data:{...}}                                   → { ok:true }
  *   remove  {id}                                               → { ok:true }  （软删除：置 deleted_at）
@@ -68,6 +68,35 @@ function kwOrCond(kw) {
     .map(function (c) { return c + '.ilike.%' + s + '%'; }).join(',');
 }
 
+// 身份合并（方案B对齐：customers 为 person 中心；弱关联只读展示，失败不阻塞主流程）
+async function enrichIdentity(rows) {
+  if (!rows || !rows.length) return rows;
+  const cids = [], rids = [];
+  rows.forEach(function (r) {
+    if (r.customer_id != null) cids.push(r.customer_id);
+    if (r.recruit_candidate_id != null) rids.push(r.recruit_candidate_id);
+  });
+  const cmap = {}, rmap = {};
+  if (cids.length) {
+    try {
+      const r = assertOk(await rdb.from('customers').select('Id, customer_name').in('Id', cids).is('deleted_at', null));
+      (r.data || []).forEach(function (c) { cmap[c.Id] = { id: c.Id, name: c.customer_name }; });
+    } catch (e) { /* 客户身份合并失败不阻塞 */ }
+  }
+  if (rids.length) {
+    try {
+      const r = assertOk(await rdb.from('v_recruit_candidates').select('candidate_id, customer_id, customer_name').in('candidate_id', rids));
+      (r.data || []).forEach(function (c) { rmap[c.candidate_id] = { id: c.candidate_id, name: c.customer_name, customer_id: c.customer_id }; });
+    } catch (e) { /* 增员视图不可用时降级 */ }
+  }
+  return rows.map(function (r) {
+    return Object.assign({}, r, {
+      linked_customer: r.customer_id != null ? (cmap[r.customer_id] || null) : null,
+      linked_recruit: r.recruit_candidate_id != null ? (rmap[r.recruit_candidate_id] || null) : null,
+    });
+  });
+}
+
 async function list(event) {
   let q = rdb.from('activity_speakers').select().is('deleted_at', null);
   const kw = String(event.keyword || '').trim();
@@ -75,7 +104,7 @@ async function list(event) {
   if (event.status) q = q.eq('status', event.status);
   if (event.stage) q = q.eq('relationship_stage', event.stage);
   const r = assertOk(await q.order('updated_at', { ascending: false }).limit(100));
-  return { rows: r.data || [] };
+  return { rows: await enrichIdentity(r.data || []) };
 }
 
 async function get(event) {
@@ -84,7 +113,7 @@ async function get(event) {
   const r = assertOk(await rdb.from('activity_speakers').select()
     .eq('id', id).is('deleted_at', null).maybeSingle());
   if (!r.data) return { error: 'speaker not found' };
-  return { speaker: r.data };
+  return { speaker: (await enrichIdentity([r.data]))[0] };
 }
 
 async function create(event) {

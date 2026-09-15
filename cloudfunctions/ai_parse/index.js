@@ -10,9 +10,9 @@
  *
  * action='quick_capture'（v1.8 Sprint4：AI Quick Capture，纯只读解析，不写任何业务数据）：
  *   入参: { action:'quick_capture', text }
- *   读取现有客户/增员名单（仅名字）做人物匹配，把一句自然语言拆解为：
+ *   读取现有客户/增员/嘉宾名单（仅名字）做人物匹配，把一句自然语言拆解为：
  *     parsed: {
- *       person_name, person_type_hint(customer|recruit|unknown),
+ *       person_name, person_type_hint(customer|recruit|speaker|unknown),
  *       interaction_type(见面/吃饭/电话/微信/活动/其他), interaction_date(YYYY-MM-DD|null),
  *       activity(活动名|null),
  *       facts[](事实FACT), needs[](事实FACT·明确需求), interests[](事实FACT·兴趣),
@@ -120,13 +120,16 @@ function qcBjToday() {
 
 function qcNorm(s) { return (s == null ? '' : String(s)).replace(/\s+/g, '').trim(); }
 
-// 人物匹配：AI 给称呼/名字，JS 在现有客户/增员名单里精确→模糊匹配，不依赖 AI 报 id
-function qcResolve(personName, hint, customers, recruits) {
+// 人物匹配：AI 给称呼/名字，JS 在现有客户/增员/嘉宾池里精确→模糊匹配，不依赖 AI 报 id
+function qcResolve(personName, hint, customers, recruits, speakers) {
   const raw = qcNorm(personName);
   if (!raw) return { status: 'none', candidates: [] };
+  // 池顺序按 hint 优先级排列；customer/recruit 优先于 speaker，避免同名时误归嘉宾
   const pools = (hint === 'recruit')
-    ? [['recruit', recruits], ['customer', customers]]
-    : [['customer', customers], ['recruit', recruits]];
+    ? [['recruit', recruits], ['customer', customers], ['speaker', speakers]]
+    : (hint === 'speaker')
+      ? [['speaker', speakers], ['customer', customers], ['recruit', recruits]]
+      : [['customer', customers], ['recruit', recruits], ['speaker', speakers]];
   const toCand = (type, p) => ({ type: type, id: p.id, name: p.name, cid: p.cid, stage: p.stage || null });
   const matched = (type, p) => ({ status: 'matched', person_type: type, person_id: p.id, person_name: p.name, cid: p.cid, stage: p.stage || null, candidates: [] });
   // 1) 精确匹配
@@ -175,7 +178,7 @@ function qcResolve(personName, hint, customers, recruits) {
   return { status: 'none', candidates: [] };
 }
 
-function qcSystem(today, custNames, recNames, actNames) {
+function qcSystem(today, custNames, recNames, actNames, spNames) {
   return [
     '你是保险代理人的 CRM 记录助手。把用户口述的一次客户交流，拆解成结构化记录。今天是 ' + today + '（北京时间）。',
     '',
@@ -186,9 +189,10 @@ function qcSystem(today, custNames, recNames, actNames) {
     '',
     '【严禁】虚构客户需求、购买意愿、成功率、ROI、联系记录、客户没说过的事实。信息不足时对应字段置 null/false/空数组，并把 confidence 设为 low。',
     '',
-    '【人物匹配】下面是系统里已有的名单。person_name 请填原话里的称呼（如“王总”）；person_type_hint 填 customer（客户/潜在客户）、recruit（增员对象）或 unknown。',
+    '【人物匹配】下面是系统里已有的名单。person_name 请填原话里的称呼（如“王总”）；person_type_hint 填 customer（客户/潜在客户）、recruit（增员对象）、speaker（嘉宾：主讲/分享/点评等受邀出席活动的人）或 unknown。',
     '现有客户：' + (custNames || '（无）'),
     '现有增员对象：' + (recNames || '（无）'),
+    '现有嘉宾：' + (spNames || '（无）'),
     '近期活动：' + (actNames || '（无）'),
     '',
     '【相对日期换算】把“今天/昨天/上周/十月以后”等换算成 YYYY-MM-DD（今天=' + today + '）。“十月以后再联系”这类，next_action_date 给十月第一个合适工作日附近的日期即可，作为建议；无法判断给 null。',
@@ -196,7 +200,7 @@ function qcSystem(today, custNames, recNames, actNames) {
     '只输出一个 JSON 对象，不要解释、不要 markdown：',
     '{',
     '  "person_name": "原话中的称呼/姓名，没有则 null",',
-    '  "person_type_hint": "customer|recruit|unknown",',
+    '  "person_type_hint": "customer|recruit|speaker|unknown",',
     '  "interaction_type": "见面|吃饭|电话|微信|活动|其他|null",',
     '  "interaction_date": "YYYY-MM-DD|null（这次交流发生的日期）",',
     '  "activity": "提到的活动名称|null（尽量用上面近期活动里的名字）",',
@@ -223,7 +227,7 @@ async function quickCapture(event) {
   const today = qcBjToday();
 
   // 名单（仅取名字，用于人物匹配与活动关联；只读）
-  let customers = [], recruits = [], actNames = '';
+  let customers = [], recruits = [], speakers = [], actNames = '';
   try {
     const cr = assertOk(await rdb.from('customers')
       .select('Id, customer_name').is('deleted_at', null)
@@ -236,13 +240,17 @@ async function quickCapture(event) {
       .filter(r => r.name);
   } catch (e) { /* 视图不可用时增员匹配降级为空 */ }
   try {
+    const sr = await rdb.from('activity_speakers').select('id, name').is('deleted_at', null).limit(3000);
+    speakers = (sr.data || []).filter(r => r.name);
+  } catch (e) { /* 嘉宾池读取失败不阻塞解析 */ }
+  try {
     const ar = await rdb.from('activities').select('id, name, activity_date')
       .order('activity_date', { ascending: false }).limit(60);
     actNames = (ar.data || []).map(a => a.name + '(' + (a.activity_date || '日期未定') + ')').join('、');
   } catch (e) { /* 活动名单失败不阻塞 */ }
 
   const messages = [
-    { role: 'system', content: qcSystem(today, customers.map(c => c.name).join('、'), recruits.map(r => r.name).join('、'), actNames) },
+    { role: 'system', content: qcSystem(today, customers.map(c => c.name).join('、'), recruits.map(r => r.name).join('、'), actNames, speakers.map(s => s.name).join('、')) },
     { role: 'user', content: text },
   ];
   let res = await generateText(messages, { timeout: 55000 });
@@ -256,7 +264,7 @@ async function quickCapture(event) {
     return { error: 'AI 暂未返回有效内容，请重试或换个说法', raw: res.text || '' };
   }
 
-  const match = qcResolve(parsed.person_name, parsed.person_type_hint, customers, recruits);
+  const match = qcResolve(parsed.person_name, parsed.person_type_hint, customers, recruits, speakers);
 
   return { parsed: parsed, match: match, today: today, raw: res.text };
 }
