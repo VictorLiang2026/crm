@@ -240,8 +240,8 @@ async function quickCapture(event) {
       .filter(r => r.name);
   } catch (e) { /* 视图不可用时增员匹配降级为空 */ }
   try {
-    const sr = await rdb.from('activity_speakers').select('id, name').is('deleted_at', null).limit(3000);
-    speakers = (sr.data || []).filter(r => r.name);
+    const sr = await rdb.from('activity_speakers').select('id, name, customer_id').is('deleted_at', null).limit(3000);
+    speakers = (sr.data || []).filter(r => r.name).map(r => ({ id: r.id, name: r.name, cid: r.customer_id }));
   } catch (e) { /* 嘉宾池读取失败不阻塞解析 */ }
   try {
     const ar = await rdb.from('activities').select('id, name, activity_date')

@@ -121,11 +121,31 @@ async function create(event) {
   if (n.error) return n;
   const d = n.data;
   if (!d.name || !String(d.name).trim()) return { error: 'name required' };
+  // 强关联兜底（v1.8.10.6：customers 为唯一 person 主表，嘉宾必须有客户档案）
+  // 未传 customer_id：精确同名唯一→直接关联；无同名→自动建客户；多个同名→报错交界面人工确认
+  if (d.customer_id == null) {
+    const exactName = String(d.name).trim();
+    const dup = assertOk(await rdb.from('customers').select('Id, customer_name')
+      .eq('customer_name', exactName).is('deleted_at', null).limit(50));
+    const dups = dup.data || [];
+    if (dups.length === 1) {
+      d.customer_id = dups[0].Id;
+    } else if (dups.length === 0) {
+      const cr = assertOk(await rdb.from('customers').insert({
+        customer_name: exactName,
+        source: d.source ? ('嘉宾：' + d.source) : '嘉宾（自动建档）',
+        created_at: nowIso(), updated_at: nowIso(),
+      }).select('Id'));
+      d.customer_id = cr.data[0].Id;
+    } else {
+      return { error: '存在 ' + dups.length + ' 个同名客户，请在界面确认要关联的客户后重试', dup_customers: dups };
+    }
+  }
   d.created_at = nowIso();
   d.updated_at = nowIso();
   const payload = normFields(d, SP_FIELDS.concat(['created_at', 'updated_at']));
   const r = assertOk(await rdb.from('activity_speakers').insert(payload).select('id'));
-  return { id: r.data[0].id };
+  return { id: r.data[0].id, customer_id: d.customer_id };
 }
 
 async function update(event) {

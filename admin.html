@@ -876,6 +876,87 @@ function attachNameDupCheck(container, excludeId){
   input.addEventListener('input', clearTip);
 }
 
+// 确保 person 主档案存在（customers 为唯一 person 表）：
+// 无同名→直接建客户；有同名→弹窗确认"是同一人(关联) / 不是(加括号区分新建)"
+// 返回 Promise<{cid, finalName, mode:'created'|'linked'}>；用户取消则 reject
+function ensurePersonCustomer(name, sourceLabel){
+  name = (name || '').trim();
+  if(!name) return Promise.reject(new Error('姓名为空'));
+  return (async function(){
+    var r = await callFn('customers', {action:'list', keyword:name, pageSize:100});
+    if(r && r.error) throw new Error(r.error);
+    var kw = name.toLowerCase();
+    var dups = (r.rows || []).filter(function(c){ return (c.customer_name||'').trim().toLowerCase() === kw; });
+    if(!dups.length){
+      var cr = await callFn('customers', {action:'create', data:{customer_name:name, source: sourceLabel || '嘉宾'}});
+      if(cr && cr.error) throw new Error(cr.error);
+      return { cid: cr.id, finalName: name, mode: 'created' };
+    }
+    // 有同名：人工确认
+    return await new Promise(function(resolve, reject){
+      var overlay = el('div', {class:'modal-overlay'});
+      var box = el('div', {class:'modal', style:'max-width:520px'});
+      box.appendChild(el('h3', {style:'margin-top:0'}, '发现同名客户：' + name));
+      box.appendChild(el('p', {style:'font-size:13px;color:#6b7280;margin:4px 0 10px'}, '请确认要建立嘉宾关系的是否为同一人。所有人都以客户档案为主档，嘉宾身份通过关联维系。'));
+      var picked = {id: dups[0].Id};
+      var listWrap = el('div', {style:'max-height:200px;overflow:auto;border:1px solid #e5e7eb;border-radius:8px;margin-bottom:10px'});
+      dups.forEach(function(c, i){
+        var meta = [c.customer_stage, c.occupation, c.phone, c.organization].filter(Boolean).join(' · ');
+        var row = el('label', {style:'display:flex;gap:8px;align-items:flex-start;padding:8px 10px;cursor:pointer;border-bottom:1px solid #f3f4f6;font-size:13px;'}, [
+          el('input', {type:'radio', name:'dup-customer', checked: i===0, onchange:function(){ picked.id = c.Id; renameWrap.style.display='none'; }}),
+          el('div', {}, [el('strong', {}, '#'+c.Id+' '+c.customer_name), el('div', {style:'color:#6b7280;font-size:12px'}, meta || '（无补充信息）')])
+        ]);
+        listWrap.appendChild(row);
+      });
+      box.appendChild(listWrap);
+      var renameWrap = el('div', {style:'display:none;margin-bottom:10px'});
+      renameWrap.appendChild(el('label', {style:'font-size:13px;font-weight:600;display:block;margin-bottom:4px'}, '不是同一人 —— 请给两人加括号区分（括号内自定义，如公司/城市/来源）'));
+      var renameInput = el('input', {type:'text', value: name + '（', placeholder:'如：杨杰（泰康）', style:'width:100%;padding:8px;border:1px solid #d1d5db;border-radius:6px'});
+      renameWrap.appendChild(renameInput);
+      box.appendChild(renameWrap);
+      var errLine = el('div', {style:'color:#e11d48;font-size:12px;margin-bottom:8px;display:none'});
+      box.appendChild(errLine);
+      var btns = el('div', {style:'display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap'});
+      var linkBtn = el('button', {class:'btn btn-primary'}, '✓ 是同一人，关联此客户');
+      var newBtn = el('button', {class:'btn btn-sm'}, '不是，新建（加括号区分）');
+      var cancelBtn = el('button', {class:'btn btn-sm btn-danger'}, '取消');
+      btns.appendChild(cancelBtn); btns.appendChild(newBtn); btns.appendChild(linkBtn);
+      box.appendChild(btns);
+      overlay.appendChild(box);
+      overlay.addEventListener('click', function(e){ if(e.target===overlay){ overlay.remove(); reject(new Error('用户取消')); } });
+      document.getElementById('modal-root').appendChild(overlay);
+      renameInput.focus();
+      linkBtn.onclick = async function(){
+        linkBtn.disabled = true;
+        try{ overlay.remove(); resolve({ cid: picked.id, finalName: name, mode: 'linked' }); }catch(e){ linkBtn.disabled=false; }
+      };
+      newBtn.onclick = function(){
+        if(renameWrap.style.display === 'none'){
+          renameWrap.style.display = 'block';
+          var v = renameInput.value;
+          renameInput.focus();
+          if(v === name + '（'){ /* 光标落括号内 */ try{ renameInput.setSelectionRange(v.length, v.length); }catch(e){} }
+          return;
+        }
+        var nn = renameInput.value.trim();
+        errLine.style.display = 'none';
+        if(nn === name || !/（.+）$/.test(nn)){
+          errLine.textContent = '请在括号内填写区分信息，格式：姓名（自定义备注）'; errLine.style.display='block'; return;
+        }
+        if(dups.some(function(c){ return c.customer_name === nn; })){
+          errLine.textContent = '该名称仍与已有客户同名，请换一个区分备注'; errLine.style.display='block'; return;
+        }
+        newBtn.disabled = true;
+        callFn('customers', {action:'create', data:{customer_name:nn, source: sourceLabel || '嘉宾'}}).then(function(cr){
+          if(cr && cr.error) throw new Error(cr.error);
+          overlay.remove(); resolve({ cid: cr.id, finalName: nn, mode: 'created' });
+        }).catch(function(e){ errLine.textContent = e.message; errLine.style.display='block'; newBtn.disabled=false; });
+      };
+      cancelBtn.onclick = function(){ overlay.remove(); reject(new Error('用户取消')); };
+    });
+  })();
+}
+
 // ==================== 路由 ====================
 function route(){
   var hash = location.hash || '#/';
@@ -5595,7 +5676,7 @@ function speakerCard(s){
   return c;
 }
 
-// 新增/编辑嘉宾（cooperation_count 及关联 ID 传文本，由云函数 parseInt 校验；空串不提交）
+// 新增/编辑嘉宾（v1.8.10.6：新建先确保客户主档——同名确认/括号改名；cooperation_count 传文本 parseInt 校验；空串不提交）
 function openSpeakerForm(s){
   var FIELDS = [
     {name:'name', label:'姓名', type:'text', req:true},
@@ -5613,19 +5694,46 @@ function openSpeakerForm(s){
     {name:'last_contact_note', label:'最近联系备注', type:'textarea'},
     {name:'next_contact_date', label:'下次联系日期', type:'date'},
     {name:'cooperation_count', label:'合作次数', type:'text'},
-    {name:'customer_id', label:'关联客户ID（可选）', type:'text'},
-    {name:'recruit_candidate_id', label:'关联增员ID（可选）', type:'text'},
     {name:'notes', label:'备注', type:'textarea'},
   ];
-  modal(s ? '编辑嘉宾：' + s.name : '新增嘉宾', FIELDS, s || {}, async function(data){
+  // 编辑时才允许看到关联ID（新建强制走同名确认自动关联；无主嘉宾编辑时会引导补关联）
+  if(s){
+    FIELDS.push({name:'customer_id', label:'关联客户ID' + (s.customer_id ? '' : '（当前为空，保存时自动补建/确认）'), type:'text'});
+    FIELDS.push({name:'recruit_candidate_id', label:'关联增员ID（可选）', type:'text'});
+  }
+  modal(s ? '编辑嘉宾：' + s.name : '新增嘉宾（自动建立/关联客户档案）', FIELDS, s || {}, async function(data){
     ['cooperation_count','customer_id','recruit_candidate_id'].forEach(function(k){
       if(data[k] === '' || data[k] == null) delete data[k];
     });
+    var followupToWrite = null;
+    if(!s){
+      // 新建：先确保客户主档（同名确认 / 加括号区分）
+      var pc = await ensurePersonCustomer((data.name || '').trim(), '嘉宾：' + (data.source || '资源池建档'));
+      data.customer_id = pc.cid;
+      data.name = pc.finalName;
+      // 填了最近联系信息：同步写一条客户跟进（沟通记录统一在客户时间线维系）
+      if(data.last_contact_date || data.last_contact_note){
+        followupToWrite = {
+          customer_id: pc.cid, customer_name: pc.finalName,
+          followup_date: data.last_contact_date || null,
+          followup_notes: '【嘉宾建档】' + (data.last_contact_note || ('建立嘉宾关系' + (data.organization ? '（' + data.organization + '）' : ''))),
+        };
+      }
+    }else if(s.customer_id == null && data.customer_id == null){
+      // 编辑无主嘉宾：引导补建/确认客户并回填
+      var pc2 = await ensurePersonCustomer((data.name || s.name || '').trim(), '嘉宾（补关联）');
+      data.customer_id = pc2.cid;
+      if(pc2.finalName && pc2.finalName !== (data.name || s.name)) data.name = pc2.finalName;
+    }
     var r = s
       ? await callFn('activity_speakers', {action:'update', id:s.id, data:data})
       : await callFn('activity_speakers', {action:'create', data:data});
     if(r.error) throw new Error(r.error);
-    toast(s ? '已保存' : '已创建嘉宾');
+    if(followupToWrite){
+      var fr2 = await callFn('followups', {action:'create', data:followupToWrite});
+      if(fr2 && fr2.error) throw new Error('嘉宾已保存，但跟进记录写入失败：' + fr2.error);
+    }
+    toast(s ? '已保存' : '已创建嘉宾并关联客户档案', 'ok');
     showSpeakers();
   }, {wide:true});
 }
@@ -8165,14 +8273,35 @@ function renderQuickCapture(container, r, text, preset){
         cid = cr.id; personType = 'customer';
       }
       if(isNewSpeaker || personType === 'speaker'){
-        // 嘉宾路径：新建到嘉宾资源池；已有嘉宾更新联系记录（对齐"采纳嘉宾建议"写法）
-        var spData = { last_contact_date: fdate, last_contact_note: '【快速记录】' + text };
-        if(nextDate) spData.next_contact_date = nextDate;
-        if(p.activity) spData.notes = '活动：' + p.activity;
-        var spr = isNewSpeaker
-          ? await callFn('activity_speakers', {action:'create', data:Object.assign({name:personName, source:'快速记录'}, spData)})
-          : await callFn('activity_speakers', {action:'update', id:parseInt(personId, 10), data:spData});
-        if(spr && spr.error) throw new Error(spr.error);
+        // 嘉宾路径（v1.8.10.6：customers 为唯一 person 主表）
+        // 1) 确保客户主档：新嘉宾走同名确认（关联/加括号新建）；已有嘉宾但缺关联（存量无主）同样补建并回填
+        if(isNewSpeaker){
+          var pc = await ensurePersonCustomer(personName, '嘉宾（快速记录）');
+          cid = pc.cid; personName = pc.finalName;
+          var spData0 = { last_contact_date: fdate, last_contact_note: '【快速记录】' + text, customer_id: cid };
+          if(nextDate) spData0.next_contact_date = nextDate;
+          if(p.activity) spData0.notes = '活动：' + p.activity;
+          var spr0 = await callFn('activity_speakers', {action:'create', data:Object.assign({name:personName, source:'快速记录'}, spData0)});
+          if(spr0 && spr0.error) throw new Error(spr0.error);
+        }else{
+          var spUpd = { last_contact_date: fdate, last_contact_note: '【快速记录】' + text };
+          if(nextDate) spUpd.next_contact_date = nextDate;
+          if(cid == null){
+            // 存量无主嘉宾：先建/确认客户再回填关联
+            var pc2 = await ensurePersonCustomer(personName, '嘉宾（快速记录）');
+            cid = pc2.cid; personName = pc2.finalName;
+            spUpd.customer_id = cid;
+          }
+          var spr1 = await callFn('activity_speakers', {action:'update', id:parseInt(personId, 10), data:spUpd});
+          if(spr1 && spr1.error) throw new Error(spr1.error);
+        }
+        // 2) 沟通记录统一写 followups（客户详情时间线可见，全生命周期一处维系）
+        var sfr = await callFn('followups', {action:'create', data:{
+          customer_id: parseInt(cid, 10), customer_name: personName || undefined, followup_date: fdate, followup_notes: '【嘉宾交流·快速记录】' + text,
+          interaction_summary: summary || null, next_action: p.next_action || null, next_action_date: nextDate,
+          next_followup_date: nextDate, next_followup_goal: p.followup_goal || null,
+        }});
+        if(sfr && sfr.error) throw new Error(sfr.error);
       }else if(personType === 'recruit'){
         var rr2 = await callFn('recruit_followups', {action:'create', data:{
           candidate_id: parseInt(personId, 10), followup_date: fdate, followup_notes: '【快速记录】' + text,
@@ -8189,7 +8318,7 @@ function renderQuickCapture(container, r, text, preset){
         }});
         if(fr && fr.error) throw new Error(fr.error);
       }
-      toast(isNewSpeaker || personType === 'speaker' ? '已保存到嘉宾资源' : '已保存为跟进记录', 'ok');
+      toast(isNewSpeaker || personType === 'speaker' ? '已保存：嘉宾档案已关联客户，跟进已记入客户时间线' : '已保存为跟进记录', 'ok');
       var ov = saveBtn.closest ? saveBtn.closest('.modal-overlay') : null;
       if(ov) ov.remove();
       // 从详情页进入：保存后刷新对应详情，让新跟进/下一步立即显示
