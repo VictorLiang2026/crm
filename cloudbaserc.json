@@ -6,32 +6,184 @@
     {
       "name": "activities",
       "timeout": 10,
-      "runtime": "Nodejs20.19",
-      "handler": "index.main"
+      "runtime": "Nodejs18.15",
+      "handler": "index.main",
+      "memorySize": 256
+    },
+    {
+      "name": "activity_reports",
+      "timeout": 15,
+      "runtime": "Nodejs18.15",
+      "handler": "index.main",
+      "memorySize": 256
+    },
+    {
+      "name": "activity_speakers",
+      "timeout": 20,
+      "runtime": "Nodejs18.15",
+      "handler": "index.main",
+      "memorySize": 256
     },
     {
       "name": "activity_tasks",
       "timeout": 10,
       "runtime": "Nodejs20.19",
-      "handler": "index.main"
+      "handler": "index.main",
+      "memorySize": 256
+    },
+    {
+      "name": "activity_topics",
+      "timeout": 10,
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "memorySize": 256
     },
     {
       "name": "ai_activity",
       "timeout": 60,
-      "runtime": "Nodejs20.19",
-      "handler": "index.main"
+      "runtime": "Nodejs18.15",
+      "handler": "index.main",
+      "memorySize": 256
+    },
+    {
+      "name": "ai_followup",
+      "timeout": 60,
+      "runtime": "Nodejs18.15",
+      "handler": "index.main",
+      "memorySize": 256
+    },
+    {
+      "name": "ai_parse",
+      "timeout": 120,
+      "runtime": "Nodejs18.15",
+      "handler": "index.main",
+      "memorySize": 256
+    },
+    {
+      "name": "ai_recommend",
+      "timeout": 120,
+      "runtime": "Nodejs18.15",
+      "handler": "index.main",
+      "memorySize": 256
+    },
+    {
+      "name": "ai_recommendations",
+      "timeout": 60,
+      "runtime": "Nodejs18.15",
+      "handler": "index.main",
+      "memorySize": 256
+    },
+    {
+      "name": "ai_referral",
+      "timeout": 60,
+      "runtime": "Nodejs18.15",
+      "handler": "index.main",
+      "memorySize": 256
+    },
+    {
+      "name": "customers",
+      "timeout": 10,
+      "runtime": "Nodejs18.15",
+      "handler": "index.main",
+      "memorySize": 256
     },
     {
       "name": "followups",
       "timeout": 10,
-      "runtime": "Nodejs20.19",
-      "handler": "index.main"
+      "runtime": "Nodejs18.15",
+      "handler": "index.main",
+      "memorySize": 256
     },
     {
       "name": "funnel_insight",
       "timeout": 60,
       "runtime": "Nodejs20.19",
-      "handler": "index.main"
+      "handler": "index.main",
+      "memorySize": 256
+    },
+    {
+      "name": "gifts",
+      "timeout": 10,
+      "runtime": "Nodejs18.15",
+      "handler": "index.main",
+      "memorySize": 256
+    },
+    {
+      "name": "ocr_records",
+      "timeout": 20,
+      "runtime": "Nodejs18.15",
+      "handler": "index.main",
+      "memorySize": 256
+    },
+    {
+      "name": "opportunities",
+      "timeout": 60,
+      "runtime": "Nodejs18.15",
+      "handler": "index.main",
+      "memorySize": 256
+    },
+    {
+      "name": "photos",
+      "timeout": 10,
+      "runtime": "Nodejs18.15",
+      "handler": "index.main",
+      "memorySize": 256
+    },
+    {
+      "name": "policy_review_reports",
+      "timeout": 150,
+      "runtime": "Nodejs18.15",
+      "handler": "index.main",
+      "memorySize": 256
+    },
+    {
+      "name": "products",
+      "timeout": 10,
+      "runtime": "Nodejs18.15",
+      "handler": "index.main",
+      "memorySize": 256
+    },
+    {
+      "name": "recruit_candidates",
+      "timeout": 30,
+      "runtime": "Nodejs18.15",
+      "handler": "index.main",
+      "memorySize": 256
+    },
+    {
+      "name": "recruit_followups",
+      "timeout": 3,
+      "runtime": "Nodejs18.15",
+      "handler": "index.main",
+      "memorySize": 256
+    },
+    {
+      "name": "recruit_goals",
+      "timeout": 30,
+      "runtime": "Nodejs18.15",
+      "handler": "index.main",
+      "memorySize": 256
+    },
+    {
+      "name": "recruit_recommend",
+      "timeout": 120,
+      "runtime": "Nodejs18.15",
+      "handler": "index.main",
+      "memorySize": 256
+    },
+    {
+      "name": "recruit_score",
+      "timeout": 60,
+      "runtime": "Nodejs18.15",
+      "handler": "index.main",
+      "memorySize": 256
+    },
+    {
+      "name": "today_coach",
+      "timeout": 60,
+      "runtime": "Nodejs18.15",
+      "handler": "index.main",
+      "memorySize": 256
     }
   ]
 }

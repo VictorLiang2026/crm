@@ -1,0 +1,8 @@
+[mcp_servers.cloudbase]
+command = "C:\\Program Files\\nodejs\\npx.cmd"
+args = ["-y", "@cloudbase/cloudbase-mcp@latest"]
+startup_timeout_sec = 120
+tool_timeout_sec = 180
+
+[mcp_servers.cloudbase.env]
+INTEGRATION_IDE = "Codex"

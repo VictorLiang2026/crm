@@ -1,5 +1,7 @@
 # 个人 CRM（CloudBase 个人版 · 事件云函数）
 
+> **2026-09-20 开发入口**：长期规则见 [AGENTS.md](AGENTS.md)，当前环境和发布流程见 [docs/development-environment.md](docs/development-environment.md)。每轮修改完成必须部署所需产物、提交推送、打标签并验证三端一致；影响已有功能的变更须在编码前确认。下文历史函数数量及运行时说明可能滞后，以完整 `cloudbaserc.json` 和实时云端核对为准。
+
 个人 CRM 系统，架构：**CloudBase 个人版 + 事件云函数 + 共享集群 PostgreSQL**。
 
 - AI 仅用 **hy3**，通过 `app.ai().createModel('cloudbase')` 调用
