@@ -6,7 +6,9 @@
 
 - 本地：`D:\CRM\crm`；GitHub：`https://github.com/VictorLiang2026/crm`；发布分支：`master`。
 - 生产 CloudBase：`crm-d1gkae8ddc930d151`；静态页面：`https://crm-d1gkae8ddc930d151-1434199662.tcloudbaseapp.com/crm/admin.html`。
-- CRM 使用无前缀云函数。不要修改同环境的 `pr_*` 函数或用途未确认的体验版环境。
+- **当前系统所有迭代升级的数据操作仅限 `public` schema**，包括查询、写入、迁移、表/视图/数据库函数、权限调整及测试数据操作。SQL 明确限定 `public`，避免依赖不确定的 `search_path`。
+- **不涉及 `pr` schema，也不涉及任何以 `pr_` 开头的云函数**：不查询或读写 `pr` 数据，不修改其结构/权限，不调用、修改、部署或删除 `pr_` 函数；不得通过跨 schema 引用或级联操作间接影响它们。发现依赖时停止相关操作并报告，不扩大本轮范围。
+- CRM 使用无前缀云函数。不要操作用途未确认的体验版环境。
 - 先读 `docs/development-environment.md`、`docs/开发安全边界说明.md`。旧文档与实时查询冲突时，以核实过的线上事实为准。
 
 ## 修改前

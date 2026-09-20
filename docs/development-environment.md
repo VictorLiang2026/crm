@@ -21,6 +21,8 @@ PowerShell 示例：`& .\tools\tcb.ps1 -CliArgs @('fn','list','-e','crm-d1gkae8d
 `cloudbaserc.json` 是从线上读取的完整 26 函数非敏感配置；环境变量和凭据仍在云端，不入库。
 同环境还有 26 个 `pr_*` 函数；另一体验版环境 `crm-victor-d4g3a9vr011807bdb` 用途未确认，不能默认作为测试环境。
 
+**迭代隔离边界（用户确认）**：当前系统的数据查询、写入、迁移、数据库对象/权限调整和测试操作均仅限 `public` schema；SQL 明确限定 `public`。不涉及 `pr` schema，也不调用、修改、部署或删除任何 `pr_` 前缀云函数。禁止跨 schema 引用或级联操作间接影响 `pr`；发现依赖时停止并报告。
+
 ## 接手基线
 
 初始提交 `bcea0ce82458780773cfd0da794adfc72a4e77df`，标签 `release-20260916-1434`。
