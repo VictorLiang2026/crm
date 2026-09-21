@@ -8111,7 +8111,7 @@ function openQuickCapture(preset){
   box.appendChild(footer);
 
   overlay.appendChild(box);
-  overlay.addEventListener('click', function(e){ if(e.target===overlay) overlay.remove(); });
+  // 快速录入保留未保存内容；仅由取消或确认保存成功关闭，点击背景不关闭。
   $('modal-root').appendChild(overlay);
   setTimeout(function(){ ta.focus(); }, 50);
 }
