@@ -4168,11 +4168,17 @@ async function renderTrashPage(opt){
   async function batchRestore(){
     var ids = []; for(var k in state.checked) if(state.checked[k]) ids.push(parseInt(k,10));
     if(!ids.length) return;
-    if(!confirm('确认恢复选中的 '+ids.length+' 项？其关联数据将一并恢复。')) return;
+    var hasLegacy = ids.some(function(id){ var row=state.checked[id]; return row && row.legacy_delete; });
+    var confirmText = hasLegacy
+      ? '确认恢复选中的 '+ids.length+' 项？其中包含历史删除记录；历史记录只恢复客户/候选人本身，关联记录保持在回收站。'
+      : '确认恢复选中的 '+ids.length+' 项？仅恢复各自本次删除批次的关联数据。';
+    if(!confirm(confirmText)) return;
     var r = await opt.restoreFn(ids);
     if(r && r.error){ toast('恢复失败：'+r.error, 'error'); return; }
     if(r && r.skipped && r.skipped.length){
       toast('恢复 '+r.restored+' 项；'+r.skipped.length+' 项跳过（'+r.skipped[0].reason+'）', 'error');
+    } else if(r && r.legacy_restored && r.legacy_restored.length){
+      toast('已恢复 '+r.restored+' 项；其中 '+r.legacy_restored.length+' 项为历史记录，仅恢复主记录', 'error');
     } else {
       toast('已恢复'+(r && r.restored != null ? ' '+r.restored+' 项' : ''));
     }
@@ -4218,10 +4224,10 @@ async function renderTrashPage(opt){
       var id = row._id;
       var tr = el('tr');
       var cb = el('input', {type:'checkbox'});
-      cb.onchange = function(){ state.checked[id] = cb.checked; updateBatchBtn(); };
+      cb.onchange = function(){ state.checked[id] = cb.checked ? row : null; updateBatchBtn(); };
       tr.appendChild(el('td', {}, cb));
-      opt.rowCells(row, tr, counts);
-      tr.appendChild(el('td', {}, el('a', {onclick:function(){ opt.restoreOne(id); }}, '恢复')));
+      opt.rowCells(row, tr, counts, data);
+      tr.appendChild(el('td', {}, el('a', {onclick:function(){ opt.restoreOne(id, row); }}, '恢复')));
       tbody.appendChild(tr);
     });
     table.appendChild(tbody);
@@ -4256,12 +4262,15 @@ async function showCustomerTrash(){
     },
     restoreFn: function(ids){ return callFn('customers', {action:'restore', ids:ids}); },
     afterRestore: function(){ invalidateCustomers(); invalidateRcMap(); },
-    restoreOne: function(id){
-      if(!confirm('确认恢复该客户？其跟进记录、伴手礼、照片/附件、保单检视报告、AI 解析记录、产品额度及增员候选人将一并恢复。')) return;
+    restoreOne: function(id, row){
+      var msg = row.legacy_delete
+        ? '这是历史删除记录，无法可靠判断关联数据归属。确认只恢复该客户，关联记录继续保留在回收站？'
+        : '确认恢复该客户？仅恢复与该客户本次删除同批次的跟进、礼品、照片/附件、报告、AI 解析、产品额度及增员记录。';
+      if(!confirm(msg)) return;
       callFn('customers', {action:'restore', ids:[id]}).then(function(r){
         if(r.error){ toast('恢复失败：'+r.error, 'error'); return; }
         invalidateCustomers(); invalidateRcMap();
-        toast('已恢复');
+        toast(r.legacy_restored && r.legacy_restored.length ? '已恢复客户；历史关联记录未自动恢复' : '已恢复');
         showCustomerTrash();
       });
     },
@@ -4273,18 +4282,18 @@ async function showCustomerTrash(){
         {label:'关联数据（移入回收站的记录）'},
       ];
     },
-    rowCells: function(row, tr, counts){
+    rowCells: function(row, tr, counts, data){
       tr.appendChild(el('td', {}, el('a', {onclick:function(){ toast('已删除客户，恢复后方可查看详情'); }}, row.customer_name || ('客户#'+row.Id))));
       tr.appendChild(el('td', {}, row.phone || '-'));
       tr.appendChild(el('td', {}, fmtTrashTime(row.deleted_at)));
       var parts = [];
-      var cnt = counts || {};
+      var cnt = (data.recoverable_counts && data.recoverable_counts[row._id]) || {};
       var labelMap = [['followups','跟进'],['gifts','礼品'],['photos','照片'],['policy_review_reports','报告'],['ocr_records','解析'],['products','额度'],['recruit_candidates','增员']];
       labelMap.forEach(function(p){
         var n = cnt[p[0]] || 0;
         if(n) parts.push(p[1]+' '+n);
       });
-      tr.appendChild(el('td', {style:'color:var(--muted);font-size:12px'}, parts.length ? parts.join(' · ') : '无'));
+      tr.appendChild(el('td', {style:'color:var(--muted);font-size:12px'}, row.legacy_delete ? '历史记录：关联数据不自动恢复' : (parts.length ? parts.join(' · ') : '无')));
     },
   });
 }
@@ -4304,12 +4313,16 @@ async function showRecruitTrash(){
     },
     restoreFn: function(ids){ return callFn('recruit_candidates', {action:'restore', ids:ids}); },
     afterRestore: function(){ invalidateRcMap(); },
-    restoreOne: function(id){
-      if(!confirm('确认恢复该候选人？其增员跟进记录将一并恢复。')) return;
+    restoreOne: function(id, row){
+      var msg = row.legacy_delete
+        ? '这是历史删除记录，无法可靠判断跟进记录归属。确认只恢复该候选人，跟进记录继续保留在回收站？'
+        : '确认恢复该候选人？仅恢复与本次删除同批次的增员跟进记录。';
+      if(!confirm(msg)) return;
       callFn('recruit_candidates', {action:'restore', ids:[id]}).then(function(r){
         if(r.error){ toast('恢复失败：'+r.error, 'error'); return; }
+        if(r.skipped && r.skipped.length){ toast('未恢复：'+r.skipped[0].reason, 'error'); return; }
         invalidateRcMap();
-        toast('已恢复');
+        toast(r.legacy_restored && r.legacy_restored.length ? '已恢复候选人；历史跟进记录未自动恢复' : '已恢复');
         showRecruitTrash();
       });
     },
@@ -4327,11 +4340,12 @@ async function showRecruitTrash(){
       tr.appendChild(el('td', {}, [
         el('a', {onclick:function(){ toast('已删除候选人，恢复后方可查看详情'); }}, row.customer_name || ('客户#'+row.customer_id)),
         row.customer_deleted_at ? el('span', {class:'badge', style:'background:#e5e7eb;color:#6b7280;margin-left:6px;font-size:11px'}, '随客户删除') : null,
+        row.legacy_delete ? el('span', {class:'badge', style:'background:#fff7ed;color:#9a3412;margin-left:6px;font-size:11px'}, '历史删除') : null,
       ]));
       tr.appendChild(el('td', {}, row.phone || '-'));
       tr.appendChild(el('td', {}, row.stage || '-'));
       tr.appendChild(el('td', {}, fmtTrashTime(row.candidate_deleted_at)));
-      tr.appendChild(el('td', {style:'color:var(--muted);font-size:12px'}, c.followups ? '跟进 '+c.followups : '无'));
+      tr.appendChild(el('td', {style:'color:var(--muted);font-size:12px'}, row.legacy_delete ? '不自动恢复' : (c.followups ? '跟进 '+c.followups : '无')));
     },
   });
 }

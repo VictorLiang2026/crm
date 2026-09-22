@@ -153,14 +153,9 @@ async function update(event) {
 async function remove(event) {
   const id = parseInt(event.id, 10);
   if (!id) return { error: 'id required' };
-  const ts = nowIso();
-  const r = assertOk(await rdb.from('recruit_candidates')
-    .update({ deleted_at: ts }).eq('id', id).is('deleted_at', null).select('id'));
-  if (!(r.data || []).length) return { ok: false, error: 'not found or already deleted' };
-  // 级联标记增员跟进（同一时间戳，恢复用）
-  const cf = assertOk(await rdb.from('recruit_followups')
-    .update({ deleted_at: ts }).eq('candidate_id', id).is('deleted_at', null).select('id'));
-  return { ok: true, deleted_at: ts, cascaded: { recruit_followups: (cf.data || []).length } };
+  return rpcResult(await rdb.rpc('crm_delete_batch', {
+    p_kind: 'recruit', p_action: 'remove', p_ids: [id],
+  }));
 }
 
 // 增员回收站列表：走 v_recruit_candidates_trash 视图（含客户基础信息与删除时间）
@@ -194,51 +189,48 @@ async function trashList(event) {
   const offset = (page - 1) * pageSize;
   const pageRows = rows.slice(offset, offset + pageSize);
 
-  // 页内候选人的跟进计数（被级联标记的）
+  // 页内候选人的跟进计数（只统计与候选人相同的删除批次）
   const counts = {};
   if (pageRows.length) {
     const ids = pageRows.map(r => r.candidate_id);
     const set = new Set(ids);
-    const cf = assertOk(await rdb.from('recruit_followups').select('candidate_id, deleted_at'));
+    const roots = assertOk(await rdb.from('recruit_candidates')
+      .select('id, delete_batch_id'));
+    const batchByCandidate = new Map();
+    for (const root of (roots.data || [])) {
+      if (set.has(root.id)) batchByCandidate.set(root.id, root.delete_batch_id || null);
+    }
+    const cf = assertOk(await rdb.from('recruit_followups')
+      .select('candidate_id, deleted_at, delete_batch_id'));
     for (const cid of ids) counts[cid] = { followups: 0 };
     for (const f of (cf.data || [])) {
-      if (f.deleted_at && set.has(f.candidate_id)) counts[f.candidate_id].followups++;
+      const batchId = batchByCandidate.get(f.candidate_id);
+      if (f.deleted_at && batchId && f.delete_batch_id === batchId && set.has(f.candidate_id)) {
+        counts[f.candidate_id].followups++;
+      }
+    }
+    for (const row of pageRows) {
+      row.legacy_delete = !batchByCandidate.get(row.candidate_id);
     }
   }
 
   return { rows: pageRows, total, page, pageSize, counts };
 }
 
-// 恢复候选人及其级联标记的跟进；客户仍处于删除状态时要求先恢复客户
+// 恢复候选人本次删除批次的跟进；历史无批次记录只恢复候选人本身。
 async function restore(event) {
   const ids = Array.isArray(event.ids)
     ? event.ids.map(x => parseInt(x, 10)).filter(Boolean)
     : (event.id ? [parseInt(event.id, 10)] : []);
   if (!ids.length) return { error: 'ids required' };
+  return rpcResult(await rdb.rpc('crm_delete_batch', {
+    p_kind: 'recruit', p_action: 'restore', p_ids: ids,
+  }));
+}
 
-  let restored = 0;
-  let cascadedFollowups = 0;
-  const skipped = [];
-  for (const id of ids) {
-    const c = assertOk(await rdb.from('recruit_candidates')
-      .select('id, customer_id').eq('id', id).maybeSingle());
-    if (!c.data) continue;
-    // 客户已删除 → 先恢复客户
-    const cust = assertOk(await rdb.from('customers')
-      .select('Id, deleted_at').eq('Id', c.data.customer_id).maybeSingle());
-    if (cust.data && cust.data.deleted_at) {
-      skipped.push({ id, reason: '客户仍在回收站，请先恢复客户' });
-      continue;
-    }
-    const u = assertOk(await rdb.from('recruit_candidates')
-      .update({ deleted_at: null }).eq('id', id).select('id'));
-    if (!(u.data || []).length) continue;
-    restored++;
-    const uf = assertOk(await rdb.from('recruit_followups')
-      .update({ deleted_at: null }).eq('candidate_id', id).select('id'));
-    cascadedFollowups += (uf.data || []).length;
-  }
-  return { ok: true, restored, cascaded: { recruit_followups: cascadedFollowups }, skipped };
+function rpcResult(response) {
+  const data = assertOk(response).data;
+  return Array.isArray(data) && data.length === 1 ? data[0] : data;
 }
 
 async function funnel(event) {

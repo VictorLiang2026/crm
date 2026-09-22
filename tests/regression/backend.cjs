@@ -6,19 +6,28 @@ const assert = require('node:assert/strict');
 
 const marker = '[CRM_TEST_ONLY]';
 function database() {
+  const customerBatch = '11111111-1111-4111-8111-111111111111';
   const c = { Id: 910001, customer_name: marker + '客户甲', deleted_at: null };
   const f = { Id: 920001, customer_id: c.Id, followup_notes: marker + '最近跟进', followup_date: '2026-09-20', deleted_at: null };
   const rc = { candidate_id: 930001, customer_id: c.Id, customer_name: marker + '候选人甲', stage: '新增人才' };
   return {
-    customers: [c, { ...c, Id: 910002, customer_name: marker + '客户乙' }, { ...c, Id: 910099, deleted_at: '2026-09-20T00:00:00Z' }],
-    followups: [f, { ...f, Id: 920002, followup_date: '2026-09-19' }, { ...f, Id: 920099, deleted_at: '2026-09-20T00:00:00Z' }, { ...f, Id: 920098, customer_id: 910002 }],
+    customers: [c, { ...c, Id: 910002, customer_name: marker + '客户乙' },
+      { ...c, Id: 910099, deleted_at: '2026-09-20T00:00:00Z', delete_batch_id: customerBatch }],
+    followups: [f, { ...f, Id: 920002, followup_date: '2026-09-19' },
+      { ...f, Id: 920099, customer_id: 910099, deleted_at: '2026-09-20T00:00:00Z', delete_batch_id: customerBatch },
+      { ...f, Id: 920097, customer_id: 910099, deleted_at: '2026-09-19T00:00:00Z', delete_batch_id: null },
+      { ...f, Id: 920098, customer_id: 910002 }],
     opportunities: [{ id: 960001, customer_id: c.Id, status: '沟通', opportunity_type: '家庭保障', deleted_at: null }, { id: 960099, customer_id: c.Id, deleted_at: '2026-09-20T00:00:00Z' }],
     activities: [{ id: 940001, name: marker + '活动甲', deleted_at: null }, { id: 940099, name: marker + '已删除活动', deleted_at: '2026-09-20T00:00:00Z' }],
     activity_participants: [{ id: 970001, activity_id: 940001, person_type: 'customer', person_id: c.Id, person_name: c.customer_name, deleted_at: null }],
-    recruit_candidates: [{ id: rc.candidate_id, customer_id: c.Id, deleted_at: null }],
-    v_recruit_candidates: [rc], v_recruit_candidates_trash: [{ ...rc, candidate_id: 930099, candidate_deleted_at: '2026-09-20T00:00:00Z', customer_deleted_at: null }],
+    recruit_candidates: [{ id: rc.candidate_id, customer_id: c.Id, deleted_at: null },
+      { id: 930099, customer_id: 910099, deleted_at: '2026-09-20T00:00:00Z', delete_batch_id: customerBatch }],
+    v_recruit_candidates: [rc], v_recruit_candidates_trash: [{ ...rc, candidate_id: 930099, customer_id: 910099,
+      candidate_deleted_at: '2026-09-20T00:00:00Z', customer_deleted_at: '2026-09-20T00:00:00Z' }],
     recruit_milestones: [{ id: 980001, candidate_id: rc.candidate_id, stage: '新增人才' }],
-    recruit_followups: [{ id: 950001, candidate_id: rc.candidate_id, followup_notes: marker + '增员跟进', deleted_at: null }],
+    recruit_followups: [{ id: 950001, candidate_id: rc.candidate_id, followup_notes: marker + '增员跟进', deleted_at: null },
+      { id: 950099, candidate_id: 930099, followup_notes: marker + '批次跟进', deleted_at: '2026-09-20T00:00:00Z', delete_batch_id: customerBatch },
+      { id: 950098, candidate_id: 930099, followup_notes: marker + '历史跟进', deleted_at: '2026-09-19T00:00:00Z', delete_batch_id: null }],
     products: [], gifts: [], photos: [], ai_recommendations: [], policy_review_reports: [], ocr_records: []
   };
 }
@@ -85,6 +94,24 @@ async function invoke(root, name, event, data = database()) {
   return { result, reads: rdb.reads, writes: rdb.writes };
 }
 
+async function invokeRpc(root, name, event, rpcData) {
+  const calls = [];
+  const rdb = {
+    rpc(functionName, params) {
+      calls.push({ functionName, params: structuredClone(params) });
+      return Promise.resolve({ data: structuredClone(rpcData), error: null });
+    },
+    from(table) { throw new Error('UNEXPECTED_TABLE_ACCESS: ' + table); }
+  };
+  const exports = {};
+  const db = { rdb, assertOk: r => { if (r.error) throw new Error(r.error.message); return r; },
+    nowIso: () => '2026-09-21T00:00:00Z', normFields: (value, fields) => Object.fromEntries(Object.entries(value).filter(([key]) => fields.includes(key))) };
+  const context = vm.createContext({ exports, console: { log() {}, warn() {}, error() {} },
+    require: dependency => { if (dependency !== './db') throw new Error('DEPENDENCY_NOT_ALLOWED: ' + dependency); return db; } });
+  new vm.Script(fs.readFileSync(path.join(root, 'cloudfunctions', name, 'index.js'), 'utf8'), { filename: name + '/index.js' }).runInContext(context, { timeout: 2000 });
+  return { result: await exports.main(event, {}), calls };
+}
+
 module.exports = async function backend(root, test) {
   const run = async (name, event, data) => {
     const r = await invoke(root, name, event, data);
@@ -139,8 +166,33 @@ module.exports = async function backend(root, test) {
   await check('backend.recycle', '客户与增员回收站只读列表', async () => {
     const c = await run('customers', { action: 'trashList' });
     assert.deepEqual(Array.from(c.rows, x => x.Id), [910099]);
+    assert.equal(c.rows[0].legacy_delete, false);
+    assert.equal(c.rows[0].delete_batch_id, undefined, '批次 UUID 不应暴露给页面');
+    assert.equal(c.recoverable_counts[910099].followups, 1, '历史独立删除跟进不得计入客户恢复');
+    assert.equal(c.recoverable_counts[910099].recruit_candidates, 1);
     const r = await run('recruit_candidates', { action: 'trashList' });
     assert.equal(r.rows[0].candidate_id, 930099);
+    assert.equal(r.rows[0].legacy_delete, false);
+    assert.equal(r.counts[930099].followups, 1, '历史独立删除增员跟进不得计入候选人恢复');
+  });
+  await check('backend.delete-batch-rpc', '客户/候选人删除恢复统一调用批次事务并保持返回结构', async () => {
+    const deleted = { ok: true, deleted_at: '2026-09-22T00:00:00Z', cascaded: { followups: 1 } };
+    const cRemove = await invokeRpc(root, 'customers', { action: 'remove', id: 910001 }, deleted);
+    assert.deepEqual(cRemove.result, deleted);
+    assert.equal(cRemove.calls[0].functionName, 'crm_delete_batch');
+    assert.equal(cRemove.calls[0].params.p_kind, 'customer');
+    assert.equal(cRemove.calls[0].params.p_action, 'remove');
+    assert.deepEqual(Array.from(cRemove.calls[0].params.p_ids), [910001]);
+
+    const restored = { ok: true, restored: 2, cascaded: {}, skipped: [], legacy_restored: [910099] };
+    const cRestore = await invokeRpc(root, 'customers', { action: 'restore', ids: [910001, 910099] }, restored);
+    assert.deepEqual(cRestore.result, restored);
+    assert.equal(cRestore.calls[0].params.p_action, 'restore');
+    assert.deepEqual(Array.from(cRestore.calls[0].params.p_ids), [910001, 910099]);
+
+    const rRemove = await invokeRpc(root, 'recruit_candidates', { action: 'remove', id: 930001 }, [deleted]);
+    assert.deepEqual(rRemove.result, deleted, '兼容 SDK 返回单元素数组的 RPC 形态');
+    assert.equal(rRemove.calls[0].params.p_kind, 'recruit');
   });
   await check('backend.not-found', '客户、活动、增员缺失ID返回错误', async () => {
     for (const name of ['customers', 'activities', 'recruit_candidates']) {

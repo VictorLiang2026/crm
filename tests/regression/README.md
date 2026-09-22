@@ -28,6 +28,7 @@ npm run test:browser
 | smoke.cjs | 真实前端脚本与 DOM 的路由、交互、异常回归 |
 | backend.cjs | 在隔离上下文中执行真实云函数，数据库替换为只读内存适配器 |
 | database-readonly.sql | public 元数据字段存在性检查，独立通过只读管理工具运行 |
+| delete-batch-live.sql | 迁移后使用 `[CRM_TEST_ONLY]` 负数 ID 临时记录验证删除批次事务；成功后在同一事务中清理 |
 
 ## 覆盖与限制
 
@@ -69,6 +70,8 @@ npm run test:browser
 4. 仅检查 public 对象的关键字段存在性；不读取视图数据，不保证字段类型/权限/视图语义正确。只读元数据检查不等于业务端到端验证。
 
 普通 npm test 不自动连接云端，报告中的 live.database=SKIP 表示该次离线运行未执行线上检查。本工作包另行执行的数据库结果见固定报告。
+
+`delete-batch-live.sql` 只能在确认迁移已应用后，通过数据库写管理入口执行。脚本只访问 `public`，先检查固定测试 ID 未被占用；断言失败时整个 DO 事务回滚，成功时显式删除全部测试记录。不得把这些负数 ID 用于真实业务。
 
 ## 新增用例
 
