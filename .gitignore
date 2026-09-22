@@ -11,6 +11,8 @@ backups/
 *.key
 
 # ===== 测试与临时文件 =====
+tests/regression/.results/
+tests/permissions/.results/
 # OCR/图片测试数据
 test_ocr.*
 # 测试脚本与生成产物

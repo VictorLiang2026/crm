@@ -1,0 +1,713 @@
+{
+  "columns": [
+    "object_name",
+    "role_name",
+    "is_superuser",
+    "bypass_rls",
+    "schema_usage",
+    "effective_privileges"
+  ],
+  "rows": [
+    {
+      "object_name": "activities",
+      "role_name": "anon",
+      "is_superuser": "false",
+      "bypass_rls": "false",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : true, \"SELECT\" : true, \"UPDATE\" : true, \"DELETE\" : true, \"TRUNCATE\" : false, \"REFERENCES\" : false, \"TRIGGER\" : false, \"MAINTAIN\" : false }"
+    },
+    {
+      "object_name": "activities",
+      "role_name": "authenticated",
+      "is_superuser": "false",
+      "bypass_rls": "false",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : false, \"SELECT\" : false, \"UPDATE\" : false, \"DELETE\" : false, \"TRUNCATE\" : false, \"REFERENCES\" : false, \"TRIGGER\" : false, \"MAINTAIN\" : false }"
+    },
+    {
+      "object_name": "activities",
+      "role_name": "service_role",
+      "is_superuser": "false",
+      "bypass_rls": "true",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : true, \"SELECT\" : true, \"UPDATE\" : true, \"DELETE\" : true, \"TRUNCATE\" : true, \"REFERENCES\" : true, \"TRIGGER\" : true, \"MAINTAIN\" : true }"
+    },
+    {
+      "object_name": "activity_participants",
+      "role_name": "anon",
+      "is_superuser": "false",
+      "bypass_rls": "false",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : true, \"SELECT\" : true, \"UPDATE\" : true, \"DELETE\" : true, \"TRUNCATE\" : false, \"REFERENCES\" : false, \"TRIGGER\" : false, \"MAINTAIN\" : false }"
+    },
+    {
+      "object_name": "activity_participants",
+      "role_name": "authenticated",
+      "is_superuser": "false",
+      "bypass_rls": "false",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : false, \"SELECT\" : false, \"UPDATE\" : false, \"DELETE\" : false, \"TRUNCATE\" : false, \"REFERENCES\" : false, \"TRIGGER\" : false, \"MAINTAIN\" : false }"
+    },
+    {
+      "object_name": "activity_participants",
+      "role_name": "service_role",
+      "is_superuser": "false",
+      "bypass_rls": "true",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : true, \"SELECT\" : true, \"UPDATE\" : true, \"DELETE\" : true, \"TRUNCATE\" : true, \"REFERENCES\" : true, \"TRIGGER\" : true, \"MAINTAIN\" : true }"
+    },
+    {
+      "object_name": "activity_speakers",
+      "role_name": "anon",
+      "is_superuser": "false",
+      "bypass_rls": "false",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : true, \"SELECT\" : true, \"UPDATE\" : true, \"DELETE\" : true, \"TRUNCATE\" : false, \"REFERENCES\" : false, \"TRIGGER\" : false, \"MAINTAIN\" : false }"
+    },
+    {
+      "object_name": "activity_speakers",
+      "role_name": "authenticated",
+      "is_superuser": "false",
+      "bypass_rls": "false",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : false, \"SELECT\" : false, \"UPDATE\" : false, \"DELETE\" : false, \"TRUNCATE\" : false, \"REFERENCES\" : false, \"TRIGGER\" : false, \"MAINTAIN\" : false }"
+    },
+    {
+      "object_name": "activity_speakers",
+      "role_name": "service_role",
+      "is_superuser": "false",
+      "bypass_rls": "true",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : true, \"SELECT\" : true, \"UPDATE\" : true, \"DELETE\" : true, \"TRUNCATE\" : true, \"REFERENCES\" : true, \"TRIGGER\" : true, \"MAINTAIN\" : true }"
+    },
+    {
+      "object_name": "activity_tasks",
+      "role_name": "anon",
+      "is_superuser": "false",
+      "bypass_rls": "false",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : true, \"SELECT\" : true, \"UPDATE\" : true, \"DELETE\" : true, \"TRUNCATE\" : false, \"REFERENCES\" : false, \"TRIGGER\" : false, \"MAINTAIN\" : false }"
+    },
+    {
+      "object_name": "activity_tasks",
+      "role_name": "authenticated",
+      "is_superuser": "false",
+      "bypass_rls": "false",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : false, \"SELECT\" : false, \"UPDATE\" : false, \"DELETE\" : false, \"TRUNCATE\" : false, \"REFERENCES\" : false, \"TRIGGER\" : false, \"MAINTAIN\" : false }"
+    },
+    {
+      "object_name": "activity_tasks",
+      "role_name": "service_role",
+      "is_superuser": "false",
+      "bypass_rls": "true",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : true, \"SELECT\" : true, \"UPDATE\" : true, \"DELETE\" : true, \"TRUNCATE\" : true, \"REFERENCES\" : true, \"TRIGGER\" : true, \"MAINTAIN\" : true }"
+    },
+    {
+      "object_name": "activity_topics",
+      "role_name": "anon",
+      "is_superuser": "false",
+      "bypass_rls": "false",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : true, \"SELECT\" : true, \"UPDATE\" : true, \"DELETE\" : true, \"TRUNCATE\" : false, \"REFERENCES\" : false, \"TRIGGER\" : false, \"MAINTAIN\" : false }"
+    },
+    {
+      "object_name": "activity_topics",
+      "role_name": "authenticated",
+      "is_superuser": "false",
+      "bypass_rls": "false",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : false, \"SELECT\" : false, \"UPDATE\" : false, \"DELETE\" : false, \"TRUNCATE\" : false, \"REFERENCES\" : false, \"TRIGGER\" : false, \"MAINTAIN\" : false }"
+    },
+    {
+      "object_name": "activity_topics",
+      "role_name": "service_role",
+      "is_superuser": "false",
+      "bypass_rls": "true",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : true, \"SELECT\" : true, \"UPDATE\" : true, \"DELETE\" : true, \"TRUNCATE\" : true, \"REFERENCES\" : true, \"TRIGGER\" : true, \"MAINTAIN\" : true }"
+    },
+    {
+      "object_name": "ai_recommendations",
+      "role_name": "anon",
+      "is_superuser": "false",
+      "bypass_rls": "false",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : true, \"SELECT\" : true, \"UPDATE\" : true, \"DELETE\" : true, \"TRUNCATE\" : false, \"REFERENCES\" : false, \"TRIGGER\" : false, \"MAINTAIN\" : false }"
+    },
+    {
+      "object_name": "ai_recommendations",
+      "role_name": "authenticated",
+      "is_superuser": "false",
+      "bypass_rls": "false",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : false, \"SELECT\" : false, \"UPDATE\" : false, \"DELETE\" : false, \"TRUNCATE\" : false, \"REFERENCES\" : false, \"TRIGGER\" : false, \"MAINTAIN\" : false }"
+    },
+    {
+      "object_name": "ai_recommendations",
+      "role_name": "service_role",
+      "is_superuser": "false",
+      "bypass_rls": "true",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : true, \"SELECT\" : true, \"UPDATE\" : true, \"DELETE\" : true, \"TRUNCATE\" : true, \"REFERENCES\" : true, \"TRIGGER\" : true, \"MAINTAIN\" : true }"
+    },
+    {
+      "object_name": "ai_recommendations_view",
+      "role_name": "anon",
+      "is_superuser": "false",
+      "bypass_rls": "false",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : false, \"SELECT\" : true, \"UPDATE\" : false, \"DELETE\" : false, \"TRUNCATE\" : false, \"REFERENCES\" : false, \"TRIGGER\" : false, \"MAINTAIN\" : false }"
+    },
+    {
+      "object_name": "ai_recommendations_view",
+      "role_name": "authenticated",
+      "is_superuser": "false",
+      "bypass_rls": "false",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : false, \"SELECT\" : false, \"UPDATE\" : false, \"DELETE\" : false, \"TRUNCATE\" : false, \"REFERENCES\" : false, \"TRIGGER\" : false, \"MAINTAIN\" : false }"
+    },
+    {
+      "object_name": "ai_recommendations_view",
+      "role_name": "service_role",
+      "is_superuser": "false",
+      "bypass_rls": "true",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : true, \"SELECT\" : true, \"UPDATE\" : true, \"DELETE\" : true, \"TRUNCATE\" : true, \"REFERENCES\" : true, \"TRIGGER\" : true, \"MAINTAIN\" : true }"
+    },
+    {
+      "object_name": "customers",
+      "role_name": "anon",
+      "is_superuser": "false",
+      "bypass_rls": "false",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : true, \"SELECT\" : true, \"UPDATE\" : true, \"DELETE\" : true, \"TRUNCATE\" : false, \"REFERENCES\" : false, \"TRIGGER\" : false, \"MAINTAIN\" : false }"
+    },
+    {
+      "object_name": "customers",
+      "role_name": "authenticated",
+      "is_superuser": "false",
+      "bypass_rls": "false",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : false, \"SELECT\" : false, \"UPDATE\" : false, \"DELETE\" : false, \"TRUNCATE\" : false, \"REFERENCES\" : false, \"TRIGGER\" : false, \"MAINTAIN\" : false }"
+    },
+    {
+      "object_name": "customers",
+      "role_name": "service_role",
+      "is_superuser": "false",
+      "bypass_rls": "true",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : true, \"SELECT\" : true, \"UPDATE\" : true, \"DELETE\" : true, \"TRUNCATE\" : true, \"REFERENCES\" : true, \"TRIGGER\" : true, \"MAINTAIN\" : true }"
+    },
+    {
+      "object_name": "customers_view",
+      "role_name": "anon",
+      "is_superuser": "false",
+      "bypass_rls": "false",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : false, \"SELECT\" : true, \"UPDATE\" : false, \"DELETE\" : false, \"TRUNCATE\" : false, \"REFERENCES\" : false, \"TRIGGER\" : false, \"MAINTAIN\" : false }"
+    },
+    {
+      "object_name": "customers_view",
+      "role_name": "authenticated",
+      "is_superuser": "false",
+      "bypass_rls": "false",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : false, \"SELECT\" : false, \"UPDATE\" : false, \"DELETE\" : false, \"TRUNCATE\" : false, \"REFERENCES\" : false, \"TRIGGER\" : false, \"MAINTAIN\" : false }"
+    },
+    {
+      "object_name": "customers_view",
+      "role_name": "service_role",
+      "is_superuser": "false",
+      "bypass_rls": "true",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : true, \"SELECT\" : true, \"UPDATE\" : true, \"DELETE\" : true, \"TRUNCATE\" : true, \"REFERENCES\" : true, \"TRIGGER\" : true, \"MAINTAIN\" : true }"
+    },
+    {
+      "object_name": "followups",
+      "role_name": "anon",
+      "is_superuser": "false",
+      "bypass_rls": "false",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : true, \"SELECT\" : true, \"UPDATE\" : true, \"DELETE\" : true, \"TRUNCATE\" : false, \"REFERENCES\" : false, \"TRIGGER\" : false, \"MAINTAIN\" : false }"
+    },
+    {
+      "object_name": "followups",
+      "role_name": "authenticated",
+      "is_superuser": "false",
+      "bypass_rls": "false",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : false, \"SELECT\" : false, \"UPDATE\" : false, \"DELETE\" : false, \"TRUNCATE\" : false, \"REFERENCES\" : false, \"TRIGGER\" : false, \"MAINTAIN\" : false }"
+    },
+    {
+      "object_name": "followups",
+      "role_name": "service_role",
+      "is_superuser": "false",
+      "bypass_rls": "true",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : true, \"SELECT\" : true, \"UPDATE\" : true, \"DELETE\" : true, \"TRUNCATE\" : true, \"REFERENCES\" : true, \"TRIGGER\" : true, \"MAINTAIN\" : true }"
+    },
+    {
+      "object_name": "followups_view",
+      "role_name": "anon",
+      "is_superuser": "false",
+      "bypass_rls": "false",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : false, \"SELECT\" : true, \"UPDATE\" : false, \"DELETE\" : false, \"TRUNCATE\" : false, \"REFERENCES\" : false, \"TRIGGER\" : false, \"MAINTAIN\" : false }"
+    },
+    {
+      "object_name": "followups_view",
+      "role_name": "authenticated",
+      "is_superuser": "false",
+      "bypass_rls": "false",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : false, \"SELECT\" : false, \"UPDATE\" : false, \"DELETE\" : false, \"TRUNCATE\" : false, \"REFERENCES\" : false, \"TRIGGER\" : false, \"MAINTAIN\" : false }"
+    },
+    {
+      "object_name": "followups_view",
+      "role_name": "service_role",
+      "is_superuser": "false",
+      "bypass_rls": "true",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : true, \"SELECT\" : true, \"UPDATE\" : true, \"DELETE\" : true, \"TRUNCATE\" : true, \"REFERENCES\" : true, \"TRIGGER\" : true, \"MAINTAIN\" : true }"
+    },
+    {
+      "object_name": "gifts",
+      "role_name": "anon",
+      "is_superuser": "false",
+      "bypass_rls": "false",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : true, \"SELECT\" : true, \"UPDATE\" : true, \"DELETE\" : true, \"TRUNCATE\" : false, \"REFERENCES\" : false, \"TRIGGER\" : false, \"MAINTAIN\" : false }"
+    },
+    {
+      "object_name": "gifts",
+      "role_name": "authenticated",
+      "is_superuser": "false",
+      "bypass_rls": "false",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : false, \"SELECT\" : false, \"UPDATE\" : false, \"DELETE\" : false, \"TRUNCATE\" : false, \"REFERENCES\" : false, \"TRIGGER\" : false, \"MAINTAIN\" : false }"
+    },
+    {
+      "object_name": "gifts",
+      "role_name": "service_role",
+      "is_superuser": "false",
+      "bypass_rls": "true",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : true, \"SELECT\" : true, \"UPDATE\" : true, \"DELETE\" : true, \"TRUNCATE\" : true, \"REFERENCES\" : true, \"TRIGGER\" : true, \"MAINTAIN\" : true }"
+    },
+    {
+      "object_name": "gifts_view",
+      "role_name": "anon",
+      "is_superuser": "false",
+      "bypass_rls": "false",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : false, \"SELECT\" : true, \"UPDATE\" : false, \"DELETE\" : false, \"TRUNCATE\" : false, \"REFERENCES\" : false, \"TRIGGER\" : false, \"MAINTAIN\" : false }"
+    },
+    {
+      "object_name": "gifts_view",
+      "role_name": "authenticated",
+      "is_superuser": "false",
+      "bypass_rls": "false",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : false, \"SELECT\" : false, \"UPDATE\" : false, \"DELETE\" : false, \"TRUNCATE\" : false, \"REFERENCES\" : false, \"TRIGGER\" : false, \"MAINTAIN\" : false }"
+    },
+    {
+      "object_name": "gifts_view",
+      "role_name": "service_role",
+      "is_superuser": "false",
+      "bypass_rls": "true",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : true, \"SELECT\" : true, \"UPDATE\" : true, \"DELETE\" : true, \"TRUNCATE\" : true, \"REFERENCES\" : true, \"TRIGGER\" : true, \"MAINTAIN\" : true }"
+    },
+    {
+      "object_name": "ocr_records",
+      "role_name": "anon",
+      "is_superuser": "false",
+      "bypass_rls": "false",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : true, \"SELECT\" : true, \"UPDATE\" : true, \"DELETE\" : true, \"TRUNCATE\" : false, \"REFERENCES\" : false, \"TRIGGER\" : false, \"MAINTAIN\" : false }"
+    },
+    {
+      "object_name": "ocr_records",
+      "role_name": "authenticated",
+      "is_superuser": "false",
+      "bypass_rls": "false",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : false, \"SELECT\" : false, \"UPDATE\" : false, \"DELETE\" : false, \"TRUNCATE\" : false, \"REFERENCES\" : false, \"TRIGGER\" : false, \"MAINTAIN\" : false }"
+    },
+    {
+      "object_name": "ocr_records",
+      "role_name": "service_role",
+      "is_superuser": "false",
+      "bypass_rls": "true",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : true, \"SELECT\" : true, \"UPDATE\" : true, \"DELETE\" : true, \"TRUNCATE\" : true, \"REFERENCES\" : true, \"TRIGGER\" : true, \"MAINTAIN\" : true }"
+    },
+    {
+      "object_name": "opportunities",
+      "role_name": "anon",
+      "is_superuser": "false",
+      "bypass_rls": "false",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : true, \"SELECT\" : true, \"UPDATE\" : true, \"DELETE\" : true, \"TRUNCATE\" : false, \"REFERENCES\" : false, \"TRIGGER\" : false, \"MAINTAIN\" : false }"
+    },
+    {
+      "object_name": "opportunities",
+      "role_name": "authenticated",
+      "is_superuser": "false",
+      "bypass_rls": "false",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : false, \"SELECT\" : false, \"UPDATE\" : false, \"DELETE\" : false, \"TRUNCATE\" : false, \"REFERENCES\" : false, \"TRIGGER\" : false, \"MAINTAIN\" : false }"
+    },
+    {
+      "object_name": "opportunities",
+      "role_name": "service_role",
+      "is_superuser": "false",
+      "bypass_rls": "true",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : true, \"SELECT\" : true, \"UPDATE\" : true, \"DELETE\" : true, \"TRUNCATE\" : true, \"REFERENCES\" : true, \"TRIGGER\" : true, \"MAINTAIN\" : true }"
+    },
+    {
+      "object_name": "photos",
+      "role_name": "anon",
+      "is_superuser": "false",
+      "bypass_rls": "false",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : true, \"SELECT\" : true, \"UPDATE\" : true, \"DELETE\" : true, \"TRUNCATE\" : false, \"REFERENCES\" : false, \"TRIGGER\" : false, \"MAINTAIN\" : false }"
+    },
+    {
+      "object_name": "photos",
+      "role_name": "authenticated",
+      "is_superuser": "false",
+      "bypass_rls": "false",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : false, \"SELECT\" : false, \"UPDATE\" : false, \"DELETE\" : false, \"TRUNCATE\" : false, \"REFERENCES\" : false, \"TRIGGER\" : false, \"MAINTAIN\" : false }"
+    },
+    {
+      "object_name": "photos",
+      "role_name": "service_role",
+      "is_superuser": "false",
+      "bypass_rls": "true",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : true, \"SELECT\" : true, \"UPDATE\" : true, \"DELETE\" : true, \"TRUNCATE\" : true, \"REFERENCES\" : true, \"TRIGGER\" : true, \"MAINTAIN\" : true }"
+    },
+    {
+      "object_name": "photos_view",
+      "role_name": "anon",
+      "is_superuser": "false",
+      "bypass_rls": "false",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : false, \"SELECT\" : false, \"UPDATE\" : false, \"DELETE\" : false, \"TRUNCATE\" : false, \"REFERENCES\" : false, \"TRIGGER\" : false, \"MAINTAIN\" : false }"
+    },
+    {
+      "object_name": "photos_view",
+      "role_name": "authenticated",
+      "is_superuser": "false",
+      "bypass_rls": "false",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : false, \"SELECT\" : false, \"UPDATE\" : false, \"DELETE\" : false, \"TRUNCATE\" : false, \"REFERENCES\" : false, \"TRIGGER\" : false, \"MAINTAIN\" : false }"
+    },
+    {
+      "object_name": "photos_view",
+      "role_name": "service_role",
+      "is_superuser": "false",
+      "bypass_rls": "true",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : true, \"SELECT\" : true, \"UPDATE\" : true, \"DELETE\" : true, \"TRUNCATE\" : true, \"REFERENCES\" : true, \"TRIGGER\" : true, \"MAINTAIN\" : true }"
+    },
+    {
+      "object_name": "policy_review_reports",
+      "role_name": "anon",
+      "is_superuser": "false",
+      "bypass_rls": "false",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : true, \"SELECT\" : true, \"UPDATE\" : true, \"DELETE\" : true, \"TRUNCATE\" : false, \"REFERENCES\" : false, \"TRIGGER\" : false, \"MAINTAIN\" : false }"
+    },
+    {
+      "object_name": "policy_review_reports",
+      "role_name": "authenticated",
+      "is_superuser": "false",
+      "bypass_rls": "false",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : false, \"SELECT\" : false, \"UPDATE\" : false, \"DELETE\" : false, \"TRUNCATE\" : false, \"REFERENCES\" : false, \"TRIGGER\" : false, \"MAINTAIN\" : false }"
+    },
+    {
+      "object_name": "policy_review_reports",
+      "role_name": "service_role",
+      "is_superuser": "false",
+      "bypass_rls": "true",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : true, \"SELECT\" : true, \"UPDATE\" : true, \"DELETE\" : true, \"TRUNCATE\" : true, \"REFERENCES\" : true, \"TRIGGER\" : true, \"MAINTAIN\" : true }"
+    },
+    {
+      "object_name": "products",
+      "role_name": "anon",
+      "is_superuser": "false",
+      "bypass_rls": "false",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : true, \"SELECT\" : true, \"UPDATE\" : true, \"DELETE\" : true, \"TRUNCATE\" : false, \"REFERENCES\" : false, \"TRIGGER\" : false, \"MAINTAIN\" : false }"
+    },
+    {
+      "object_name": "products",
+      "role_name": "authenticated",
+      "is_superuser": "false",
+      "bypass_rls": "false",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : false, \"SELECT\" : false, \"UPDATE\" : false, \"DELETE\" : false, \"TRUNCATE\" : false, \"REFERENCES\" : false, \"TRIGGER\" : false, \"MAINTAIN\" : false }"
+    },
+    {
+      "object_name": "products",
+      "role_name": "service_role",
+      "is_superuser": "false",
+      "bypass_rls": "true",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : true, \"SELECT\" : true, \"UPDATE\" : true, \"DELETE\" : true, \"TRUNCATE\" : true, \"REFERENCES\" : true, \"TRIGGER\" : true, \"MAINTAIN\" : true }"
+    },
+    {
+      "object_name": "products_view",
+      "role_name": "anon",
+      "is_superuser": "false",
+      "bypass_rls": "false",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : false, \"SELECT\" : true, \"UPDATE\" : false, \"DELETE\" : false, \"TRUNCATE\" : false, \"REFERENCES\" : false, \"TRIGGER\" : false, \"MAINTAIN\" : false }"
+    },
+    {
+      "object_name": "products_view",
+      "role_name": "authenticated",
+      "is_superuser": "false",
+      "bypass_rls": "false",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : false, \"SELECT\" : false, \"UPDATE\" : false, \"DELETE\" : false, \"TRUNCATE\" : false, \"REFERENCES\" : false, \"TRIGGER\" : false, \"MAINTAIN\" : false }"
+    },
+    {
+      "object_name": "products_view",
+      "role_name": "service_role",
+      "is_superuser": "false",
+      "bypass_rls": "true",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : true, \"SELECT\" : true, \"UPDATE\" : true, \"DELETE\" : true, \"TRUNCATE\" : true, \"REFERENCES\" : true, \"TRIGGER\" : true, \"MAINTAIN\" : true }"
+    },
+    {
+      "object_name": "recruit_candidates",
+      "role_name": "anon",
+      "is_superuser": "false",
+      "bypass_rls": "false",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : true, \"SELECT\" : true, \"UPDATE\" : true, \"DELETE\" : true, \"TRUNCATE\" : false, \"REFERENCES\" : false, \"TRIGGER\" : false, \"MAINTAIN\" : false }"
+    },
+    {
+      "object_name": "recruit_candidates",
+      "role_name": "authenticated",
+      "is_superuser": "false",
+      "bypass_rls": "false",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : false, \"SELECT\" : false, \"UPDATE\" : false, \"DELETE\" : false, \"TRUNCATE\" : false, \"REFERENCES\" : false, \"TRIGGER\" : false, \"MAINTAIN\" : false }"
+    },
+    {
+      "object_name": "recruit_candidates",
+      "role_name": "service_role",
+      "is_superuser": "false",
+      "bypass_rls": "true",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : true, \"SELECT\" : true, \"UPDATE\" : true, \"DELETE\" : true, \"TRUNCATE\" : true, \"REFERENCES\" : true, \"TRIGGER\" : true, \"MAINTAIN\" : true }"
+    },
+    {
+      "object_name": "recruit_followups",
+      "role_name": "anon",
+      "is_superuser": "false",
+      "bypass_rls": "false",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : true, \"SELECT\" : true, \"UPDATE\" : true, \"DELETE\" : true, \"TRUNCATE\" : false, \"REFERENCES\" : false, \"TRIGGER\" : false, \"MAINTAIN\" : false }"
+    },
+    {
+      "object_name": "recruit_followups",
+      "role_name": "authenticated",
+      "is_superuser": "false",
+      "bypass_rls": "false",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : false, \"SELECT\" : false, \"UPDATE\" : false, \"DELETE\" : false, \"TRUNCATE\" : false, \"REFERENCES\" : false, \"TRIGGER\" : false, \"MAINTAIN\" : false }"
+    },
+    {
+      "object_name": "recruit_followups",
+      "role_name": "service_role",
+      "is_superuser": "false",
+      "bypass_rls": "true",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : true, \"SELECT\" : true, \"UPDATE\" : true, \"DELETE\" : true, \"TRUNCATE\" : true, \"REFERENCES\" : true, \"TRIGGER\" : true, \"MAINTAIN\" : true }"
+    },
+    {
+      "object_name": "recruit_goal_benchmarks",
+      "role_name": "anon",
+      "is_superuser": "false",
+      "bypass_rls": "false",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : true, \"SELECT\" : true, \"UPDATE\" : true, \"DELETE\" : true, \"TRUNCATE\" : false, \"REFERENCES\" : false, \"TRIGGER\" : false, \"MAINTAIN\" : false }"
+    },
+    {
+      "object_name": "recruit_goal_benchmarks",
+      "role_name": "authenticated",
+      "is_superuser": "false",
+      "bypass_rls": "false",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : false, \"SELECT\" : false, \"UPDATE\" : false, \"DELETE\" : false, \"TRUNCATE\" : false, \"REFERENCES\" : false, \"TRIGGER\" : false, \"MAINTAIN\" : false }"
+    },
+    {
+      "object_name": "recruit_goal_benchmarks",
+      "role_name": "service_role",
+      "is_superuser": "false",
+      "bypass_rls": "true",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : true, \"SELECT\" : true, \"UPDATE\" : true, \"DELETE\" : true, \"TRUNCATE\" : true, \"REFERENCES\" : true, \"TRIGGER\" : true, \"MAINTAIN\" : true }"
+    },
+    {
+      "object_name": "recruit_goals",
+      "role_name": "anon",
+      "is_superuser": "false",
+      "bypass_rls": "false",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : true, \"SELECT\" : true, \"UPDATE\" : true, \"DELETE\" : true, \"TRUNCATE\" : false, \"REFERENCES\" : false, \"TRIGGER\" : false, \"MAINTAIN\" : false }"
+    },
+    {
+      "object_name": "recruit_goals",
+      "role_name": "authenticated",
+      "is_superuser": "false",
+      "bypass_rls": "false",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : false, \"SELECT\" : false, \"UPDATE\" : false, \"DELETE\" : false, \"TRUNCATE\" : false, \"REFERENCES\" : false, \"TRIGGER\" : false, \"MAINTAIN\" : false }"
+    },
+    {
+      "object_name": "recruit_goals",
+      "role_name": "service_role",
+      "is_superuser": "false",
+      "bypass_rls": "true",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : true, \"SELECT\" : true, \"UPDATE\" : true, \"DELETE\" : true, \"TRUNCATE\" : true, \"REFERENCES\" : true, \"TRIGGER\" : true, \"MAINTAIN\" : true }"
+    },
+    {
+      "object_name": "recruit_milestones",
+      "role_name": "anon",
+      "is_superuser": "false",
+      "bypass_rls": "false",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : true, \"SELECT\" : true, \"UPDATE\" : true, \"DELETE\" : true, \"TRUNCATE\" : false, \"REFERENCES\" : false, \"TRIGGER\" : false, \"MAINTAIN\" : false }"
+    },
+    {
+      "object_name": "recruit_milestones",
+      "role_name": "authenticated",
+      "is_superuser": "false",
+      "bypass_rls": "false",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : false, \"SELECT\" : false, \"UPDATE\" : false, \"DELETE\" : false, \"TRUNCATE\" : false, \"REFERENCES\" : false, \"TRIGGER\" : false, \"MAINTAIN\" : false }"
+    },
+    {
+      "object_name": "recruit_milestones",
+      "role_name": "service_role",
+      "is_superuser": "false",
+      "bypass_rls": "true",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : true, \"SELECT\" : true, \"UPDATE\" : true, \"DELETE\" : true, \"TRUNCATE\" : true, \"REFERENCES\" : true, \"TRIGGER\" : true, \"MAINTAIN\" : true }"
+    },
+    {
+      "object_name": "v_action_center",
+      "role_name": "anon",
+      "is_superuser": "false",
+      "bypass_rls": "false",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : false, \"SELECT\" : true, \"UPDATE\" : false, \"DELETE\" : false, \"TRUNCATE\" : false, \"REFERENCES\" : false, \"TRIGGER\" : false, \"MAINTAIN\" : false }"
+    },
+    {
+      "object_name": "v_action_center",
+      "role_name": "authenticated",
+      "is_superuser": "false",
+      "bypass_rls": "false",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : false, \"SELECT\" : false, \"UPDATE\" : false, \"DELETE\" : false, \"TRUNCATE\" : false, \"REFERENCES\" : false, \"TRIGGER\" : false, \"MAINTAIN\" : false }"
+    },
+    {
+      "object_name": "v_action_center",
+      "role_name": "service_role",
+      "is_superuser": "false",
+      "bypass_rls": "true",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : true, \"SELECT\" : true, \"UPDATE\" : true, \"DELETE\" : true, \"TRUNCATE\" : true, \"REFERENCES\" : true, \"TRIGGER\" : true, \"MAINTAIN\" : true }"
+    },
+    {
+      "object_name": "v_funnel_stats",
+      "role_name": "anon",
+      "is_superuser": "false",
+      "bypass_rls": "false",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : false, \"SELECT\" : true, \"UPDATE\" : false, \"DELETE\" : false, \"TRUNCATE\" : false, \"REFERENCES\" : false, \"TRIGGER\" : false, \"MAINTAIN\" : false }"
+    },
+    {
+      "object_name": "v_funnel_stats",
+      "role_name": "authenticated",
+      "is_superuser": "false",
+      "bypass_rls": "false",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : false, \"SELECT\" : false, \"UPDATE\" : false, \"DELETE\" : false, \"TRUNCATE\" : false, \"REFERENCES\" : false, \"TRIGGER\" : false, \"MAINTAIN\" : false }"
+    },
+    {
+      "object_name": "v_funnel_stats",
+      "role_name": "service_role",
+      "is_superuser": "false",
+      "bypass_rls": "true",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : true, \"SELECT\" : true, \"UPDATE\" : true, \"DELETE\" : true, \"TRUNCATE\" : true, \"REFERENCES\" : true, \"TRIGGER\" : true, \"MAINTAIN\" : true }"
+    },
+    {
+      "object_name": "v_recruit_candidates",
+      "role_name": "anon",
+      "is_superuser": "false",
+      "bypass_rls": "false",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : false, \"SELECT\" : true, \"UPDATE\" : false, \"DELETE\" : false, \"TRUNCATE\" : false, \"REFERENCES\" : false, \"TRIGGER\" : false, \"MAINTAIN\" : false }"
+    },
+    {
+      "object_name": "v_recruit_candidates",
+      "role_name": "authenticated",
+      "is_superuser": "false",
+      "bypass_rls": "false",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : false, \"SELECT\" : false, \"UPDATE\" : false, \"DELETE\" : false, \"TRUNCATE\" : false, \"REFERENCES\" : false, \"TRIGGER\" : false, \"MAINTAIN\" : false }"
+    },
+    {
+      "object_name": "v_recruit_candidates",
+      "role_name": "service_role",
+      "is_superuser": "false",
+      "bypass_rls": "true",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : true, \"SELECT\" : true, \"UPDATE\" : true, \"DELETE\" : true, \"TRUNCATE\" : true, \"REFERENCES\" : true, \"TRIGGER\" : true, \"MAINTAIN\" : true }"
+    },
+    {
+      "object_name": "v_recruit_candidates_trash",
+      "role_name": "anon",
+      "is_superuser": "false",
+      "bypass_rls": "false",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : false, \"SELECT\" : true, \"UPDATE\" : false, \"DELETE\" : false, \"TRUNCATE\" : false, \"REFERENCES\" : false, \"TRIGGER\" : false, \"MAINTAIN\" : false }"
+    },
+    {
+      "object_name": "v_recruit_candidates_trash",
+      "role_name": "authenticated",
+      "is_superuser": "false",
+      "bypass_rls": "false",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : false, \"SELECT\" : false, \"UPDATE\" : false, \"DELETE\" : false, \"TRUNCATE\" : false, \"REFERENCES\" : false, \"TRIGGER\" : false, \"MAINTAIN\" : false }"
+    },
+    {
+      "object_name": "v_recruit_candidates_trash",
+      "role_name": "service_role",
+      "is_superuser": "false",
+      "bypass_rls": "true",
+      "schema_usage": "true",
+      "effective_privileges": "{ \"INSERT\" : true, \"SELECT\" : true, \"UPDATE\" : true, \"DELETE\" : true, \"TRUNCATE\" : true, \"REFERENCES\" : true, \"TRIGGER\" : true, \"MAINTAIN\" : true }"
+    }
+  ],
+  "returnedRows": 87,
+  "truncated": false,
+  "truncatedCount": 0,
+  "command": "SELECT",
+  "rowCount": 0
+}

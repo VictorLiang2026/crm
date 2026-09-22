@@ -1,0 +1,141 @@
+{
+  "environment": "crm-d1gkae8ddc930d151",
+  "checkedAt": "2026-09-21T06:39:20.121Z",
+  "method": "queryPgDatabase(action=sql), metadata only",
+  "sqlFile": "tests/regression/database-readonly.sql",
+  "sql": "-- Run ONLY with queryPgDatabase(action='sql') after auth(status) confirms\n-- env crm-d1gkae8ddc930d151. Never run a migration command for this file.\n-- Metadata only; no customer rows, remote business functions, writes or other schemas.\nWITH expected(table_name, column_name) AS (VALUES\n  ('customers','Id'), ('customers','customer_name'), ('customers','deleted_at'),\n  ('followups','customer_id'), ('followups','followup_notes'), ('followups','deleted_at'),\n  ('opportunities','customer_id'), ('opportunities','status'), ('opportunities','deleted_at'),\n  ('activities','id'), ('activities','name'), ('activities','deleted_at'),\n  ('activity_participants','activity_id'), ('activity_participants','person_name'),\n  ('recruit_candidates','customer_id'), ('recruit_candidates','deleted_at'),\n  ('recruit_followups','candidate_id'), ('recruit_followups','deleted_at'),\n  ('v_recruit_candidates','candidate_id'), ('v_recruit_candidates','customer_name'),\n  ('v_recruit_candidates_trash','candidate_id'), ('v_recruit_candidates_trash','candidate_deleted_at'),\n  ('v_action_center','person_id'), ('v_funnel_stats','stage')\n)\nSELECT 'public.' || e.table_name || '.' || e.column_name AS check_id,\n       CASE WHEN c.column_name IS NOT NULL THEN 'PASS' ELSE 'FAIL' END AS status,\n       c.data_type\nFROM expected e\nLEFT JOIN information_schema.columns c\n  ON c.table_schema = 'public' AND c.table_name = e.table_name AND c.column_name = e.column_name\nORDER BY e.table_name, e.column_name;",
+  "response": {
+    "columns": [
+      "check_id",
+      "status",
+      "data_type"
+    ],
+    "rows": [
+      {
+        "check_id": "public.activities.deleted_at",
+        "status": "PASS",
+        "data_type": "timestamp with time zone"
+      },
+      {
+        "check_id": "public.activities.id",
+        "status": "PASS",
+        "data_type": "bigint"
+      },
+      {
+        "check_id": "public.activities.name",
+        "status": "PASS",
+        "data_type": "text"
+      },
+      {
+        "check_id": "public.activity_participants.activity_id",
+        "status": "PASS",
+        "data_type": "integer"
+      },
+      {
+        "check_id": "public.activity_participants.person_name",
+        "status": "PASS",
+        "data_type": "text"
+      },
+      {
+        "check_id": "public.customers.Id",
+        "status": "PASS",
+        "data_type": "integer"
+      },
+      {
+        "check_id": "public.customers.customer_name",
+        "status": "PASS",
+        "data_type": "text"
+      },
+      {
+        "check_id": "public.customers.deleted_at",
+        "status": "PASS",
+        "data_type": "timestamp without time zone"
+      },
+      {
+        "check_id": "public.followups.customer_id",
+        "status": "PASS",
+        "data_type": "integer"
+      },
+      {
+        "check_id": "public.followups.deleted_at",
+        "status": "PASS",
+        "data_type": "timestamp with time zone"
+      },
+      {
+        "check_id": "public.followups.followup_notes",
+        "status": "PASS",
+        "data_type": "text"
+      },
+      {
+        "check_id": "public.opportunities.customer_id",
+        "status": "PASS",
+        "data_type": "integer"
+      },
+      {
+        "check_id": "public.opportunities.deleted_at",
+        "status": "PASS",
+        "data_type": "timestamp with time zone"
+      },
+      {
+        "check_id": "public.opportunities.status",
+        "status": "PASS",
+        "data_type": "text"
+      },
+      {
+        "check_id": "public.recruit_candidates.customer_id",
+        "status": "PASS",
+        "data_type": "bigint"
+      },
+      {
+        "check_id": "public.recruit_candidates.deleted_at",
+        "status": "PASS",
+        "data_type": "timestamp with time zone"
+      },
+      {
+        "check_id": "public.recruit_followups.candidate_id",
+        "status": "PASS",
+        "data_type": "bigint"
+      },
+      {
+        "check_id": "public.recruit_followups.deleted_at",
+        "status": "PASS",
+        "data_type": "timestamp with time zone"
+      },
+      {
+        "check_id": "public.v_action_center.person_id",
+        "status": "PASS",
+        "data_type": "bigint"
+      },
+      {
+        "check_id": "public.v_funnel_stats.stage",
+        "status": "PASS",
+        "data_type": "text"
+      },
+      {
+        "check_id": "public.v_recruit_candidates.candidate_id",
+        "status": "PASS",
+        "data_type": "bigint"
+      },
+      {
+        "check_id": "public.v_recruit_candidates.customer_name",
+        "status": "PASS",
+        "data_type": "text"
+      },
+      {
+        "check_id": "public.v_recruit_candidates_trash.candidate_deleted_at",
+        "status": "PASS",
+        "data_type": "timestamp with time zone"
+      },
+      {
+        "check_id": "public.v_recruit_candidates_trash.candidate_id",
+        "status": "PASS",
+        "data_type": "bigint"
+      }
+    ],
+    "returnedRows": 24,
+    "truncated": false,
+    "truncatedCount": 0,
+    "command": "SELECT",
+    "rowCount": 0
+  }
+}

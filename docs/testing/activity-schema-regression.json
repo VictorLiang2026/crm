@@ -1,0 +1,437 @@
+{
+  "startedAt": "2026-09-22T00:50:00.535Z",
+  "finishedAt": "2026-09-22T00:50:16.708Z",
+  "head": "147bd60a91406c37fa0556824485cebf14a2f1f9",
+  "sourceHash": "ed857e177b0862768a3e793b5c752195e632697d6cd38dc40434b1fda7e4b6b4",
+  "mode": "all",
+  "safety": "Offline fixtures only. No production SDK, database connection, cloud function invocation or remote data mutation.",
+  "counts": {
+    "PASS": 56,
+    "FAIL": 0,
+    "SKIP": 5
+  },
+  "results": [
+    {
+      "id": "backend.customers",
+      "title": "客户列表排除软删除、搜索及分页",
+      "layer": "actual cloud function / in-memory read-only adapter",
+      "status": "PASS",
+      "durationMs": 8
+    },
+    {
+      "id": "backend.customer-detail",
+      "title": "客户详情关联正确跟进且排除软删除",
+      "layer": "actual cloud function / in-memory read-only adapter",
+      "status": "PASS",
+      "durationMs": 3
+    },
+    {
+      "id": "backend.followups",
+      "title": "跟进查询按客户隔离、日期倒序",
+      "layer": "actual cloud function / in-memory read-only adapter",
+      "status": "PASS",
+      "durationMs": 2
+    },
+    {
+      "id": "backend.opportunities",
+      "title": "机会列表按客户隔离且排除软删除",
+      "layer": "actual cloud function / in-memory read-only adapter",
+      "status": "PASS",
+      "durationMs": 3
+    },
+    {
+      "id": "backend.activities",
+      "title": "活动列表排除软删除",
+      "layer": "actual cloud function / in-memory read-only adapter",
+      "status": "PASS",
+      "durationMs": 2
+    },
+    {
+      "id": "backend.activity-detail",
+      "title": "活动详情与已具名参与人读取",
+      "layer": "actual cloud function / in-memory read-only adapter",
+      "status": "PASS",
+      "durationMs": 4
+    },
+    {
+      "id": "backend.activity-readonly",
+      "title": "活动详情缺姓名旧记录：读取不应尝试写入",
+      "layer": "actual cloud function / in-memory read-only adapter",
+      "status": "PASS",
+      "durationMs": 6
+    },
+    {
+      "id": "backend.recruit",
+      "title": "增员列表和详情使用候选人ID关联里程碑",
+      "layer": "actual cloud function / in-memory read-only adapter",
+      "status": "PASS",
+      "durationMs": 6
+    },
+    {
+      "id": "backend.recruit-followups",
+      "title": "增员跟进绑定候选人",
+      "layer": "actual cloud function / in-memory read-only adapter",
+      "status": "PASS",
+      "durationMs": 2
+    },
+    {
+      "id": "backend.recycle",
+      "title": "客户与增员回收站只读列表",
+      "layer": "actual cloud function / in-memory read-only adapter",
+      "status": "PASS",
+      "durationMs": 4
+    },
+    {
+      "id": "backend.not-found",
+      "title": "客户、活动、增员缺失ID返回错误",
+      "layer": "actual cloud function / in-memory read-only adapter",
+      "status": "PASS",
+      "durationMs": 5
+    },
+    {
+      "id": "guard.boundaries",
+      "title": "测试适配器拒绝非public、写操作和未知函数",
+      "layer": "actual cloud function / in-memory read-only adapter",
+      "status": "PASS",
+      "durationMs": 1
+    },
+    {
+      "id": "browser.start",
+      "title": "隔离浏览器启动",
+      "layer": "harness",
+      "status": "PASS",
+      "durationMs": 1870
+    },
+    {
+      "id": "login.empty",
+      "title": "登录入口：空字段不发起认证",
+      "layer": "browser / isolated fixtures",
+      "status": "PASS",
+      "durationMs": 534
+    },
+    {
+      "id": "login.denied",
+      "title": "错误凭据保持登录页并显示失败",
+      "layer": "browser / isolated fixtures",
+      "status": "PASS",
+      "durationMs": 85
+    },
+    {
+      "id": "login.success",
+      "title": "模拟登录成功后进入原目标路由",
+      "layer": "browser / isolated fixtures",
+      "status": "PASS",
+      "durationMs": 59
+    },
+    {
+      "id": "customers.list",
+      "title": "客户列表显示记录与客户详情导航",
+      "layer": "browser / isolated fixtures",
+      "status": "PASS",
+      "durationMs": 261
+    },
+    {
+      "id": "customer.detail",
+      "title": "客户详情及跟进下一步展示",
+      "layer": "browser / isolated fixtures",
+      "status": "PASS",
+      "durationMs": 190
+    },
+    {
+      "id": "followups.tab",
+      "title": "跟进标签显示跟进记录",
+      "layer": "browser / isolated fixtures",
+      "status": "PASS",
+      "durationMs": 27
+    },
+    {
+      "id": "opportunities.tab",
+      "title": "机会标签加载当前客户的经营机会",
+      "layer": "browser / isolated fixtures",
+      "status": "PASS",
+      "durationMs": 23
+    },
+    {
+      "id": "customers.pagination",
+      "title": "客户分页每页最多50条且第二页可达",
+      "layer": "browser / isolated fixtures",
+      "status": "PASS",
+      "durationMs": 313
+    },
+    {
+      "id": "customers.search",
+      "title": "客户搜索无匹配提示",
+      "layer": "browser / isolated fixtures",
+      "status": "PASS",
+      "durationMs": 282
+    },
+    {
+      "id": "today.page",
+      "title": "今日经营页使用隔离建议响应",
+      "layer": "browser / isolated fixtures",
+      "status": "PASS",
+      "durationMs": 651
+    },
+    {
+      "id": "funnels.page",
+      "title": "漏斗事实卡展示三个漏斗，不调用AI解读",
+      "layer": "browser / isolated fixtures",
+      "status": "PASS",
+      "durationMs": 389
+    },
+    {
+      "id": "activities.list",
+      "title": "活动列表点击进入活动详情",
+      "layer": "browser / isolated fixtures",
+      "status": "PASS",
+      "durationMs": 648
+    },
+    {
+      "id": "activity.detail",
+      "title": "活动详情显示参与人及异步待办区",
+      "layer": "browser / isolated fixtures",
+      "status": "PASS",
+      "durationMs": 327
+    },
+    {
+      "id": "recruit.list",
+      "title": "增员列表与漏斗加载",
+      "layer": "browser / isolated fixtures",
+      "status": "PASS",
+      "durationMs": 531
+    },
+    {
+      "id": "recruit.detail",
+      "title": "增员详情与增员跟进标签",
+      "layer": "browser / isolated fixtures",
+      "status": "PASS",
+      "durationMs": 468
+    },
+    {
+      "id": "recycle.customers",
+      "title": "回收站只读展示：customers",
+      "layer": "browser / isolated fixtures",
+      "status": "PASS",
+      "durationMs": 540
+    },
+    {
+      "id": "recycle.recruit",
+      "title": "回收站只读展示：recruit",
+      "layer": "browser / isolated fixtures",
+      "status": "PASS",
+      "durationMs": 526
+    },
+    {
+      "id": "empty.customers",
+      "title": "空数据状态：customers",
+      "layer": "browser / isolated fixtures",
+      "status": "PASS",
+      "durationMs": 456
+    },
+    {
+      "id": "empty.activities",
+      "title": "空数据状态：activities",
+      "layer": "browser / isolated fixtures",
+      "status": "PASS",
+      "durationMs": 353
+    },
+    {
+      "id": "empty.recycle",
+      "title": "空数据状态：recycle",
+      "layer": "browser / isolated fixtures",
+      "status": "PASS",
+      "durationMs": 697
+    },
+    {
+      "id": "empty.funnels",
+      "title": "空数据状态：funnels",
+      "layer": "browser / isolated fixtures",
+      "status": "PASS",
+      "durationMs": 606
+    },
+    {
+      "id": "error.customer",
+      "title": "接口错误可见：customer",
+      "layer": "browser / isolated fixtures",
+      "status": "PASS",
+      "durationMs": 435
+    },
+    {
+      "id": "error.activities",
+      "title": "接口错误可见：activities",
+      "layer": "browser / isolated fixtures",
+      "status": "PASS",
+      "durationMs": 352
+    },
+    {
+      "id": "error.activity",
+      "title": "接口错误可见：activity",
+      "layer": "browser / isolated fixtures",
+      "status": "PASS",
+      "durationMs": 496
+    },
+    {
+      "id": "error.recruit",
+      "title": "接口错误可见：recruit",
+      "layer": "browser / isolated fixtures",
+      "status": "PASS",
+      "durationMs": 550
+    },
+    {
+      "id": "error.funnels",
+      "title": "接口错误可见：funnels",
+      "layer": "browser / isolated fixtures",
+      "status": "PASS",
+      "durationMs": 685
+    },
+    {
+      "id": "error.opportunities",
+      "title": "接口错误可见：opportunities",
+      "layer": "browser / isolated fixtures",
+      "status": "PASS",
+      "durationMs": 788
+    },
+    {
+      "id": "quickcapture.preserve",
+      "title": "快速录入点击背景保留草稿",
+      "layer": "browser / isolated fixtures",
+      "status": "PASS",
+      "durationMs": 746
+    },
+    {
+      "id": "activity-schema.task-recruit-name",
+      "title": "task-recruit-name",
+      "layer": "real cloud function / strict synthetic schema",
+      "status": "PASS",
+      "durationMs": 14
+    },
+    {
+      "id": "activity-schema.participant-search-id",
+      "title": "participant-search-id",
+      "layer": "real cloud function / strict synthetic schema",
+      "status": "PASS",
+      "durationMs": 3
+    },
+    {
+      "id": "activity-schema.prepare-context",
+      "title": "prepare-context",
+      "layer": "real cloud function / strict synthetic schema",
+      "status": "PASS",
+      "durationMs": 8
+    },
+    {
+      "id": "activity-schema.prepare",
+      "title": "prepare",
+      "layer": "real cloud function / strict synthetic schema",
+      "status": "PASS",
+      "durationMs": 8
+    },
+    {
+      "id": "activity-schema.decompose",
+      "title": "decompose",
+      "layer": "real cloud function / strict synthetic schema",
+      "status": "PASS",
+      "durationMs": 3
+    },
+    {
+      "id": "activity-schema.analyze",
+      "title": "analyze",
+      "layer": "real cloud function / strict synthetic schema",
+      "status": "PASS",
+      "durationMs": 3
+    },
+    {
+      "id": "activity-schema.postReview",
+      "title": "postReview",
+      "layer": "real cloud function / strict synthetic schema",
+      "status": "PASS",
+      "durationMs": 5
+    },
+    {
+      "id": "activity-schema.participantReview",
+      "title": "participantReview",
+      "layer": "real cloud function / strict synthetic schema",
+      "status": "PASS",
+      "durationMs": 4
+    },
+    {
+      "id": "activity-schema.speaker-recruit-link",
+      "title": "speaker-recruit-link",
+      "layer": "real cloud function / strict synthetic schema",
+      "status": "PASS",
+      "durationMs": 2
+    },
+    {
+      "id": "activity-schema.participant-add",
+      "title": "participant-add",
+      "layer": "real cloud function / strict synthetic schema",
+      "status": "PASS",
+      "durationMs": 3
+    },
+    {
+      "id": "activity-schema.participant-link",
+      "title": "participant-link",
+      "layer": "real cloud function / strict synthetic schema",
+      "status": "PASS",
+      "durationMs": 3
+    },
+    {
+      "id": "activity-schema.deleted-customers",
+      "title": "deleted-customers",
+      "layer": "real cloud function / strict synthetic schema",
+      "status": "PASS",
+      "durationMs": 8
+    },
+    {
+      "id": "activity-schema.deleted-recruit_candidates",
+      "title": "deleted-recruit_candidates",
+      "layer": "real cloud function / strict synthetic schema",
+      "status": "PASS",
+      "durationMs": 6
+    },
+    {
+      "id": "activity-schema.unlinked-participant",
+      "title": "unlinked-participant",
+      "layer": "real cloud function / strict synthetic schema",
+      "status": "PASS",
+      "durationMs": 2
+    },
+    {
+      "id": "activity-schema.missing-customer",
+      "title": "missing-customer",
+      "layer": "real cloud function / strict synthetic schema",
+      "status": "PASS",
+      "durationMs": 3
+    },
+    {
+      "id": "live.login",
+      "title": "真实 CloudBase 账号、SDK 与会话认证",
+      "layer": "not exercised",
+      "status": "SKIP"
+    },
+    {
+      "id": "live.database",
+      "title": "线上public对象SQL检查（需通过只读管理工具单独执行 database-readonly.sql）",
+      "layer": "not exercised",
+      "status": "SKIP"
+    },
+    {
+      "id": "live.ai",
+      "title": "真实 Today / 漏斗 AI 生成与计费链路",
+      "layer": "not exercised",
+      "status": "SKIP"
+    },
+    {
+      "id": "live.writes",
+      "title": "新增、编辑、删除、恢复和级联写入；本骨架不提供线上写模式",
+      "layer": "not exercised",
+      "status": "SKIP"
+    },
+    {
+      "id": "live.mobile",
+      "title": "真实移动设备及视觉布局回归",
+      "layer": "not exercised",
+      "status": "SKIP"
+    }
+  ]
+}

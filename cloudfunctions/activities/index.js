@@ -29,11 +29,16 @@ var ACT_STATUS_ENUM = ['idea', 'preparing', 'confirmed', 'in_progress', 'ended',
 var PARTICIPANT_ROLE_ENUM = ['attendee', 'speaker', 'organizer', 'partner', 'guest'];
 var FOLLOWUP_STATUS_ENUM = ['none', 'pending', 'done', 'not_needed'];
 
-// 人员表映射：customers 主键 Id、姓名 customer_name；recruit_candidates/activity_speakers 主键 id、姓名 name
+// 增员视图由客户提供姓名，candidate_id 仍为候选人 ID；视图已过滤双方软删除。
 function personTable(pt) {
-  if (pt === 'recruit') return { table: 'recruit_candidates', idCol: 'id', nameCol: 'name' };
+  if (pt === 'recruit') return { table: 'v_recruit_candidates', idCol: 'candidate_id', nameCol: 'customer_name' };
   if (pt === 'speaker') return { table: 'activity_speakers', idCol: 'id', nameCol: 'name' };
   return { table: 'customers', idCol: 'Id', nameCol: 'customer_name' };
+}
+
+function personQuery(cfg, columns) {
+  const q = rdb.from(cfg.table).select(columns);
+  return cfg.table === 'v_recruit_candidates' ? q : q.is('deleted_at', null);
 }
 
 exports.main = async (event, context) => {
@@ -96,17 +101,16 @@ async function enrichParticipants(parts) {
     const ids = needByType[pt];
     if (!ids || !ids.length) continue;
     const cfg = personTable(pt);
-    const q = await rdb.from(cfg.table).select(cfg.idCol + ',' + cfg.nameCol)
-      .in(cfg.idCol, ids).is('deleted_at', null);
+    const q = await personQuery(cfg, cfg.idCol + ',' + cfg.nameCol)
+      .in(cfg.idCol, ids);
     (q.data || []).forEach(function (row) { nameMap[pt + ':' + row[cfg.idCol]] = row[cfg.nameCol]; });
   }
   if (Object.keys(nameMap).length) {
-    // 回填内存对象，并顺手补写数据库（fire-and-forget）
+    // 查询只补齐返回姓名；持久化由显式新增/关联参与者操作负责。
     parts.forEach(function (it) {
       const nm = nameMap[it.person_type + ':' + it.person_id];
       if (nm) {
         it.person_name = nm;
-        rdb.from('activity_participants').update({ person_name: nm }).eq('id', it.id);
       }
     });
   }
@@ -242,9 +246,7 @@ async function searchPerson(event) {
   };
   // 转义 postgrest 保留字符
   const safeKw = kw.replace(/[%,_()\\]/g, function (c) { return '\\' + c; });
-  let q = rdb.from(cfg.table)
-    .select(cfg.idCol + ', ' + cfg.nameCol + ', ' + EXTRA[pt])
-    .is('deleted_at', null);
+  let q = personQuery(cfg, cfg.idCol + ', ' + cfg.nameCol + ', ' + EXTRA[pt]);
   // 嘉宾仅可加入启用中的；停用嘉宾不进入联想结果
   if (pt === 'speaker') q = q.eq('status', 'active');
   // 姓名模糊；客户/嘉宾额外支持电话匹配（仅当关键词含数字时才加电话条件，避免 ilike '%%' 匹配全部）
@@ -283,8 +285,8 @@ async function addParticipant(event) {
   var pid = parseInt(data.person_id, 10);
   if (pid) {
     // 关联已有人员：校验存在并回填姓名
-    const p = assertOk(await rdb.from(cfg.table).select(cfg.idCol + ', ' + cfg.nameCol)
-      .eq(cfg.idCol, pid).is('deleted_at', null).maybeSingle());
+    const p = assertOk(await personQuery(cfg, cfg.idCol + ', ' + cfg.nameCol)
+      .eq(cfg.idCol, pid).maybeSingle());
     if (!p.data) return { error: '未找到该' + ({ customer: '客户', recruit: '增员对象', speaker: '嘉宾' }[data.person_type] || '人员') };
     data.person_id = pid;
     data.person_name = p.data[cfg.nameCol];
@@ -325,8 +327,8 @@ async function linkParticipant(event) {
   if (rec.data.person_id) return { error: '该参与者已关联' };
   if (PT_ENUM.indexOf(rec.data.person_type) < 0) return { error: '参与者类型无效' };
   const cfg = personTable(rec.data.person_type);
-  const p = assertOk(await rdb.from(cfg.table).select(cfg.idCol + ', ' + cfg.nameCol)
-    .eq(cfg.idCol, pid).is('deleted_at', null).maybeSingle());
+  const p = assertOk(await personQuery(cfg, cfg.idCol + ', ' + cfg.nameCol)
+    .eq(cfg.idCol, pid).maybeSingle());
   if (!p.data) return { error: '未找到该' + ({ customer: '客户', recruit: '增员对象', speaker: '嘉宾' }[rec.data.person_type] || '人员') };
   // 同活动同人已关联则不重复
   const dup = assertOk(await rdb.from('activity_participants').select('id')

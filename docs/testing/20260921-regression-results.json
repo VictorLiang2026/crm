@@ -1,0 +1,333 @@
+{
+  "startedAt": "2026-09-21T06:37:23.360Z",
+  "finishedAt": "2026-09-21T06:37:36.234Z",
+  "head": "147bd60a91406c37fa0556824485cebf14a2f1f9",
+  "sourceHash": "ed857e177b0862768a3e793b5c752195e632697d6cd38dc40434b1fda7e4b6b4",
+  "mode": "all",
+  "safety": "Offline fixtures only. No production SDK, database connection, cloud function invocation or remote data mutation.",
+  "counts": {
+    "PASS": 40,
+    "FAIL": 1,
+    "SKIP": 5
+  },
+  "results": [
+    {
+      "id": "backend.customers",
+      "title": "客户列表排除软删除、搜索及分页",
+      "layer": "actual cloud function / in-memory read-only adapter",
+      "status": "PASS",
+      "durationMs": 7
+    },
+    {
+      "id": "backend.customer-detail",
+      "title": "客户详情关联正确跟进且排除软删除",
+      "layer": "actual cloud function / in-memory read-only adapter",
+      "status": "PASS",
+      "durationMs": 3
+    },
+    {
+      "id": "backend.followups",
+      "title": "跟进查询按客户隔离、日期倒序",
+      "layer": "actual cloud function / in-memory read-only adapter",
+      "status": "PASS",
+      "durationMs": 2
+    },
+    {
+      "id": "backend.opportunities",
+      "title": "机会列表按客户隔离且排除软删除",
+      "layer": "actual cloud function / in-memory read-only adapter",
+      "status": "PASS",
+      "durationMs": 2
+    },
+    {
+      "id": "backend.activities",
+      "title": "活动列表排除软删除",
+      "layer": "actual cloud function / in-memory read-only adapter",
+      "status": "PASS",
+      "durationMs": 2
+    },
+    {
+      "id": "backend.activity-detail",
+      "title": "活动详情与已具名参与人读取",
+      "layer": "actual cloud function / in-memory read-only adapter",
+      "status": "PASS",
+      "durationMs": 2
+    },
+    {
+      "id": "backend.activity-readonly",
+      "title": "活动详情缺姓名旧记录：读取不应尝试写入",
+      "layer": "actual cloud function / in-memory read-only adapter",
+      "status": "FAIL",
+      "durationMs": 3,
+      "error": "AssertionError [ERR_ASSERTION]: Read action attempted writes: [{\"table\":\"public.activity_participants\",\"method\":\"update\"}]\n\n1 !== 0\n\n    at run (D:\\CRM\\crm\\tests\\regression\\backend.cjs:91:12)\n    at async D:\\CRM\\crm\\tests\\regression\\backend.cjs:125:5\n    at async test (D:\\CRM\\crm\\tests\\regression\\run.cjs:14:9)\n    at async backend (D:\\CRM\\crm\\tests\\regression\\backend.cjs:123:3)\n    at async D:\\CRM\\crm\\tests\\regression\\run.cjs:22:41"
+    },
+    {
+      "id": "backend.recruit",
+      "title": "增员列表和详情使用候选人ID关联里程碑",
+      "layer": "actual cloud function / in-memory read-only adapter",
+      "status": "PASS",
+      "durationMs": 3
+    },
+    {
+      "id": "backend.recruit-followups",
+      "title": "增员跟进绑定候选人",
+      "layer": "actual cloud function / in-memory read-only adapter",
+      "status": "PASS",
+      "durationMs": 1
+    },
+    {
+      "id": "backend.recycle",
+      "title": "客户与增员回收站只读列表",
+      "layer": "actual cloud function / in-memory read-only adapter",
+      "status": "PASS",
+      "durationMs": 2
+    },
+    {
+      "id": "backend.not-found",
+      "title": "客户、活动、增员缺失ID返回错误",
+      "layer": "actual cloud function / in-memory read-only adapter",
+      "status": "PASS",
+      "durationMs": 3
+    },
+    {
+      "id": "guard.boundaries",
+      "title": "测试适配器拒绝非public、写操作和未知函数",
+      "layer": "actual cloud function / in-memory read-only adapter",
+      "status": "PASS",
+      "durationMs": 2
+    },
+    {
+      "id": "browser.start",
+      "title": "隔离浏览器启动",
+      "layer": "harness",
+      "status": "PASS",
+      "durationMs": 1311
+    },
+    {
+      "id": "login.empty",
+      "title": "登录入口：空字段不发起认证",
+      "layer": "browser / isolated fixtures",
+      "status": "PASS",
+      "durationMs": 250
+    },
+    {
+      "id": "login.denied",
+      "title": "错误凭据保持登录页并显示失败",
+      "layer": "browser / isolated fixtures",
+      "status": "PASS",
+      "durationMs": 14
+    },
+    {
+      "id": "login.success",
+      "title": "模拟登录成功后进入原目标路由",
+      "layer": "browser / isolated fixtures",
+      "status": "PASS",
+      "durationMs": 39
+    },
+    {
+      "id": "customers.list",
+      "title": "客户列表显示记录与客户详情导航",
+      "layer": "browser / isolated fixtures",
+      "status": "PASS",
+      "durationMs": 358
+    },
+    {
+      "id": "customer.detail",
+      "title": "客户详情及跟进下一步展示",
+      "layer": "browser / isolated fixtures",
+      "status": "PASS",
+      "durationMs": 138
+    },
+    {
+      "id": "followups.tab",
+      "title": "跟进标签显示跟进记录",
+      "layer": "browser / isolated fixtures",
+      "status": "PASS",
+      "durationMs": 14
+    },
+    {
+      "id": "opportunities.tab",
+      "title": "机会标签加载当前客户的经营机会",
+      "layer": "browser / isolated fixtures",
+      "status": "PASS",
+      "durationMs": 19
+    },
+    {
+      "id": "customers.pagination",
+      "title": "客户分页每页最多50条且第二页可达",
+      "layer": "browser / isolated fixtures",
+      "status": "PASS",
+      "durationMs": 249
+    },
+    {
+      "id": "customers.search",
+      "title": "客户搜索无匹配提示",
+      "layer": "browser / isolated fixtures",
+      "status": "PASS",
+      "durationMs": 348
+    },
+    {
+      "id": "today.page",
+      "title": "今日经营页使用隔离建议响应",
+      "layer": "browser / isolated fixtures",
+      "status": "PASS",
+      "durationMs": 332
+    },
+    {
+      "id": "funnels.page",
+      "title": "漏斗事实卡展示三个漏斗，不调用AI解读",
+      "layer": "browser / isolated fixtures",
+      "status": "PASS",
+      "durationMs": 300
+    },
+    {
+      "id": "activities.list",
+      "title": "活动列表点击进入活动详情",
+      "layer": "browser / isolated fixtures",
+      "status": "PASS",
+      "durationMs": 499
+    },
+    {
+      "id": "activity.detail",
+      "title": "活动详情显示参与人及异步待办区",
+      "layer": "browser / isolated fixtures",
+      "status": "PASS",
+      "durationMs": 469
+    },
+    {
+      "id": "recruit.list",
+      "title": "增员列表与漏斗加载",
+      "layer": "browser / isolated fixtures",
+      "status": "PASS",
+      "durationMs": 511
+    },
+    {
+      "id": "recruit.detail",
+      "title": "增员详情与增员跟进标签",
+      "layer": "browser / isolated fixtures",
+      "status": "PASS",
+      "durationMs": 509
+    },
+    {
+      "id": "recycle.customers",
+      "title": "回收站只读展示：customers",
+      "layer": "browser / isolated fixtures",
+      "status": "PASS",
+      "durationMs": 306
+    },
+    {
+      "id": "recycle.recruit",
+      "title": "回收站只读展示：recruit",
+      "layer": "browser / isolated fixtures",
+      "status": "PASS",
+      "durationMs": 774
+    },
+    {
+      "id": "empty.customers",
+      "title": "空数据状态：customers",
+      "layer": "browser / isolated fixtures",
+      "status": "PASS",
+      "durationMs": 220
+    },
+    {
+      "id": "empty.activities",
+      "title": "空数据状态：activities",
+      "layer": "browser / isolated fixtures",
+      "status": "PASS",
+      "durationMs": 246
+    },
+    {
+      "id": "empty.recycle",
+      "title": "空数据状态：recycle",
+      "layer": "browser / isolated fixtures",
+      "status": "PASS",
+      "durationMs": 622
+    },
+    {
+      "id": "empty.funnels",
+      "title": "空数据状态：funnels",
+      "layer": "browser / isolated fixtures",
+      "status": "PASS",
+      "durationMs": 352
+    },
+    {
+      "id": "error.customer",
+      "title": "接口错误可见：customer",
+      "layer": "browser / isolated fixtures",
+      "status": "PASS",
+      "durationMs": 766
+    },
+    {
+      "id": "error.activities",
+      "title": "接口错误可见：activities",
+      "layer": "browser / isolated fixtures",
+      "status": "PASS",
+      "durationMs": 398
+    },
+    {
+      "id": "error.activity",
+      "title": "接口错误可见：activity",
+      "layer": "browser / isolated fixtures",
+      "status": "PASS",
+      "durationMs": 266
+    },
+    {
+      "id": "error.recruit",
+      "title": "接口错误可见：recruit",
+      "layer": "browser / isolated fixtures",
+      "status": "PASS",
+      "durationMs": 265
+    },
+    {
+      "id": "error.funnels",
+      "title": "接口错误可见：funnels",
+      "layer": "browser / isolated fixtures",
+      "status": "PASS",
+      "durationMs": 261
+    },
+    {
+      "id": "error.opportunities",
+      "title": "接口错误可见：opportunities",
+      "layer": "browser / isolated fixtures",
+      "status": "PASS",
+      "durationMs": 375
+    },
+    {
+      "id": "quickcapture.preserve",
+      "title": "快速录入点击背景保留草稿",
+      "layer": "browser / isolated fixtures",
+      "status": "PASS",
+      "durationMs": 450
+    },
+    {
+      "id": "live.login",
+      "title": "真实 CloudBase 账号、SDK 与会话认证",
+      "layer": "not exercised",
+      "status": "SKIP"
+    },
+    {
+      "id": "live.database",
+      "title": "线上public对象SQL检查（需通过只读管理工具单独执行 database-readonly.sql）",
+      "layer": "not exercised",
+      "status": "SKIP"
+    },
+    {
+      "id": "live.ai",
+      "title": "真实 Today / 漏斗 AI 生成与计费链路",
+      "layer": "not exercised",
+      "status": "SKIP"
+    },
+    {
+      "id": "live.writes",
+      "title": "新增、编辑、删除、恢复和级联写入；本骨架不提供线上写模式",
+      "layer": "not exercised",
+      "status": "SKIP"
+    },
+    {
+      "id": "live.mobile",
+      "title": "真实移动设备及视觉布局回归",
+      "layer": "not exercised",
+      "status": "SKIP"
+    }
+  ]
+}

@@ -1,5 +1,10 @@
 {
   "name": "crm",
+  "scripts": {
+    "test": "node tests/regression/run.cjs",
+    "test:backend": "node tests/regression/run.cjs --backend-only",
+    "test:browser": "node tests/regression/run.cjs --browser-only"
+  },
   "dependencies": {
     "docx": "^9.7.1"
   }

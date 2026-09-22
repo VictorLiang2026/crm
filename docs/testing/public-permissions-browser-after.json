@@ -1,0 +1,172 @@
+{
+  "schema": "public",
+  "version": "after",
+  "results": [
+    {
+      "table": "customers",
+      "count": null,
+      "errorCode": "DATABASE_42501",
+      "errorMessage": "permission denied for table customers"
+    },
+    {
+      "table": "policy_review_reports",
+      "count": null,
+      "errorCode": "DATABASE_42501",
+      "errorMessage": "permission denied for table policy_review_reports"
+    },
+    {
+      "table": "customers_view",
+      "count": null,
+      "errorCode": "DATABASE_42501",
+      "errorMessage": "permission denied for view customers_view"
+    },
+    {
+      "table": "followups_view",
+      "count": null,
+      "errorCode": "DATABASE_42501",
+      "errorMessage": "permission denied for view followups_view"
+    },
+    {
+      "table": "gifts_view",
+      "count": null,
+      "errorCode": "DATABASE_42501",
+      "errorMessage": "permission denied for view gifts_view"
+    },
+    {
+      "table": "photos_view",
+      "count": null,
+      "errorCode": "DATABASE_42501",
+      "errorMessage": "permission denied for view photos_view"
+    },
+    {
+      "table": "products_view",
+      "count": null,
+      "errorCode": "DATABASE_42501",
+      "errorMessage": "permission denied for view products_view"
+    },
+    {
+      "table": "ai_recommendations_view",
+      "count": null,
+      "errorCode": "DATABASE_42501",
+      "errorMessage": "permission denied for view ai_recommendations_view"
+    },
+    {
+      "table": "v_recruit_candidates",
+      "count": null,
+      "errorCode": "DATABASE_42501",
+      "errorMessage": "permission denied for view v_recruit_candidates"
+    },
+    {
+      "table": "v_recruit_candidates_trash",
+      "count": null,
+      "errorCode": "DATABASE_42501",
+      "errorMessage": "permission denied for view v_recruit_candidates_trash"
+    },
+    {
+      "table": "v_action_center",
+      "count": null,
+      "errorCode": "DATABASE_42501",
+      "errorMessage": "permission denied for view v_action_center"
+    },
+    {
+      "table": "v_funnel_stats",
+      "count": null,
+      "errorCode": "DATABASE_42501",
+      "errorMessage": "permission denied for view v_funnel_stats"
+    },
+    {
+      "function": "policy_review_reports",
+      "action": "get",
+      "found": true,
+      "markerMatches": true
+    },
+    {
+      "function": "customers",
+      "action": "update",
+      "ok": true,
+      "updated": 1,
+      "error": null
+    },
+    {
+      "function": "policy_review_reports",
+      "action": "update-readback",
+      "ok": true,
+      "error": null
+    },
+    {
+      "function": "customers",
+      "action": "list",
+      "ok": true,
+      "responseKeys": [
+        "rows",
+        "total",
+        "page",
+        "pageSize"
+      ]
+    },
+    {
+      "function": "customers",
+      "action": "trashList",
+      "ok": true,
+      "responseKeys": [
+        "rows",
+        "total",
+        "page",
+        "pageSize",
+        "counts"
+      ]
+    },
+    {
+      "function": "recruit_candidates",
+      "action": "list",
+      "ok": true,
+      "responseKeys": [
+        "rows",
+        "total",
+        "page",
+        "pageSize"
+      ]
+    },
+    {
+      "function": "recruit_candidates",
+      "action": "trashList",
+      "ok": true,
+      "responseKeys": [
+        "rows",
+        "total",
+        "page",
+        "pageSize",
+        "counts"
+      ]
+    },
+    {
+      "function": "funnel_insight",
+      "action": "stats",
+      "ok": true,
+      "responseKeys": [
+        "ok",
+        "generated_at",
+        "funnels"
+      ]
+    },
+    {
+      "function": "today_coach",
+      "action": "cockpit",
+      "ok": true,
+      "responseKeys": [
+        "today",
+        "fingerprint",
+        "trends",
+        "reminders"
+      ]
+    },
+    {
+      "function": "activities",
+      "action": "list",
+      "ok": true,
+      "responseKeys": [
+        "rows"
+      ]
+    }
+  ]
+}

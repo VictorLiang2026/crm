@@ -1,0 +1,25 @@
+{
+  "schema": "public",
+  "credential": "publishable key",
+  "version": "after",
+  "results": [
+    {
+      "table": "customers",
+      "status": 200,
+      "count": 0,
+      "errorCode": null
+    },
+    {
+      "table": "policy_review_reports",
+      "status": 200,
+      "count": 0,
+      "errorCode": null
+    },
+    {
+      "table": "customers_view",
+      "status": 200,
+      "count": 0,
+      "errorCode": null
+    }
+  ]
+}

@@ -9,7 +9,7 @@
  *   complete: { action:'complete', id } → { ok }（status=completed + completed_at）
  *   skip:     { action:'skip', id } → { ok }（status=skipped + completed_at）
  *   remove:   { action:'remove', id } → { ok }（硬删除）
- * 关联人回填：related_type=customer → customers.customer_name；recruit → recruit_candidates.name（speaker/activity v1 不回填）
+ * 关联人回填：customer → customers.customer_name；recruit → v_recruit_candidates.customer_name（speaker/activity v1 不回填）
  */
 'use strict';
 
@@ -68,9 +68,9 @@ async function enrichRelated(rows) {
     cs.forEach(function (c) { nameMap['customer:' + c.Id] = c.customer_name; });
   }
   if (recruitIds.length) {
-    const rs = assertOk(await rdb.from('recruit_candidates').select('id, name')
-      .in('id', recruitIds).is('deleted_at', null)).data || [];
-    rs.forEach(function (r) { nameMap['recruit:' + r.id] = r.name; });
+    const rs = assertOk(await rdb.from('v_recruit_candidates').select('candidate_id, customer_name')
+      .in('candidate_id', recruitIds)).data || [];
+    rs.forEach(function (r) { nameMap['recruit:' + r.candidate_id] = r.customer_name; });
   }
   return rows.map(function (t) {
     t.related_name = (t.related_type === 'customer' || t.related_type === 'recruit')

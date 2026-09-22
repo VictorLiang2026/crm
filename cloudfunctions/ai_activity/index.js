@@ -37,6 +37,24 @@ function bjNow() { return new Date(Date.now() + 8 * 3600 * 1000); }
 function todayStr() { return bjNow().toISOString().slice(0, 10); }
 function clip(v, n) { return typeof v === 'string' ? v.trim().slice(0, n) : ''; }
 
+// 批量关联客户人物资料；对外保留 id/name/priority/occupation 的旧输入契约。
+async function loadRecruitPeople(ids) {
+  if (!ids.length) return [];
+  const recruits = assertOk(await rdb.from('recruit_candidates')
+    .select('id, customer_id, stage').in('id', ids).is('deleted_at', null)).data || [];
+  const customerIds = [...new Set(recruits.map(r => r.customer_id).filter(id => id != null))];
+  if (!customerIds.length) return [];
+  const customers = assertOk(await rdb.from('customers')
+    .select('Id, customer_name, recruitment_priority, occupation')
+    .in('Id', customerIds).is('deleted_at', null)).data || [];
+  const people = new Map(customers.map(c => [String(c.Id), c]));
+  return recruits.filter(r => people.has(String(r.customer_id))).map(r => {
+    const c = people.get(String(r.customer_id));
+    return { id: r.id, customer_id: r.customer_id, stage: r.stage,
+      name: c.customer_name, priority: c.recruitment_priority || '', occupation: c.occupation || '' };
+  });
+}
+
 exports.main = async (event, context) => {
   try {
     var action = (event && event.action) || 'analyze';
@@ -78,8 +96,7 @@ exports.main = async (event, context) => {
       cs.forEach(function(c){ customerMap[c.Id] = c; });
     }
     if (recruitIds.length) {
-      var rs = assertOk(await rdb.from('recruit_candidates').select('id, name, stage, priority, occupation')
-        .in('id', recruitIds).is('deleted_at', null)).data || [];
+      var rs = await loadRecruitPeople(recruitIds);
       rs.forEach(function(r){ recruitMap[r.id] = r; });
     }
 
@@ -236,8 +253,7 @@ async function loadActivityContext(activityId) {
     cs.forEach(function(c){ nameMap['customer:' + c.Id] = c; });
   }
   if (recruitIds.length) {
-    var rs = assertOk(await rdb.from('recruit_candidates').select('id, name, stage, priority, occupation')
-      .in('id', recruitIds).is('deleted_at', null)).data || [];
+    var rs = await loadRecruitPeople(recruitIds);
     rs.forEach(function(rc){ nameMap['recruit:' + rc.id] = rc; });
   }
   if (speakerIds.length) {
@@ -569,9 +585,7 @@ async function postReview(event) {
       cs.forEach(function (c) { customerMap[c.Id] = c; });
     }
     if (recruitIds.length) {
-      var rs = assertOk(await rdb.from('recruit_candidates')
-        .select('id, name, stage, priority, occupation')
-        .in('id', recruitIds).is('deleted_at', null)).data || [];
+      var rs = await loadRecruitPeople(recruitIds);
       rs.forEach(function (r) { recruitMap[r.id] = r; });
     }
     if (speakerIds.length) {
