@@ -4,6 +4,7 @@
     "build:shared": "node tools/sync-shared.cjs --sync",
     "check:shared": "node tools/sync-shared.cjs --check",
     "test:modular": "node tests/tooling/modular-frontend.mjs",
+    "test:ai-gateway": "node --test tests/ai-gateway/run.cjs",
     "test": "node tests/regression/run.cjs",
     "test:backend": "node tests/regression/run.cjs --backend-only",
     "test:browser": "node tests/regression/run.cjs --browser-only"
