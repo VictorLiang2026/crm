@@ -1,0 +1,20 @@
+name: CRM shared module guard
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  shared-modules:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Verify checked-in function copies
+        run: npm run check:shared
+      - name: Verify sync failure behavior
+        run: node tests/tooling/shared-sync.cjs
+      - name: Backend regression
+        run: npm run test:backend

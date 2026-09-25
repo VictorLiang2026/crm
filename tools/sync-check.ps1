@@ -11,6 +11,8 @@ function GitRead([string[]]$Arguments) {
 try {
   $config = Get-Content (Join-Path $repo 'cloudbaserc.json') -Raw | ConvertFrom-Json
   if ($config.envId -ne 'crm-d1gkae8ddc930d151') { throw 'Unexpected environment.' }
+  & node (Join-Path $PSScriptRoot 'sync-shared.cjs') --check
+  if ($LASTEXITCODE -ne 0) { throw 'Shared module hash check failed.' }
   if (!$CloudOnly) {
     if (@(GitRead @('status','--porcelain')).Count) { throw 'Uncommitted changes.' }
     $branch = GitRead @('branch','--show-current')
