@@ -182,6 +182,15 @@ function createAIGateway(options) {
     const timeoutMs = configuredTimeoutMs ?? TIMEOUT_CLASS_MS[definition.timeoutClass] ?? DEFAULT_TIMEOUT_MS;
     const input = jsonSnapshot(request.input, 'input');
     const context = jsonSnapshot(request.context, 'context');
+    const contextSnapshot = request.contextSnapshot === undefined ? context :
+      jsonSnapshot(request.contextSnapshot, 'contextSnapshot');
+    if (request.contextSnapshot !== undefined) {
+      const { _context, ...snapshotData } = contextSnapshot;
+      if (!_context || typeof _context !== 'object' || Array.isArray(_context) ||
+          !isDeepStrictEqual(snapshotData, context)) {
+        throw new AIGatewayError('INVALID_INPUT', 'contextSnapshot must match context and include provenance');
+      }
+    }
     const schema = definition.outputSchema;
     if (request.outputSchema !== undefined &&
       !isDeepStrictEqual(jsonSnapshot(request.outputSchema, 'outputSchema'), schema)) {
@@ -224,7 +233,7 @@ function createAIGateway(options) {
       status: 'running',
       capability,
       input_snapshot: input,
-      context_snapshot: { ...context, _skill: { name: skill, version: definition.version } },
+      context_snapshot: { ...contextSnapshot, _skill: { name: skill, version: definition.version } },
       requires_confirmation: true,
     }); } catch (error) { throw auditError(error); }
 

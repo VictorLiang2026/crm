@@ -67,6 +67,16 @@ test('default registry validates a real skill before audit and records its versi
   assert.equal(f.calls[0].args.timeout, 60000);
 });
 
+test('records verified Context Engine provenance in task snapshot', async () => {
+  const f = fixture([{ text: '{"recommendation":"review first"}' }]);
+  const contextSnapshot = { subject: 'isolated-test', _context: { recipe: 'person_basic', version: '1.0.0' } };
+  await f.gateway.runAITask({ ...request, contextSnapshot });
+  assert.deepEqual(f.rows.tasks[0].context_snapshot._context, contextSnapshot._context);
+  await assert.rejects(f.gateway.runAITask({ ...request, contextSnapshot: { subject: 'different',
+    _context: contextSnapshot._context } }), error => error.code === 'INVALID_INPUT');
+  assert.equal(f.rows.tasks.length, 1);
+});
+
 test('structured result is audited with actual response metadata and remains unselected', async () => {
   const f = fixture([{
     text: '```json\n{"recommendation":"review first"}\n```',
