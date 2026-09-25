@@ -3,6 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { createAIGateway, createRdbAuditStore } = require('../../cloudfunctions/_shared/ai-gateway');
+const { SkillValidationError } = require('../../cloudfunctions/_shared/skill-registry');
 
 const schema = {
   type: 'object',
@@ -13,6 +14,18 @@ const schema = {
 const request = {
   taskType: 'test_advice', skill: 'test_skill', capability: 'text',
   context: { subject: 'isolated-test' }, input: { question: 'example' }, outputSchema: schema,
+};
+const testRegistry = {
+  get: name => name === 'test_skill' ? { name, version: '1.0.0', capability: 'text',
+    timeoutClass: 'standard', outputSchema: schema } : null,
+  validateInput: () => true,
+  validateContext: () => true,
+  validateOutput: (_, value) => {
+    if (!value || typeof value.recommendation !== 'string' || Object.keys(value).length !== 1) {
+      throw new SkillValidationError('INVALID_SKILL_OUTPUT', 'test_skill', []);
+    }
+    return true;
+  },
 };
 
 function fixture(responses, overrides = {}) {
@@ -34,10 +47,25 @@ function fixture(responses, overrides = {}) {
     } };
   } }) };
   const gateway = createAIGateway({
-    app, store, modelResolver: () => 'configured-model', sleep: async () => {}, ...overrides,
+    app, store, skillRegistry: testRegistry, modelResolver: () => 'configured-model', sleep: async () => {}, ...overrides,
   });
-  return { gateway, rows, calls, store };
+  return { gateway, rows, calls, store, app };
 }
+
+test('default registry validates a real skill before audit and records its version', async () => {
+  const f = fixture([{ text: JSON.stringify({ people: [], events: [], facts: [], needs: [], nextActions: [] }) }]);
+  const gateway = createAIGateway({ app: f.app, store: f.store, modelResolver: () => 'configured-model' });
+  const skillRequest = { taskType: 'capture', skill: 'quick_capture', capability: 'structured_extraction',
+    context: {}, input: { text: 'Follow up tomorrow' } };
+  await assert.rejects(gateway.runAITask({ ...skillRequest, input: { text: '' } }),
+    error => error.code === 'INVALID_INPUT');
+  assert.equal(f.rows.tasks.length, 0);
+  const result = await gateway.runAITask(skillRequest);
+  assert.equal(result.skillVersion, '1.0.0');
+  assert.equal(result.confirmationLevel, 'confirm_before_write');
+  assert.deepEqual(f.rows.tasks[0].context_snapshot._skill, { name: 'quick_capture', version: '1.0.0' });
+  assert.equal(f.calls[0].args.timeout, 60000);
+});
 
 test('structured result is audited with actual response metadata and remains unselected', async () => {
   const f = fixture([{
@@ -78,7 +106,7 @@ test('timeout is recorded but never retried because the remote call may still fi
   const f = fixture([], { timeoutMs: 1000 });
   f.gateway = createAIGateway({
     app: { ai: () => ({ createModel: () => ({ generateText: () => new Promise(() => {}) }) }) },
-    store: f.store, modelResolver: () => 'configured-model', timeoutMs: 1000, maxAttempts: 3,
+    store: f.store, skillRegistry: testRegistry, modelResolver: () => 'configured-model', timeoutMs: 1000, maxAttempts: 3,
     sleep: async () => { throw new Error('unexpected retry'); },
   });
   await assert.rejects(f.gateway.runAITask(request), error => error.code === 'TIMEOUT' && error.taskId === 1);
@@ -131,7 +159,7 @@ test('audit insert denial prevents any billable model call', async () => {
   const rdb = { from: () => ({ insert: () => ({ select: async () => ({ data: null, error: { message: 'denied' } }) }) }) };
   const gateway = createAIGateway({
     app: { ai: () => { calls++; throw new Error('must not call model'); } },
-    rdb, modelResolver: () => 'configured-model',
+    rdb, skillRegistry: testRegistry, modelResolver: () => 'configured-model',
   });
   await assert.rejects(gateway.runAITask(request), error => error.code === 'PERSISTENCE_ERROR');
   assert.equal(calls, 0);

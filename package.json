@@ -5,11 +5,14 @@
     "check:shared": "node tools/sync-shared.cjs --check",
     "test:modular": "node tests/tooling/modular-frontend.mjs",
     "test:ai-gateway": "node --test tests/ai-gateway/run.cjs",
+    "test:ai-skills": "node --test tests/ai-gateway/skill-registry.cjs",
     "test": "node tests/regression/run.cjs",
     "test:backend": "node tests/regression/run.cjs --backend-only",
     "test:browser": "node tests/regression/run.cjs --browser-only"
   },
   "dependencies": {
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1",
     "docx": "^9.7.1"
   }
 }

@@ -2,6 +2,7 @@
 'use strict';
 
 const { isDeepStrictEqual } = require('node:util');
+const { defaultRegistry, TIMEOUT_CLASS_MS, SkillValidationError } = require('./skill-registry');
 
 const DEFAULT_TIMEOUT_MS = 60000;
 const DEFAULT_MAX_ATTEMPTS = 2;
@@ -34,79 +35,13 @@ function jsonSnapshot(value, label) {
   return JSON.parse(serialized);
 }
 
-function validateSchemaDefinition(schema, path = '$') {
-  if (!schema || typeof schema !== 'object' || Array.isArray(schema)) {
-    throw new AIGatewayError('INVALID_INPUT', 'outputSchema must be a JSON schema object');
-  }
-  const supported = new Set(['type', 'required', 'properties', 'items', 'enum', 'additionalProperties']);
-  for (const key of Object.keys(schema)) {
-    if (!supported.has(key)) throw new AIGatewayError('INVALID_INPUT', `Unsupported outputSchema keyword: ${key}`);
-  }
-  const type = schema.type;
-  if (!['object', 'array', 'string', 'number', 'integer', 'boolean', 'null'].includes(type)) {
-    throw new AIGatewayError('INVALID_INPUT', `Unsupported outputSchema type at ${path}`);
-  }
-  if (schema.enum !== undefined && !Array.isArray(schema.enum)) {
-    throw new AIGatewayError('INVALID_INPUT', `Invalid enum at ${path}`);
-  }
-  if (type === 'object') {
-    if (schema.required !== undefined && (!Array.isArray(schema.required) ||
-      schema.required.some(key => typeof key !== 'string'))) {
-      throw new AIGatewayError('INVALID_INPUT', `Invalid required list at ${path}`);
-    }
-    const properties = schema.properties || {};
-    if (typeof properties !== 'object' || Array.isArray(properties)) {
-      throw new AIGatewayError('INVALID_INPUT', `Invalid properties at ${path}`);
-    }
-    if (schema.additionalProperties !== undefined && typeof schema.additionalProperties !== 'boolean') {
-      throw new AIGatewayError('INVALID_INPUT', `Invalid additionalProperties at ${path}`);
-    }
-    for (const [key, child] of Object.entries(properties)) validateSchemaDefinition(child, `${path}.${key}`);
-  }
-  if (type === 'array' && schema.items) validateSchemaDefinition(schema.items, `${path}[]`);
-}
-
-function checkSchema(schema, value, path = '$') {
-  const type = schema.type;
-  const validType = type === 'object' ? value !== null && typeof value === 'object' && !Array.isArray(value)
-    : type === 'array' ? Array.isArray(value)
-      : type === 'null' ? value === null
-        : type === 'integer' ? Number.isInteger(value)
-          : type === 'number' ? typeof value === 'number' && Number.isFinite(value)
-            : typeof value === type;
-  if (!validType) throw new AIGatewayError('INVALID_RESULT', `Result type mismatch at ${path}`);
-  if (schema.enum !== undefined) {
-    if (!schema.enum.some(item => isDeepStrictEqual(item, value))) {
-      throw new AIGatewayError('INVALID_RESULT', `Result enum mismatch at ${path}`);
-    }
-  }
-  if (type === 'object') {
-    const properties = schema.properties || {};
-    for (const key of schema.required || []) {
-      if (!Object.prototype.hasOwnProperty.call(value, key)) {
-        throw new AIGatewayError('INVALID_RESULT', `Missing result field at ${path}.${key}`);
-      }
-    }
-    for (const [key, item] of Object.entries(value)) {
-      if (Object.prototype.hasOwnProperty.call(properties, key)) checkSchema(properties[key], item, `${path}.${key}`);
-      else if (schema.additionalProperties === false) {
-        throw new AIGatewayError('INVALID_RESULT', `Unexpected result field at ${path}.${key}`);
-      }
-    }
-  }
-  if (type === 'array' && schema.items) {
-    value.forEach((item, index) => checkSchema(schema.items, item, `${path}[${index}]`));
-  }
-}
-
-function parseStructured(text, schema) {
+function parseStructured(text) {
   if (typeof text !== 'string' || !text.trim()) throw new AIGatewayError('INVALID_RESULT', 'Empty model result');
   const trimmed = text.trim();
   const fenced = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
   let parsed;
   try { parsed = JSON.parse(fenced ? fenced[1] : trimmed); }
   catch (_) { throw new AIGatewayError('INVALID_RESULT', 'Model result is not valid JSON'); }
-  checkSchema(schema, parsed);
   return parsed;
 }
 
@@ -207,12 +142,18 @@ function createAIGateway(options) {
   const app = options.app;
   if (!app || typeof app.ai !== 'function') throw new AIGatewayError('INVALID_CONFIG', 'CloudBase app is required');
   const store = options.store || createRdbAuditStore(options.rdb);
+  const skillRegistry = options.skillRegistry || defaultRegistry;
   for (const method of ['createTask', 'updateTask', 'createRun', 'updateRun', 'createResult']) {
     if (typeof store[method] !== 'function') throw new AIGatewayError('INVALID_CONFIG', `Missing audit method: ${method}`);
   }
-  const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  if (typeof skillRegistry.get !== 'function' || typeof skillRegistry.validateInput !== 'function' ||
+      typeof skillRegistry.validateContext !== 'function' || typeof skillRegistry.validateOutput !== 'function') {
+    throw new AIGatewayError('INVALID_CONFIG', 'Skill Registry is required');
+  }
+  const configuredTimeoutMs = options.timeoutMs;
   const maxAttempts = options.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
-  if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1000 || timeoutMs > 300000 ||
+  if ((configuredTimeoutMs !== undefined && (!Number.isSafeInteger(configuredTimeoutMs) ||
+      configuredTimeoutMs < 1000 || configuredTimeoutMs > 300000)) ||
       !Number.isSafeInteger(maxAttempts) || maxAttempts < 1 || maxAttempts > 3) {
     throw new AIGatewayError('INVALID_CONFIG', 'Invalid timeout or retry limit');
   }
@@ -233,12 +174,28 @@ function createAIGateway(options) {
   async function runAITask(request) {
     request = request || {};
     const taskType = requiredString(request.taskType, 'taskType');
-    const skill = request.skill == null ? null : requiredString(request.skill, 'skill');
+    const skill = requiredString(request.skill, 'skill');
     const capability = requiredString(request.capability, 'capability');
+    const definition = skillRegistry.get(skill);
+    if (!definition) throw new AIGatewayError('INVALID_INPUT', `Unknown skill: ${skill}`);
+    if (capability !== definition.capability) throw new AIGatewayError('INVALID_INPUT', 'Skill capability mismatch');
+    const timeoutMs = configuredTimeoutMs ?? TIMEOUT_CLASS_MS[definition.timeoutClass] ?? DEFAULT_TIMEOUT_MS;
     const input = jsonSnapshot(request.input, 'input');
     const context = jsonSnapshot(request.context, 'context');
-    const schema = jsonSnapshot(request.outputSchema, 'outputSchema');
-    validateSchemaDefinition(schema);
+    const schema = definition.outputSchema;
+    if (request.outputSchema !== undefined &&
+      !isDeepStrictEqual(jsonSnapshot(request.outputSchema, 'outputSchema'), schema)) {
+      throw new AIGatewayError('INVALID_INPUT', 'outputSchema differs from registered skill');
+    }
+    try {
+      skillRegistry.validateInput(skill, input);
+      skillRegistry.validateContext(skill, context);
+    } catch (error) {
+      if (!(error instanceof SkillValidationError)) throw error;
+      const invalid = new AIGatewayError('INVALID_INPUT', 'Skill input or context failed JSON Schema validation');
+      invalid.details = error.details;
+      throw invalid;
+    }
     const hasSubject = request.subjectType != null || request.subjectId != null;
     if (hasSubject && (request.subjectType == null || request.subjectId == null)) {
       throw new AIGatewayError('INVALID_INPUT', 'subjectType and subjectId must be supplied together');
@@ -267,7 +224,7 @@ function createAIGateway(options) {
       status: 'running',
       capability,
       input_snapshot: input,
-      context_snapshot: context,
+      context_snapshot: { ...context, _skill: { name: skill, version: definition.version } },
       requires_confirmation: true,
     }); } catch (error) { throw auditError(error); }
 
@@ -282,7 +239,14 @@ function createAIGateway(options) {
         const client = app.ai().createModel(group);
         response = await withTimeout(client.generateText({ model, messages, timeout: timeoutMs }), timeoutMs);
         if (response?.error) throw response.error;
-        result = parseStructured(response?.text, schema);
+        result = parseStructured(response?.text);
+        try { skillRegistry.validateOutput(skill, result); }
+        catch (error) {
+          if (!(error instanceof SkillValidationError)) throw error;
+          const invalid = new AIGatewayError('INVALID_RESULT', 'Model result failed JSON Schema validation');
+          invalid.details = error.details;
+          throw invalid;
+        }
       } catch (error) {
         const normalized = normalizeError(error);
         try { await store.updateRun(runId, {
@@ -309,7 +273,8 @@ function createAIGateway(options) {
         });
         await store.updateTask(taskId, { status: 'completed', completed_at: new Date().toISOString() });
       } catch (error) { await markFailed(taskId); throw auditError(error); }
-      return { taskId, runId, resultId, result, usage, requiresConfirmation: true };
+      return { taskId, runId, resultId, result, usage, skillVersion: definition.version,
+        confirmationLevel: definition.confirmationLevel, requiresConfirmation: true };
     }
     throw new AIGatewayError('AI_REQUEST_FAILED', 'AI request failed');
   }

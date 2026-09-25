@@ -6,25 +6,19 @@
 const { createAIGateway } = require('./ai-gateway');
 const { runAITask } = createAIGateway({ app: privilegedCloudBaseApp, rdb: privilegedCloudBaseApp.rdb() });
 const draft = await runAITask({
-  taskType: 'example_advice',
-  skill: 'example_skill',
-  capability: 'text',
-  context: { facts: ['isolated example'] },
-  input: { question: 'What should be reviewed?' },
-  outputSchema: {
-    type: 'object',
-    required: ['recommendation'],
-    properties: { recommendation: { type: 'string' } },
-    additionalProperties: false,
-  },
+  taskType: 'capture',
+  skill: 'quick_capture',
+  capability: 'structured_extraction',
+  context: {},
+  input: { text: 'Call the customer tomorrow' },
 });
 // draft.result is a proposal. A separate, authorized user action must confirm it.
 ```
 
-模型由 `modelResolver({ taskType, skill, capability })` 选择；默认读取服务端 `AI_GATEWAY_MODEL`，为空时兼容回退到现有 `AI_MODEL` 环境变量。模型组由 `groupResolver` 或 `AI_GATEWAY_GROUP` 决定，默认使用 CloudBase 托管组 `cloudbase`。这里没有内置任何具体模型 ID、厂商或费用单价。CloudBase 的模型组和模型必须在接入前核对已启用状态；若没有配置模型，调用在落库前失败。`skill` 当前只是审计元数据，尚未装载任意外部提示词。
+模型由 `modelResolver({ taskType, skill, capability })` 选择；默认读取服务端 `AI_GATEWAY_MODEL`，为空时兼容回退到现有 `AI_MODEL` 环境变量。模型组由 `groupResolver` 或 `AI_GATEWAY_GROUP` 决定，默认使用 CloudBase 托管组 `cloudbase`。这里没有内置任何具体模型 ID、厂商或费用单价。CloudBase 的模型组和模型必须在接入前核对已启用状态；若没有配置模型，调用在落库前失败。`skill` 必须在 [Skill Registry](ai-skill-registry.md) 注册；Registry 定义能力、上下文配方、输入输出契约、确认级别与超时类别，不装载模型配置或任意外部提示词。
 
-Gateway 先插入 `public.ai_tasks`，每次尝试先插入一条 `public.ai_runs`，再调用 CloudBase `generateText`。它把上下文和输入作为 JSON 快照保存；超时默认 60 秒，最多两次尝试，只重试限流、服务端故障和明确的连接故障。超时不重试，因为未取消的远端请求仍可能完成并产生费用。每次尝试记录成功状态、耗时、错误类别和实际返回的用量。`provider`、`model` 与 `cost` 仅在 SDK 响应提供时记录，否则为 `NULL`，不从配置猜测。SDK 返回文本必须是 JSON；`outputSchema` 只支持 `type`、`required`、`properties`、`items`、`enum`、`additionalProperties`，不支持的关键字在调用前拒绝。成功后写入一条 `public.ai_results`，`user_selected=false`、`user_edited=false`、`requires_confirmation=true`；Gateway 不修改客户、活动等业务数据。
+Gateway 使用 Registry 的 JSON Schema 在落库前校验输入和上下文，并在模型返回后校验结构化输出。调用者可以省略 `outputSchema`；如传入则必须与注册版本完全相同，不能用临时 Schema 绕过约束。Gateway 先插入 `public.ai_tasks`，每次尝试先插入一条 `public.ai_runs`，再调用 CloudBase `generateText`。它把输入和上下文作为 JSON 快照保存，并在上下文快照中记录 Skill 名称及版本；超时由 Skill 类别决定（短 30 秒、标准 60 秒、长 120 秒），最多两次尝试，只重试限流、服务端故障和明确的连接故障。超时不重试，因为未取消的远端请求仍可能完成并产生费用。每次尝试记录成功状态、耗时、错误类别和实际返回的用量。`provider`、`model` 与 `cost` 仅在 SDK 响应提供时记录，否则为 `NULL`，不从配置猜测。成功后写入一条 `public.ai_results`，`user_selected=false`、`user_edited=false`、`requires_confirmation=true`；Gateway 不修改客户、活动等业务数据。
 
 审计写入失败时不调用模型或不重试已经完成的模型调用，也不返回成功。当前 CloudBase RDB 是多次独立请求，不能保证跨三表原子提交；网络故障可能留下 `running` 任务或尚未补全的 run。后续接入前需设计对账、幂等和授权调用入口。SDK 调用的本地超时不等于远端取消，实际计费以 CloudBase 返回为准。
 
-本阶段不向现有 26 个函数同步或部署该文件，不改现有 `db.js` / `ai.js` 与 `AI_MODEL` 行为。现有 shared 同步脚本仍只治理 `db.js`、`ai.js`。首个实际调用者出现时，应单独审查服务端 API Key 存放、RLS 身份、模型配额、函数超时、重试幂等、敏感快照、人工确认和业务回归，然后将此文件复制到明确受影响的函数并只部署该函数。当前环境的 Token Credits 只读预检返回空列表，本轮不进行真实模型调用。
+本阶段不向现有 26 个函数同步或部署 Gateway/Registry，不改现有 `db.js` / `ai.js` 与 `AI_MODEL` 行为。现有 shared 同步脚本仍只治理 `db.js`、`ai.js`。首个实际调用者出现时，应单独审查服务端 API Key 存放、RLS 身份、模型配额、函数超时、重试幂等、敏感快照、人工确认和业务回归，然后将 Gateway、Registry 和 `ajv` / `ajv-formats` 依赖加入明确受影响的函数并只部署该函数。当前环境的 Token Credits 只读预检返回空列表，本轮不进行真实模型调用。
