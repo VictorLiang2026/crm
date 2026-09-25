@@ -1,0 +1,9 @@
+# Person Name Resolution V1 work package
+
+Before this change, `public.persons.name_key` held the full display name from the initial customer backfill. Read-only inspection found 776 linked persons, no independent persons, and 70 deterministic keys containing removable trailing qualifiers. The local/GitHub/cloud baseline matched commit `ccba84f4b8961268c3516da28d053ad32c4e5252` and all 26 deployed CRM function sources.
+
+Migration `20260925170916_person_name_key.sql` updated those 70 keys in `public.persons` only, while preserving display names and customer links. It refuses unexpected pre-existing keys and is safe to rerun. The paired rollback restores full-display-name keys only when linked names and current keys still match the migrated form. No customer row, table, view, function or route was modified. Remote migration task succeeded and the version appears in CloudBase history.
+
+`PersonService.resolveName()` now provides a read-only, bounded exact-key lookup in `public.persons`. It returns a status and candidate evidence, never an automatically chosen person ID. One match requires confirmation; multiple matches require choosing or adding a qualifier; a new qualifier still requires human confirmation before creation. The service is server-side and not yet imported into a deployed Cloud Function. The existing Legacy Quick Capture remains unchanged. A project rule and architecture contract require any future Quick Capture Person link/create flow to call this service and wait for a human decision.
+
+Validation: service unit tests 6/6 passed; existing CRM regression 57 passed, 0 failed, 5 expected skips. Read-only SQL verified 776 persons, 70 converted keys, 0 mismatched or empty keys, 0 missing customer links, and unchanged RLS/grants (`anon` and `authenticated` cannot SELECT). No real customer record was changed or deleted. No cloud page/function artifact was deployed; only the public migration was applied.

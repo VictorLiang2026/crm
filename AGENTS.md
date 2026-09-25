@@ -19,6 +19,7 @@
 11. 不允许“大顺手重构”；发现额外问题只记录和报告，不借当前工作包扩张修改面。
 12. 遇到高风险操作必须先停止并报告风险、影响范围和所需授权，不得自行继续。
 13. 从现在起，新 AI-native 前端功能必须放在 `crm/js/modules/`，复用 `crm/js/core/`、`crm/js/components/` 与 `crm/css/`；保留 `admin.html` 的旧实现，不为建立新功能而整体抽离旧代码。
+14. 未来 Quick Capture 新建或关联 Person 前，必须由服务端调用 `PersonService.resolveName()` 并让人确认候选身份；AI 不能自行选定 Person。现有 Legacy Quick Capture 保持原流程，直到单独批准接入。
 
 ## 环境与范围
 

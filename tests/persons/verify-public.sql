@@ -12,7 +12,10 @@ SELECT
   (SELECT count(*) FROM public.persons AS p
      JOIN public.customers AS c ON c."Id" = p.legacy_customer_id
      WHERE p.display_name IS DISTINCT FROM c.customer_name
-        OR p.name_key IS DISTINCT FROM lower(regexp_replace(btrim(c.customer_name), '[[:space:]]+', ' ', 'g'))
+        OR p.name_key IS DISTINCT FROM lower(regexp_replace(btrim(regexp_replace(
+          translate(c.customer_name, '　', ' '),
+          '([[:space:]]*(（[^（）]+）|[(][^()]+[)]))+[[:space:]]*$', '')),
+          '[[:space:]]+', ' ', 'g'))
         OR p.phone IS DISTINCT FROM c.phone
         OR p.wechat IS DISTINCT FROM c.wx_account
         OR p.gender IS DISTINCT FROM c.gender
