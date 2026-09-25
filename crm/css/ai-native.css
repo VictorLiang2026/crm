@@ -1,0 +1,5 @@
+/* Styles for future AI-native modules must stay inside this namespace. */
+.crm-ai {
+  color: var(--text, #0f172a);
+  font: inherit;
+}
