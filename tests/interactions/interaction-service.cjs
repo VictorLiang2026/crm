@@ -1,7 +1,17 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const { InteractionService } = require('../../cloudfunctions/_shared/interaction-service');
+
+test('deployed InteractionService copy matches the shared source', () => {
+  const root = path.resolve(__dirname, '../..');
+  assert.deepEqual(
+    fs.readFileSync(path.join(root, 'cloudfunctions/person_360/interaction-service.js')),
+    fs.readFileSync(path.join(root, 'cloudfunctions/_shared/interaction-service.js')),
+  );
+});
 
 function fixture({ materialized = false, standalone = false } = {}) {
   const calls = [];

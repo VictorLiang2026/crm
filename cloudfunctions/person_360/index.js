@@ -3,9 +3,17 @@
 
 const cloudbase = require('@cloudbase/node-sdk');
 const { parsePersonName } = require('./person-service');
+const { InteractionService } = require('./interaction-service');
 
 const app = cloudbase.init({ env: process.env.TCB_ENV });
-const TABLES = new Set(['persons', 'households', 'household_members']);
+const LEGACY_INTERACTION_TABLES = new Set([
+  'followups', 'recruit_candidates', 'recruit_followups',
+  'activity_participants', 'activity_speakers', 'activities',
+]);
+const TABLES = new Set([
+  'persons', 'households', 'household_members', 'interactions',
+  ...LEGACY_INTERACTION_TABLES,
+]);
 const ROLES = new Set(['spouse', 'child', 'parent', 'sibling', 'other']);
 
 function idOf(value) {
@@ -18,6 +26,7 @@ function one(rows) { return Array.isArray(rows) ? rows[0] || null : null; }
 
 async function pgRequest(table, method, filters = {}, body) {
   if (!TABLES.has(table)) throw new Error('Invalid table');
+  if (LEGACY_INTERACTION_TABLES.has(table) && method !== 'GET') throw new Error('Invalid source operation');
   const env = process.env.TCB_ENV;
   const key = process.env.CRM_PERSON360_DB_API_KEY;
   if (!/^crm-[a-z0-9]+$/.test(env || '') || !key) throw new Error('Person 360 is not configured');
@@ -164,11 +173,15 @@ exports.main = async event => {
         event.personId, event.memberId, event.relationship,
         event.selectedDisplayName, event.confirmed, uid);
       case 'removeMember': return await service.removeMember(event.personId, event.membershipId, event.confirmed);
+      case 'listInteractions': return await new InteractionService({ request: pgRequest })
+        .listForPerson(event.personId, { limit: event.limit });
+      case 'createInteraction': return await new InteractionService({ request: pgRequest })
+        .createManual(event.personId, event.data, uid);
       default: return { error: 'Unknown action' };
     }
   } catch (error) {
     return { error: error.message === 'UNAUTHORIZED' ? 'UNAUTHORIZED' :
-      /^(Invalid |Person |This customer|Both people|Human confirmation|Selected Person|Household |Important facts|Could not)/.test(error.message)
+      /^(Invalid |Person |Activity not found|This customer|Both people|Human confirmation|Selected Person|Household |Important facts|Could not)/.test(error.message)
         ? error.message : 'Person 360 request failed' };
   }
 };

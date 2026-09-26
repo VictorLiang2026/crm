@@ -9,7 +9,7 @@
     "test:context-engine": "node --test tests/ai-gateway/context-engine.cjs tests/ai-gateway/run.cjs tests/ai-gateway/skill-registry.cjs",
     "test:person-service": "node --test tests/persons/person-service.cjs",
     "test:households": "node --test tests/households/person360-service.cjs",
-    "test:interactions": "node --test tests/interactions/interaction-service.cjs",
+    "test:interactions": "node --test tests/interactions/interaction-service.cjs tests/interactions/person360-dispatch.cjs",
     "test": "node tests/regression/run.cjs",
     "test:backend": "node tests/regression/run.cjs --backend-only",
     "test:browser": "node tests/regression/run.cjs --browser-only"
