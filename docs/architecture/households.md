@@ -1,0 +1,11 @@
+# Lightweight household context
+
+`public.households` is an optional family context anchored to one existing `public.persons` row. It stores only a short `important_facts` text field (maximum 2,000 characters) and timestamps. One active context is allowed per anchor Person. It does not store assets, income, policies or financial calculations.
+
+`public.household_members` links an existing Person to the anchor's household with `relationship_to_anchor` in `spouse`, `child`, `parent`, `sibling`, `other`. A member row cannot be inserted without a valid existing Person ID, `confirmed_at`, and `confirmed_by_uid`; a future write path must require an explicit human choice of that Person. The migration creates no Person or member and does not infer relationships from customer profile text. One active membership per Person per household is allowed. Both tables use soft-delete timestamps and restrictive foreign keys.
+
+The two tables have RLS enabled and service-role-only grants. They contain potentially sensitive family facts, so the legacy anonymous RDB path cannot read them. The dedicated `person_360` Event Function checks the CloudBase caller UID before using a server-only database API Key. It exposes only fixed actions and selected columns through the existing `callFn` bridge; the key is neither in the repository nor in the browser. The existing gateway policy denies anonymous function calls as another layer. Its `search` action returns existing Person candidates but never selects or creates one. `addMember` requires the selected ID, exact displayed name, allowed relationship, explicit confirmation, and records the caller UID and confirmation time. The browser asks for confirmation again before submitting. No legacy stage, recruit or recycle-bin flow is changed.
+
+`#/person/<id>` is a new independent Person 360 route loaded from `crm/js/modules/person-360.js`. The old customer detail has a single link that resolves its legacy customer ID to a Person ID. The page displays family members and facts, supports manual facts editing and member linking, and has no financial planning fields or AI inference.
+
+Rollback is deliberately guarded: it refuses to drop either table if any family data exists and uses `DROP TABLE ... RESTRICT`. This prevents accidental loss of confirmed family links or facts.

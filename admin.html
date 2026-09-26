@@ -7,6 +7,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>Victor's AI Relationship OS</title>
+<link rel="stylesheet" href="/crm/css/person-360.css">
 <style>
   :root{
     --pri:#2563eb;--pri-hover:#1d4ed8;--pri-light:#dbeafe;
@@ -961,6 +962,10 @@ function ensurePersonCustomer(name, sourceLabel){
 function route(){
   var hash = location.hash || '#/';
   updateModuleSwitch(hash);
+  var person360 = hash.match(/^#\/person\/(\d+)$/);
+  if(person360) return import('/crm/js/modules/person-360.js').then(function(module){
+    return module.renderPerson360({root:$('view'), personId:person360[1], callFn:callFn});
+  }).catch(function(e){ $('view').textContent = 'Person 360 加载失败：' + e.message; });
   var m = hash.match(/^#\/customer\/(\d+)$/);
   if(m) return showDetail(parseInt(m[1],10));
   var rc = hash.match(/^#\/recruit\/(\d+)$/);
@@ -1846,6 +1851,13 @@ async function showDetail(id){
   view.appendChild(el('div', {class:'toolbar'}, [
     el('a', {onclick:function(){ location.hash='#/'; }}, '← 返回首页'),
     el('a', {onclick:function(){ location.hash='#/customers'; }, style:'margin-left:14px'}, '客户列表'),
+    el('a', {onclick:async function(){
+      try{
+        var p = await callFn('person_360', {action:'lookupCustomer', customerId:id});
+        if(p.error) throw new Error(p.error);
+        location.hash = '#/person/' + p.personId;
+      }catch(e){ toast('Person 360 暂不可用：' + e.message, 'err'); }
+    }, style:'margin-left:14px'}, 'Person 360'),
     el('a', {onclick:async function(){
       if(!confirm('确认删除该客户？\n\n其跟进记录、伴手礼、照片/附件、保单检视报告、AI 解析记录、产品额度及名下增员候选人将一并移入回收站，可随时恢复。')) return;
       var r = await callFn('customers', {action:'remove', id:id});

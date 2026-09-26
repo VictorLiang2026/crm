@@ -27,6 +27,12 @@ function installFixtures() {
       ? Array.from({ length: 55 }, (_, i) => ({ ...customer, Id: 910001 + i, customer_name: marker + '客户' + String(i).padStart(2, '0') }))
       : [customer]),
     'customers:get': () => ({ customer, followups: mode === 'empty' ? [] : [followup], products: [], gifts: [], photos: [], recommendations: [], reports: [] }),
+    'person_360:lookupCustomer': () => ({ personId: 980001 }),
+    'person_360:get': () => ({ person: { id: 980001, display_name: marker + '客户甲', legacy_customer_id: customer.Id },
+      household: mode === 'family' ? { id: 981001, important_facts: marker + '周末一起探望父母' } : null,
+      members: mode === 'family' ? [{ id: 982001, person_id: 980002, relationship_to_anchor: 'spouse',
+        person: { id: 980002, display_name: marker + '家人乙' } }] : [] }),
+    'person_360:search': () => ({ candidates: [{ id: 980002, display_name: marker + '家人乙' }], hasMore: false }),
     'customers:trashList': () => ({ ...rows([{ ...customer, Id: 910099, customer_name: marker + '已删除客户', deleted_at: '2026-09-20T01:00:00Z' }]), counts: {} }),
     'recruit_candidates:rcMap': () => rows([{ id: candidate.candidate_id, customer_id: customer.Id, deleted_at: null }]),
     'recruit_candidates:list': () => rows([candidate]),
@@ -65,7 +71,7 @@ function installFixtures() {
     async callFunction({ name, data }) {
       const key = name + ':' + data.action;
       if (!Object.hasOwn(replies, key)) return fail('UNEXPECTED_OR_WRITE_ACTION: ' + key);
-      calls.push({ name, action: data.action, id: data.id, customer_id: data.customer_id, candidate_id: data.candidate_id });
+      calls.push({ name, action: data.action, id: data.id, customer_id: data.customer_id, candidate_id: data.candidate_id, personId: data.personId });
       if (!loggedIn) return fail('CALL_BEFORE_LOGIN: ' + key);
       if (mode === 'error' && (!params.get('fail') || params.get('fail') === key)) return { result: { error: 'TEST_API_FAILURE' } };
       return { result: structuredClone(replies[key]()) };

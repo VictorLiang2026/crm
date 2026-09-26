@@ -1,0 +1,15 @@
+.person360{max-width:860px;margin:0 auto;display:grid;gap:16px}
+.person360-toolbar{display:flex;align-items:center;gap:12px}
+.person360-card{padding:20px}
+.person360-card h3{margin-bottom:12px}
+.person360-add{border-top:1px solid #e5e7eb;margin-top:16px;padding-top:16px;display:grid;gap:10px}
+.person360-row{display:flex;gap:10px;flex-wrap:wrap}
+.person360-row input,.person360-row select{min-height:38px;padding:7px 10px;border:1px solid #d1d5db;border-radius:8px}
+.person360-row input{flex:1;min-width:220px}
+.person360-member{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid #f1f5f9}
+.person360-remove{color:#b91c1c}
+.person360-candidates{display:grid;gap:5px}
+.person360-candidate{display:flex;align-items:center;gap:8px;padding:8px;border:1px solid #e5e7eb;border-radius:8px;cursor:pointer}
+.person360-facts{width:100%;min-height:110px;resize:vertical;padding:10px;border:1px solid #d1d5db;border-radius:8px;font:inherit}
+.person360-muted{color:#64748b;font-size:13px;margin:8px 0}
+.person360-error{color:#b91c1c;font-size:13px}

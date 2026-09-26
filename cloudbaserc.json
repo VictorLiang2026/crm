@@ -130,6 +130,13 @@
       "memorySize": 256
     },
     {
+      "name": "person_360",
+      "timeout": 20,
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "memorySize": 256
+    },
+    {
       "name": "policy_review_reports",
       "timeout": 150,
       "runtime": "Nodejs18.15",

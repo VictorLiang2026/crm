@@ -40,6 +40,28 @@ module.exports = async function smoke(root, test) {
       await open('#/customer/910001', '[CRM_TEST_ONLY]预约沟通');
       assert.equal(await b.evaluate("window.__crmTest.calls.find(c=>c.name==='customers' && c.action==='get').id"), 910001);
     });
+    await check('person360.family', 'Person 360 独立入口显示家庭成员与事实且只读加载', async () => {
+      await b.click('#view a', 'Person 360');
+      await b.wait(text('家庭成员'));
+      await b.wait(text('重要家庭事实'));
+      assert.equal(await b.evaluate('location.hash'), '#/person/980001');
+      assert.equal(await b.evaluate("window.__crmTest.calls.some(c=>c.name==='person_360' && c.action==='get' && c.personId==='980001')"), true);
+      assert.equal(await b.evaluate("window.__crmTest.calls.some(c=>c.name==='person_360' && ['addMember','saveFacts'].includes(c.action))"), false);
+    });
+    await check('person360.search', '家庭成员只能搜索并选择已有 Person', async () => {
+      await b.evaluate("document.querySelector('.person360-row input').value='[CRM_TEST_ONLY]家人乙'");
+      await b.click('.person360-row button', '查找');
+      await b.wait(text('[CRM_TEST_ONLY]家人乙'));
+      assert.equal(await b.evaluate("window.__crmTest.calls.some(c=>c.name==='person_360' && c.action==='search')"), true);
+      assert.equal(await b.evaluate("window.__crmTest.calls.some(c=>c.name==='persons' && c.action==='create')"), false);
+      await open('#/customer/910001', '[CRM_TEST_ONLY]预约沟通');
+    });
+    await check('person360.details', 'Person 360 显示已确认成员与重要家庭事实', async () => {
+      await open('#/person/980001', '[CRM_TEST_ONLY]家人乙', 'mode=family');
+      assert.equal(await b.evaluate("document.querySelector('.person360-facts').value"), '[CRM_TEST_ONLY]周末一起探望父母');
+      assert.equal(await b.evaluate("document.querySelector('.person360-member').innerText.includes('配偶')"), true);
+      await open('#/customer/910001', '[CRM_TEST_ONLY]预约沟通');
+    });
     await check('followups.tab', '跟进标签显示跟进记录', async () => {
       await b.click('.tab', '跟进记录');
       await b.wait(text('[CRM_TEST_ONLY]跟进内容'));
