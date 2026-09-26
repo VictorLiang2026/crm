@@ -1,0 +1,11 @@
+# Interactions work package
+
+Baseline: local/GitHub HEAD `ec817f41db75d9b422b3a5d1c480a9e631b295ab`, tag `release-20260926-205506`; local, GitHub, online `admin.html`, and 27 CRM Functions (113 source/config files) matched. `public.interactions` did not exist. Live schema confirmed `persons.legacy_customer_id`, `followups.customer_id`, `recruit_followups.candidate_id` through `recruit_candidates.customer_id`, and polymorphic activity participation. The source tables were not altered.
+
+Migration version `20260926213135` was planned, dry-run classified as a security change, and applied successfully to the production CloudBase migration history. Post-migration schema readback found 13 columns, two foreign keys, the person/time and source uniqueness indexes, forced RLS, the service-only policy, and zero ledger rows. The table ACL lists only `service_role` and its owner. Rollback is data guarded.
+
+Compatibility design: read-through of bounded active legacy records; no backfill and no changes to legacy CRUD, existing routes, or Quick Capture. Only explicit manual capture writes the new ledger. The service rejects absent Persons, invalid values, ambiguous identity mapping, and date-only manual timestamps. Production write tests require a separately marked test Person and are not run against real customer records.
+
+The isolated `InteractionService` suite passed 6/6 cases: all four sources, attendance-only activity mapping, conflicting speaker exclusion, materialized-source deduplication, standalone Person behavior, manual capture validation/audit, and bounded results. The full offline CRM regression passed 60, failed 0, skipped 5. `npm run check:shared`, syntax, and `git diff --check` passed. The new service is source code only at this stage; no existing Cloud Function or frontend route has been changed. Therefore its production HTTP path and manual database write path remain unverified.
+
+The production migration was applied before this Git publication because the new table was explicitly requested. Git publication records its exact SQL and guarded rollback. An additive `person_360` function entry for the service has been proposed separately under the existing-function compatibility confirmation rule in `AGENTS.md`; it is not part of this foundation release unless confirmed and validated before release.
