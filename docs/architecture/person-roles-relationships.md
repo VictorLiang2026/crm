@@ -1,0 +1,9 @@
+# Person roles and relationships
+
+`public.person_roles` attaches zero or more roles to a `public.persons` identity. The allowed roles are `customer`, `recruit`, `speaker`, `participant`, `partner`, `referrer`, `alumni` and `other`; `(person_id, role)` is unique. Its initial backfill uses only explicit customer IDs already linked to persons. The `origin` field distinguishes that snapshot from future manual assignments. It does not synchronize subsequent edits in legacy modules.
+
+`public.relationships` represents a directed link from `from_person_id` to `to_person_id`. The reverse direction is a separate link. A person cannot link to themself, and one active link of a given `relationship_type` may exist per ordered pair. Soft-deleted history remains available; a new active link can then be created. `introduced_by_person_id` optionally references another Person. `context` is a JSON object. The stage, strength, trust level and trend are independent higher-level descriptors; no vocabulary or numeric scale is imposed in this first data-layer package.
+
+The relationship table starts empty. Legacy `customers.customer_stage`, `recruit_candidates.stage` and `activity_speakers.relationship_stage` are unchanged and are not synchronized with it. Neither new table has a page or Cloud Function consumer yet. Both tables have RLS enabled and grant access only to `service_role`; any future runtime write path needs a separate permission and business review.
+
+Both migrations have guarded rollbacks. Roll back relationships before roles; a nonempty relationship table blocks its rollback, and manual or edited role assignments block the role rollback. Both use `DROP TABLE ... RESTRICT`, so dependent objects also block removal. The earlier persons migration cannot be rolled back while these foreign keys depend on it.
