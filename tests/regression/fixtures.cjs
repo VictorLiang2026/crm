@@ -33,6 +33,15 @@ function installFixtures() {
       members: mode === 'family' ? [{ id: 982001, person_id: 980002, relationship_to_anchor: 'spouse',
         person: { id: 980002, display_name: marker + '家人乙' } }] : [] }),
     'person_360:search': () => ({ candidates: [{ id: 980002, display_name: marker + '家人乙' }], hasMore: false }),
+    'person_360:resolveQuickCaptureName': () => ({ status: 'confirm_existing', hasMore: false,
+      candidates: [{ id: '980001', displayName: marker + '客户甲', organization: '测试机构' }], selectedPersonId: null }),
+    'person_360:commitQuickCaptureV2': () => ({ interactionId: 990001, contextItemCount: 2 }),
+    'ai_parse:quick_capture': data => data.version === 2 ? ({ today: '2026-09-27', preview: {
+      personName: marker + '客户甲', interaction: { type: '微信', date: '2026-09-27', channel: '微信', summary: marker + '沟通摘要' },
+      facts: [marker + '明确事实'], signals: [marker + '观察线索'],
+      opportunityCandidates: [marker + '机会推断'], actionCandidates: [marker + '下一步建议'],
+      commitmentCandidates: [marker + '明确约定'], evidence: [marker + '原话依据'],
+    } }) : fail('UNEXPECTED_LEGACY_AI_PARSE'),
     'customers:trashList': () => ({ ...rows([{ ...customer, Id: 910099, customer_name: marker + '已删除客户', deleted_at: '2026-09-20T01:00:00Z' }]), counts: {} }),
     'recruit_candidates:rcMap': () => rows([{ id: candidate.candidate_id, customer_id: customer.Id, deleted_at: null }]),
     'recruit_candidates:list': () => rows([candidate]),
@@ -71,10 +80,12 @@ function installFixtures() {
     async callFunction({ name, data }) {
       const key = name + ':' + data.action;
       if (!Object.hasOwn(replies, key)) return fail('UNEXPECTED_OR_WRITE_ACTION: ' + key);
-      calls.push({ name, action: data.action, id: data.id, customer_id: data.customer_id, candidate_id: data.candidate_id, personId: data.personId });
+      calls.push({ name, action: data.action, id: data.id, customer_id: data.customer_id,
+        candidate_id: data.candidate_id, personId: data.personId, version: data.version,
+        payload: key === 'person_360:commitQuickCaptureV2' ? data.data : null });
       if (!loggedIn) return fail('CALL_BEFORE_LOGIN: ' + key);
       if (mode === 'error' && (!params.get('fail') || params.get('fail') === key)) return { result: { error: 'TEST_API_FAILURE' } };
-      return { result: structuredClone(replies[key]()) };
+      return { result: structuredClone(replies[key](data)) };
     },
     rdb() { return fail('DIRECT_DATABASE_ACCESS'); },
     storage() { return fail('STORAGE_ACCESS'); }

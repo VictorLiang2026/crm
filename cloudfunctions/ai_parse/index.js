@@ -34,6 +34,7 @@
 'use strict';
 
 const { rdb, generateText, extractJson, assertOk } = require('./db');
+const { quickCaptureV2 } = require('./quick-capture-v2');
 
 const AI_MODEL = process.env.AI_MODEL || 'hy3';
 // 视觉模型：官方文档确认 hy3/hy3-preview 不支持多模态（图片会被静默忽略），
@@ -65,6 +66,9 @@ const SYSTEM_VISION = [
 exports.main = async (event, context) => {
   try {
     const action = (event && event.action) || 'parse';
+    if (action === 'quick_capture' && event?.version === 2) {
+      return await quickCaptureV2(event, { generateText, extractJson, today: qcBjToday() });
+    }
     if (action === 'quick_capture') return await quickCapture(event);
 
     const text = ((event && event.text) || '').trim();

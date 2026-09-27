@@ -66,18 +66,22 @@ function personId(value) {
 }
 
 class PersonService {
-  constructor({ rdb } = {}) {
-    if (!rdb || typeof rdb.from !== 'function') {
+  constructor({ rdb, request } = {}) {
+    if ((!rdb || typeof rdb.from !== 'function') && typeof request !== 'function') {
       throw new PersonResolutionError('INVALID_CONFIG', 'Authorized server-side CloudBase RDB is required');
     }
     this.rdb = rdb;
+    this.request = request;
   }
 
   async resolveName(displayName) {
     const parsed = parsePersonName(displayName);
     let response;
     try {
-      response = await this.rdb.from('public.persons')
+      response = this.request ? { data: await this.request('persons', 'GET', {
+        select: COLUMNS, name_key: `eq.${parsed.nameKey}`, deleted_at: 'is.null',
+        order: 'id.asc', limit: MAX_CANDIDATES + 1,
+      }) } : await this.rdb.from('public.persons')
         .select(COLUMNS)
         .eq('name_key', parsed.nameKey)
         .is('deleted_at', null)

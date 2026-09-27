@@ -10,6 +10,7 @@
     "test:person-service": "node --test tests/persons/person-service.cjs",
     "test:households": "node --test tests/households/person360-service.cjs",
     "test:interactions": "node --test tests/interactions/interaction-service.cjs tests/interactions/legacy-adapter.cjs tests/interactions/person360-dispatch.cjs",
+    "test:quick-capture-v2": "node --test tests/quick-capture-v2/server.cjs",
     "test": "node tests/regression/run.cjs",
     "test:backend": "node tests/regression/run.cjs --backend-only",
     "test:browser": "node tests/regression/run.cjs --browser-only"

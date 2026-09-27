@@ -2,7 +2,7 @@
 'use strict';
 
 const cloudbase = require('@cloudbase/node-sdk');
-const { parsePersonName } = require('./person-service');
+const { parsePersonName, PersonService } = require('./person-service');
 const { InteractionService } = require('./interaction-service');
 
 const app = cloudbase.init({ env: process.env.TCB_ENV });
@@ -56,7 +56,35 @@ async function pgRequest(table, method, filters = {}, body) {
   } finally { clearTimeout(timeout); }
 }
 
-function createService({ request = pgRequest } = {}) {
+async function pgRpc(name, body) {
+  if (name !== 'quick_capture_v2_commit') throw new Error('Invalid RPC');
+  const env = process.env.TCB_ENV;
+  const key = process.env.CRM_PERSON360_DB_API_KEY;
+  if (!/^crm-[a-z0-9]+$/.test(env || '') || !key) throw new Error('Person 360 is not configured');
+  const url = `https://${env}.api.tcloudbasegateway.com/v1/rdb/rest/rpc/${name}`;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000);
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${key}`,
+        'Accept-Profile': 'public',
+        'Content-Profile': 'public',
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    if (!response.ok) throw new Error(`Database request failed (${response.status})`);
+    const result = await response.json();
+    if (!result || typeof result !== 'object' || Array.isArray(result)) throw new Error('Unexpected database response');
+    return result;
+  } finally { clearTimeout(timeout); }
+}
+
+function createService({ request = pgRequest, rpc = pgRpc } = {}) {
   const findPerson = async id => one(await request('persons', 'GET', {
     select: 'id,display_name,legacy_customer_id,occupation,organization',
     id: `eq.${idOf(id)}`, deleted_at: 'is.null', limit: 1,
@@ -103,6 +131,43 @@ function createService({ request = pgRequest } = {}) {
       name_key: `eq.${nameKey}`, deleted_at: 'is.null', order: 'id.asc', limit: 11,
     });
     return { candidates: candidates.slice(0, 10), hasMore: candidates.length > 10 };
+  }
+
+  const personService = new PersonService({ request });
+  async function resolveQuickCaptureName(name) {
+    return personService.resolveName(name);
+  }
+
+  async function commitQuickCaptureV2(data, uid) {
+    if (!uid || data?.confirmed !== true) throw new Error('Human confirmation is required');
+    const selectedId = idOf(data.personId);
+    const selectedName = data.selectedDisplayName;
+    if (typeof selectedName !== 'string') throw new Error('Selected Person is required');
+    const resolution = await personService.resolveName(selectedName);
+    if (!resolution.candidates.some(candidate =>
+      candidate.id === selectedId && candidate.displayName === selectedName)) {
+      throw new Error('Selected Person changed; resolve identity again');
+    }
+    const interaction = data.interaction;
+    if (!interaction || typeof interaction !== 'object' || Array.isArray(interaction) ||
+        typeof interaction.type !== 'string' || typeof interaction.at !== 'string' ||
+        typeof interaction.summary !== 'string' || typeof interaction.rawNote !== 'string' ||
+        interaction.rawNote.length > 10000 || interaction.summary.length > 2000 ||
+        (interaction.channel != null && typeof interaction.channel !== 'string')) {
+      throw new Error('Invalid Interaction candidate');
+    }
+    const lists = [data.facts, data.signals];
+    if (lists.some((items, index) => !Array.isArray(items) || items.length > (index ? 12 : 20) ||
+      items.some(item => typeof item !== 'string' || !item.trim() || item.trim().length > 500))) {
+      throw new Error('Invalid Context Item candidate');
+    }
+    return rpc('quick_capture_v2_commit', {
+      p_person_id: Number(selectedId), p_selected_display_name: selectedName,
+      p_actor_uid: uid, p_interaction: {
+        type: interaction.type, at: interaction.at, channel: interaction.channel || '',
+        summary: interaction.summary, rawNote: interaction.rawNote,
+      }, p_facts: data.facts, p_signals: data.signals,
+    });
   }
 
   async function saveFacts(personId, facts) {
@@ -155,7 +220,8 @@ function createService({ request = pgRequest } = {}) {
     return get(anchor.id);
   }
 
-  return { get, lookupCustomer, search, saveFacts, addMember, removeMember };
+  return { get, lookupCustomer, search, saveFacts, addMember, removeMember,
+    resolveQuickCaptureName, commitQuickCaptureV2 };
 }
 
 exports.main = async event => {
@@ -177,6 +243,8 @@ exports.main = async event => {
         .listForPerson(event.personId, { limit: event.limit });
       case 'createInteraction': return await new InteractionService({ request: pgRequest })
         .createManual(event.personId, event.data, uid);
+      case 'resolveQuickCaptureName': return await service.resolveQuickCaptureName(event.name);
+      case 'commitQuickCaptureV2': return await service.commitQuickCaptureV2(event.data, uid);
       default: return { error: 'Unknown action' };
     }
   } catch (error) {

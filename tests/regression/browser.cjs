@@ -25,10 +25,23 @@ class Browser {
       const pathname = new URL(req.url, 'http://127.0.0.1').pathname;
       res.setHeader('Cache-Control', 'no-store');
       res.setHeader('Content-Security-Policy', "default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src data:; connect-src 'none'; form-action 'none'; base-uri 'none'; frame-src 'none'");
-      if (pathname === '/admin.html') { res.setHeader('Content-Type', 'text/html; charset=utf-8'); res.end(html); }
+      if (pathname === '/admin.html') {
+        res.setHeader('Content-Type', 'text/html; charset=utf-8');
+        res.end(new URL(req.url, 'http://127.0.0.1').searchParams.get('v2') === '1'
+          ? html.replace('quick_capture_v2: false', 'quick_capture_v2: true') : html);
+      }
       else if (pathname === '/fixtures.js') { res.setHeader('Content-Type', 'text/javascript; charset=utf-8'); res.end('(' + installFixtures.toString() + ')();'); }
       else if (pathname === '/crm/js/modules/person-360.js') { res.setHeader('Content-Type', 'text/javascript; charset=utf-8'); res.end(fs.readFileSync(path.join(this.root, 'crm/js/modules/person-360.js'))); }
       else if (pathname === '/crm/css/person-360.css') { res.setHeader('Content-Type', 'text/css; charset=utf-8'); res.end(fs.readFileSync(path.join(this.root, 'crm/css/person-360.css'))); }
+      else if (pathname === '/crm/js/core/api.js' || pathname === '/crm/js/core/feature-flags.js' ||
+               pathname === '/crm/js/modules/quick-capture-v2.js') {
+        res.setHeader('Content-Type', 'text/javascript; charset=utf-8');
+        res.end(fs.readFileSync(path.join(this.root, pathname.slice(1))));
+      }
+      else if (pathname === '/crm/css/quick-capture-v2.css') {
+        res.setHeader('Content-Type', 'text/css; charset=utf-8');
+        res.end(fs.readFileSync(path.join(this.root, pathname.slice(1))));
+      }
       else { res.writeHead(404); res.end(); }
     });
     this.server.listen(0, '127.0.0.1');

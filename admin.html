@@ -511,7 +511,7 @@
 <main id="view"><div class="loading">初始化中…</div></main>
 <div id="modal-root"></div>
 <div id="toast-root"></div>
-<script>window.APP_CONFIG = { envId: 'crm-d1gkae8ddc930d151', operator: { name: 'Victor', gender: '男', birthday: '1976-10' } };</script>
+<script>window.APP_CONFIG = { envId: 'crm-d1gkae8ddc930d151', operator: { name: 'Victor', gender: '男', birthday: '1976-10' }, featureFlags: { quick_capture_v2: false } };</script>
 <script src="https://static.cloudbase.net/cloudbase-js-sdk/latest/cloudbase.full.js"></script>
 <script>
 (function(){
@@ -8360,6 +8360,18 @@ function renderQuickCapture(container, r, text, preset){
 
 var qcEntryBtn = document.getElementById('qc-entry-btn');
 if(qcEntryBtn) qcEntryBtn.addEventListener('click', openQuickCapture);
+if(qcEntryBtn && CONFIG.featureFlags && CONFIG.featureFlags.quick_capture_v2 === true){
+  var qcV2Btn = el('button', {type:'button', class:'mod-btn'}, '快速记录 V2');
+  qcV2Btn.addEventListener('click', async function(){
+    try{
+      var featureModule = await import('/crm/js/core/feature-flags.js');
+      if(!featureModule.createFeatureFlags(CONFIG.featureFlags).isEnabled('quick_capture_v2')) return;
+      var module = await import('/crm/js/modules/quick-capture-v2.js');
+      module.openQuickCaptureV2({callFn:callFn});
+    }catch(e){ toast('快速记录 V2 加载失败：' + e.message, 'err'); }
+  });
+  qcEntryBtn.after(qcV2Btn);
+}
 
 })();
 </script>
