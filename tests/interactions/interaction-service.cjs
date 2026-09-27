@@ -5,12 +5,14 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { InteractionService } = require('../../cloudfunctions/_shared/interaction-service');
 
-test('deployed InteractionService copy matches the shared source', () => {
+test('deployed InteractionService and Legacy Adapter copies match shared sources', () => {
   const root = path.resolve(__dirname, '../..');
-  assert.deepEqual(
-    fs.readFileSync(path.join(root, 'cloudfunctions/person_360/interaction-service.js')),
-    fs.readFileSync(path.join(root, 'cloudfunctions/_shared/interaction-service.js')),
-  );
+  for (const file of ['interaction-service.js', 'legacy-interaction-adapter.js']) {
+    assert.deepEqual(
+      fs.readFileSync(path.join(root, 'cloudfunctions/person_360', file)),
+      fs.readFileSync(path.join(root, 'cloudfunctions/_shared', file)),
+    );
+  }
 });
 
 function fixture({ materialized = false, standalone = false } = {}) {
@@ -58,6 +60,14 @@ test('timeline reads all four sources without writes or invitations', async () =
     ['manual', 'activity_participants', 'recruit_followups', 'activity_participants', 'followups']);
   assert.equal(result.rows[1].summary, '参加活动：演讲活动');
   assert.equal(result.rows[2].channel, 'phone');
+  assert.deepEqual(result.rows.filter(row => row.virtual).map(row => [
+    row.id, row.interaction_type, row.source_id, row.interaction_at,
+  ]), [
+    ['activity_participants:21', 'activity_participation', 21, '2026-09-12T16:00:00.000Z'],
+    ['recruit_followups:8', 'recruit_followup', 8, '2026-09-11T16:00:00.000Z'],
+    ['activity_participants:20', 'activity_participation', 20, '2026-09-10T16:00:00.000Z'],
+    ['followups:5', 'followup', 5, '2026-09-09T16:00:00.000Z'],
+  ]);
   assert.ok(calls.every(call => call.method === 'GET'));
   assert.ok(calls.filter(call => ['followups', 'recruit_followups', 'activity_participants'].includes(call.table))
     .every(call => call.filters.deleted_at === 'is.null'));
