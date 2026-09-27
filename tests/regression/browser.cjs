@@ -44,7 +44,7 @@ class Browser {
     const portFile = path.join(this.profile, 'DevToolsActivePort');
     for (let i = 0; i < 150 && !fs.existsSync(portFile); i++) {
       if (spawnError) throw spawnError;
-      if (this.process.exitCode !== null) throw new Error('Browser exited before debugger ready');
+      // Edge may relaunch under the same test profile; the debugger port is the readiness signal.
       await delay(100);
     }
     if (!fs.existsSync(portFile)) throw new Error('Browser debugger startup timed out');
