@@ -7,7 +7,8 @@ function fixture() {
   const calls = [];
   const tables = {
     persons: [{ id: 11, legacy_customer_id: 101 }, { id: 12, legacy_customer_id: 102 }],
-    opportunities: [{ id: 21, customer_id: 101 }, { id: 22, customer_id: 102 }],
+    opportunities: [{ id: 21, customer_id: 101 }, { id: 22, customer_id: 102 },
+      { id: 23, customer_id: null, person_id: 11 }],
     interactions: [{ id: 31, person_id: 11 }, { id: 32, person_id: 12 }],
     activities: [{ id: 41 }],
     actions: [{ id: 51, person_id: 11, title: '已有行动', status: 'open' }],
@@ -48,6 +49,14 @@ test('manual creation validates linked Person, opportunity, interaction and acti
   assert.deepEqual([result.action.opportunity_id, result.action.interaction_id, result.action.activity_id],
     [21, 31, 41]);
   assert.deepEqual(calls.filter(call => call.method !== 'GET').map(call => call.table), ['actions']);
+});
+
+test('Person-only opportunity may be linked to a manual action', async () => {
+  const { service } = fixture();
+  const result = await service.createManual(11, {
+    action_type: 'call', title: '联系测试 Person', opportunity_id: 23,
+  }, 'test-actor');
+  assert.equal(result.action.opportunity_id, 23);
 });
 
 test('wrong-person links, unsupported source and invalid scores fail before any write', async () => {

@@ -13,9 +13,16 @@ const LEGACY_INTERACTION_TABLES = new Set([
 ]);
 const TABLES = new Set([
   'persons', 'households', 'household_members', 'interactions', 'commitments',
+  'opportunities',
   ...LEGACY_INTERACTION_TABLES,
 ]);
 const ROLES = new Set(['spouse', 'child', 'parent', 'sibling', 'other']);
+const OPPORTUNITY_TYPES = new Set([
+  'insurance', 'recruit', 'referral', 'activity', 'speaker',
+  'partnership', 'service', 'relationship',
+]);
+const OPPORTUNITY_STATUSES = new Set(['发现', '沟通', '方案', '成交', '关闭']);
+const REFERRAL_STATUSES = new Set(['潜在线索', '已介绍', '已联系', '已建立关系', '成交', '关闭']);
 
 function idOf(value) {
   const s = String(value ?? '');
@@ -126,6 +133,106 @@ function createService({ request = pgRequest, rpc = pgRpc } = {}) {
     return { personId: String(person.id) };
   }
 
+  async function listOpportunities(personId) {
+    const person = await findPerson(personId);
+    if (!person) throw new Error('Person not found');
+    const own = await request('opportunities', 'GET', {
+      select: '*', person_id: `eq.${idOf(person.id)}`,
+      deleted_at: 'is.null', order: 'updated_at.desc', limit: 100,
+    });
+    const legacy = person.legacy_customer_id == null ? [] : await request('opportunities', 'GET', {
+      select: '*', customer_id: `eq.${idOf(person.legacy_customer_id)}`,
+      deleted_at: 'is.null', order: 'updated_at.desc', limit: 100,
+    });
+    const byId = new Map();
+    for (const row of own.concat(legacy)) byId.set(String(row.id), row);
+    return { rows: [...byId.values()].sort((a, b) =>
+      String(b.updated_at || '').localeCompare(String(a.updated_at || ''))) };
+  }
+
+  function opportunityData(data, currentType, creating) {
+    if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('Invalid opportunity data');
+    const allowed = ['opportunity_type', 'status', 'discovered_at', 'last_progress',
+      'next_action', 'next_action_date', 'ai_summary', 'referred_name', 'referred_relation'];
+    const payload = {};
+    for (const key of allowed) if (Object.prototype.hasOwnProperty.call(data, key)) payload[key] = data[key];
+    const type = payload.opportunity_type || currentType;
+    if (!OPPORTUNITY_TYPES.has(type)) throw new Error('Invalid opportunity type');
+    if (payload.opportunity_type != null && typeof payload.opportunity_type !== 'string') {
+      throw new Error('Invalid opportunity type');
+    }
+    const statuses = type === 'referral' ? REFERRAL_STATUSES : OPPORTUNITY_STATUSES;
+    if (payload.status != null && !statuses.has(payload.status)) throw new Error('Invalid opportunity status');
+    for (const key of ['last_progress', 'next_action', 'ai_summary', 'referred_name', 'referred_relation']) {
+      if (payload[key] != null && (typeof payload[key] !== 'string' || payload[key].length > 4000)) {
+        throw new Error('Invalid opportunity field');
+      }
+    }
+    for (const key of ['discovered_at', 'next_action_date']) {
+      if (payload[key] != null && payload[key] !== '' &&
+          (typeof payload[key] !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(payload[key]))) {
+        throw new Error('Invalid opportunity date');
+      }
+      if (payload[key] === '') payload[key] = null;
+    }
+    if (creating) payload.status = payload.status || (type === 'referral' ? '潜在线索' : '发现');
+    return payload;
+  }
+
+  async function findPersonOpportunity(personId, opportunityId) {
+    const person = await findPerson(personId);
+    if (!person) throw new Error('Person not found');
+    const row = one(await request('opportunities', 'GET', {
+      select: 'id,opportunity_type,status', id: `eq.${idOf(opportunityId)}`,
+      person_id: `eq.${idOf(person.id)}`, customer_id: 'is.null',
+      deleted_at: 'is.null', limit: 1,
+    }));
+    if (!row) throw new Error('Person opportunity not found');
+    return row;
+  }
+
+  async function createOpportunity(personId, data) {
+    const person = await findPerson(personId);
+    if (!person) throw new Error('Person not found');
+    const payload = opportunityData(data, null, true);
+    const saved = one(await request('opportunities', 'POST', {}, {
+      ...payload, person_id: Number(person.id), customer_id: null,
+      created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    }));
+    if (!saved) throw new Error('Person opportunity could not be saved');
+    return { id: saved.id };
+  }
+
+  async function updateOpportunity(personId, opportunityId, data) {
+    const current = await findPersonOpportunity(personId, opportunityId);
+    const payload = opportunityData(data, current.opportunity_type, false);
+    if (!Object.keys(payload).length) return { ok: true, updated: false };
+    const saved = await request('opportunities', 'PATCH', {
+      id: `eq.${idOf(opportunityId)}`, person_id: `eq.${idOf(personId)}`,
+      customer_id: 'is.null', deleted_at: 'is.null',
+    }, { ...payload, updated_at: new Date().toISOString() });
+    return { ok: saved.length === 1 };
+  }
+
+  async function closeOpportunity(personId, opportunityId) {
+    await findPersonOpportunity(personId, opportunityId);
+    const saved = await request('opportunities', 'PATCH', {
+      id: `eq.${idOf(opportunityId)}`, person_id: `eq.${idOf(personId)}`,
+      customer_id: 'is.null', deleted_at: 'is.null',
+    }, { status: '关闭', updated_at: new Date().toISOString() });
+    return { ok: saved.length === 1 };
+  }
+
+  async function removeOpportunity(personId, opportunityId) {
+    await findPersonOpportunity(personId, opportunityId);
+    const now = new Date().toISOString();
+    const saved = await request('opportunities', 'PATCH', {
+      id: `eq.${idOf(opportunityId)}`, person_id: `eq.${idOf(personId)}`,
+      customer_id: 'is.null', deleted_at: 'is.null',
+    }, { deleted_at: now, updated_at: now });
+    return { ok: saved.length === 1 };
+  }
+
   async function search(name) {
     const { nameKey } = parsePersonName(name);
     const candidates = await request('persons', 'GET', {
@@ -223,6 +330,7 @@ function createService({ request = pgRequest, rpc = pgRpc } = {}) {
   }
 
   return { get, lookupCustomer, search, saveFacts, addMember, removeMember,
+    listOpportunities, createOpportunity, updateOpportunity, closeOpportunity, removeOpportunity,
     resolveQuickCaptureName, commitQuickCaptureV2 };
 }
 
@@ -235,6 +343,11 @@ exports.main = async event => {
     switch (event?.action) {
       case 'get': return await service.get(event.personId);
       case 'lookupCustomer': return await service.lookupCustomer(event.customerId);
+      case 'listOpportunities': return await service.listOpportunities(event.personId);
+      case 'createOpportunity': return await service.createOpportunity(event.personId, event.data);
+      case 'updateOpportunity': return await service.updateOpportunity(event.personId, event.id, event.data);
+      case 'closeOpportunity': return await service.closeOpportunity(event.personId, event.id);
+      case 'removeOpportunity': return await service.removeOpportunity(event.personId, event.id);
       case 'search': return await service.search(event.name);
       case 'saveFacts': return await service.saveFacts(event.personId, event.facts);
       case 'addMember': return await service.addMember(

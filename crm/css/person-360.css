@@ -13,3 +13,10 @@
 .person360-facts{width:100%;min-height:110px;resize:vertical;padding:10px;border:1px solid #d1d5db;border-radius:8px;font:inherit}
 .person360-muted{color:#64748b;font-size:13px;margin:8px 0}
 .person360-error{color:#b91c1c;font-size:13px}
+.person360-opportunity-list{display:grid;gap:8px;margin-bottom:12px}
+.person360-opportunity{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:10px 0;border-bottom:1px solid #f1f5f9}
+.person360-opportunity a{white-space:nowrap}
+.person360-opportunity-form{display:grid;gap:10px;border-top:1px solid #e5e7eb;margin-top:16px;padding-top:16px}
+.person360-opportunity-field{display:grid;gap:4px;font-size:13px}
+.person360-opportunity-field input,.person360-opportunity-field select,.person360-opportunity-field textarea{width:100%;padding:8px;border:1px solid #d1d5db;border-radius:8px;font:inherit}
+.person360-opportunity-field textarea{min-height:72px;resize:vertical}

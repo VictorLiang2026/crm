@@ -23,11 +23,14 @@ function probe() {
   (async () => {
     if (!await initSdk()) throw new Error('SDK initialization failed');
     const response = await callFn('person_360', { action: 'get', personId: 1 });
+    const opportunities = await callFn('person_360', { action: 'listOpportunities', personId: 1 });
     await publish({ ready: true, hasPerson: Boolean(response?.person?.id),
       householdCount: response?.household ? 1 : 0,
       memberCount: Array.isArray(response?.members) ? response.members.length : null,
-      error: typeof response?.error === 'string' ? response.error.slice(0, 120) : null });
-    document.getElementById('view').textContent = 'Person 360 只读验证完成。';
+      opportunityCount: Array.isArray(opportunities?.rows) ? opportunities.rows.length : null,
+      error: typeof (response?.error || opportunities?.error) === 'string'
+        ? (response.error || opportunities.error).slice(0, 120) : null });
+    document.getElementById('view').textContent = 'Person 360 与机会只读验证完成。';
   })().catch(async error => {
     await publish({ ready: true, hasPerson: false, error: String(error?.message || error).slice(0, 120) });
     document.getElementById('view').textContent = 'Person 360 只读验证未通过。';
@@ -50,7 +53,7 @@ const server = http.createServer((req, res) => {
     req.on('end', () => {
       try {
         const value = JSON.parse(body);
-        if (Object.keys(value).some(key => !['ready','hasPerson','householdCount','memberCount','error'].includes(key))) throw new Error('Unsafe report');
+        if (Object.keys(value).some(key => !['ready','hasPerson','householdCount','memberCount','opportunityCount','error'].includes(key))) throw new Error('Unsafe report');
         status = value;
         fs.writeFileSync(path.join(results, 'latest.json'), JSON.stringify(value, null, 2));
         res.end('ok');

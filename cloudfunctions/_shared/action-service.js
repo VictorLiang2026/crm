@@ -101,11 +101,17 @@ class ActionService {
     let activityId = null;
     if (data.opportunity_id != null) {
       opportunityId = idOf(data.opportunity_id);
-      if (person.legacy_customer_id == null || !one(await this.request('opportunities', 'GET', {
+      const direct = one(await this.request('opportunities', 'GET', {
         select: 'id', id: `eq.${opportunityId}`,
-        customer_id: `eq.${idOf(person.legacy_customer_id)}`,
-        deleted_at: 'is.null', limit: 1,
-      }))) throw new Error('Opportunity not found for Person');
+        person_id: `eq.${idOf(person.id)}`, deleted_at: 'is.null', limit: 1,
+      }));
+      const legacy = direct || person.legacy_customer_id == null ? null :
+        one(await this.request('opportunities', 'GET', {
+          select: 'id', id: `eq.${opportunityId}`,
+          customer_id: `eq.${idOf(person.legacy_customer_id)}`,
+          deleted_at: 'is.null', limit: 1,
+        }));
+      if (!direct && !legacy) throw new Error('Opportunity not found for Person');
     }
     if (data.interaction_id != null) {
       interactionId = idOf(data.interaction_id);

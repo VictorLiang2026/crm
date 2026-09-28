@@ -48,6 +48,29 @@ module.exports = async function smoke(root, test) {
       assert.equal(await b.evaluate("window.__crmTest.calls.some(c=>c.name==='person_360' && c.action==='get' && c.personId==='980001')"), true);
       assert.equal(await b.evaluate("window.__crmTest.calls.some(c=>c.name==='person_360' && ['addMember','saveFacts'].includes(c.action))"), false);
     });
+    await check('person360.opportunities', 'Person 360 显示旧客户及 Person 专属机会', async () => {
+      await b.wait(called('person_360', 'listOpportunities'));
+      await b.wait(text('[CRM_TEST_ONLY]联系候选人'));
+      assert.equal(await b.evaluate("document.querySelectorAll('.person360-opportunity').length"), 2);
+      assert.equal(await b.evaluate("document.querySelectorAll('.person360-opportunity a').length"), 1);
+      assert.equal(await b.evaluate("window.__crmTest.calls.some(c=>['createOpportunity','updateOpportunity'].includes(c.action))"), false);
+    });
+    await check('person360.opportunity-create', 'Person 机会先人工填写再通过登录接口创建', async () => {
+      await b.click('.person360-opportunities button', '新增 Person 机会');
+      assert.equal(await b.evaluate("window.__crmTest.calls.some(c=>c.action==='createOpportunity')"), false);
+      await b.evaluate("document.querySelector('.person360-opportunity-form select').value='speaker'; document.querySelector('.person360-opportunity-form input[type=text]').value='[CRM_TEST_ONLY]邀请嘉宾'");
+      await b.click('.person360-opportunity-form button', '保存机会');
+      await b.wait(called('person_360', 'createOpportunity'));
+      assert.equal(await b.evaluate("window.__crmTest.calls.find(c=>c.action==='createOpportunity').payload.opportunity_type"), 'speaker');
+    });
+    await check('person360.opportunity-edit', 'Person 专属机会可编辑，旧客户机会仅跳转原详情', async () => {
+      await b.wait(text('[CRM_TEST_ONLY]联系候选人'));
+      await b.click('.person360-opportunity button', '编辑');
+      await b.evaluate("document.querySelector('.person360-opportunity-form input[type=text]').value='[CRM_TEST_ONLY]更新行动'");
+      await b.click('.person360-opportunity-form button', '保存机会');
+      await b.wait(called('person_360', 'updateOpportunity'));
+      assert.equal(await b.evaluate("window.__crmTest.calls.find(c=>c.action==='updateOpportunity').id"), 961001);
+    });
     await check('person360.search', '家庭成员只能搜索并选择已有 Person', async () => {
       await b.evaluate("document.querySelector('.person360-row input').value='[CRM_TEST_ONLY]家人乙'");
       await b.click('.person360-row button', '查找');

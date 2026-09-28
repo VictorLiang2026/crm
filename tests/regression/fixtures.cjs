@@ -37,6 +37,14 @@ function installFixtures() {
       household: mode === 'family' ? { id: 981001, important_facts: marker + '周末一起探望父母' } : null,
       members: mode === 'family' ? [{ id: 982001, person_id: 980002, relationship_to_anchor: 'spouse',
         person: { id: 980002, display_name: marker + '家人乙' } }] : [] }),
+    'person_360:listOpportunities': () => rows(mode === 'empty' ? [] : [
+      { id: 961001, person_id: 980001, customer_id: null, opportunity_type: 'recruit',
+        status: '发现', next_action: marker + '联系候选人', updated_at: '2026-09-28' },
+      { id: 960001, person_id: 980001, customer_id: customer.Id, opportunity_type: '家庭保障',
+        status: '沟通', next_action: marker + '核对保障', updated_at: '2026-09-27' },
+    ]),
+    'person_360:createOpportunity': () => ({ id: 961002 }),
+    'person_360:updateOpportunity': () => ({ ok: true }),
     'person_360:search': () => ({ candidates: [{ id: 980002, display_name: marker + '家人乙' }], hasMore: false }),
     'person_360:resolveQuickCaptureName': () => ({ status: 'confirm_existing', hasMore: false,
       candidates: [{ id: '980001', displayName: marker + '客户甲', organization: '测试机构' }], selectedPersonId: null }),
@@ -94,7 +102,8 @@ function installFixtures() {
       if (!Object.hasOwn(replies, key)) return fail('UNEXPECTED_OR_WRITE_ACTION: ' + key);
       calls.push({ name, action: data.action, id: data.id, customer_id: data.customer_id,
         candidate_id: data.candidate_id, personId: data.personId, version: data.version,
-        payload: key === 'person_360:commitQuickCaptureV2' ? data.data : null });
+        payload: ['person_360:commitQuickCaptureV2', 'person_360:createOpportunity',
+          'person_360:updateOpportunity'].includes(key) ? data.data : null });
       if (!loggedIn) return fail('CALL_BEFORE_LOGIN: ' + key);
       if (mode === 'error' && (!params.get('fail') || params.get('fail') === key)) return { result: { error: 'TEST_API_FAILURE' } };
       return { result: structuredClone(replies[key](data)) };

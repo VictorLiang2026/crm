@@ -18,11 +18,15 @@
 
 const { rdb, nowIso, normFields, assertOk } = require('./db');
 
-var TYPE_ENUM = ['医疗保障', '重疾保障', '养老规划', '教育规划', '财富规划', '家庭保障', '转介绍'];
+var TYPE_ENUM = [
+  '医疗保障', '重疾保障', '养老规划', '教育规划', '财富规划', '家庭保障', '转介绍',
+  'insurance', 'recruit', 'referral', 'activity', 'speaker',
+  'partnership', 'service', 'relationship'
+];
 var STATUS_ENUM = ['发现', '沟通', '方案', '成交', '关闭'];
 var REF_STATUS_ENUM = ['潜在线索', '已介绍', '已联系', '已建立关系', '成交', '关闭'];
 
-function isReferral(type) { return type === '转介绍'; }
+function isReferral(type) { return type === '转介绍' || type === 'referral'; }
 // 按机会类型校验状态；返回错误串或 null
 function statusError(type, status) {
   if (!status) return null;
@@ -122,6 +126,15 @@ async function update(event) {
     Object.assign({}, data, { updated_at: nowIso() }),
     FIELDS.concat(['updated_at'])
   );
+  // The legacy API may reassign a customer opportunity. Its Person link must
+  // not continue pointing at the previous customer after reassignment.
+  if (Object.prototype.hasOwnProperty.call(payload, 'customer_id')) {
+    const existing = assertOk(await rdb.from('opportunities').select('customer_id')
+      .eq('id', id).maybeSingle());
+    if (existing.data && Number(existing.data.customer_id) !== Number(payload.customer_id)) {
+      payload.person_id = null;
+    }
+  }
   if (!Object.keys(payload).length) return { ok: true, updated: false };
   const r = assertOk(await rdb.from('opportunities').update(payload).eq('id', id).select('id'));
   return { ok: (r.data || []).length === 1 };
