@@ -1213,7 +1213,8 @@ function coachGo(it){
     else if(it.activity_id) location.hash = '#/activity/' + it.activity_id;
     return;
   }
-  if(it.type === 'recruit') location.hash = '#/recruit/' + it.id;
+  if(it.type === 'person') location.hash = '#/person/' + it.id;
+  else if(it.type === 'recruit') location.hash = '#/recruit/' + it.id;
   else location.hash = '#/customer/' + it.id;
 }
 // v1.7.6：活动行动标签文案与配色
@@ -1258,6 +1259,9 @@ function renderCoachItems(box, data, stale){
           ]),
           el('div', {class:'coach-reason'}, String(it.assessment || '')),
           el('div', {class:'coach-action'}, [ el('b', {}, '下一步：'), String(it.next_action || '查看详情') ]),
+          el('div', {class:'coach-sub'}, '预期目标：' + String(it.expected_objective || it.goal || '—')),
+          el('div', {class:'coach-sub'}, '准备：' + String(it.preparation || '—')),
+          el('div', {class:'coach-avoid'}, '风险：' + String(it.risk || '—')),
           el('div', {class:'coach-crit'}, (it.next_followup_date ? '到期/应联系：' + String(it.next_followup_date).slice(0,10) : '')),
         ]),
       ]));
@@ -1268,7 +1272,7 @@ function renderCoachItems(box, data, stale){
       el('div', {class:'coach-body'}, [
         el('div', {class:'coach-line1'}, [
           el('span', {class:'coach-name'}, String(it.name || '')),
-          el('span', {class:'coach-tag ' + (it.type === 'recruit' ? 't-recruit' : 't-customer')}, it.type === 'recruit' ? '增员' : '客户'),
+          el('span', {class:'coach-tag ' + (it.type === 'recruit' ? 't-recruit' : 't-customer')}, it.type === 'recruit' ? '增员' : it.type === 'person' ? '人物' : '客户'),
           it.ref ? el('span', {class:'coach-tag', style:'background:#fdf2f8;color:#be185d;border:1px solid #fbcfe8'}, '转介绍') : null,
           el('span', {class:'coach-tag t-stage'}, String(it.stage || '')),
           el('span', {class:'coach-tag ' + pCls}, '优先级 ' + String(it.priority || '中')),
@@ -1276,7 +1280,10 @@ function renderCoachItems(box, data, stale){
         it.ref ? el('div', {style:'font-size:12px;color:#be185d;margin:2px 0'}, '转介绍线索：' + esc(it.ref.name || '被介绍人待记录') + '（' + esc(it.ref.status || '') + '）') : null,
         el('div', {class:'coach-reason' + (isNa(it.assessment) ? ' coach-na' : '')}, String(cv(it.assessment))),
         el('div', {class:'coach-action'}, [ el('b', {}, '下一步：'), String(cv(it.next_action)) ]),
-        el('div', {class:'coach-sub'}, '目标：' + cv(it.goal) + ' · 主题：' + cv(it.topic)),
+        el('div', {class:'coach-sub'}, '预期目标：' + cv(it.expected_objective || it.goal)),
+        el('div', {class:'coach-sub'}, '准备：' + cv(it.preparation)),
+        el('div', {class:'coach-avoid'}, '风险：' + cv(it.risk || it.avoid)),
+        el('div', {class:'coach-sub'}, '主题：' + cv(it.topic)),
         el('div', {class:'coach-avoid' + (isNa(it.avoid) ? ' coach-na' : '')}, '不建议：' + cv(it.avoid)),
         el('div', {class:'coach-crit'}, '成功标准：' + cv(it.success_criteria) + ' · 下次跟进：' + (it.next_followup_date ? String(it.next_followup_date).slice(0,10) : '信息不足')),
       ]),
@@ -1290,7 +1297,7 @@ async function renderTodayCoach(force){
   if(!box) return;
   var today = dayStr(new Date());
   var cache = coachLoad();
-  if(!force && cache && cache.date === today && cache.v === 5 && cache.data && cache.data.items){
+  if(!force && cache && cache.date === today && cache.v === 6 && cache.data && cache.data.items){
     renderCoachItems(box, cache.data, false);
     // 指纹校验（轻量接口，不调 AI）：数据有变化仅提示
     callFn('today_coach', {action:'candidates'}).then(function(r){
@@ -1305,7 +1312,7 @@ async function renderTodayCoach(force){
   try{
     var r = await callFn('today_coach', {action:'generate'});
     if(r.error) throw new Error(r.error);
-    coachSave({ v: 5, date: today, fingerprint: r.fingerprint || '', data: r });
+    coachSave({ v: 6, date: today, fingerprint: r.fingerprint || '', data: r });
     renderCoachItems(box, r, false);
   }catch(e){
     box.innerHTML = '';
@@ -1456,7 +1463,8 @@ var DASH_TREND_LINK = { customer:'#/customers', opportunity:'#/customers', recru
 var DASH_REM_CLS = { high:'rem-high', mid:'rem-mid', low:'rem-low' };
 
 function dashT5Go(it){
-  if(it.person_type === 'recruit') location.hash = '#/recruit/' + it.person_id;
+  if(it.person_type === 'person') location.hash = '#/person/' + it.person_id;
+  else if(it.person_type === 'recruit') location.hash = '#/recruit/' + it.person_id;
   else if(it.person_type === 'activity') location.hash = '#/activity/' + it.person_id;
   else location.hash = '#/customer/' + it.person_id;
 }
@@ -1497,7 +1505,7 @@ function renderDashT5(box, data, stale){
       ? el('span', {class:'t5-tag tp-recruit'}, '增员')
       : (it.person_type === 'activity'
           ? el('span', {class:'t5-tag tp-activity'}, '活动')
-          : el('span', {class:'t5-tag tp-customer'}, '客户'));
+          : el('span', {class:'t5-tag tp-customer'}, it.person_type === 'person' ? '人物' : '客户'));
     var sd = dashMd(it.suggested_date);
     var script = String(it.script || '').trim();
     list.appendChild(el('div', {class:'t5-item', onclick:function(){ dashT5Go(it); }}, [
@@ -1509,8 +1517,12 @@ function renderDashT5(box, data, stale){
           el('span', {class:'t5-tier ' + tier.cls}, tier.label),
           el('span', {class:'t5-st ' + st.cls}, st.t),
         ]),
-        el('div', {class:'t5-row'}, [ el('b', {}, '为什么现在做'), String(it.reason || '—') ]),
-        el('div', {class:'t5-row'}, [ el('b', {}, '建议做什么'), String(it.action || it.title || '查看详情') ]),
+        el('div', {class:'t5-row'}, [ el('b', {}, '为什么现在做'), String(it.why_now || it.reason || '—') ]),
+        el('div', {class:'t5-row'}, [ el('b', {}, '要做什么'), String(it.what_to_do || it.action || it.title || '查看详情') ]),
+        el('div', {class:'t5-row'}, [ el('b', {}, '预期目标'), String(it.expected_objective || it.goal || '—') ]),
+        el('div', {class:'t5-row'}, [ el('b', {}, '准备'), String(it.preparation || '—') ]),
+        el('div', {class:'t5-row'}, [ el('b', {}, '风险'), String(it.risk || '—') ]),
+        it.coaching_note ? el('div', {class:'t5-row'}, [el('b', {}, 'AI排序补充'), String(it.coaching_note)]) : null,
         el('div', {class:'t5-meta'}, [
           el('span', {class:'t5-channel'}, (DASH_CH_ICON[it.channel] || '📌') + ' ' + String(it.channel || '微信')),
           el('span', {}, sd ? ('建议 ' + sd) : '建议尽快'),
@@ -1526,7 +1538,7 @@ function renderDashT5(box, data, stale){
 async function renderDashToday(box, force){
   var today = dayStr(new Date());
   var cache = coachLoad();
-  if(!force && cache && cache.date === today && cache.v === 5 && cache.data &&
+  if(!force && cache && cache.date === today && cache.v === 6 && cache.data &&
      Array.isArray(cache.data.today5) && cache.data.today5.length){
     renderDashT5(box, cache.data, false);
     // 指纹校验（轻量接口，不调 AI）：数据有变化仅提示，不自动重生成
@@ -1542,7 +1554,7 @@ async function renderDashToday(box, force){
   try{
     var r = await callFn('today_coach', {action:'generate'});
     if(r.error) throw new Error(r.error);
-    coachSave({ v:5, date:today, fingerprint:r.fingerprint || '', data:r });
+    coachSave({ v:6, date:today, fingerprint:r.fingerprint || '', data:r });
     renderDashT5(box, r, false);
   }catch(e){
     box.innerHTML = '';

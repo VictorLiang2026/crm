@@ -96,6 +96,15 @@ module.exports = async function smoke(root, test) {
       await b.wait(called('customers', 'get'));
       assert.equal(await b.evaluate('location.hash'), '#/customer/910001');
     });
+    await check('today.action_fields', 'Today 五项输出和 Person 跳转', async () => {
+      await open('#/today', '[CRM_TEST_ONLY]Action事项');
+      await b.wait(text('预期目标：完成已记录行动并确认下一步'));
+      await b.wait(text('准备：核对已有记录'));
+      await b.wait(text('风险：先核实信息'));
+      await b.click('.coach-item', '[CRM_TEST_ONLY]Action事项');
+      await b.wait(called('person_360', 'get'));
+      assert.equal(await b.evaluate('location.hash'), '#/person/980001');
+    });
     await check('today.commitment_link', '承诺提醒可进入独立 Person 360', async () => {
       await open('#/today', '[CRM_TEST_ONLY]已逾期承诺');
       await b.click('#today-commitments a', '[CRM_TEST_ONLY]客户甲');

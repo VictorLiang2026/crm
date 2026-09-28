@@ -63,9 +63,16 @@ function installFixtures() {
     'today_coach:candidates': () => ({ fingerprint: 'test-only' }),
     // Local fixture only: never invoke the real generate action (AI cost / side effects).
     'today_coach:generate': () => ({ source: 'rules', fingerprint: 'test-only', generated_at: '2026-09-21T00:00:00Z',
-      today5: mode === 'empty' ? [] : [{ person_type: 'customer', person_id: customer.Id, person_name: customer.customer_name, action: marker + '今日行动', tier: 'must_do' }],
+      today5: mode === 'empty' ? [] : [{ person_type: 'customer', person_id: customer.Id, person_name: customer.customer_name, action: marker + '今日行动', tier: 'must_do' },
+        { person_type: 'person', person_id: 980001, person_name: customer.customer_name,
+          action: marker + 'Action事项', what_to_do: marker + 'Action事项', why_now: '今天到期',
+          expected_objective: '完成已记录行动并确认下一步', preparation: '核对已有记录', risk: '先核实信息',
+          action_date: '2026-09-21', status: 'today', tier: 'recommended' }],
       items: mode === 'empty' ? [] : [{ type: 'customer', id: customer.Id, name: customer.customer_name,
-        stage: '关系维护', priority: '高', assessment: marker + '今日依据', next_action: marker + '今日行动' }], summary: marker + '今日摘要' }),
+        stage: '关系维护', priority: '高', assessment: marker + '今日依据', next_action: marker + '今日行动' },
+        { type: 'person', id: 980001, name: customer.customer_name, priority: '高', assessment: '今天到期',
+          next_action: marker + 'Action事项', expected_objective: '完成已记录行动并确认下一步',
+          preparation: '核对已有记录', risk: '先核实信息' }], summary: marker + '今日摘要' }),
     'today_coach:cockpit': () => ({ trends: [], reminders: [] }),
     'funnel_insight:stats': () => ({ ok: true, generated_at: '2026-09-21T00:00:00Z', funnels: ['customer', 'opportunity', 'recruit'].map(key => ({
       key, label: marker + key, total: mode === 'empty' ? 0 : 1, metrics: [], rates: [], warnings: [],
