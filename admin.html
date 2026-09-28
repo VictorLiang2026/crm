@@ -1379,6 +1379,43 @@ function renderCoachReview(box, data){
 
 // ==================== 今日经营（独立功能页 #/today） ====================
 // 当天已生成则直接用缓存（不调 AI），否则自动生成一次；「重新生成今日建议」主动刷新
+async function renderDueCommitments(card){
+  card.innerHTML = '';
+  card.appendChild(el('div', {class:'loading'}, '正在读取承诺到期提醒…'));
+  try {
+    var result = await callFn('person_360', {action:'listDueCommitments'});
+    if(result.error) throw new Error(result.error);
+    var overdue = Array.isArray(result.overdue) ? result.overdue : [];
+    var dueSoon = Array.isArray(result.dueSoon) ? result.dueSoon : [];
+    card.innerHTML = '';
+    card.appendChild(el('div', {class:'coach-head'}, [
+      el('span', {class:'coach-title'}, '承诺到期'),
+      el('span', {class:'coach-meta'}, '逾期 ' + overdue.length + ' · 未来3天 ' + dueSoon.length),
+      el('button', {class:'btn btn-sm', onclick:function(){ renderDueCommitments(card); }}, '刷新'),
+    ]));
+    function addGroup(title, rows, hasMore){
+      var group = el('div', {style:'padding:12px 16px'});
+      group.appendChild(el('div', {style:'font-weight:600;margin-bottom:8px'}, title));
+      if(!rows.length) group.appendChild(el('div', {class:'empty'}, '暂无'));
+      rows.forEach(function(row){
+        var due = new Date(row.due_at);
+        var when = Number.isFinite(due.getTime()) ? due.toLocaleString('zh-CN', {timeZone:'Asia/Shanghai', hour12:false}) : '';
+        group.appendChild(el('div', {style:'padding:8px 0;border-top:1px solid #eee'}, [
+          el('a', {onclick:function(){ location.hash='#/person/' + row.person_id; }}, String(row.person_name || '人物')),
+          el('span', {style:'margin-left:8px'}, String(row.content || '')),
+          el('div', {class:'coach-meta'}, '到期：' + when + ' · ' + String(row.commitment_type || '')),
+        ]));
+      });
+      if(hasMore) group.appendChild(el('div', {class:'coach-meta'}, '仅显示前50条，请先处理较近的承诺。'));
+      card.appendChild(group);
+    }
+    addGroup('已逾期', overdue, result.hasMoreOverdue);
+    addGroup('未来3天到期', dueSoon, result.hasMoreDueSoon);
+  } catch(e){
+    card.innerHTML = '';
+    card.appendChild(el('div', {class:'coach-stale'}, '承诺提醒读取失败：' + esc(e.message)));
+  }
+}
 async function showTodayCoach(){
   var view = $('view');
   view.innerHTML = '';
@@ -1388,6 +1425,9 @@ async function showTodayCoach(){
   var card = el('div', {class:'card'});
   card.appendChild(el('div', {class:'loading'}, '加载中…'));
   view.appendChild(card);
+  var commitmentCard = el('div', {class:'card', id:'today-commitments'});
+  view.appendChild(commitmentCard);
+  renderDueCommitments(commitmentCard);
 
   try {
     var coachBox = el('div', {class:'coach-box'});

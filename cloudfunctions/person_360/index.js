@@ -4,6 +4,7 @@
 const cloudbase = require('@cloudbase/node-sdk');
 const { parsePersonName, PersonService } = require('./person-service');
 const { InteractionService } = require('./interaction-service');
+const { CommitmentService } = require('./commitment-service');
 
 const app = cloudbase.init({ env: process.env.TCB_ENV });
 const LEGACY_INTERACTION_TABLES = new Set([
@@ -11,7 +12,7 @@ const LEGACY_INTERACTION_TABLES = new Set([
   'activity_participants', 'activity_speakers', 'activities',
 ]);
 const TABLES = new Set([
-  'persons', 'households', 'household_members', 'interactions',
+  'persons', 'households', 'household_members', 'interactions', 'commitments',
   ...LEGACY_INTERACTION_TABLES,
 ]);
 const ROLES = new Set(['spouse', 'child', 'parent', 'sibling', 'other']);
@@ -27,6 +28,7 @@ function one(rows) { return Array.isArray(rows) ? rows[0] || null : null; }
 async function pgRequest(table, method, filters = {}, body) {
   if (!TABLES.has(table)) throw new Error('Invalid table');
   if (LEGACY_INTERACTION_TABLES.has(table) && method !== 'GET') throw new Error('Invalid source operation');
+  if (table === 'commitments' && method !== 'GET') throw new Error('Invalid source operation');
   const env = process.env.TCB_ENV;
   const key = process.env.CRM_PERSON360_DB_API_KEY;
   if (!/^crm-[a-z0-9]+$/.test(env || '') || !key) throw new Error('Person 360 is not configured');
@@ -241,6 +243,7 @@ exports.main = async event => {
       case 'removeMember': return await service.removeMember(event.personId, event.membershipId, event.confirmed);
       case 'listInteractions': return await new InteractionService({ request: pgRequest })
         .listForPerson(event.personId, { limit: event.limit });
+      case 'listDueCommitments': return await new CommitmentService({ request: pgRequest }).listDue();
       case 'createInteraction': return await new InteractionService({ request: pgRequest })
         .createManual(event.personId, event.data, uid);
       case 'resolveQuickCaptureName': return await service.resolveQuickCaptureName(event.name);

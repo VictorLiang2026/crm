@@ -89,9 +89,18 @@ module.exports = async function smoke(root, test) {
       await b.open('#/today');
       await b.wait(called('today_coach', 'generate'));
       await b.wait(text('[CRM_TEST_ONLY]今日行动'));
+      await b.wait(called('person_360', 'listDueCommitments'));
+      await b.wait(text('[CRM_TEST_ONLY]已逾期承诺'));
+      await b.wait(text('[CRM_TEST_ONLY]即将到期承诺'));
       await b.click('.coach-name', '[CRM_TEST_ONLY]客户甲');
       await b.wait(called('customers', 'get'));
       assert.equal(await b.evaluate('location.hash'), '#/customer/910001');
+    });
+    await check('today.commitment_link', '承诺提醒可进入独立 Person 360', async () => {
+      await open('#/today', '[CRM_TEST_ONLY]已逾期承诺');
+      await b.click('#today-commitments a', '[CRM_TEST_ONLY]客户甲');
+      await b.wait(called('person_360', 'get'));
+      assert.equal(await b.evaluate('location.hash'), '#/person/980001');
     });
     await check('funnels.page', '漏斗事实卡展示三个漏斗，不调用AI解读', async () => {
       await open('#/funnels', '[CRM_TEST_ONLY]阶段');

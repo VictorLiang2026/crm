@@ -27,6 +27,10 @@ global.fetch = async (url, options) => {
   assert.equal(options.headers['Accept-Profile'], 'public');
   let rows = [];
   if (table === 'persons') rows = [{ id: 11, legacy_customer_id: 101, display_name: '测试人物' }];
+  if (table === 'commitments' && u.searchParams.get('due_at').startsWith('gte.')) rows = [{
+    id: 17, person_id: 11, commitment_type: 'I_PROMISED', content: '[CRM_TEST_ONLY]承诺',
+    due_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(), status: 'open', source: 'manual',
+  }];
   if (table === 'followups') rows = [{ Id: 5, followup_date: '2026-09-10', interaction_summary: '旧跟进' }];
   if (table === 'interactions' && options.method === 'POST') rows = [{ id: 9, ...JSON.parse(options.body) }];
   return { ok: true, text: async () => JSON.stringify(rows) };
@@ -43,7 +47,18 @@ test('new actions reject missing login before database requests', async () => {
   calls.length = 0;
   assert.deepEqual(await main({ action: 'listInteractions', personId: 11 }), { error: 'UNAUTHORIZED' });
   assert.deepEqual(await main({ action: 'createInteraction', personId: 11, data: {} }), { error: 'UNAUTHORIZED' });
+  assert.deepEqual(await main({ action: 'listDueCommitments' }), { error: 'UNAUTHORIZED' });
   assert.equal(calls.length, 0);
+});
+
+test('listDueCommitments uses read-only public queries after login', async () => {
+  uid = 'test-uid';
+  calls.length = 0;
+  const result = await main({ action: 'listDueCommitments' });
+  assert.equal(result.dueSoon.length, 1);
+  assert.equal(result.dueSoon[0].person_name, '测试人物');
+  assert.deepEqual(calls.map(call => call.table), ['commitments', 'commitments', 'persons']);
+  assert.ok(calls.every(call => call.method === 'GET'));
 });
 
 test('listInteractions reads legacy followups through the authenticated function', async () => {
