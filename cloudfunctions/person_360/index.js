@@ -5,15 +5,20 @@ const cloudbase = require('@cloudbase/node-sdk');
 const { parsePersonName, PersonService } = require('./person-service');
 const { InteractionService } = require('./interaction-service');
 const { CommitmentService } = require('./commitment-service');
+const { InsuranceContextService } = require('./insurance-context-service');
 
 const app = cloudbase.init({ env: process.env.TCB_ENV });
 const LEGACY_INTERACTION_TABLES = new Set([
   'followups', 'recruit_candidates', 'recruit_followups',
   'activity_participants', 'activity_speakers', 'activities',
 ]);
+const INSURANCE_READ_TABLES = new Set([
+  'products', 'policy_review_reports', 'ocr_records', 'photos', 'actions',
+]);
 const TABLES = new Set([
   'persons', 'households', 'household_members', 'interactions', 'commitments',
   'opportunities',
+  ...INSURANCE_READ_TABLES,
   ...LEGACY_INTERACTION_TABLES,
 ]);
 const ROLES = new Set(['spouse', 'child', 'parent', 'sibling', 'other']);
@@ -35,6 +40,7 @@ function one(rows) { return Array.isArray(rows) ? rows[0] || null : null; }
 async function pgRequest(table, method, filters = {}, body) {
   if (!TABLES.has(table)) throw new Error('Invalid table');
   if (LEGACY_INTERACTION_TABLES.has(table) && method !== 'GET') throw new Error('Invalid source operation');
+  if (INSURANCE_READ_TABLES.has(table) && method !== 'GET') throw new Error('Invalid source operation');
   if (table === 'commitments' && method !== 'GET') throw new Error('Invalid source operation');
   const env = process.env.TCB_ENV;
   const key = process.env.CRM_PERSON360_DB_API_KEY;
@@ -148,6 +154,12 @@ function createService({ request = pgRequest, rpc = pgRpc } = {}) {
     for (const row of own.concat(legacy)) byId.set(String(row.id), row);
     return { rows: [...byId.values()].sort((a, b) =>
       String(b.updated_at || '').localeCompare(String(a.updated_at || ''))) };
+  }
+
+  async function getInsuranceContext(personId) {
+    const person = await findPerson(personId);
+    if (!person) throw new Error('Person not found');
+    return new InsuranceContextService({ request }).build(person);
   }
 
   function opportunityData(data, currentType, creating) {
@@ -331,6 +343,7 @@ function createService({ request = pgRequest, rpc = pgRpc } = {}) {
 
   return { get, lookupCustomer, search, saveFacts, addMember, removeMember,
     listOpportunities, createOpportunity, updateOpportunity, closeOpportunity, removeOpportunity,
+    getInsuranceContext,
     resolveQuickCaptureName, commitQuickCaptureV2 };
 }
 
@@ -344,6 +357,7 @@ exports.main = async event => {
       case 'get': return await service.get(event.personId);
       case 'lookupCustomer': return await service.lookupCustomer(event.customerId);
       case 'listOpportunities': return await service.listOpportunities(event.personId);
+      case 'getInsuranceContext': return await service.getInsuranceContext(event.personId);
       case 'createOpportunity': return await service.createOpportunity(event.personId, event.data);
       case 'updateOpportunity': return await service.updateOpportunity(event.personId, event.id, event.data);
       case 'closeOpportunity': return await service.closeOpportunity(event.personId, event.id);

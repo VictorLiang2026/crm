@@ -148,6 +148,54 @@ export async function renderPerson360({ root, personId, callFn }) {
     formHost.append(form);
   }
 
+  const insurance = node('section', 'card person360-card person360-insurance');
+  insurance.append(node('h3', '', '保险概览'));
+  const insuranceBody = node('div', 'person360-insurance-grid');
+  insurance.append(insuranceBody);
+  wrap.append(insurance);
+  try {
+    const context = await request('getInsuranceContext', { personId });
+    if (location.hash !== hash) return;
+    function section(title, rows, empty, render) {
+      const block = node('div', 'person360-insurance-block');
+      block.append(node('h4', '', title));
+      if (!rows.length) block.append(node('p', 'person360-muted', empty));
+      for (const row of rows) block.append(render(row));
+      insuranceBody.append(block);
+    }
+    section('Existing Coverage · 已录入保障', context.existingCoverage || [],
+      '尚无已录入保单明细；不能据此判断没有保障。', row =>
+        node('p', '', `${row.label}：保额 ${row.amount ?? '—'}，年缴 ${row.premium ?? '—'}`));
+    const reviewRows = [];
+    if (context.review?.latest) reviewRows.push({ label: '最近检视',
+      text: `${context.review.latest.date || ''} ${context.review.latest.summary || '暂无摘要'}`,
+      provenance: context.review.latest.provenance });
+    for (const row of context.review?.ocr || []) reviewRows.push({ label: 'OCR',
+      text: row.summary, provenance: row.provenance });
+    for (const row of context.review?.evidence || []) reviewRows.push({ label: '资料',
+      text: `${row.fileName || '未命名文件'}${row.note ? ` · ${row.note}` : ''}`, provenance: '附件元数据' });
+    section('Review · 检视与依据', reviewRows, '暂无相关检视报告、OCR 摘要或资料。', row =>
+      node('p', '', `${row.label}：${row.text}（${row.provenance}）`));
+    section('Known Needs · 已记录需求', context.knownNeeds || [],
+      '暂无人工编辑的检视需求。', row => node('p', '', `${row.content}（${row.provenance}）`));
+    section('Potential Gaps · 待核实缺口', context.potentialGaps || [],
+      '暂无报告提出的待核实缺口；不能据此判断保障充分。', row =>
+        node('p', '', `${row.content}（${row.provenance}）`));
+    section('Open Opportunities · 进行中的保险机会', context.openOpportunities || [],
+      '暂无进行中的保险机会。', row =>
+        node('p', '', `${row.type} · ${row.status || '未分阶段'}${row.progress ? ` · ${row.progress}` : ''}`));
+    section('Next Actions · 下一步行动', context.nextActions || [],
+      '暂无已记录的保险相关行动。', row =>
+        node('p', '', `${row.title}${row.dueAt ? ` · ${String(row.dueAt).slice(0, 10)}` : ''}`));
+    if (context.legacyCustomerId) {
+      const link = node('a', '', '打开原保单检视页面');
+      link.href = `#/customer/${context.legacyCustomerId}`;
+      insurance.append(link);
+    }
+  } catch (error) {
+    insuranceBody.append(node('p', 'person360-error', `保险概览加载失败：${error.message}`));
+  }
+
   const family = node('section', 'card person360-card');
   family.append(node('h3', '', '家庭成员'));
   if (!model.members.length) family.append(node('p', 'person360-muted', '尚未关联家庭成员。只可选择已有 Person，且需人工确认。'));

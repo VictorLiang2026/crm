@@ -55,6 +55,15 @@ module.exports = async function smoke(root, test) {
       assert.equal(await b.evaluate("document.querySelectorAll('.person360-opportunity a').length"), 1);
       assert.equal(await b.evaluate("window.__crmTest.calls.some(c=>['createOpportunity','updateOpportunity'].includes(c.action))"), false);
     });
+    await check('person360.insurance', 'Person 360 分源显示六块只读保险概览，旧保单检视入口保留', async () => {
+      await b.wait(called('person_360', 'getInsuranceContext'));
+      for (const label of ['Existing Coverage', 'Review', 'Known Needs', 'Potential Gaps', 'Open Opportunities', 'Next Actions']) {
+        assert.equal(await b.evaluate(text(label)), true);
+      }
+      assert.equal(await b.evaluate(text('[CRM_TEST_ONLY]核对保障')), true);
+      assert.equal(await b.evaluate("document.querySelector('.person360-insurance a').getAttribute('href')"), '#/customer/910001');
+      assert.equal(await b.evaluate("window.__crmTest.calls.some(c=>c.name==='person_360' && c.action==='getInsuranceContext')"), true);
+    });
     await check('person360.opportunity-create', 'Person 机会先人工填写再通过登录接口创建', async () => {
       await b.click('.person360-opportunities button', '新增 Person 机会');
       assert.equal(await b.evaluate("window.__crmTest.calls.some(c=>c.action==='createOpportunity')"), false);
@@ -84,6 +93,11 @@ module.exports = async function smoke(root, test) {
       assert.equal(await b.evaluate("document.querySelector('.person360-facts').value"), '[CRM_TEST_ONLY]周末一起探望父母');
       assert.equal(await b.evaluate("document.querySelector('.person360-member').innerText.includes('配偶')"), true);
       await open('#/customer/910001', '[CRM_TEST_ONLY]预约沟通');
+    });
+    await check('customer.policy-review', '原客户详情的保单检视页签和生成入口保留', async () => {
+      await b.click('.tab', '保单检视');
+      await b.wait(text('生成保单检视报告'));
+      assert.equal(await b.evaluate("document.querySelectorAll('.prod-table').length"), 1);
     });
     await check('followups.tab', '跟进标签显示跟进记录', async () => {
       await b.click('.tab', '跟进记录');

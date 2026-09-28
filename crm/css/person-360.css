@@ -20,3 +20,8 @@
 .person360-opportunity-field{display:grid;gap:4px;font-size:13px}
 .person360-opportunity-field input,.person360-opportunity-field select,.person360-opportunity-field textarea{width:100%;padding:8px;border:1px solid #d1d5db;border-radius:8px;font:inherit}
 .person360-opportunity-field textarea{min-height:72px;resize:vertical}
+.person360-insurance-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px}
+.person360-insurance-block{padding:12px;border:1px solid #e5e7eb;border-radius:8px;min-width:0}
+.person360-insurance-block h4{margin:0 0 8px;font-size:14px}
+.person360-insurance-block p{margin:6px 0;overflow-wrap:anywhere;white-space:pre-wrap}
+.person360-insurance>a{display:inline-block;margin-top:12px}
