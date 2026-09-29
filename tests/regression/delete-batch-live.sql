@@ -16,6 +16,7 @@ DECLARE
   v_batch uuid;
 BEGIN
   IF EXISTS (SELECT 1 FROM public.customers WHERE "Id" IN (c_id, legacy_c_id))
+     OR EXISTS (SELECT 1 FROM public.persons WHERE legacy_customer_id IN (c_id, legacy_c_id))
      OR EXISTS (SELECT 1 FROM public.followups WHERE "Id" BETWEEN -92209199 AND -92209100)
      OR EXISTS (SELECT 1 FROM public.recruit_candidates WHERE id IN (active_rc_id, old_rc_id))
      OR EXISTS (SELECT 1 FROM public.recruit_followups WHERE id BETWEEN -92209399 AND -92209300) THEN
@@ -110,6 +111,8 @@ BEGIN
 
   DELETE FROM public.recruit_followups WHERE id IN (active_rf_id, old_rf_id, old_rc_rf_id);
   DELETE FROM public.recruit_candidates WHERE id IN (active_rc_id, old_rc_id);
+  DELETE FROM public.persons WHERE legacy_customer_id = c_id
+    AND display_name = '[CRM_TEST_ONLY] delete batch customer';
   DELETE FROM public.followups WHERE "Id" IN (active_f_id, old_f_id, standalone_f_id, legacy_f_id);
   DELETE FROM public.customers WHERE "Id" IN (c_id, legacy_c_id);
 END;
