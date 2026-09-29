@@ -33,6 +33,8 @@ class Browser {
       else if (pathname === '/fixtures.js') { res.setHeader('Content-Type', 'text/javascript; charset=utf-8'); res.end('(' + installFixtures.toString() + ')();'); }
       else if (pathname === '/crm/js/modules/person-360.js') { res.setHeader('Content-Type', 'text/javascript; charset=utf-8'); res.end(fs.readFileSync(path.join(this.root, 'crm/js/modules/person-360.js'))); }
       else if (pathname === '/crm/css/person-360.css') { res.setHeader('Content-Type', 'text/css; charset=utf-8'); res.end(fs.readFileSync(path.join(this.root, 'crm/css/person-360.css'))); }
+      else if (pathname === '/crm/js/modules/activity-review-v2.js') { res.setHeader('Content-Type', 'text/javascript; charset=utf-8'); res.end(fs.readFileSync(path.join(this.root, 'crm/js/modules/activity-review-v2.js'))); }
+      else if (pathname === '/crm/css/activity-review-v2.css') { res.setHeader('Content-Type', 'text/css; charset=utf-8'); res.end(fs.readFileSync(path.join(this.root, 'crm/css/activity-review-v2.css'))); }
       else if (pathname === '/crm/js/core/api.js' || pathname === '/crm/js/core/feature-flags.js' ||
                pathname === '/crm/js/modules/quick-capture-v2.js') {
         res.setHeader('Content-Type', 'text/javascript; charset=utf-8');

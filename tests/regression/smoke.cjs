@@ -165,6 +165,14 @@ module.exports = async function smoke(root, test) {
       await b.wait("!document.querySelector('#view .loading')");
       assert.equal(await b.evaluate("window.__crmTest.calls.find(c=>c.name==='activities' && c.action==='get').id"), 940001);
     });
+    await check('activity.relationship-review-preview', '关系复盘只生成有来源的行动候选，不触发业务写入', async () => {
+      await open('#/activity/940001', '[CRM_TEST_ONLY]客户甲', 'mode=activity-ended');
+      await b.click('#view button', '关系复盘预览');
+      await b.wait(called('ai_activity', 'postReviewV2'));
+      await b.wait(text('[CRM_TEST_ONLY]核实需求'));
+      assert.equal(await b.evaluate("document.querySelectorAll('.activity-review-v2-candidate').length"), 1);
+      assert.equal(await b.evaluate("window.__crmTest.calls.some(c=>['createOpportunity','createInteraction','createManual','recordActivityInteraction'].includes(c.action))"), false);
+    });
     await check('activity.important-interaction', '重要互动必须填写结果与摘要并人工确认', async () => {
       await open('#/activity/940001', '[CRM_TEST_ONLY]客户甲');
       await b.click('#view a', '记录重要互动');

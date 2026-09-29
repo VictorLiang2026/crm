@@ -1,0 +1,12 @@
+.activity-review-v2{margin-bottom:12px;border:1px solid #c7d2fe;background:#f8faff;padding:16px}
+.activity-review-v2 h3{color:#4338ca;margin-bottom:6px}
+.activity-review-v2-note{color:#475569;font-size:12px;margin-bottom:10px}
+.activity-review-v2-summary{margin-bottom:12px;white-space:pre-wrap}
+.activity-review-v2-section{border-top:1px solid #e0e7ff;padding:10px 0}
+.activity-review-v2-section h4{font-size:13px;margin-bottom:6px}
+.activity-review-v2-section ul{padding-left:18px}
+.activity-review-v2-section li{margin-bottom:8px}
+.activity-review-v2-source{display:block;color:#64748b;overflow-wrap:anywhere}
+.activity-review-v2-muted{color:#64748b}
+.activity-review-v2-candidate{padding:8px 10px;margin:8px 0;background:#fff;border-left:3px solid #6366f1}
+.activity-review-v2-candidate p{margin:4px 0}

@@ -13,7 +13,8 @@ function installFixtures() {
   const candidate = { candidate_id: 930001, customer_id: customer.Id,
     customer_name: marker + '候选人甲', stage: '新增人才', phone: 'TEST-0002', idle_days: 1 };
   const activity = { id: 940001, name: marker + '活动甲', activity_date: '2026-09-25',
-    status: 'preparing', description: marker + '活动说明', topic_ids: [], deleted_at: null };
+    status: mode === 'activity-ended' ? 'ended' : 'preparing',
+    description: marker + '活动说明', topic_ids: [], deleted_at: null };
   const calls = [], violations = [], errors = [];
   let loggedIn = params.get('login') !== 'required';
   window.__crmTest = { calls, violations, errors, loginAttempts: 0 };
@@ -23,6 +24,14 @@ function installFixtures() {
   const fail = message => { violations.push(message); throw new Error(message); };
   const rows = value => ({ rows: mode === 'empty' ? [] : value, total: mode === 'empty' ? 0 : value.length, page: 1, pageSize: 50 });
   const replies = {
+    'ai_activity:postReviewV2': () => ({ activity_id: activity.id, activity_name: activity.name,
+      task_id: 800001, result_id: 800002, requires_confirmation: true,
+      business_data_written: false, discarded_unsupported_items: 0,
+      review: { summary: marker + '关系复盘摘要',
+        whoMattered: [{ text: marker + '客户甲值得关注', sourceRefs: ['public.persons#980001'] }],
+        whatChanged: [], relationshipsImproved: [], signalsAppeared: [], opportunitiesAppeared: [],
+        followUpPeople: [], actionCandidates: [{ personId: '980001', personName: marker + '客户甲',
+          title: marker + '核实需求', reason: marker + '活动后联系', sourceRefs: ['public.interactions#990001'] }] } }),
     'customers:list': () => rows(mode === 'pagination'
       ? Array.from({ length: 55 }, (_, i) => ({ ...customer, Id: 910001 + i, customer_name: marker + '客户' + String(i).padStart(2, '0') }))
       : [customer]),

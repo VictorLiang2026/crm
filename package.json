@@ -4,7 +4,7 @@
     "build:shared": "node tools/sync-shared.cjs --sync",
     "check:shared": "node tools/sync-shared.cjs --check",
     "test:modular": "node tests/tooling/modular-frontend.mjs",
-    "test:ai-gateway": "node --test tests/ai-gateway/run.cjs",
+    "test:ai-gateway": "node --test tests/ai-gateway/run.cjs tests/ai-gateway/activity-review-v2.cjs",
     "test:ai-skills": "node --test tests/ai-gateway/skill-registry.cjs",
     "test:context-engine": "node --test tests/ai-gateway/context-engine.cjs tests/ai-gateway/run.cjs tests/ai-gateway/skill-registry.cjs",
     "test:person-service": "node --test tests/persons/person-service.cjs",

@@ -40,7 +40,7 @@
     },
     {
       "name": "ai_activity",
-      "timeout": 60,
+      "timeout": 120,
       "runtime": "Nodejs18.15",
       "handler": "index.main",
       "memorySize": 256

@@ -8,6 +8,7 @@
 <meta http-equiv="Expires" content="0">
 <title>Victor's AI Relationship OS</title>
 <link rel="stylesheet" href="/crm/css/person-360.css">
+<link rel="stylesheet" href="/crm/css/activity-review-v2.css">
 <style>
   :root{
     --pri:#2563eb;--pri-hover:#1d4ed8;--pri-light:#dbeafe;
@@ -4951,9 +4952,11 @@ async function showActivityDetail(id){
     if(act.status === 'ended' || act.status === 'reviewed') {
       card.appendChild(el('div', {style:'margin-bottom:12px'}, [
         el('button', {class:'btn btn-ai', style:'margin-right:8px', onclick:function(){ runActivityPostReview(id, this); }}, '✨ AI 活动复盘'),
+        el('button', {class:'btn btn-ai', style:'margin-right:8px', onclick:function(){ runActivityRelationshipReview(id, this); }}, '关系复盘预览'),
         el('button', {class:'btn btn-ai', onclick:function(){ runParticipantReview(id, this); }}, '🎯 活动后跟进建议（谁该跟·跟什么）'),
       ]));
       card.appendChild(el('div', {id:'activity-postreview-box'}));
+      card.appendChild(el('div', {id:'activity-relationship-review-box'}));
       card.appendChild(el('div', {id:'activity-participant-review-box'}));
     }
 
@@ -8654,6 +8657,20 @@ if(qcEntryBtn && CONFIG.featureFlags && CONFIG.featureFlags.quick_capture_v2 ===
     }catch(e){ toast('快速记录 V2 加载失败：' + e.message, 'err'); }
   });
   qcEntryBtn.after(qcV2Btn);
+}
+
+async function runActivityRelationshipReview(activityId, btn){
+  var box = document.getElementById('activity-relationship-review-box');
+  if(!box) return;
+  if(btn) btn.disabled = true;
+  try {
+    var module = await import('/crm/js/modules/activity-review-v2.js');
+    await module.renderActivityRelationshipReview({root:box, activityId:activityId, callFn:callFn});
+  } catch(e) {
+    box.textContent = '关系复盘暂不可用：' + e.message;
+  } finally {
+    if(btn) btn.disabled = false;
+  }
 }
 
 })();

@@ -1,6 +1,6 @@
 /**
- * ai_activity — AI 活动分析（事件云函数，超时 60s，rdb() 版）
- * 入参 event: { action:'analyze'|'prepare'|'decompose'|'recommendSpeakers'|'recommendTopics'|'postReview', activity_id }
+ * ai_activity — AI 活动分析（事件云函数，超时 120s；旧 action 继续使用 rdb()）
+ * 入参 event: { action:'analyze'|'prepare'|'decompose'|'recommendSpeakers'|'recommendTopics'|'postReview'|'postReviewV2', activity_id }
  *   analyze:   活动后参与者跟进分析（v1.3）
  *   prepare:   AI 筹备助手（v1.7.2）：综合评估 → summary/current_stage/risks/priorities/suggested_tasks
  *   decompose: AI 筹备任务拆解（v1.7.2）：聚焦把筹备工作拆解为建议任务，输出结构同 prepare
@@ -10,6 +10,8 @@
  *   postReview: AI 活动复盘（v1.7.5）：活动 ended/reviewed 后从 6 维度发现经营机会
  *               → {summary, customer_actions[], recruit_actions[], speaker_actions[], topic_actions[],
  *                  opportunity_suggestions[], next_activity_suggestions[]}
+ *   postReviewV2: 真实登录保护的关系复盘预览，经 Context Engine + AI Gateway 生成六项回答和 Action Candidate；
+ *                 仅写 AI Runtime 审计，不写 Person/Interaction/Action/Opportunity 业务事实。
  *   participantReview: AI 活动后跟进分类（v1.8 Sprint6）：把每位已关联参与者分到 A/B/C/D/E 并给逐人行动+话术，纯只读
  *               → {activity_id, activity_name, activity_date, today, total, counts{A..E},
  *                  classifications:[{person_type, person_id, cid, name, classification, classification_label,
@@ -31,7 +33,7 @@
  */
 'use strict';
 
-const { rdb, generateText, extractJson, assertOk, nowIso } = require('./db');
+const { app, rdb, generateText, extractJson, assertOk, nowIso } = require('./db');
 
 function bjNow() { return new Date(Date.now() + 8 * 3600 * 1000); }
 function todayStr() { return bjNow().toISOString().slice(0, 10); }
@@ -63,6 +65,7 @@ exports.main = async (event, context) => {
     if (action === 'recommendSpeakers') return await recommendSpeakers(event);
     if (action === 'recommendTopics') return await recommendTopics(event);
     if (action === 'postReview') return await postReview(event);
+    if (action === 'postReviewV2') return await require('./activity-review-v2').run(event, { app });
     if (action === 'participantReview') return await participantReview(event);
     if (action === 'learning') return await learning(event);
     if (action !== 'analyze') return { error: 'unknown action: ' + action };
