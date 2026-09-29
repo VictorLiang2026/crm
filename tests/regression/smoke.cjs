@@ -55,6 +55,12 @@ module.exports = async function smoke(root, test) {
       assert.equal(await b.evaluate("document.querySelectorAll('.person360-opportunity a').length"), 1);
       assert.equal(await b.evaluate("window.__crmTest.calls.some(c=>['createOpportunity','updateOpportunity'].includes(c.action))"), false);
     });
+    await check('person360.recruit', 'Person 360 显示招募资料和原详情入口，只读加载', async () => {
+      await b.wait(called('person_360', 'listRecruitContext'));
+      await b.wait(text('[CRM_TEST_ONLY]增员沟通'));
+      assert.equal(await b.evaluate("document.querySelector('.person360-recruit a').getAttribute('href')"), '#/recruit/930001');
+      assert.equal(await b.evaluate("window.__crmTest.calls.some(c=>c.name==='person_360' && c.action==='createInteraction')"), false);
+    });
     await check('person360.insurance', 'Person 360 分源显示六块只读保险概览，旧保单检视入口保留', async () => {
       await b.wait(called('person_360', 'getInsuranceContext'));
       for (const label of ['Existing Coverage', 'Review', 'Known Needs', 'Potential Gaps', 'Open Opportunities', 'Next Actions']) {

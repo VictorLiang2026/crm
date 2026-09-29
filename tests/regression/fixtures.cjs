@@ -52,6 +52,12 @@ function installFixtures() {
       { id: 960001, person_id: 980001, customer_id: customer.Id, opportunity_type: '家庭保障',
         status: '沟通', next_action: marker + '核对保障', updated_at: '2026-09-27' },
     ]),
+    'person_360:listRecruitContext': () => rows(mode === 'empty' ? [] : [{
+      id: candidate.candidate_id, stage: '面谈', motivation: marker + '了解事业',
+      concerns: marker + '担心时间', potentialScore: 4, careerPlan: marker + '职业转型',
+      nextAction: marker + '继续交流', nextActionDate: '2026-10-01',
+      recentFollowups: [{ id: 950001, date: '2026-09-20', channel: '微信', summary: marker + '增员沟通' }],
+    }]),
     'person_360:getInsuranceContext': () => ({
       existingCoverage: [{ label: '医疗(CI)', amount: 100000, premium: 3000 }],
       review: { latest: { date: '2026-09-20', summary: marker + '人工检视', provenance: '人工编辑' },

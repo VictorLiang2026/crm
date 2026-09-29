@@ -20,6 +20,12 @@
 .person360-opportunity-field{display:grid;gap:4px;font-size:13px}
 .person360-opportunity-field input,.person360-opportunity-field select,.person360-opportunity-field textarea{width:100%;padding:8px;border:1px solid #d1d5db;border-radius:8px;font:inherit}
 .person360-opportunity-field textarea{min-height:72px;resize:vertical}
+.person360-recruit-list{display:grid;gap:12px}
+.person360-recruit-candidate{padding:12px;border:1px solid #e5e7eb;border-radius:8px;min-width:0}
+.person360-recruit-candidate p{margin:7px 0;overflow-wrap:anywhere;white-space:pre-wrap}
+.person360-recruit-candidate h4{margin:12px 0 6px;font-size:14px}
+.person360-recruit-heading{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.person360-recruit-followup{padding:7px 0;border-top:1px solid #f1f5f9}
 .person360-insurance-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px}
 .person360-insurance-block{padding:12px;border:1px solid #e5e7eb;border-radius:8px;min-width:0}
 .person360-insurance-block h4{margin:0 0 8px;font-size:14px}

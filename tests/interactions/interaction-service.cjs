@@ -24,9 +24,11 @@ function fixture({ materialized = false, standalone = false } = {}) {
       ...(materialized ? [{ id: 2, person_id: 11, interaction_type: 'followup',
         interaction_at: '2026-09-10T00:00:00Z', summary: '已导入', source_type: 'followups', source_id: 5 }] : [])],
     followups: [{ Id: 5, customer_id: 101, followup_date: '2026-09-10', interaction_summary: '电话沟通', followup_notes: '客户反馈' }],
-    recruit_candidates: [{ id: 7, customer_id: 101 }],
+    recruit_candidates: [{ id: 7, customer_id: 101, person_id: 11 },
+      { id: 9, customer_id: 202, person_id: 22 }],
     recruit_followups: [{ id: 8, candidate_id: 7, followup_date: '2026-09-12',
-      interaction_summary: '增员沟通', followup_notes: '下次再谈', contact_method: 'phone' }],
+      interaction_summary: '增员沟通', followup_notes: '下次再谈', contact_method: 'phone' },
+      { id: 10, candidate_id: 9, followup_date: '2026-09-13', interaction_summary: '其他人的跟进' }],
     activity_speakers: [{ id: 30, customer_id: 101, recruit_candidate_id: null },
       { id: 31, customer_id: 202, recruit_candidate_id: 7 }],
     activity_participants: [
@@ -50,7 +52,7 @@ function fixture({ materialized = false, standalone = false } = {}) {
     }
     return rows;
   }
-  return { service: new InteractionService({ request }), calls };
+  return { service: new InteractionService({ request }), calls, tables };
 }
 
 test('timeline reads all four sources without writes or invitations', async () => {
@@ -71,6 +73,26 @@ test('timeline reads all four sources without writes or invitations', async () =
   assert.ok(calls.every(call => call.method === 'GET'));
   assert.ok(calls.filter(call => ['followups', 'recruit_followups', 'activity_participants'].includes(call.table))
     .every(call => call.filters.deleted_at === 'is.null'));
+});
+
+test('new recruit followup is mapped by canonical Person and shown only once', async () => {
+  const { service, calls } = fixture();
+  const result = await service.listForPerson(11);
+  assert.deepEqual(result.rows.filter(row => row.source_type === 'recruit_followups')
+    .map(row => [row.source_id, row.summary, row.virtual]), [[8, '增员沟通', true]]);
+  const candidateRead = calls.find(call => call.table === 'recruit_candidates');
+  assert.equal(candidateRead.filters.person_id, 'eq.11');
+  assert.ok(!calls.some(call => call.method !== 'GET'));
+});
+
+test('recruit followup edits and removal immediately change the read-through timeline', async () => {
+  const { service, tables } = fixture();
+  tables.recruit_followups[0].interaction_summary = '重新约定面谈';
+  let rows = (await service.listForPerson(11)).rows;
+  assert.equal(rows.find(row => row.source_type === 'recruit_followups').summary, '重新约定面谈');
+  tables.recruit_followups.splice(0, 1);
+  rows = (await service.listForPerson(11)).rows;
+  assert.equal(rows.some(row => row.source_type === 'recruit_followups'), false);
 });
 
 test('materialized source takes precedence over the same virtual row', async () => {

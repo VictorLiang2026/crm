@@ -163,6 +163,40 @@ function createService({ request = pgRequest, rpc = pgRpc } = {}) {
       String(b.updated_at || '').localeCompare(String(a.updated_at || ''))) };
   }
 
+  async function listRecruitContext(personId) {
+    const person = await findPerson(personId);
+    if (!person) throw new Error('Person not found');
+    const candidates = await request('recruit_candidates', 'GET', {
+      select: 'id,person_id,stage,motivation,concerns,potential_score,career_plan,next_action,next_action_date',
+      person_id: `eq.${idOf(person.id)}`, deleted_at: 'is.null',
+      order: 'updated_at.desc,id.desc', limit: 10,
+    });
+    const ids = candidates.map(candidate => idOf(candidate.id));
+    const followups = ids.length ? await request('recruit_followups', 'GET', {
+      select: 'id,candidate_id,followup_date,contact_method,interaction_summary,followup_notes',
+      candidate_id: `in.(${ids.join(',')})`, deleted_at: 'is.null',
+      order: 'followup_date.desc,id.desc', limit: 20,
+    }) : [];
+    const recent = new Map(ids.map(id => [id, []]));
+    for (const row of followups) {
+      const list = recent.get(String(row.candidate_id));
+      if (list) list.push({
+        id: row.id, date: row.followup_date, channel: row.contact_method || null,
+        summary: String(row.interaction_summary || row.followup_notes || '增员跟进').slice(0, 500),
+      });
+    }
+    return { rows: candidates.map(candidate => ({
+      id: candidate.id, stage: candidate.stage,
+      motivation: String(candidate.motivation || '').slice(0, 500),
+      concerns: String(candidate.concerns || '').slice(0, 500),
+      potentialScore: candidate.potential_score,
+      careerPlan: String(candidate.career_plan || '').slice(0, 500),
+      nextAction: String(candidate.next_action || '').slice(0, 500),
+      nextActionDate: candidate.next_action_date,
+      recentFollowups: recent.get(String(candidate.id)) || [],
+    })) };
+  }
+
   async function getInsuranceContext(personId) {
     const person = await findPerson(personId);
     if (!person) throw new Error('Person not found');
@@ -349,7 +383,7 @@ function createService({ request = pgRequest, rpc = pgRpc } = {}) {
   }
 
   return { get, lookupCustomer, search, saveFacts, addMember, removeMember,
-    listOpportunities, createOpportunity, updateOpportunity, closeOpportunity, removeOpportunity,
+    listOpportunities, listRecruitContext, createOpportunity, updateOpportunity, closeOpportunity, removeOpportunity,
     getInsuranceContext,
     resolveQuickCaptureName, commitQuickCaptureV2 };
 }
@@ -364,6 +398,7 @@ exports.main = async event => {
       case 'get': return await service.get(event.personId);
       case 'lookupCustomer': return await service.lookupCustomer(event.customerId);
       case 'listOpportunities': return await service.listOpportunities(event.personId);
+      case 'listRecruitContext': return await service.listRecruitContext(event.personId);
       case 'getInsuranceContext': return await service.getInsuranceContext(event.personId);
       case 'createOpportunity': return await service.createOpportunity(event.personId, event.data);
       case 'updateOpportunity': return await service.updateOpportunity(event.personId, event.id, event.data);

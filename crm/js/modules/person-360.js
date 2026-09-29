@@ -148,6 +148,48 @@ export async function renderPerson360({ root, personId, callFn }) {
     formHost.append(form);
   }
 
+  const recruit = node('section', 'card person360-card person360-recruit');
+  recruit.append(node('h3', '', '招募 · Recruit'));
+  const recruitBody = node('div', 'person360-recruit-list');
+  recruit.append(recruitBody);
+  wrap.append(recruit);
+  try {
+    const result = await request('listRecruitContext', { personId });
+    if (location.hash !== hash) return;
+    if (!Array.isArray(result.rows)) throw new Error('招募数据格式异常');
+    if (!result.rows.length) recruitBody.append(node('p', 'person360-muted', '暂无在用招募候选人。'));
+    for (const candidate of result.rows) {
+      const card = node('div', 'person360-recruit-candidate');
+      const heading = node('div', 'person360-recruit-heading');
+      heading.append(node('strong', '', `阶段：${candidate.stage || '未分阶段'}`));
+      const link = node('a', '', '打开原招募详情');
+      link.href = `#/recruit/${candidate.id}`;
+      heading.append(link);
+      card.append(heading);
+      const fields = [
+        ['动机', candidate.motivation], ['顾虑', candidate.concerns],
+        ['潜力评分', candidate.potentialScore], ['职业规划', candidate.careerPlan],
+        ['下一步', candidate.nextAction],
+      ];
+      for (const [label, value] of fields) {
+        if (value !== null && value !== undefined && value !== '') {
+          card.append(node('p', '', `${label}：${value}`));
+        }
+      }
+      if (candidate.nextActionDate) card.append(node('p', 'person360-muted', `下一步日期：${String(candidate.nextActionDate).slice(0, 10)}`));
+      const followups = Array.isArray(candidate.recentFollowups) ? candidate.recentFollowups : [];
+      card.append(node('h4', '', '最近招募互动'));
+      if (!followups.length) card.append(node('p', 'person360-muted', '暂无招募跟进。新增跟进后会在此和 Interaction 时间线即时呈现。'));
+      for (const followup of followups) {
+        card.append(node('p', 'person360-recruit-followup',
+          `${String(followup.date || '').slice(0, 10)}${followup.channel ? ` · ${followup.channel}` : ''} · ${followup.summary || '增员跟进'}`));
+      }
+      recruitBody.append(card);
+    }
+  } catch (error) {
+    recruitBody.append(node('p', 'person360-error', `招募资料加载失败：${error.message}`));
+  }
+
   const insurance = node('section', 'card person360-card person360-insurance');
   insurance.append(node('h3', '', '保险概览'));
   const insuranceBody = node('div', 'person360-insurance-grid');

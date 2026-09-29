@@ -85,8 +85,11 @@ class LegacyInteractionAdapter {
     });
   }
 
-  async listForCustomer(legacyCustomerId) {
+  async listForCustomer(legacyCustomerId, personId = null) {
     const customerId = idOf(legacyCustomerId);
+    const candidateFilter = personId == null
+      ? { customer_id: `eq.${customerId}` }
+      : { person_id: `eq.${idOf(personId)}` };
     const rows = [];
     const [followups, candidates] = await Promise.all([
       this.request('followups', 'GET', {
@@ -95,7 +98,7 @@ class LegacyInteractionAdapter {
         order: 'followup_date.desc,Id.desc', limit: MAX_LIMIT,
       }),
       this.request('recruit_candidates', 'GET', {
-        select: 'id,customer_id', customer_id: `eq.${customerId}`,
+        select: 'id,customer_id,person_id', ...candidateFilter,
         deleted_at: 'is.null', limit: 10,
       }),
     ]);

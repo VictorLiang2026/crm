@@ -55,7 +55,7 @@ class InteractionService {
     const rows = stored.map(item => ({ ...item, virtual: false }));
     const adapter = new LegacyInteractionAdapter({ request: this.request });
     if (person.legacy_customer_id != null) {
-      rows.push(...await adapter.listForCustomer(person.legacy_customer_id));
+      rows.push(...await adapter.listForCustomer(person.legacy_customer_id, person.id));
     }
     rows.push(...await adapter.listCanonicalAttended(person.id));
     // A future import may materialize a legacy source. Show it once, preferring the ledger row.
