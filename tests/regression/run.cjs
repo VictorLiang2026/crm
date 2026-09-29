@@ -22,6 +22,7 @@ async function test(id, title, layer, fn) {
   if (!args.includes('--browser-only')) await require('./backend.cjs')(root, test);
   if (!args.includes('--backend-only')) await require('./smoke.cjs')(root, test);
   if (!args.includes('--browser-only')) await require('./activity-schema.cjs')(root, test);
+  if (!args.includes('--browser-only')) await require('./activity-canonical.cjs')(root, test);
   const skipped = [
     ['live.login', '真实 CloudBase 账号、SDK 与会话认证'],
     ['live.database', '线上public对象SQL检查（需通过只读管理工具单独执行 database-readonly.sql）'],

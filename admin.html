@@ -4941,15 +4941,17 @@ async function showActivityDetail(id){
         var pc = el('div', {class:'card', style:'margin-bottom:6px;padding:8px'});
         var stColor = p.status === 'attended' ? '#047857' : (p.status === 'absent' ? '#9ca3af' : '#2563eb');
         var stLabel = p.status === 'attended' ? '已参加' : (p.status === 'absent' ? '缺席' : '已邀请');
-        var linked = !!p.person_id;
+        var linked = !!p.person_id || !!p.canonical_person_id;
         var ri = partRoleInfo(p.participant_role);
         var fi = followupStatusInfo(p.followup_status);
         var actions = [];
         if(linked){
-          var viewHash = p.person_type === 'customer' ? '#/customer/' + p.person_id
-            : (p.person_type === 'speaker' ? '#/speakers' : '#/recruit/' + p.person_id);
+          var viewHash = p.person_id
+            ? (p.person_type === 'customer' ? '#/customer/' + p.person_id
+              : (p.person_type === 'speaker' ? '#/speakers' : '#/recruit/' + p.person_id))
+            : '#/person/' + p.canonical_person_id;
           actions.push(el('a', {class:'btn-sm', style:'margin-right:6px', onclick:function(){ location.hash = viewHash; }}, '查看'));
-          if(p.person_type === 'customer')
+          if(p.person_type === 'customer' && p.person_id)
             actions.push(el('a', {class:'btn-sm btn-green', style:'margin-right:6px', onclick:function(){ openActivityFollowup(id, p); }}, '记录沟通'));
         } else {
           actions.push(el('a', {class:'btn-sm', style:'margin-right:6px;background:#fef3c7;color:#92400e', onclick:function(){ openLinkParticipant(id, p); }}, '关联'));
@@ -5574,8 +5576,99 @@ function openPersonPickerModal(opts){
   setTimeout(function(){ nameInput.focus(); }, 50);
 }
 
-// 添加参与者（按姓名搜索/暂存）
+// 新增时先使用服务端 Person 身份解析；旧入口保留给尚未建立 Person 的人员。
 function openAddParticipant(activityId){
+  var overlay = el('div', {class:'modal-overlay'});
+  var modal = el('div', {class:'modal', style:'max-width:460px'});
+  overlay.appendChild(modal);
+  overlay.addEventListener('click', function(e){ if(e.target === overlay) overlay.remove(); });
+  modal.appendChild(el('h3', {}, '添加参与者 · 先确认 Person'));
+  var typeSel = el('select', {class:'input'}, [
+    el('option', {value:'customer'}, '客户'),
+    el('option', {value:'recruit'}, '增员对象'),
+    el('option', {value:'speaker'}, '嘉宾（资源池）'),
+  ]);
+  modal.appendChild(el('div', {class:'field'}, [el('label', {}, '类型'), typeSel]));
+  var nameInput = el('input', {type:'text', class:'input', autocomplete:'off', placeholder:'输入完整姓名搜索 Person'});
+  var results = el('div', {style:'border:1px solid var(--border);border-radius:6px;max-height:180px;overflow-y:auto;margin-top:4px;display:none'});
+  var selectedHint = el('div', {style:'font-size:12px;color:#047857;margin-top:5px'});
+  modal.appendChild(el('div', {class:'field'}, [
+    el('label', {}, 'Person 身份'), nameInput, results, selectedHint,
+    el('div', {style:'font-size:12px;color:var(--muted);margin-top:4px'}, '请点选明确的 Person；同名时核对括号限定、职业和机构。'),
+  ]));
+  var statusSel = el('select', {class:'input'}, [
+    el('option', {value:'invited'}, '已邀请'),
+    el('option', {value:'attended'}, '已参加'),
+    el('option', {value:'absent'}, '缺席'),
+  ]);
+  modal.appendChild(el('div', {class:'field'}, [el('label', {}, '参加状态'), statusSel]));
+  var noteInput = el('textarea', {class:'input', rows:'2', placeholder:'可选'});
+  modal.appendChild(el('div', {class:'field'}, [el('label', {}, '备注'), noteInput]));
+  var selected = null, timer = null, searchVersion = 0;
+  async function searchPerson(){
+    var name = nameInput.value.trim(), version = ++searchVersion;
+    results.innerHTML = '';
+    if(!name){ results.style.display = 'none'; return; }
+    results.style.display = '';
+    results.appendChild(el('div', {style:'padding:8px;color:var(--muted)'}, '正在核对 Person…'));
+    try {
+      var resolution = await callFn('person_360', {action:'resolveQuickCaptureName', name:name});
+      if(version !== searchVersion) return;
+      if(resolution.error) throw new Error(resolution.error);
+      results.innerHTML = '';
+      if(!resolution.candidates || !resolution.candidates.length){
+        results.appendChild(el('div', {style:'padding:8px;color:var(--muted)'}, '没有匹配的 Person；可使用下方旧方式添加。'));
+      } else {
+        resolution.candidates.forEach(function(candidate){
+          results.appendChild(el('div', {class:'person-candidate', style:'padding:8px;cursor:pointer;border-bottom:1px solid var(--border)', onclick:function(){
+            selected = candidate;
+            nameInput.value = candidate.displayName;
+            ++searchVersion;
+            results.style.display = 'none';
+            selectedHint.textContent = '已选择：' + candidate.displayName + ' #' + candidate.id;
+          }}, candidate.displayName + (candidate.occupation ? ' · ' + candidate.occupation : '') +
+            (candidate.organization ? ' · ' + candidate.organization : '') + ' #' + candidate.id));
+        });
+        if(resolution.hasMore) results.appendChild(el('div', {style:'padding:8px;color:#92400e'}, '同名结果较多，请输入括号限定并明确点选。'));
+      }
+    } catch(e){
+      if(version !== searchVersion) return;
+      results.innerHTML = '';
+      results.appendChild(el('div', {style:'padding:8px;color:#c0392b'}, 'Person 查询失败：' + e.message));
+    }
+  }
+  nameInput.addEventListener('input', function(){
+    selected = null; selectedHint.textContent = '';
+    ++searchVersion;
+    if(timer) clearTimeout(timer);
+    timer = setTimeout(searchPerson, 300);
+  });
+  var msg = el('div', {style:'color:#c0392b;font-size:13px;margin-top:6px'});
+  var addBtn = el('button', {class:'btn btn-primary'}, '确认添加 Person');
+  addBtn.addEventListener('click', async function(){
+    if(!selected){ msg.textContent = '请先从 Person 搜索结果中点选；无匹配可使用旧方式添加。'; return; }
+    addBtn.disabled = true; msg.textContent = '';
+    try {
+      var result = await callFn('person_360', {action:'addCanonicalParticipant', data:{
+        activityId:activityId, personType:typeSel.value, canonicalPersonId:selected.id,
+        selectedDisplayName:selected.displayName, status:statusSel.value,
+        relationshipNote:noteInput.value.trim(), confirmed:true,
+      }});
+      if(result.error) throw new Error(result.error);
+      overlay.remove();
+      toast('已添加并关联 Person');
+      showActivityDetail(activityId);
+    } catch(e){ msg.textContent = e.message || String(e); addBtn.disabled = false; }
+  });
+  var legacyBtn = el('button', {class:'btn btn-sm', style:'margin-left:8px'}, '按旧方式添加');
+  legacyBtn.addEventListener('click', function(){ overlay.remove(); openAddParticipantLegacy(activityId); });
+  modal.appendChild(el('div', {style:'margin-top:10px'}, [addBtn, legacyBtn, msg]));
+  document.getElementById('modal-root').appendChild(overlay);
+  setTimeout(function(){ nameInput.focus(); }, 50);
+}
+
+// 旧的姓名搜索、关联或暂存流程保持兼容。
+function openAddParticipantLegacy(activityId){
   openPersonPickerModal({
     title: '添加参与者',
     defaultType: 'customer',

@@ -6,10 +6,11 @@ const { parsePersonName, PersonService } = require('./person-service');
 const { InteractionService } = require('./interaction-service');
 const { CommitmentService } = require('./commitment-service');
 const { InsuranceContextService } = require('./insurance-context-service');
+const { ParticipantService } = require('./participant-service');
 
 const app = cloudbase.init({ env: process.env.TCB_ENV });
 const LEGACY_INTERACTION_TABLES = new Set([
-  'followups', 'recruit_candidates', 'recruit_followups',
+  'followups', 'customers', 'recruit_candidates', 'recruit_followups',
   'activity_participants', 'activity_speakers', 'activities',
 ]);
 const INSURANCE_READ_TABLES = new Set([
@@ -39,7 +40,8 @@ function one(rows) { return Array.isArray(rows) ? rows[0] || null : null; }
 
 async function pgRequest(table, method, filters = {}, body) {
   if (!TABLES.has(table)) throw new Error('Invalid table');
-  if (LEGACY_INTERACTION_TABLES.has(table) && method !== 'GET') throw new Error('Invalid source operation');
+  if (LEGACY_INTERACTION_TABLES.has(table) && method !== 'GET' &&
+      !(table === 'activity_participants' && method === 'POST')) throw new Error('Invalid source operation');
   if (INSURANCE_READ_TABLES.has(table) && method !== 'GET') throw new Error('Invalid source operation');
   if (table === 'commitments' && method !== 'GET') throw new Error('Invalid source operation');
   const env = process.env.TCB_ENV;
@@ -374,12 +376,14 @@ exports.main = async event => {
       case 'createInteraction': return await new InteractionService({ request: pgRequest })
         .createManual(event.personId, event.data, uid);
       case 'resolveQuickCaptureName': return await service.resolveQuickCaptureName(event.name);
+      case 'addCanonicalParticipant': return await new ParticipantService({ request: pgRequest })
+        .add(event.data, uid);
       case 'commitQuickCaptureV2': return await service.commitQuickCaptureV2(event.data, uid);
       default: return { error: 'Unknown action' };
     }
   } catch (error) {
     return { error: error.message === 'UNAUTHORIZED' ? 'UNAUTHORIZED' :
-      /^(Invalid |Person |Activity not found|This customer|Both people|Human confirmation|Selected Person|Household |Important facts|Could not)/.test(error.message)
+      /^(Invalid |Person |Activity not found|Participant |This customer|Both people|Human confirmation|Selected Person|Household |Important facts|Could not)/.test(error.message)
         ? error.message : 'Person 360 request failed' };
   }
 };
