@@ -5763,7 +5763,10 @@ async function showSpeakers(){
   var view = $('view');
   view.innerHTML = '';
   var toolbar = el('div', {class:'toolbar'}, [
-    el('button', {class:'btn btn-primary', onclick:function(){ openSpeakerForm(null); }}, '+ 新增嘉宾'),
+    el('button', {class:'btn btn-primary', onclick:function(){
+      openSpeakerPersonPicker('选择嘉宾对应的 Person', function(person){ openSpeakerForm(null, person); });
+    }}, '+ 从 Person 新增嘉宾'),
+    el('button', {class:'btn', onclick:function(){ openSpeakerForm(null); }}, '+ 原方式新增嘉宾'),
     el('button', {class:'btn', onclick:function(){ location.hash='#/activities'; }}, '返回活动列表'),
   ]);
   view.appendChild(toolbar);
@@ -5822,10 +5825,20 @@ function speakerCard(s){
       el('span', {style:'font-size:11px;color:#fff;background:'+si.color+';padding:1px 6px;border-radius:8px;margin-left:8px'}, si.label),
       s.linked_customer ? el('span', {style:'font-size:11px;color:#fff;background:#2563eb;padding:1px 6px;border-radius:8px;margin-left:6px', title:'已关联客户档案'}, '客户') : null,
       s.linked_recruit ? el('span', {style:'font-size:11px;color:#fff;background:#d97706;padding:1px 6px;border-radius:8px;margin-left:6px', title:'已关联增员候选人'}, '增员') : null,
+      s.person_id ? el('span', {style:'font-size:11px;color:#fff;background:#047857;padding:1px 6px;border-radius:8px;margin-left:6px', title:'已关联 Person 身份'}, 'Person') : null,
       s.status === 'inactive' ? el('span', {style:'font-size:11px;color:#6b7280;border:1px solid #ddd;padding:0 4px;border-radius:4px;margin-left:6px'}, '已停用') : null,
     ]),
     el('div', {}, [
       el('a', {class:'btn-sm', style:'margin-right:6px', onclick:function(){ openSpeakerForm(s); }}, '编辑'),
+      !s.person_id ? el('a', {class:'btn-sm', style:'margin-right:6px', onclick:function(){
+        openSpeakerPersonPicker('关联嘉宾的 Person', async function(person){
+          var result = await callFn('person_360', {action:'linkSpeakerPerson', data:{
+            speakerId:s.id, personId:person.id, selectedDisplayName:person.displayName, confirmed:true,
+          }});
+          if(result.error) throw new Error(result.error);
+          toast('已关联 Person', 'ok'); showSpeakers();
+        });
+      }}, '关联 Person') : null,
       el('a', {class:'btn-sm btn-danger', onclick:async function(){
         if(!confirm('删除嘉宾「' + (s.name || '') + '」？（软删除，不影响其已参加的活动记录）')) return;
         var r = await callFn('activity_speakers', {action:'remove', id:s.id});
@@ -5847,8 +5860,54 @@ function speakerCard(s){
   return c;
 }
 
-// 新增/编辑嘉宾（v1.8.10.6：新建先确保客户主档——同名确认/括号改名；cooperation_count 传文本 parseInt 校验；空串不提交）
-function openSpeakerForm(s){
+// 仅允许用户明确点选已存在的 Person；同名结果不自动取第一项。
+function openSpeakerPersonPicker(title, onPick){
+  var overlay = el('div', {class:'modal-overlay'});
+  var box = el('div', {class:'modal', style:'max-width:460px'});
+  var input = el('input', {type:'text', class:'input', placeholder:'输入 Person 姓名搜索', autocomplete:'off'});
+  var results = el('div', {style:'max-height:220px;overflow-y:auto;margin-top:8px'});
+  var chosen = null, sequence = 0;
+  var message = el('div', {style:'font-size:12px;color:var(--muted);margin-top:6px'}, '请输入姓名，并从结果中选择身份。');
+  var confirmButton = el('button', {class:'btn btn-primary', disabled:true, onclick:async function(){
+    if(!chosen) return;
+    this.disabled = true;
+    try { await onPick(chosen); overlay.remove(); }
+    catch(error){ message.textContent = error.message || String(error); this.disabled = false; }
+  }}, '确认选择 Person');
+  async function search(){
+    var value = input.value.trim(), current = ++sequence;
+    chosen = null; confirmButton.disabled = true; results.innerHTML = '';
+    if(!value){ message.textContent = '请输入姓名，并从结果中选择身份。'; return; }
+    message.textContent = '搜索中…';
+    try {
+      var response = await callFn('person_360', {action:'resolveQuickCaptureName', name:value});
+      if(current !== sequence) return;
+      if(response.error) throw new Error(response.error);
+      (response.candidates || []).forEach(function(person){
+        results.appendChild(el('button', {type:'button', class:'btn', style:'display:block;width:100%;text-align:left;margin:4px 0', onclick:function(){
+          chosen = person; confirmButton.disabled = false;
+          message.textContent = '已选择：' + person.displayName + '（#' + person.id + '）';
+        }}, person.displayName + (person.organization ? ' · ' + person.organization : '') + ' #' + person.id));
+      });
+      message.textContent = response.hasMore ? '同名结果较多，请输入括号限定后重试。'
+        : ((response.candidates || []).length ? '请点选正确的 Person，再确认。' : '未找到 Person；可使用原方式新增嘉宾，之后再人工关联。');
+    } catch(error){ if(current === sequence) message.textContent = error.message || String(error); }
+  }
+  var timer;
+  input.addEventListener('input', function(){ if(timer) clearTimeout(timer); timer = setTimeout(search, 300); });
+  box.appendChild(el('h3', {}, title));
+  box.appendChild(input); box.appendChild(results); box.appendChild(message);
+  box.appendChild(el('div', {class:'modal-footer'}, [
+    el('button', {class:'btn', onclick:function(){ overlay.remove(); }}, '取消'), confirmButton,
+  ]));
+  overlay.appendChild(box);
+  overlay.addEventListener('click', function(event){ if(event.target === overlay) overlay.remove(); });
+  document.getElementById('modal-root').appendChild(overlay);
+  setTimeout(function(){ input.focus(); }, 50);
+}
+
+// 嘉宾档案：Person 入口先人工选身份；原新增/编辑入口保留客户主档兼容流程。
+function openSpeakerForm(s, selectedPerson){
   var FIELDS = [
     {name:'name', label:'姓名', type:'text', req:true},
     {name:'phone', label:'电话', type:'text'},
@@ -5867,15 +5926,29 @@ function openSpeakerForm(s){
     {name:'cooperation_count', label:'合作次数', type:'text'},
     {name:'notes', label:'备注', type:'textarea'},
   ];
+  if(selectedPerson){
+    FIELDS = FIELDS.filter(function(field){
+      return ['name','phone','wechat','organization'].indexOf(field.name) < 0;
+    });
+  }
   // 编辑时才允许看到关联ID（新建强制走同名确认自动关联；无主嘉宾编辑时会引导补关联）
   if(s){
     FIELDS.push({name:'customer_id', label:'关联客户ID' + (s.customer_id ? '' : '（当前为空，保存时自动补建/确认）'), type:'text'});
     FIELDS.push({name:'recruit_candidate_id', label:'关联增员ID（可选）', type:'text'});
   }
-  modal(s ? '编辑嘉宾：' + s.name : '新增嘉宾（自动建立/关联客户档案）', FIELDS, s || {}, async function(data){
+  modal(s ? '编辑嘉宾：' + s.name : (selectedPerson ? '新增嘉宾档案：' + selectedPerson.displayName : '新增嘉宾（自动建立/关联客户档案）'), FIELDS, s || {}, async function(data){
     ['cooperation_count','customer_id','recruit_candidate_id'].forEach(function(k){
       if(data[k] === '' || data[k] == null) delete data[k];
     });
+    if(selectedPerson){
+      var created = await callFn('person_360', {action:'createSpeakerProfile', data:{
+        personId:selectedPerson.id, selectedDisplayName:selectedPerson.displayName,
+        confirmed:true, profile:data,
+      }});
+      if(created.error) throw new Error(created.error);
+      toast('已创建嘉宾档案并关联 Person', 'ok'); showSpeakers();
+      return;
+    }
     var followupToWrite = null;
     if(!s){
       // 新建：先确保客户主档（同名确认 / 加括号区分）

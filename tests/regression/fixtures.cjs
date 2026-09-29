@@ -60,6 +60,8 @@ function installFixtures() {
     'person_360:resolveQuickCaptureName': () => ({ status: 'confirm_existing', hasMore: false,
       candidates: [{ id: '980001', displayName: marker + '客户甲', organization: '测试机构' }], selectedPersonId: null }),
     'person_360:addCanonicalParticipant': () => ({ id: 970002, linked: true, canonicalPersonId: '980001' }),
+    'person_360:createSpeakerProfile': () => ({ id: 990011, personId: '980001', customerId: 910001 }),
+    'person_360:linkSpeakerPerson': () => ({ ok: true, personId: '980001' }),
     'person_360:commitQuickCaptureV2': () => ({ interactionId: 990001, contextItemCount: 2 }),
     'ai_parse:quick_capture': data => data.version === 2 ? ({ today: '2026-09-27', preview: {
       personName: marker + '客户甲', interaction: { type: '微信', date: '2026-09-27', channel: '微信', summary: marker + '沟通摘要' },
@@ -78,6 +80,9 @@ function installFixtures() {
     'opportunities:list': () => rows([{ id: 960001, customer_id: customer.Id, opportunity_type: '家庭保障', status: '沟通', notes: marker + '机会说明' }]),
     'activities:list': () => rows([activity]),
     'activities:get': () => ({ activity, participants: [{ id: 970001, person_type: 'customer', person_id: customer.Id, person_name: customer.customer_name, status: 'invited' }] }),
+    'activity_speakers:list': () => rows([{ id: 990010, name: customer.customer_name,
+      customer_id: customer.Id, person_id: null, expertise: marker + '讲师',
+      relationship_stage: 'new', status: 'active' }]),
     'activity_tasks:list': () => rows([]),
     'activity_topics:list': () => rows([]),
     'today_coach:candidates': () => ({ fingerprint: 'test-only' }),
@@ -115,7 +120,8 @@ function installFixtures() {
       calls.push({ name, action: data.action, id: data.id, customer_id: data.customer_id,
         candidate_id: data.candidate_id, personId: data.personId, version: data.version,
         payload: ['person_360:commitQuickCaptureV2', 'person_360:addCanonicalParticipant', 'person_360:createOpportunity',
-          'person_360:updateOpportunity'].includes(key) ? data.data : null });
+          'person_360:updateOpportunity', 'person_360:createSpeakerProfile',
+          'person_360:linkSpeakerPerson'].includes(key) ? data.data : null });
       if (!loggedIn) return fail('CALL_BEFORE_LOGIN: ' + key);
       if (mode === 'error' && (!params.get('fail') || params.get('fail') === key)) return { result: { error: 'TEST_API_FAILURE' } };
       return { result: structuredClone(replies[key](data)) };
