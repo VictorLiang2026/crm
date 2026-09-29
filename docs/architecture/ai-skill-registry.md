@@ -15,6 +15,8 @@
 | `conversation_playbook` | coaching | person | confirm_before_write | standard |
 | `ai_search` | retrieval | search_results | review | standard |
 
+`meeting_prep` 2.0 使用唯一输入 `person_id`。其上下文为 Person、Household、双向 Relationship、最近 Interactions、已确认 Facts、Signals、进行中 Opportunities、未完成 Actions、未完成 Commitments、Insurance Context 与 Relevant Playbook。输出契约要求七项：30 秒人物摘要、最近变化、本次建议目标、建议切入点、可能异议、需要确认的信息、不建议做什么。它是只读建议，`confirmationLevel=review`；原 1.0 契约未接入生产调用。本轮未接入模型或页面，Playbook 因尚无内容源而明确标为不可用。
+
 `contextRecipe` 只声明语义上下文段及各列表上限，不执行数据库查询，也不依赖具体模型。未来接入者须从获授权的 `public` 数据构造这些段，并按既有登录/RLS 边界过滤；其中的 `person`、`activity` 等名称是上下文键，不是直接表名。`review` 表示结果可供人审阅，但不能由 Skill 自动写业务数据；`confirm_before_write` 表示用于业务写入前必须由人明确确认。Gateway 对全部结果仍保持 `requires_confirmation=true`。超时类映射为 short 30 秒、standard 60 秒、long 120 秒，实际云函数超时需在接入时单独匹配。
 
 Registry 使用 Ajv 按 JSON Schema Draft 2020-12 在启动时编译所有输入、输出和上下文 Schema，使用 `ajv-formats` 校验日期与日期时间。严格模式拒绝无效 Schema；校验不会强制类型转换、补默认值或删除多余字段。错误只返回路径、关键字和消息，不回显客户内容。调用 `defaultRegistry.get(name)`、`list()`、`validateInput(name,data)`、`validateContext(name,data)`、`validateOutput(name,data)`；定义递归冻结。Registry 的元数据 Schema 禁止额外键，版本或契约变化必须显式更新 Skill 版本。

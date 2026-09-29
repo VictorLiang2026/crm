@@ -44,11 +44,11 @@ const sample = {
   recruit_followups: [{ id: 15, candidate_id: 14, followup_notes: 'hello', deleted_at: null }],
 };
 
-test('six recipes produce registry-compatible, sourced, bounded read-only context', async () => {
+test('six legacy recipes remain sourced and bounded; current Skill contracts validate compatible recipes', async () => {
   const { engine, calls } = fixture(sample);
   const requests = [
     ['person_basic', 'customer', 7, 'person_summary'],
-    ['meeting_prep', 'customer', 7, 'meeting_prep'],
+    ['meeting_prep', 'customer', 7, null],
     ['quick_capture', 'none', null, 'quick_capture'],
     ['today_coach', 'day', '2026-09-25', 'today_coach'],
     ['activity_review', 'activity', 11, 'activity_review'],
@@ -56,7 +56,9 @@ test('six recipes produce registry-compatible, sourced, bounded read-only contex
   ];
   for (const [recipe, subjectType, subjectId, skill] of requests) {
     const built = await engine.buildContext({ recipe, subjectType, subjectId });
-    assert.equal(defaultRegistry.validateContext(skill, built.context), true);
+    if (skill) assert.equal(defaultRegistry.validateContext(skill, built.context), true);
+    else assert.deepEqual(Object.keys(built.context).sort(),
+      ['person', 'recent_interactions', 'open_opportunities', 'meeting_history'].sort());
     assert.equal(built.context_snapshot._context.recipe, recipe);
     assert.deepEqual(Object.fromEntries(Object.entries(built.context_snapshot).filter(([key]) => key !== '_context')), built.context);
   }
