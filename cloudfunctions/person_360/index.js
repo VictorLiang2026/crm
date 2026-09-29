@@ -4,6 +4,7 @@
 const cloudbase = require('@cloudbase/node-sdk');
 const { parsePersonName, PersonService } = require('./person-service');
 const { InteractionService } = require('./interaction-service');
+const { ActivityInteractionService } = require('./activity-interaction-service');
 const { CommitmentService } = require('./commitment-service');
 const { InsuranceContextService } = require('./insurance-context-service');
 const { ParticipantService } = require('./participant-service');
@@ -379,6 +380,8 @@ exports.main = async event => {
       case 'listDueCommitments': return await new CommitmentService({ request: pgRequest }).listDue();
       case 'createInteraction': return await new InteractionService({ request: pgRequest })
         .createManual(event.personId, event.data, uid);
+      case 'recordActivityInteraction': return await new ActivityInteractionService({ request: pgRequest })
+        .record(event.data, uid);
       case 'resolveQuickCaptureName': return await service.resolveQuickCaptureName(event.name);
       case 'addCanonicalParticipant': return await new ParticipantService({ request: pgRequest })
         .add(event.data, uid);
@@ -391,7 +394,7 @@ exports.main = async event => {
     }
   } catch (error) {
     return { error: error.message === 'UNAUTHORIZED' ? 'UNAUTHORIZED' :
-      /^(Invalid |Person |Activity not found|Participant |Speaker |This customer|Both people|Human confirmation|Selected Person|Household |Important facts|Could not)/.test(error.message)
+      /^(Invalid |Person |Activity |Attendance |Post-event |Participant |Speaker |This customer|Both people|Human confirmation|Selected Person|Household |Important facts|Could not)/.test(error.message)
         ? error.message : 'Person 360 request failed' };
   }
 };

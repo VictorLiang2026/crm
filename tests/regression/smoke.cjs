@@ -165,6 +165,22 @@ module.exports = async function smoke(root, test) {
       await b.wait("!document.querySelector('#view .loading')");
       assert.equal(await b.evaluate("window.__crmTest.calls.find(c=>c.name==='activities' && c.action==='get').id"), 940001);
     });
+    await check('activity.important-interaction', '重要互动必须填写结果与摘要并人工确认', async () => {
+      await open('#/activity/940001', '[CRM_TEST_ONLY]客户甲');
+      await b.click('#view a', '记录重要互动');
+      assert.equal(await b.evaluate("window.__crmTest.calls.some(c=>c.action==='recordActivityInteraction')"), false);
+      await b.click('.modal-overlay button', '确认并保存互动');
+      assert.equal(await b.evaluate("window.__crmTest.calls.some(c=>c.action==='recordActivityInteraction')"), false);
+      await b.evaluate("(() => { const modal=document.querySelector('.modal-overlay'); modal.querySelector('textarea').value='当面讨论保障需求并约定后续核对保单'; modal.querySelector('input[type=checkbox]').checked=true; })()");
+      await b.click('.modal-overlay button', '确认并保存互动');
+      await b.wait(called('person_360', 'recordActivityInteraction'));
+      const payload = await b.evaluate("window.__crmTest.calls.find(c=>c.action==='recordActivityInteraction').payload");
+      assert.equal(payload.activityId, 940001);
+      assert.equal(payload.participantId, 970001);
+      assert.equal(payload.eventType, 'invitation');
+      assert.equal(payload.importance, 3);
+      assert.equal(payload.confirmed, true);
+    });
     await check('activity.person-first-add', '活动新增参与者先人工选择 Person 再提交', async () => {
       await b.click('#view button', '+ 添加参与者');
       assert.equal(await b.evaluate("window.__crmTest.calls.some(c=>c.action==='addCanonicalParticipant')"), false);

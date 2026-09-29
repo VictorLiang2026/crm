@@ -85,7 +85,43 @@ test('standalone Person reads only their direct interactions', async () => {
   const { service, calls } = fixture({ standalone: true });
   const result = await service.listForPerson(11);
   assert.deepEqual(result.rows.map(row => row.source_type), ['manual']);
-  assert.ok(calls.every(call => ['persons', 'interactions'].includes(call.table)));
+  assert.ok(calls.every(call => ['persons', 'interactions', 'activity_participants', 'activity_speakers'].includes(call.table)));
+  assert.ok(calls.filter(call => call.table === 'activity_participants')
+    .every(call => call.filters.canonical_person_id === 'eq.11' && call.filters.status === 'eq.attended'));
+});
+
+test('canonical-only attendance is read once and invitation is excluded', async () => {
+  const { LegacyInteractionAdapter } = require('../../cloudfunctions/_shared/legacy-interaction-adapter');
+  const adapter = new LegacyInteractionAdapter({ request: async (table, method, filters) => {
+    assert.equal(method, 'GET');
+    if (table === 'activity_participants') {
+      assert.equal(filters.canonical_person_id, 'eq.11');
+      return [{ id: 20, activity_id: 40, status: 'attended', canonical_person_id: 11 },
+        { id: 21, activity_id: 40, status: 'invited', canonical_person_id: 11 }]
+        .filter(row => row.status === 'attended');
+    }
+    if (table === 'activity_speakers') return [];
+    if (table === 'activities') return [{ id: 40, name: '专属 Person 活动', activity_date: '2026-09-15' }];
+    throw new Error(`Unexpected ${table}`);
+  } });
+  const rows = await adapter.listCanonicalAttended(11);
+  assert.deepEqual(rows.map(row => row.id), ['activity_participants:20']);
+  assert.equal(rows[0].importance, 3);
+});
+
+test('Person-only speaker attendance uses explicit speaker profile Person ID', async () => {
+  const { LegacyInteractionAdapter } = require('../../cloudfunctions/_shared/legacy-interaction-adapter');
+  const adapter = new LegacyInteractionAdapter({ request: async (table, method, filters) => {
+    assert.equal(method, 'GET');
+    if (table === 'activity_speakers') return [{ id: 30, person_id: 11 }];
+    if (table === 'activity_participants' && filters.canonical_person_id) return [];
+    if (table === 'activity_participants' && filters.person_type === 'eq.speaker') {
+      return [{ id: 31, activity_id: 40, person_type: 'speaker', person_id: 30, status: 'attended' }];
+    }
+    if (table === 'activities') return [{ id: 40, name: '嘉宾活动', activity_date: '2026-09-15' }];
+    throw new Error(`Unexpected ${table}`);
+  } });
+  assert.deepEqual((await adapter.listCanonicalAttended(11)).map(row => row.id), ['activity_participants:31']);
 });
 
 test('manual capture validates identity, explicit time, Person and fields', async () => {

@@ -47,6 +47,7 @@ test('new actions reject missing login before database requests', async () => {
   calls.length = 0;
   assert.deepEqual(await main({ action: 'listInteractions', personId: 11 }), { error: 'UNAUTHORIZED' });
   assert.deepEqual(await main({ action: 'createInteraction', personId: 11, data: {} }), { error: 'UNAUTHORIZED' });
+  assert.deepEqual(await main({ action: 'recordActivityInteraction', data: {} }), { error: 'UNAUTHORIZED' });
   assert.deepEqual(await main({ action: 'listDueCommitments' }), { error: 'UNAUTHORIZED' });
   assert.equal(calls.length, 0);
 });

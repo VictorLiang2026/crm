@@ -4645,6 +4645,70 @@ function followupStatusInfo(v) {
   return f || {v: v || 'none', label: v || '无需跟进', color:'#6b7280'};
 }
 
+// 活动事实先核对身份与重要度，再由人确认写入 Person Interaction。
+function openActivityInteraction(activity, participant){
+  var definitions = {
+    invitation:{label:'个别邀约（已有回应）', min:3, outcomes:[['replied','对方已回复'],['accepted','确认参加'],['declined','明确拒绝'],['next_step','约定下一步']]},
+    conversation:{label:'实质沟通', min:3, outcomes:[['need','发现需求'],['decision','形成决定'],['commitment','产生承诺'],['relationship','关系有变化']]},
+    speaker_cooperation:{label:'嘉宾合作进展', min:4, outcomes:[['topic','确认主题'],['format','确认形式'],['agreement','达成合作'],['delivery','完成合作']]},
+    post_event_followup:{label:'活动后跟进', min:3, outcomes:[['contacted','已联系'],['response','收到反馈'],['next_step','约定下一步'],['closed','完成闭环']]},
+  };
+  var allowed = ['invitation','conversation'];
+  if(participant.person_type === 'speaker' || participant.participant_role === 'speaker') allowed.push('speaker_cooperation');
+  if(activity.status === 'ended' || activity.status === 'reviewed') allowed.push('post_event_followup');
+  var overlay = el('div', {class:'modal-overlay'});
+  var modal = el('div', {class:'modal', style:'max-width:480px'});
+  overlay.appendChild(modal);
+  overlay.addEventListener('click', function(e){ if(e.target === overlay) overlay.remove(); });
+  modal.appendChild(el('h3', {}, '记录重要互动 · ' + (participant.person_name || '参与者')));
+  modal.appendChild(el('p', {style:'font-size:12px;color:var(--muted)'}, '仅报名或批量邀请不会生成互动；实际到场从参与记录只读呈现。已有跟进请继续使用原“记录沟通”，避免重复。'));
+  var typeSel = el('select', {class:'input'}, allowed.map(function(type){ return el('option', {value:type}, definitions[type].label); }));
+  var outcomeSel = el('select', {class:'input'});
+  var importanceSel = el('select', {class:'input'});
+  var timeInput = el('input', {type:'datetime-local', class:'input'});
+  timeInput.value = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0,16);
+  var channelInput = el('input', {class:'input', maxlength:'100', placeholder:'如：面对面、电话、微信'});
+  var summaryInput = el('textarea', {class:'input', rows:'4', maxlength:'2000', placeholder:'记录具体回应、决定或下一步（至少12字）'});
+  var confirmInput = el('input', {type:'checkbox'});
+  var thresholdHint = el('div', {style:'font-size:12px;color:var(--muted)'});
+  function refreshType(){
+    var def = definitions[typeSel.value];
+    outcomeSel.innerHTML = '';
+    def.outcomes.forEach(function(pair){ outcomeSel.appendChild(el('option', {value:pair[0]}, pair[1])); });
+    importanceSel.innerHTML = '';
+    for(var i=def.min;i<=5;i++) importanceSel.appendChild(el('option', {value:String(i)}, String(i) + ' / 5'));
+    thresholdHint.textContent = '此类事件最低重要度 ' + def.min + ' / 5；需有具体结果，服务端会再次校验。';
+  }
+  typeSel.addEventListener('change', refreshType);
+  refreshType();
+  modal.appendChild(el('div', {class:'field'}, [el('label', {}, '事件类型'), typeSel]));
+  modal.appendChild(el('div', {class:'field'}, [el('label', {}, '具体结果'), outcomeSel]));
+  modal.appendChild(el('div', {class:'field'}, [el('label', {}, '发生时间'), timeInput]));
+  modal.appendChild(el('div', {class:'field'}, [el('label', {}, '沟通渠道（可选）'), channelInput]));
+  modal.appendChild(el('div', {class:'field'}, [el('label', {}, '事实摘要'), summaryInput]));
+  modal.appendChild(el('div', {class:'field'}, [el('label', {}, '重要度'), importanceSel, thresholdHint]));
+  modal.appendChild(el('label', {style:'display:flex;gap:8px;align-items:center;font-size:13px'}, [confirmInput, '我确认此事已发生，且不是单纯报名或批量邀约']));
+  var message = el('div', {style:'color:#c0392b;font-size:13px;margin-top:6px'});
+  var saveBtn = el('button', {class:'btn btn-primary', style:'margin-top:10px'}, '确认并保存互动');
+  saveBtn.addEventListener('click', async function(){
+    if(!confirmInput.checked){ message.textContent = '请确认事件已真实发生'; return; }
+    if(!timeInput.value || summaryInput.value.trim().length < 12){ message.textContent = '请填写时间及至少12字的事实摘要'; return; }
+    saveBtn.disabled = true; message.textContent = '';
+    try {
+      var result = await callFn('person_360', {action:'recordActivityInteraction', data:{
+        activityId:activity.id, participantId:participant.id, eventType:typeSel.value,
+        evidence:outcomeSel.value, importance:Number(importanceSel.value),
+        interactionAt:new Date(timeInput.value).toISOString(),
+        channel:channelInput.value.trim(), summary:summaryInput.value.trim(), confirmed:true,
+      }});
+      if(result.error) throw new Error(result.error);
+      overlay.remove(); toast('重要互动已记录到 Person 时间线');
+    } catch(e){ message.textContent = e.message || String(e); saveBtn.disabled = false; }
+  });
+  modal.appendChild(el('div', {}, [saveBtn, message]));
+  document.getElementById('modal-root').appendChild(overlay);
+}
+
 // ===== 活动待办（v1.7.1）=====
 var TASK_TYPES = [
   {v:'preparation', label:'筹备', color:'#d97706'},
@@ -4953,6 +5017,7 @@ async function showActivityDetail(id){
           actions.push(el('a', {class:'btn-sm', style:'margin-right:6px', onclick:function(){ location.hash = viewHash; }}, '查看'));
           if(p.person_type === 'customer' && p.person_id)
             actions.push(el('a', {class:'btn-sm btn-green', style:'margin-right:6px', onclick:function(){ openActivityFollowup(id, p); }}, '记录沟通'));
+          actions.push(el('a', {class:'btn-sm', style:'margin-right:6px', onclick:function(){ openActivityInteraction(act, p); }}, '记录重要互动'));
         } else {
           actions.push(el('a', {class:'btn-sm', style:'margin-right:6px;background:#fef3c7;color:#92400e', onclick:function(){ openLinkParticipant(id, p); }}, '关联'));
         }

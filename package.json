@@ -9,7 +9,7 @@
     "test:context-engine": "node --test tests/ai-gateway/context-engine.cjs tests/ai-gateway/run.cjs tests/ai-gateway/skill-registry.cjs",
     "test:person-service": "node --test tests/persons/person-service.cjs",
     "test:households": "node --test tests/households/person360-service.cjs",
-    "test:interactions": "node --test tests/interactions/interaction-service.cjs tests/interactions/legacy-adapter.cjs tests/interactions/person360-dispatch.cjs",
+    "test:interactions": "node --test tests/interactions/interaction-service.cjs tests/interactions/legacy-adapter.cjs tests/interactions/person360-dispatch.cjs tests/interactions/activity-interaction-service.cjs",
     "test:actions": "node --test tests/actions/action-service.cjs",
     "test:commitments": "node --test tests/commitments/commitment-service.cjs tests/interactions/person360-dispatch.cjs",
     "test:quick-capture-v2": "node --test tests/quick-capture-v2/server.cjs",

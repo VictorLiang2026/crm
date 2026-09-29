@@ -53,10 +53,11 @@ class InteractionService {
       person_id: `eq.${idOf(person.id)}`, order: 'interaction_at.desc,id.desc', limit: MAX_LIMIT,
     });
     const rows = stored.map(item => ({ ...item, virtual: false }));
+    const adapter = new LegacyInteractionAdapter({ request: this.request });
     if (person.legacy_customer_id != null) {
-      rows.push(...await new LegacyInteractionAdapter({ request: this.request })
-        .listForCustomer(person.legacy_customer_id));
+      rows.push(...await adapter.listForCustomer(person.legacy_customer_id));
     }
+    rows.push(...await adapter.listCanonicalAttended(person.id));
     // A future import may materialize a legacy source. Show it once, preferring the ledger row.
     const seen = new Set();
     const unique = rows.filter(row => {

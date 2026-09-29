@@ -53,6 +53,38 @@ class LegacyInteractionAdapter {
     });
   }
 
+  async listCanonicalAttended(personId) {
+    const personKey = idOf(personId);
+    const direct = await this.request('activity_participants', 'GET', {
+      select: 'id,activity_id,person_type,person_id,canonical_person_id,status,relationship_note,created_at',
+      canonical_person_id: `eq.${personKey}`, status: 'eq.attended',
+      deleted_at: 'is.null', order: 'created_at.desc,id.desc', limit: MAX_LIMIT,
+    });
+    const speakerProfiles = await this.request('activity_speakers', 'GET', {
+      select: 'id,person_id', person_id: `eq.${personKey}`,
+      deleted_at: 'is.null', limit: MAX_LIMIT,
+    });
+    const speakerIds = speakerProfiles.map(row => idOf(row.id));
+    const speakerAttendance = speakerIds.length ? await this.participants('speaker', speakerIds) : [];
+    const participants = [...new Map([...direct, ...speakerAttendance]
+      .map(row => [String(row.id), row])).values()];
+    const ids = [...new Set(participants.map(row => idOf(row.activity_id)))];
+    const activities = ids.length ? await this.request('activities', 'GET', {
+      select: 'id,name,activity_date', id: `in.(${ids.join(',')})`,
+      deleted_at: 'is.null', limit: MAX_LIMIT * 2,
+    }) : [];
+    const activityMap = new Map(activities.map(row => [String(row.id), row]));
+    return participants.flatMap(row => {
+      const activity = activityMap.get(String(row.activity_id));
+      if (!activity) return [];
+      const item = representation('activity_participants', row,
+        timestamp(activity.activity_date || row.created_at),
+        excerpt(`参加活动：${activity.name || ''}`, '参加活动'),
+        row.relationship_note, 'activity', row.activity_id);
+      return item ? [item] : [];
+    });
+  }
+
   async listForCustomer(legacyCustomerId) {
     const customerId = idOf(legacyCustomerId);
     const rows = [];
