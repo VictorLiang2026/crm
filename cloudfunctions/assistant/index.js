@@ -4,13 +4,30 @@
 const { routeIntent, IntentError } = require('./intent-router');
 const { handleCommand, OPERATIONS } = require('./command-safety');
 
-function createMain(getIdentity, searchRunner = event => require('./search-service').runSearch(event)) {
+function createMain(getIdentity, searchRunner = event => require('./search-service').runSearch(event),
+  actionRunner = (event, uid) => require('./action-command-service').runActionCommand(event, uid)) {
   return async event => {
     let identity;
     try { identity = await getIdentity(); }
     catch (_) { return { ok: false, error: { code: 'UNAUTHORIZED', message: 'Login required' } }; }
     if (typeof identity?.uid !== 'string' || !identity.uid.trim() || identity.isAnonymous !== false) {
       return { ok: false, error: { code: 'UNAUTHORIZED', message: 'Login required' } };
+    }
+    const isActionPlan = event?.action === 'command' && event.stage === 'plan' &&
+      event.command?.operation === 'create' && event.command?.resource === 'actions' &&
+      event.command?.personId != null;
+    const isActionNext = event?.action === 'command' && event.resource === 'actions' &&
+      ['preview', 'confirm', 'execute'].includes(event.stage);
+    if (isActionPlan || isActionNext) {
+      try { return await actionRunner({ action: 'command', stage: event.stage,
+        command: event.command, resource: event.resource,
+        commandId: event.commandId, previewHash: event.previewHash }, identity.uid); }
+      catch (error) {
+        const code = ['INVALID_COMMAND','DUPLICATE_ACTION','PREVIEW_STALE',
+          'CONFIRMATION_REQUIRED','ACTION_COMMAND_FAILED'].includes(error?.code) ?
+          error.code : 'ACTION_COMMAND_FAILED';
+        return { ok: false, error: { code, message: 'Action command could not be completed' } };
+      }
     }
     if (event?.action === 'command' || OPERATIONS.includes(event?.action)) {
       return handleCommand({ action: event.action, stage: event.stage, command: event.command });

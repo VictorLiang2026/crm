@@ -963,6 +963,9 @@ function ensurePersonCustomer(name, sourceLabel){
 function route(){
   var hash = location.hash || '#/';
   updateModuleSwitch(hash);
+  if(hash === '#/assistant/actions/new') return import('/crm/js/modules/assistant-action-create.js').then(function(module){
+    return module.renderAssistantActionCreate({root:$('view'), callFn:callFn});
+  }).catch(function(e){ $('view').textContent = '新建行动加载失败：' + e.message; });
   if(hash === '#/ai/search') return import('/crm/js/modules/ai-crm-search.js').then(function(module){
     return module.renderAiCrmSearch({root:$('view'), callFn:callFn});
   }).catch(function(e){ $('view').textContent = 'AI CRM 搜索加载失败：' + e.message; });
@@ -1659,6 +1662,7 @@ async function showDashboard(){
     el('a', {href:'#/funnels'}, '漏斗经营'),
     el('a', {href:'#/ai-suggestions'}, 'AI 建议'),
     el('a', {href:'#/ai/search'}, 'AI CRM 搜索'),
+    el('a', {href:'#/assistant/actions/new'}, '新建行动'),
     el('a', {href:'#/recruit'}, '增员管理'),
     el('a', {href:'#/activities'}, '活动列表'),
     el('a', {href:'#/activity/customer'}, '活动量'),

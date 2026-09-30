@@ -34,6 +34,27 @@ module.exports = async function smoke(root, test) {
       await b.wait(text('最近三个月参加过活动'));
       assert.equal(await b.evaluate("window.__crmTest.calls.some(c=>c.name==='assistant')"), false);
     });
+    await check('assistant.action.create', 'Action 必须人工选人、预览、确认后才执行', async () => {
+      await open('#/assistant/actions/new', '新建行动');
+      assert.equal(await b.evaluate("window.__crmTest.calls.some(c=>c.name==='assistant' && c.action==='command')"), false);
+      await b.evaluate("document.querySelector('.crm-action-search input').value='[CRM_TEST_ONLY]家人乙'");
+      await b.click('.crm-action-search button', '查找人物');
+      await b.wait(text('[CRM_TEST_ONLY]家人乙 · #980002'));
+      await b.click('.crm-action-choices button', '[CRM_TEST_ONLY]家人乙');
+      await b.evaluate("document.querySelector('.crm-action-field input').value='[CRM_TEST_ONLY]联系'");
+      await b.click('.crm-action-form button', '1. 规划');
+      await b.wait(called('assistant', 'command'));
+      assert.equal(await b.evaluate("window.__crmTest.calls.some(c=>c.name==='assistant' && c.stage==='execute')"), false);
+      await b.click('.crm-action-progress button', '2. 查看预览');
+      await b.wait(text('标题：[CRM_TEST_ONLY]联系'));
+      assert.equal(await b.evaluate("window.__crmTest.calls.some(c=>c.name==='assistant' && c.stage==='execute')"), false);
+      await b.click('.crm-action-progress button', '3. 确认预览');
+      await b.wait(text('已确认预览'));
+      assert.equal(await b.evaluate("window.__crmTest.calls.some(c=>c.name==='assistant' && c.stage==='execute')"), false);
+      await b.click('.crm-action-progress button', '4. 执行创建');
+      await b.wait(text('行动已创建：#990777'));
+      assert.equal(await b.evaluate("window.__crmTest.calls.filter(c=>c.name==='assistant' && c.stage==='execute').length"), 1);
+    });
     await check('customers.list', '客户列表显示记录与客户详情导航', async () => {
       await open('#/customers', '[CRM_TEST_ONLY]客户甲');
       await b.click('#view a', '[CRM_TEST_ONLY]客户甲');

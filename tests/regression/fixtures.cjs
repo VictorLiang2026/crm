@@ -16,6 +16,7 @@ function installFixtures() {
     status: mode === 'activity-ended' ? 'ended' : 'preparing',
     description: marker + '活动说明', topic_ids: [], deleted_at: null };
   const calls = [], violations = [], errors = [];
+  let actionCommandStage = null;
   let loggedIn = params.get('login') !== 'required';
   window.__crmTest = { calls, violations, errors, loginAttempts: 0 };
   addEventListener('error', e => errors.push(e.message));
@@ -24,6 +25,28 @@ function installFixtures() {
   const fail = message => { violations.push(message); throw new Error(message); };
   const rows = value => ({ rows: mode === 'empty' ? [] : value, total: mode === 'empty' ? 0 : value.length, page: 1, pageSize: 50 });
   const replies = {
+    'assistant:command': data => {
+      if (data.stage === 'plan' && data.command?.personId === 980002) {
+        actionCommandStage = 'planned';
+        return { ok: true, status: 'planned', commandId: '11111111-1111-4111-8111-111111111111' };
+      }
+      if (data.stage === 'preview' && actionCommandStage === 'planned') {
+        actionCommandStage = 'previewed';
+        return { ok: true, status: 'previewed', previewHash: 'a'.repeat(32),
+          preview: { person: { id: 980002, displayName: marker + '家人乙' },
+            after: { title: marker + '联系', action_type: 'followup', priority: 'medium',
+              description: '', due_at: null } } };
+      }
+      if (data.stage === 'confirm' && actionCommandStage === 'previewed' && data.previewHash === 'a'.repeat(32)) {
+        actionCommandStage = 'confirmed';
+        return { ok: true, status: 'confirmed' };
+      }
+      if (data.stage === 'execute' && actionCommandStage === 'confirmed') {
+        actionCommandStage = 'executed';
+        return { ok: true, status: 'executed', actionId: 990777 };
+      }
+      return fail('ACTION_COMMAND_STAGE_BYPASS');
+    },
     'ai_activity:postReviewV2': () => ({ activity_id: activity.id, activity_name: activity.name,
       task_id: 800001, result_id: 800002, requires_confirmation: true,
       business_data_written: false, discarded_unsupported_items: 0,
@@ -133,7 +156,7 @@ function installFixtures() {
     async callFunction({ name, data }) {
       const key = name + ':' + data.action;
       if (!Object.hasOwn(replies, key)) return fail('UNEXPECTED_OR_WRITE_ACTION: ' + key);
-      calls.push({ name, action: data.action, id: data.id, customer_id: data.customer_id,
+      calls.push({ name, action: data.action, stage: data.stage, id: data.id, customer_id: data.customer_id,
         candidate_id: data.candidate_id, personId: data.personId, version: data.version,
         payload: ['person_360:commitQuickCaptureV2', 'person_360:addCanonicalParticipant', 'person_360:recordActivityInteraction', 'person_360:createOpportunity',
           'person_360:updateOpportunity', 'person_360:createSpeakerProfile',
