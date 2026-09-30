@@ -29,6 +29,11 @@ module.exports = async function smoke(root, test) {
       await b.wait(text('[CRM_TEST_ONLY]客户甲'));
       await b.wait(called('customers', 'list'));
     });
+    await check('ai.search.entry', 'AI CRM 搜索独立页面展示固定示例，进入页面不执行搜索', async () => {
+      await open('#/ai/search', 'AI CRM 搜索');
+      await b.wait(text('最近三个月参加过活动'));
+      assert.equal(await b.evaluate("window.__crmTest.calls.some(c=>c.name==='assistant')"), false);
+    });
     await check('customers.list', '客户列表显示记录与客户详情导航', async () => {
       await open('#/customers', '[CRM_TEST_ONLY]客户甲');
       await b.click('#view a', '[CRM_TEST_ONLY]客户甲');

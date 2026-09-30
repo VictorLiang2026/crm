@@ -7,9 +7,9 @@ const { createSkillRegistry, defaultRegistry, SkillValidationError, TIMEOUT_CLAS
 
 const names = ['quick_capture', 'person_summary', 'meeting_prep', 'today_coach',
   'opportunity_analysis', 'activity_prepare', 'activity_review', 'recruit_coach',
-  'conversation_playbook', 'ai_search'];
+  'conversation_playbook', 'ai_search', 'crm_search_parse'];
 
-test('all ten versioned contracts are model-independent and immutable', () => {
+test('all versioned contracts are model-independent and immutable', () => {
   assert.deepEqual(defaultRegistry.list().map(item => item.name), names);
   for (const skill of defaultRegistry.list()) {
     assert.deepEqual(Object.keys(skill).sort(), ['name', 'version', 'capability', 'contextRecipe',
@@ -56,6 +56,9 @@ test('every initial skill accepts a representative input, context and output', (
         nextObjective: '明确待核实的保障范围', doNotSay: [] }],
     ai_search: [{ query: 'Find a fact' }, { search_results: [] },
       { answer: 'A sourced answer', citations: [{ sourceType: 'record', sourceId: '1', excerpt: 'Fact' }], confidence: 'low' }],
+    crm_search_parse: [{ query: '最近三个月参加过活动但没有继续跟进的人' },
+      { guidance: { supportedTemplates: ['activity_no_followup'] } },
+      { template: 'activity_no_followup', months: 3 }],
   };
   for (const name of names) {
     const [input, context, output] = examples[name];
@@ -104,6 +107,18 @@ test('AI search requires source citations and bounded confidence', () => {
   }), true);
   assert.throws(() => defaultRegistry.validateOutput('ai_search', {
     answer: 'Guess', citations: [{ sourceType: 'record', sourceId: '42', excerpt: 'fact' }], confidence: 'certain',
+  }), error => error.code === 'INVALID_SKILL_OUTPUT');
+});
+
+test('CRM search parser cannot output SQL, person names or result lists', () => {
+  assert.equal(defaultRegistry.validateOutput('crm_search_parse', {
+    template: 'declining_priority', months: 3,
+  }), true);
+  assert.throws(() => defaultRegistry.validateOutput('crm_search_parse', {
+    template: 'declining_priority', months: 3, sql: 'SELECT * FROM public.persons',
+  }), error => error.code === 'INVALID_SKILL_OUTPUT');
+  assert.throws(() => defaultRegistry.validateOutput('crm_search_parse', {
+    template: 'declining_priority', months: 3, people: ['invented'],
   }), error => error.code === 'INVALID_SKILL_OUTPUT');
 });
 

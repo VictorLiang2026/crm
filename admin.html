@@ -963,6 +963,9 @@ function ensurePersonCustomer(name, sourceLabel){
 function route(){
   var hash = location.hash || '#/';
   updateModuleSwitch(hash);
+  if(hash === '#/ai/search') return import('/crm/js/modules/ai-crm-search.js').then(function(module){
+    return module.renderAiCrmSearch({root:$('view'), callFn:callFn});
+  }).catch(function(e){ $('view').textContent = 'AI CRM 搜索加载失败：' + e.message; });
   var person360 = hash.match(/^#\/person\/(\d+)$/);
   if(person360) return import('/crm/js/modules/person-360.js').then(function(module){
     return module.renderPerson360({root:$('view'), personId:person360[1], callFn:callFn});
@@ -1655,6 +1658,7 @@ async function showDashboard(){
     el('a', {href:'#/today'}, '今日经营'),
     el('a', {href:'#/funnels'}, '漏斗经营'),
     el('a', {href:'#/ai-suggestions'}, 'AI 建议'),
+    el('a', {href:'#/ai/search'}, 'AI CRM 搜索'),
     el('a', {href:'#/recruit'}, '增员管理'),
     el('a', {href:'#/activities'}, '活动列表'),
     el('a', {href:'#/activity/customer'}, '活动量'),
@@ -1845,6 +1849,7 @@ async function showList(){
   toolbar.appendChild(el('button', {class:'btn btn-primary', onclick:function(){ openCustomerForm(null); }}, '+ 新增客户'));
   toolbar.appendChild(el('button', {class:'btn', onclick:function(){ openAiParse(); }}, 'AI 解析新增'));
   toolbar.appendChild(el('button', {class:'btn', onclick:function(){ location.hash='#/ai-suggestions'; }}, 'AI 建议'));
+  toolbar.appendChild(el('button', {class:'btn', onclick:function(){ location.hash='#/ai/search'; }}, 'AI CRM 搜索'));
   toolbar.appendChild(el('button', {class:'btn', onclick:function(){ location.hash='#/customers/trash'; }}, '回收站'));
   view.appendChild(toolbar);
 

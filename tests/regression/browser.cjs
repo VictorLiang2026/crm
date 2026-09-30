@@ -34,6 +34,8 @@ class Browser {
       else if (pathname === '/crm/js/modules/person-360.js') { res.setHeader('Content-Type', 'text/javascript; charset=utf-8'); res.end(fs.readFileSync(path.join(this.root, 'crm/js/modules/person-360.js'))); }
       else if (pathname === '/crm/css/person-360.css') { res.setHeader('Content-Type', 'text/css; charset=utf-8'); res.end(fs.readFileSync(path.join(this.root, 'crm/css/person-360.css'))); }
       else if (pathname === '/crm/js/modules/activity-review-v2.js') { res.setHeader('Content-Type', 'text/javascript; charset=utf-8'); res.end(fs.readFileSync(path.join(this.root, 'crm/js/modules/activity-review-v2.js'))); }
+      else if (pathname === '/crm/js/modules/ai-crm-search.js') { res.setHeader('Content-Type', 'text/javascript; charset=utf-8'); res.end(fs.readFileSync(path.join(this.root, 'crm/js/modules/ai-crm-search.js'))); }
+      else if (pathname === '/crm/css/ai-crm-search.css') { res.setHeader('Content-Type', 'text/css; charset=utf-8'); res.end(fs.readFileSync(path.join(this.root, 'crm/css/ai-crm-search.css'))); }
       else if (pathname === '/crm/css/activity-review-v2.css') { res.setHeader('Content-Type', 'text/css; charset=utf-8'); res.end(fs.readFileSync(path.join(this.root, 'crm/css/activity-review-v2.css'))); }
       else if (pathname === '/crm/js/core/api.js' || pathname === '/crm/js/core/feature-flags.js' ||
                pathname === '/crm/js/modules/quick-capture-v2.js') {
@@ -50,22 +52,28 @@ class Browser {
     await once(this.server, 'listening');
     this.origin = 'http://127.0.0.1:' + this.server.address().port;
     this.profile = fs.mkdtempSync(path.join(os.tmpdir(), 'crm-regression-'));
-    this.process = spawn(executable, ['--headless=new', '--no-first-run', '--no-default-browser-check',
+    this.process = spawn(executable, ['--headless=new', '--disable-gpu', '--no-sandbox', '--no-first-run', '--no-default-browser-check',
       '--disable-background-networking', '--disable-component-update', '--disable-sync', '--disable-extensions',
       '--remote-debugging-address=127.0.0.1', '--remote-debugging-port=0', '--user-data-dir=' + this.profile, 'about:blank'],
     { windowsHide: true, stdio: 'ignore' });
     let spawnError;
     this.process.on('error', e => { spawnError = e; });
     const portFile = path.join(this.profile, 'DevToolsActivePort');
-    for (let i = 0; i < 150 && !fs.existsSync(portFile); i++) {
+    for (let i = 0; i < 450 && !fs.existsSync(portFile); i++) {
       if (spawnError) throw spawnError;
       // Edge may relaunch under the same test profile; the debugger port is the readiness signal.
       await delay(100);
     }
     if (!fs.existsSync(portFile)) throw new Error('Browser debugger startup timed out');
     const port = fs.readFileSync(portFile, 'utf8').split(/\r?\n/)[0];
-    const targets = await (await fetch('http://127.0.0.1:' + port + '/json/list')).json();
-    const target = targets.find(t => t.type === 'page');
+    let target;
+    for (let i = 0; i < 200 && !target; i++) {
+      try {
+        const targets = await (await fetch('http://127.0.0.1:' + port + '/json/list')).json();
+        target = targets.find(t => t.type === 'page');
+      } catch (_) { /* Edge can publish its port before the debugger is ready. */ }
+      if (!target) await delay(100);
+    }
     if (!target) throw new Error('No browser page target');
     this.socket = new WebSocket(target.webSocketDebuggerUrl);
     await new Promise((resolve, reject) => { this.socket.addEventListener('open', resolve, { once: true }); this.socket.addEventListener('error', reject, { once: true }); });

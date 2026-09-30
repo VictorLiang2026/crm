@@ -5,7 +5,7 @@
   "functions": [
     {
       "name": "assistant",
-      "timeout": 10,
+      "timeout": 90,
       "runtime": "Nodejs18.15",
       "handler": "index.main",
       "memorySize": 256
