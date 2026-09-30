@@ -4,6 +4,13 @@
   "functionRoot": "cloudfunctions",
   "functions": [
     {
+      "name": "assistant",
+      "timeout": 10,
+      "runtime": "Nodejs18.15",
+      "handler": "index.main",
+      "memorySize": 256
+    },
+    {
       "name": "activities",
       "timeout": 10,
       "runtime": "Nodejs18.15",
