@@ -2,6 +2,7 @@
 'use strict';
 
 const { routeIntent, IntentError } = require('./intent-router');
+const { handleCommand, OPERATIONS } = require('./command-safety');
 
 function createMain(getIdentity, searchRunner = event => require('./search-service').runSearch(event)) {
   return async event => {
@@ -10,6 +11,9 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
     catch (_) { return { ok: false, error: { code: 'UNAUTHORIZED', message: 'Login required' } }; }
     if (typeof identity?.uid !== 'string' || !identity.uid.trim() || identity.isAnonymous !== false) {
       return { ok: false, error: { code: 'UNAUTHORIZED', message: 'Login required' } };
+    }
+    if (event?.action === 'command' || OPERATIONS.includes(event?.action)) {
+      return handleCommand({ action: event.action, stage: event.stage, command: event.command });
     }
     if (event?.action === 'search') {
       try { return await searchRunner({ query: event.query }); }

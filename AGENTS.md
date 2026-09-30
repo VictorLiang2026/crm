@@ -20,6 +20,7 @@
 12. 遇到高风险操作必须先停止并报告风险、影响范围和所需授权，不得自行继续。
 13. 从现在起，新 AI-native 前端功能必须放在 `crm/js/modules/`，复用 `crm/js/core/`、`crm/js/components/` 与 `crm/css/`；保留 `admin.html` 的旧实现，不为建立新功能而整体抽离旧代码。
 14. 未来 Quick Capture 新建或关联 Person 前，必须由服务端调用 `PersonService.resolveName()` 并让人确认候选身份；AI 不能自行选定 Person。现有 Legacy Quick Capture 保持原流程，直到单独批准接入。
+15. AI 自然语言命令涉及 `create`、`update`、`close`、`delete` 时，必须依次经过 Command → Plan → 服务端核实的 Preview → 人工 Confirm → 有范围授权的 Execute。不能凭自然语言、客户端 `confirmed` 标志或未经核实的预览直接写入业务数据；未接入具体执行器时必须拒绝执行。
 
 ## 环境与范围
 
