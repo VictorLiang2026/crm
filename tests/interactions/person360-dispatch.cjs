@@ -55,7 +55,20 @@ test('new actions reject missing login before database requests', async () => {
   assert.deepEqual(await main({ action: 'createInteraction', personId: 11, data: {} }), { error: 'UNAUTHORIZED' });
   assert.deepEqual(await main({ action: 'recordActivityInteraction', data: {} }), { error: 'UNAUTHORIZED' });
   assert.deepEqual(await main({ action: 'listDueCommitments' }), { error: 'UNAUTHORIZED' });
+  assert.deepEqual(await main({ action: 'getRelationshipDecay', personId: 11 }), { error: 'UNAUTHORIZED' });
   assert.equal(calls.length, 0);
+});
+
+test('relationship decay endpoint only reads bounded public sources after login', async () => {
+  uid = 'test-uid';
+  calls.length = 0;
+  const result = await main({ action: 'getRelationshipDecay', personId: 11 });
+  assert.equal(result.status, 'insufficient_evidence');
+  assert.equal(result.candidate, false);
+  assert.equal(result.persisted, false);
+  assert.match(result.why, /关系强度/);
+  assert.ok(calls.some(call => call.table === 'context_items' && call.filters.limit === '30'));
+  assert.ok(calls.every(call => call.method === 'GET'));
 });
 
 test('listDueCommitments uses read-only public queries after login', async () => {

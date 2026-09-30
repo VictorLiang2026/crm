@@ -17,6 +17,7 @@ tests/households/.results/
 tests/interactions/.results/
 tests/commitments/.results/
 tests/commitments/.results/
+tests/relationship-decay/.results/
 # OCR/图片测试数据
 test_ocr.*
 # 测试脚本与生成产物

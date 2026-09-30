@@ -44,6 +44,40 @@ export async function renderPerson360({ root, personId, callFn }) {
   top.append(back);
   wrap.append(top, node('h2', '', `${model.person.display_name} · Person 360`));
 
+  const decay = node('section', 'card person360-card person360-decay');
+  decay.append(node('h3', '', '关系节奏提醒'));
+  const decayBody = node('div', 'person360-decay-body');
+  decayBody.append(node('p', 'person360-muted', '正在核对关系与互动依据…'));
+  decay.append(decayBody);
+  wrap.append(decay);
+  void request('getRelationshipDecay', { personId }).then(result => {
+    if (location.hash !== hash) return;
+    if (!['signal', 'stable', 'insufficient_evidence'].includes(result.status) ||
+        typeof result.why !== 'string' || typeof result.recommended_action !== 'string') {
+      throw new Error('关系提示数据格式异常');
+    }
+    const status = {
+      signal: '建议关注（待人工核实）', stable: '当前节奏未见明显偏离',
+      insufficient_evidence: '证据不足，暂不判断',
+    }[result.status];
+    decayBody.replaceChildren(node('strong', '', status),
+      node('p', '', `依据：${result.why}`),
+      node('p', '', `建议行动：${result.recommended_action}`));
+    if (result.status === 'insufficient_evidence') {
+      decayBody.append(node('p', 'person360-muted', '置信度：无法评估（证据不足）。'));
+    } else if (Number.isFinite(result.confidence)) {
+      decayBody.append(node('p', 'person360-muted',
+        `置信度：${Math.round(result.confidence * 100)}% · 仅供人工判断，不会自动创建行动。`));
+    }
+    if (result.evidence?.importance_source === 'sales_priority_proxy') {
+      decayBody.append(node('p', 'person360-muted',
+        '关系重要性暂以客户优先级代用，并已降低置信度；这不是已确认的关系事实。'));
+    }
+  }).catch(error => {
+    if (location.hash === hash) decayBody.replaceChildren(
+      node('p', 'person360-error', `关系提示加载失败：${error.message}`));
+  });
+
   const opportunities = node('section', 'card person360-card person360-opportunities');
   opportunities.append(node('h3', '', '经营机会'));
   const opportunityList = node('div', 'person360-opportunity-list');

@@ -74,6 +74,15 @@ module.exports = async function smoke(root, test) {
       assert.equal(await b.evaluate("window.__crmTest.calls.some(c=>c.name==='person_360' && c.action==='get' && c.personId==='980001')"), true);
       assert.equal(await b.evaluate("window.__crmTest.calls.some(c=>c.name==='person_360' && ['addMember','saveFacts'].includes(c.action))"), false);
     });
+    await check('person360.relationship-decay', '关系节奏候选只读显示依据、置信度与人工建议', async () => {
+      await b.wait(called('person_360', 'getRelationshipDecay'));
+      await b.wait(text('建议关注（待人工核实）'));
+      for (const label of ['依据：', '建议行动：', '置信度：65%', '客户优先级代用']) {
+        assert.equal(await b.evaluate(text(label)), true);
+      }
+      assert.equal(await b.evaluate("window.__crmTest.calls.some(c=>c.name==='person_360' && c.action==='getRelationshipDecay' && c.personId==='980001')"), true);
+      assert.equal(await b.evaluate("window.__crmTest.calls.some(c=>c.name==='actions' || c.action==='createAction')"), false);
+    });
     await check('person360.opportunities', 'Person 360 显示旧客户及 Person 专属机会', async () => {
       await b.wait(called('person_360', 'listOpportunities'));
       await b.wait(text('[CRM_TEST_ONLY]联系候选人'));
@@ -124,6 +133,12 @@ module.exports = async function smoke(root, test) {
       await open('#/person/980001', '[CRM_TEST_ONLY]家人乙', 'mode=family');
       assert.equal(await b.evaluate("document.querySelector('.person360-facts').value"), '[CRM_TEST_ONLY]周末一起探望父母');
       assert.equal(await b.evaluate("document.querySelector('.person360-member').innerText.includes('配偶')"), true);
+      await open('#/customer/910001', '[CRM_TEST_ONLY]预约沟通');
+    });
+    await check('person360.relationship-decay-insufficient', '缺少依据时明确不判断且不显示伪造置信度', async () => {
+      await open('#/person/980001', '证据不足，暂不判断', 'mode=empty');
+      assert.equal(await b.evaluate(text('置信度：无法评估（证据不足）')), true);
+      assert.equal(await b.evaluate("window.__crmTest.calls.some(c=>c.name==='actions' || c.action==='createAction')"), false);
       await open('#/customer/910001', '[CRM_TEST_ONLY]预约沟通');
     });
     await check('customer.policy-review', '原客户详情的保单检视页签和生成入口保留', async () => {

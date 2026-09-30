@@ -9,6 +9,7 @@ const { CommitmentService } = require('./commitment-service');
 const { InsuranceContextService } = require('./insurance-context-service');
 const { ParticipantService } = require('./participant-service');
 const { SpeakerProfileService } = require('./speaker-profile-service');
+const { RelationshipDecayService } = require('./relationship-decay-service');
 
 const app = cloudbase.init({ env: process.env.TCB_ENV });
 const LEGACY_INTERACTION_TABLES = new Set([
@@ -18,10 +19,12 @@ const LEGACY_INTERACTION_TABLES = new Set([
 const INSURANCE_READ_TABLES = new Set([
   'products', 'policy_review_reports', 'ocr_records', 'photos', 'actions',
 ]);
+const RELATIONSHIP_READ_TABLES = new Set(['context_items']);
 const TABLES = new Set([
   'persons', 'households', 'household_members', 'interactions', 'commitments',
   'opportunities',
   ...INSURANCE_READ_TABLES,
+  ...RELATIONSHIP_READ_TABLES,
   ...LEGACY_INTERACTION_TABLES,
 ]);
 const ROLES = new Set(['spouse', 'child', 'parent', 'sibling', 'other']);
@@ -48,6 +51,7 @@ async function pgRequest(table, method, filters = {}, body) {
     throw new Error('Invalid source operation');
   }
   if (INSURANCE_READ_TABLES.has(table) && method !== 'GET') throw new Error('Invalid source operation');
+  if (RELATIONSHIP_READ_TABLES.has(table) && method !== 'GET') throw new Error('Invalid source operation');
   if (table === 'commitments' && method !== 'GET') throw new Error('Invalid source operation');
   const env = process.env.TCB_ENV;
   const key = process.env.CRM_PERSON360_DB_API_KEY;
@@ -400,6 +404,8 @@ exports.main = async event => {
       case 'listOpportunities': return await service.listOpportunities(event.personId);
       case 'listRecruitContext': return await service.listRecruitContext(event.personId);
       case 'getInsuranceContext': return await service.getInsuranceContext(event.personId);
+      case 'getRelationshipDecay': return await new RelationshipDecayService({ request: pgRequest })
+        .evaluateForPerson(event.personId);
       case 'createOpportunity': return await service.createOpportunity(event.personId, event.data);
       case 'updateOpportunity': return await service.updateOpportunity(event.personId, event.id, event.data);
       case 'closeOpportunity': return await service.closeOpportunity(event.personId, event.id);

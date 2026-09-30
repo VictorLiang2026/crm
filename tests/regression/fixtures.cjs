@@ -69,6 +69,14 @@ function installFixtures() {
       household: mode === 'family' ? { id: 981001, important_facts: marker + '周末一起探望父母' } : null,
       members: mode === 'family' ? [{ id: 982001, person_id: 980002, relationship_to_anchor: 'spouse',
         person: { id: 980002, display_name: marker + '家人乙' } }] : [] }),
+    'person_360:getRelationshipDecay': () => mode === 'empty' ? ({
+      status: 'insufficient_evidence', why: '缺少明确的关系强度、最近一次重要互动，暂不能判断关系是否衰减。',
+      confidence: 0, recommended_action: '先核实并补录真实的关系和互动信息，不要仅因经过的天数打扰对方。',
+      candidate: false, persisted: false,
+    }) : ({ status: 'signal', why: '最近一次重要互动距今 30 天；个人典型间隔约 7 天。',
+      confidence: 0.65, recommended_action: '先核实是否有未录入的重要互动，再由人决定是否联系。',
+      candidate: true, persisted: false,
+      evidence: { importance_source: 'sales_priority_proxy' } }),
     'person_360:listOpportunities': () => rows(mode === 'empty' ? [] : [
       { id: 961001, person_id: 980001, customer_id: null, opportunity_type: 'recruit',
         status: '发现', next_action: marker + '联系候选人', updated_at: '2026-09-28' },

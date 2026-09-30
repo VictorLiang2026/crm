@@ -15,8 +15,18 @@
 
 结果始终包含 `why`、0–1 `confidence`、`recommended_action`；仅为 `signal` 候选，不创建 Action，不写 `public.context_items`，不修改关系阶段。推荐行动要求先核实有无未录入互动，由人决定是否联系。
 
-`relationship-decay-service.js` 是尚未接入旧函数分发的 Person 级只读读取模块。它只接受已确认的 `context_items`：`relationship_strength` / `relationship_importance` 为人工评估（`inference`），`last_meaningful_interaction_at` 为已确认时间事实（`fact`）；或使用原始 `interactions.importance >= 4`。旧互动适配器只提供频率；客户优先级可作为低置信度重要性代理。服务返回来源引用，不返回原始跟进备注。
+`relationship-decay-service.js` 是 Person 级只读读取模块。它只接受已确认的 `context_items`：`relationship_strength` / `relationship_importance` 为人工评估（`inference`），`last_meaningful_interaction_at` 为已确认时间事实（`fact`）；或使用原始 `interactions.importance >= 4`。旧互动适配器只提供频率；客户优先级可作为低置信度重要性代理。服务返回来源引用，不返回原始跟进备注。
 
 ## 验证与接入门槛
 
-纯计算和只读服务共 9 项隔离单测通过，包括不同节奏、稀疏记录、同日去重、过期/未确认资料和不存在 Person。尚未修改 `person_360` 分发或 Person 360 页面，也未触发线上业务调用。接入前须确定目标是 CRM 与 Person 的经营关系，还是两位 Person 的有向关系；后者还需先设计互动与关系边的明确归属。项目 `AGENTS.md`“修改前”第 3 条要求改动旧接口/页面前明确确认影响与回归范围。
+纯计算和只读服务的隔离测试覆盖不同节奏、稀疏记录、同日去重、过期/未确认资料和不存在 Person。
+
+## 2026-10-01 接入 Person 360
+
+用户确认采用 CRM 与 Person 的经营关系口径，并同意只读 Person 360 卡片。本轮在已有登录保护的 `person_360` 函数增加 `getRelationshipDecay`：仅通过服务端密钥读取 `public.persons`、`context_items`、旧客户优先级及有上限的 Interaction 时间线；`context_items` 被单独限制为 GET。页面显示 `why`、`confidence`、`recommended_action`，明确区分候选提醒、稳定和证据不足；使用客户优先级代用重要性时显示警示。不会写入 Action、Signal 或关系阶段，不自动联系客户。
+
+当前线上关系评估与新 Interaction 资料为空，大多数 Person 预计显示“证据不足”。这不是关系稳定的证明；需要人工记录明确的关系强度和重要互动后，才可能形成可信候选信号。两位 Person 间的有向 `relationships` 不在本轮计算范围。
+
+本轮验证：16 项关系评估与接口隔离测试通过；完整旧功能回归 86 PASS / 0 FAIL / 5 SKIP（线上 AI、写入与移动端等按骨架保留）。静态模块经线上 HTTP 200 与 SHA-256 一致校验。使用测试账号登录后的 `getRelationshipDecay` 真实调用返回 `insufficient_evidence`、有效的 `why` / `recommended_action` / `confidence`，且 `persisted=false`、无接口错误；请求未创建业务记录。只读 SQL 核验测试 Person 存在，`public.context_items` 与 `public.interactions` 均为 0。旧页面全链路未在生产逐页人工点击；浏览器回归使用隔离 fixture。
+
+回滚：本轮没有数据库变更。若页面或接口异常，可从上一发布标签 `release-20261001-045756` 重新部署 `person_360` 及 `/crm/js/modules/person-360.js`，并创建恢复提交；不要回滚数据库数据。
