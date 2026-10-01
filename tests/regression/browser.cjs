@@ -35,6 +35,8 @@ class Browser {
       else if (pathname === '/crm/js/modules/opportunity-candidates.js') { res.setHeader('Content-Type', 'text/javascript; charset=utf-8'); res.end(fs.readFileSync(path.join(this.root, 'crm/js/modules/opportunity-candidates.js'))); }
       else if (pathname === '/crm/css/person-360.css') { res.setHeader('Content-Type', 'text/css; charset=utf-8'); res.end(fs.readFileSync(path.join(this.root, 'crm/css/person-360.css'))); }
       else if (pathname === '/crm/js/modules/activity-review-v2.js') { res.setHeader('Content-Type', 'text/javascript; charset=utf-8'); res.end(fs.readFileSync(path.join(this.root, 'crm/js/modules/activity-review-v2.js'))); }
+      else if (pathname === '/crm/js/modules/morning-brief.js') { res.setHeader('Content-Type', 'text/javascript; charset=utf-8'); res.end(fs.readFileSync(path.join(this.root, 'crm/js/modules/morning-brief.js'))); }
+      else if (pathname === '/crm/css/morning-brief.css') { res.setHeader('Content-Type', 'text/css; charset=utf-8'); res.end(fs.readFileSync(path.join(this.root, 'crm/css/morning-brief.css'))); }
       else if (pathname === '/crm/js/modules/ai-crm-search.js') { res.setHeader('Content-Type', 'text/javascript; charset=utf-8'); res.end(fs.readFileSync(path.join(this.root, 'crm/js/modules/ai-crm-search.js'))); }
       else if (pathname === '/crm/js/modules/assistant-action-create.js') { res.setHeader('Content-Type', 'text/javascript; charset=utf-8'); res.end(fs.readFileSync(path.join(this.root, 'crm/js/modules/assistant-action-create.js'))); }
       else if (pathname === '/crm/css/assistant-action-create.css') { res.setHeader('Content-Type', 'text/css; charset=utf-8'); res.end(fs.readFileSync(path.join(this.root, 'crm/css/assistant-action-create.css'))); }

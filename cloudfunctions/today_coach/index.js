@@ -43,6 +43,7 @@
 
 const { app, rdb, generateText, extractJson, assertOk, nowIso } = require('./db');
 const { readOpenActions, mapActions, scoreDimensions, fingerprint: actionFingerprint } = require('./action-facts');
+const { readMorningFacts, buildMorningSections, enhanceGuidance } = require('./morning-brief');
 
 const POOL_CUSTOMER = 12;  // 进入 AI 排序的客户候选数
 const POOL_RECRUIT = 9;    // 进入 AI 排序的增员候选数
@@ -1209,6 +1210,21 @@ exports.main = async (event, context) => {
     const action = (event && event.action) || '';
     if (action !== 'candidates' && action !== 'generate' && action !== 'daily_review' && action !== 'cockpit') {
       return { error: 'action must be candidates|generate|daily_review|cockpit' };
+    }
+
+    // An explicit view keeps the original daily_review contract and Today 5 cache untouched.
+    if (action === 'daily_review' && event && event.view) {
+      if (event.view !== 'morning') return { error: 'view must be morning' };
+      const today = todayStr();
+      const [data, openActions, morningFacts] = await Promise.all([
+        loadAll(),
+        readOpenActions({ env: process.env.TCB_ENV, key: process.env.CRM_TODAY_DB_API_KEY }),
+        readMorningFacts({ env: process.env.TCB_ENV, key: process.env.CRM_TODAY_DB_API_KEY, today }),
+      ]);
+      const ranked = buildActionCandidates(data, indexFreshNba(data, today), today, openActions);
+      const sections = buildMorningSections({ data, actions: ranked, facts: morningFacts, today });
+      await enhanceGuidance(sections, generateText, extractJson);
+      return { view: 'morning', today, generated_at: nowIso(), sections };
     }
 
     const [d, facts] = await Promise.all([

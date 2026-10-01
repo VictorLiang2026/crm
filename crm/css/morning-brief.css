@@ -1,0 +1,18 @@
+#today-morning-brief .mb-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+#today-morning-brief .mb-heading h3{margin:0}
+#today-morning-brief .mb-note,#today-morning-brief .mb-status{color:var(--text-secondary);font-size:13px;margin-top:8px}
+#today-morning-brief .mb-status:empty{display:none}
+#today-morning-brief .mb-output{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-top:16px}
+#today-morning-brief .mb-section{border:1px solid var(--border);border-radius:9px;padding:14px;background:#fff;min-width:0}
+#today-morning-brief .mb-section:first-child{grid-column:1/-1;background:#eff6ff;border-color:#bfdbfe}
+#today-morning-brief .mb-section h4{font-size:14px;margin:0 0 9px;color:#1e3a8a}
+#today-morning-brief .mb-section h5{font-size:12px;margin:12px 0 5px;color:var(--text-secondary)}
+#today-morning-brief .mb-headline{font-weight:600;margin:0}
+#today-morning-brief .mb-guidance{margin:5px 0 0;color:var(--text-secondary)}
+#today-morning-brief .mb-list{list-style:none;padding:0;margin:0}
+#today-morning-brief .mb-row{padding:6px 0;border-top:1px solid var(--border-light);overflow-wrap:anywhere}
+#today-morning-brief .mb-row:first-child{border-top:0}
+#today-morning-brief .mb-link{color:var(--pri);text-decoration:none}
+#today-morning-brief .mb-link:hover{text-decoration:underline}
+#today-morning-brief .mb-empty,#today-morning-brief .mb-limit{color:var(--text-secondary);font-size:12px;margin:0}
+#today-morning-brief .mb-limit{padding:4px 0 0}

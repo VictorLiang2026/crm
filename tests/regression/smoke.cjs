@@ -208,6 +208,24 @@ module.exports = async function smoke(root, test) {
       await b.wait(called('person_360', 'get'));
       assert.equal(await b.evaluate('location.hash'), '#/person/980001');
     });
+    await check('today.morning_brief', '晨间简报按需生成七段且旧 Today 5 仍显示', async () => {
+      await open('#/today', '[CRM_TEST_ONLY]今日行动');
+      await b.wait(text('生成晨间简报'));
+      assert.equal(await b.evaluate("window.__crmTest.calls.some(c=>c.name==='today_coach' && c.action==='daily_review')"), false);
+      await b.click('#today-morning-brief button', '生成晨间简报');
+      await b.wait(text('[CRM_TEST_ONLY]晨间摘要'));
+      for (const label of ['Morning Brief', 'Top Actions', 'Commitments', 'Upcoming',
+        'Risk', 'Opportunities', 'Need Confirmation']) await b.wait(text(label));
+      await b.wait(text('[CRM_TEST_ONLY]待审核依据'));
+      await b.wait(text('[CRM_TEST_ONLY]今日行动'));
+      assert.equal(await b.evaluate("window.__crmTest.calls.filter(c=>c.name==='today_coach' && c.action==='daily_review').length"), 1);
+    });
+    await check('today.legacy_review', '旧版今日复盘入口与返回字段继续可用', async () => {
+      await open('#/today', '[CRM_TEST_ONLY]今日行动');
+      await b.click('#view button', '今日复盘');
+      await b.wait(text('[CRM_TEST_ONLY]旧版经营复盘'));
+      await b.wait(text('AI 经营复盘（今日）'));
+    });
     await check('funnels.page', '漏斗事实卡展示三个漏斗，不调用AI解读', async () => {
       await open('#/funnels', '[CRM_TEST_ONLY]阶段');
       assert.equal(await b.evaluate("document.querySelectorAll('.fn-total').length"), 3);

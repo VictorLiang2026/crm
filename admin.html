@@ -9,6 +9,7 @@
 <title>Victor's AI Relationship OS</title>
 <link rel="stylesheet" href="/crm/css/person-360.css">
 <link rel="stylesheet" href="/crm/css/activity-review-v2.css">
+<link rel="stylesheet" href="/crm/css/morning-brief.css">
 <style>
   :root{
     --pri:#2563eb;--pri-hover:#1d4ed8;--pri-light:#dbeafe;
@@ -1439,6 +1440,13 @@ async function showTodayCoach(){
   var card = el('div', {class:'card'});
   card.appendChild(el('div', {class:'loading'}, '加载中…'));
   view.appendChild(card);
+  var morningCard = el('div', {class:'card', id:'today-morning-brief'});
+  view.appendChild(morningCard);
+  import('/crm/js/modules/morning-brief.js').then(function(module){
+    module.mountMorningBrief({root:morningCard, callFn:callFn});
+  }).catch(function(error){
+    morningCard.textContent = '晨间简报加载失败：' + error.message;
+  });
   var commitmentCard = el('div', {class:'card', id:'today-commitments'});
   view.appendChild(commitmentCard);
   renderDueCommitments(commitmentCard);

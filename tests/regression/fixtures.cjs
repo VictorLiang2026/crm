@@ -151,6 +151,28 @@ function installFixtures() {
     'activity_tasks:list': () => rows([]),
     'activity_topics:list': () => rows([]),
     'today_coach:candidates': () => ({ fingerprint: 'test-only' }),
+    'today_coach:daily_review': data => data.view === 'morning' ? ({
+      view: 'morning', generated_at: '2026-10-01T00:00:00Z',
+      sections: {
+        morningBrief: { headline: marker + '晨间摘要', guidance: '先核对事实。', guidanceSource: 'rule' },
+        topActions: [{ title: marker + '今日行动', personName: customer.customer_name,
+          whyNow: '今天到期', target: '#/customer/910001' }],
+        commitments: { overdue: [{ personName: customer.customer_name,
+          content: marker + '已逾期承诺', dueAt: '2026-09-20', target: '#/person/980001' }], dueSoon: [] },
+        upcoming: [{ title: marker + '近期活动', date: '2026-10-02', kind: 'activity', target: '#/activity/940001' }],
+        risk: [{ title: marker + '逾期风险', target: '#/person/980001' }],
+        opportunities: [{ personName: customer.customer_name, type: 'insurance', status: '沟通',
+          target: '#/person/980001' }],
+        needConfirmation: [{ personName: customer.customer_name, type: 'insurance',
+          reason: marker + '待审核依据', target: '#/person/980001' }],
+      },
+    }) : !data.view && ['today', '7d'].includes(data.period) ? ({
+      period: data.period, generated_at: '2026-10-01T00:00:00Z',
+      start: '2026-10-01', end: '2026-10-01',
+      review: { overview: marker + '旧版经营复盘', best_done: '已记录行动',
+        biggest_gap: '需核对', key_customers: '', key_recruits: '',
+        tomorrow_top3: ['核对资料'], advice: '保持人工判断' },
+    }) : fail('UNEXPECTED_REVIEW_VIEW'),
     // Local fixture only: never invoke the real generate action (AI cost / side effects).
     'today_coach:generate': () => ({ source: 'rules', fingerprint: 'test-only', generated_at: '2026-09-21T00:00:00Z',
       today5: mode === 'empty' ? [] : [{ person_type: 'customer', person_id: customer.Id, person_name: customer.customer_name, action: marker + '今日行动', tier: 'must_do' },
