@@ -49,33 +49,20 @@ async function saveGoals(event) {
   const goalMonth = event.goalMonth;
   if (!goalMonth) return { error: 'goalMonth required (YYYY-MM)' };
   const goals = event.goals || {};
-  const goalDate = goalMonth + '-01';
-  const ts = nowIso();
-
-  // 先删除该月所有目标，再批量插入
-  assertOk(await rdb.from('recruit_goals').delete().eq('goal_month', goalDate));
-
-  const rows = [];
+  const normalizedGoals = {};
   for (const stage of STAGES) {
     const count = parseInt(goals[stage], 10);
-    // 只保存非0目标：全0保存 = 清空该月目标
-    if (count > 0) {
-      rows.push({
-        goal_month: goalDate,
-        stage: stage,
-        target_count: count || 0,
-        operator: event.operator || null,
-        created_at: ts,
-        updated_at: ts,
-      });
-    }
+    // Preserve the old input semantics: missing, invalid and nonpositive goals clear a stage.
+    normalizedGoals[stage] = count > 0 ? count : 0;
   }
-
-  if (rows.length > 0) {
-    const r = assertOk(await rdb.from('recruit_goals').insert(rows).select('id'));
-    return { ok: true, inserted: (r.data || []).length };
-  }
-  return { ok: true, inserted: 0 };
+  const r = assertOk(await rdb.rpc('crm_recruit_goals_save_v1', {
+    p_goal_month: goalMonth,
+    p_goals: normalizedGoals,
+    p_operator: event.operator || null,
+  }));
+  const result = Array.isArray(r.data) && r.data.length === 1 ? r.data[0] : r.data;
+  if (!result || result.ok !== true) throw new Error('Monthly goals were not saved');
+  return result;
 }
 
 // 目标 vs 实际完成统计（核心）
