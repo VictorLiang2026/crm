@@ -73,6 +73,26 @@ const SKILLS = [
     confirmationLevel: 'confirm_before_write', timeoutClass: 'standard',
   },
   {
+    name: 'opportunity_candidate', version: '1.0.0', capability: 'analysis',
+    contextRecipe: recipe(['person', 'evidence', 'existing_opportunities', 'guidance'], [],
+      { evidence: 30, existing_opportunities: 10 }),
+    inputSchema: object({ personId: { anyOf: [
+      { type: 'integer', minimum: 1 }, { type: 'string', pattern: '^[1-9][0-9]*$' },
+    ] } }, ['personId']),
+    outputSchema: object({
+      status: { type: 'string', enum: ['candidate', 'insufficient_evidence'] },
+      opportunityType: { type: 'string', enum: [
+        'insurance','recruit','referral','activity','speaker','partnership','service','relationship',
+      ] },
+      reason: { type: 'string', maxLength: 1000 },
+      nextAction: { type: 'string', maxLength: 500 },
+      confidence: { type: 'number', minimum: 0, maximum: 1 },
+      sourceRefs: { type: 'array', maxItems: 8, uniqueItems: true,
+        items: { type: 'string', pattern: '^public\\.[a-z_]+#[1-9][0-9]*$' } },
+    }, ['status','opportunityType','reason','nextAction','confidence','sourceRefs']),
+    confirmationLevel: 'confirm_before_write', timeoutClass: 'standard',
+  },
+  {
     name: 'activity_prepare', version: '1.0.0', capability: 'planning',
     contextRecipe: recipe(['activity'], ['participants', 'speakers', 'tasks'],
       { participants: 100, speakers: 30, tasks: 50 }),

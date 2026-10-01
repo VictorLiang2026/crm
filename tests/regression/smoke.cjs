@@ -90,6 +90,19 @@ module.exports = async function smoke(root, test) {
       assert.equal(await b.evaluate("document.querySelectorAll('.person360-opportunity a').length"), 1);
       assert.equal(await b.evaluate("window.__crmTest.calls.some(c=>['createOpportunity','updateOpportunity'].includes(c.action))"), false);
     });
+    await check('person360.opportunity-candidate-preview', '机会候选显示来源；预览与取消确认不会创建正式机会', async () => {
+      await open('#/person/980001', '[CRM_TEST_ONLY]客户主动询问保障', 'mode=candidate');
+      await b.click('.opportunity-candidate-row button', '审核');
+      await b.wait(text('public.interactions#990001'));
+      await b.wait(text('[CRM_TEST_ONLY]主动询问保障'));
+      await b.click('.opportunity-candidate-detail button', '预览正式创建');
+      await b.wait(text('正式创建预览'));
+      assert.equal(await b.evaluate("window.__crmTest.calls.some(c=>c.name==='assistant' && c.operation==='preview')"), true);
+      assert.equal(await b.evaluate("window.__crmTest.calls.some(c=>c.name==='assistant' && ['confirm','execute'].includes(c.operation))"), false);
+      await b.click('.opportunity-candidate-preview button', '确认并创建正式机会');
+      assert.equal(await b.evaluate("window.__crmTest.calls.some(c=>c.name==='assistant' && ['confirm','execute'].includes(c.operation))"), false);
+      await open('#/person/980001', '[CRM_TEST_ONLY]联系候选人');
+    });
     await check('person360.recruit', 'Person 360 显示招募资料和原详情入口，只读加载', async () => {
       await b.wait(called('person_360', 'listRecruitContext'));
       await b.wait(text('[CRM_TEST_ONLY]增员沟通'));

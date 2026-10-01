@@ -60,6 +60,24 @@ function installFixtures() {
       : [customer]),
     'customers:get': () => ({ customer, followups: mode === 'empty' ? [] : [followup], products: [], gifts: [], photos: [], recommendations: [], reports: [] }),
     'person_360:lookupCustomer': () => ({ personId: 980001 }),
+    'assistant:opportunityCandidate': data => {
+      if (data.operation === 'list') return { ok:true,status:'listed',rows:mode==='candidate' ? [{
+        id:880001,person_id:980001,status:'draft',evidence:['public.interactions#990001'],
+        draft:{opportunity_type:'insurance',reason:marker+'客户主动询问保障',
+          next_action:marker+'先核实已有保障'},
+      }] : [] };
+      if (data.operation === 'context') return { ok:true,status:'context',evidence:mode==='candidate' ? [{
+        ref:'public.interactions#990001',text:marker+'主动询问保障',
+        certainty:'recorded_interaction',primary:true,
+      }] : [] };
+      if (data.operation === 'preview' && mode === 'candidate') return {ok:true,status:'previewed',
+        previewHash:'a'.repeat(32),expiresAt:'2026-10-01T12:00:00Z',preview:{
+          person:{id:980001,displayName:marker+'客户甲'},
+          after:{opportunity_type:'insurance',reason:marker+'客户主动询问保障',
+            next_action:marker+'先核实已有保障'},
+        }};
+      return fail('UNEXPECTED_OR_WRITE_ACTION: assistant:opportunityCandidate:' + data.operation);
+    },
     'person_360:listDueCommitments': () => ({ overdue: [{ id: 991001, person_id: 980001,
       person_name: marker + '客户甲', commitment_type: 'I_PROMISED', content: marker + '已逾期承诺',
       due_at: '2026-09-20T01:00:00Z' }], dueSoon: [{ id: 991002, person_id: 980001,
@@ -164,8 +182,9 @@ function installFixtures() {
     async callFunction({ name, data }) {
       const key = name + ':' + data.action;
       if (!Object.hasOwn(replies, key)) return fail('UNEXPECTED_OR_WRITE_ACTION: ' + key);
-      calls.push({ name, action: data.action, stage: data.stage, id: data.id, customer_id: data.customer_id,
-        candidate_id: data.candidate_id, personId: data.personId, version: data.version,
+      calls.push({ name, action: data.action, operation: data.operation, stage: data.stage, id: data.id,
+        customer_id: data.customer_id, candidate_id: data.candidate_id,
+        candidateId:data.candidateId, personId: data.personId, version: data.version,
         payload: ['person_360:commitQuickCaptureV2', 'person_360:addCanonicalParticipant', 'person_360:recordActivityInteraction', 'person_360:createOpportunity',
           'person_360:updateOpportunity', 'person_360:createSpeakerProfile',
           'person_360:linkSpeakerPerson'].includes(key) ? data.data : null });

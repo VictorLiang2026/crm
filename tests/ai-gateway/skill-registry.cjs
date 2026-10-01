@@ -6,7 +6,7 @@ const { createSkillRegistry, defaultRegistry, SkillValidationError, TIMEOUT_CLAS
   require('../../cloudfunctions/_shared/skill-registry');
 
 const names = ['quick_capture', 'person_summary', 'meeting_prep', 'today_coach',
-  'opportunity_analysis', 'activity_prepare', 'activity_review', 'recruit_coach',
+  'opportunity_analysis', 'opportunity_candidate', 'activity_prepare', 'activity_review', 'recruit_coach',
   'conversation_playbook', 'ai_search', 'crm_search_parse'];
 
 test('all versioned contracts are model-independent and immutable', () => {
@@ -39,6 +39,10 @@ test('every initial skill accepts a representative input, context and output', (
       { priorities: [], reviewNote: 'Review the day' }],
     opportunity_analysis: [{ opportunityId: '1' }, { opportunity: {} },
       { assessment: 'Needs review', risks: [], nextActions: [], evidence: [] }],
+    opportunity_candidate: [{ personId: 1 }, { person: {}, evidence: [],
+      existing_opportunities: [], guidance: {} }, { status: 'insufficient_evidence',
+      opportunityType: 'relationship', reason: '', nextAction: '', confidence: 0,
+      sourceRefs: [] }],
     activity_prepare: [{ activityId: '1' }, { activity: {} },
       { brief: 'Prepare activity', checklist: [], outreach: [], risks: [] }],
     activity_review: [{ activityId: '1' }, { activity: {}, participants: [], tasks: [],

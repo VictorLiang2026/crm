@@ -20,6 +20,11 @@
 .person360-opportunity-field{display:grid;gap:4px;font-size:13px}
 .person360-opportunity-field input,.person360-opportunity-field select,.person360-opportunity-field textarea{width:100%;padding:8px;border:1px solid #d1d5db;border-radius:8px;font:inherit}
 .person360-opportunity-field textarea{min-height:72px;resize:vertical}
+.opportunity-candidate-list{display:grid;gap:10px;margin-top:12px}
+.opportunity-candidate-row{border:1px solid #e5e7eb;border-radius:8px;padding:12px}
+.opportunity-candidate-row p{overflow-wrap:anywhere;white-space:pre-wrap}
+.opportunity-candidate-evidence,.opportunity-candidate-preview{border:1px solid #dbeafe;border-radius:8px;padding:12px;margin:10px 0}
+.opportunity-candidate-evidence p{overflow-wrap:anywhere}
 .person360-recruit-list{display:grid;gap:12px}
 .person360-recruit-candidate{padding:12px;border:1px solid #e5e7eb;border-radius:8px;min-width:0}
 .person360-recruit-candidate p{margin:7px 0;overflow-wrap:anywhere;white-space:pre-wrap}

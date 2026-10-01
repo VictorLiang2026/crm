@@ -5,13 +5,24 @@ const { routeIntent, IntentError } = require('./intent-router');
 const { handleCommand, OPERATIONS } = require('./command-safety');
 
 function createMain(getIdentity, searchRunner = event => require('./search-service').runSearch(event),
-  actionRunner = (event, uid) => require('./action-command-service').runActionCommand(event, uid)) {
+  actionRunner = (event, uid) => require('./action-command-service').runActionCommand(event, uid),
+  candidateRunner = (event, uid) => require('./opportunity-candidate-service').runOpportunityCandidate(event, uid)) {
   return async event => {
     let identity;
     try { identity = await getIdentity(); }
     catch (_) { return { ok: false, error: { code: 'UNAUTHORIZED', message: 'Login required' } }; }
     if (typeof identity?.uid !== 'string' || !identity.uid.trim() || identity.isAnonymous !== false) {
       return { ok: false, error: { code: 'UNAUTHORIZED', message: 'Login required' } };
+    }
+    if (event?.action === 'opportunityCandidate') {
+      try { return await candidateRunner(event, identity.uid); }
+      catch (error) {
+        const code = ['INVALID_INPUT','INVALID_CONFIG','INVALID_RESULT','RATE_LIMIT','TIMEOUT',
+          'UPSTREAM_UNAVAILABLE','PERSISTENCE_ERROR','AI_REQUEST_FAILED','INVALID_CANDIDATE',
+          'DUPLICATE_OPPORTUNITY','PREVIEW_STALE','CONFIRMATION_REQUIRED',
+          'CANDIDATE_DATABASE_ERROR'].includes(error?.code) ? error.code : 'CANDIDATE_FAILED';
+        return { ok:false,error:{code,message:'机会候选操作未完成'} };
+      }
     }
     const isActionPlan = event?.action === 'command' && event.stage === 'plan' &&
       event.command?.operation === 'create' && event.command?.resource === 'actions' &&

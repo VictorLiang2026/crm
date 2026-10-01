@@ -1,4 +1,5 @@
 // Isolated Person 360 view. All data requests use the existing authenticated callFn bridge.
+import { renderOpportunityCandidates } from './opportunity-candidates.js';
 const ROLE_LABELS = { spouse: '配偶', child: '子女', parent: '父母', sibling: '兄弟姐妹', other: '其他' };
 const OPPORTUNITY_LABELS = {
   insurance: '保险', recruit: '增员', referral: '转介绍', activity: '活动',
@@ -111,6 +112,8 @@ export async function renderPerson360({ root, personId, callFn }) {
   }
   opportunities.append(formHost);
   wrap.append(opportunities);
+  renderOpportunityCandidates({root:wrap,personId,callFn,
+    onCreated:()=>{if(location.hash===hash)void renderPerson360({root,personId,callFn});}});
 
   function showOpportunityForm(opportunity) {
     formHost.replaceChildren();
