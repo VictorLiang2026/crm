@@ -34,7 +34,37 @@ function database() {
 
 // Minimal in-memory query adapter, not a PostgreSQL emulator. Unsupported APIs fail closed.
 function createReadOnlyDb(data) {
-  const reads = [], writes = [];
+  const reads = [], writes = [], rpcCalls = [];
+  function rpc(name, params) {
+    if (name !== 'crm_customers_page_v1') throw new Error('RPC_NOT_ALLOWED: ' + name);
+    rpcCalls.push({ name, params: structuredClone(params) });
+    reads.push('public.customers', 'public.followups');
+    const keyword = params.p_keyword.toLowerCase();
+    const exact = params.p_exact_name?.toLowerCase();
+    const rows = structuredClone(data.customers).filter(c => c.deleted_at == null &&
+      (!exact || c.customer_name.trim().toLowerCase() === exact) &&
+      (!keyword || [c.customer_name, c.phone, c.occupation].some(v => String(v || '').toLowerCase().includes(keyword))));
+    for (const c of rows) {
+      const followup = data.followups.filter(f => f.customer_id === c.Id && f.deleted_at == null)
+        .sort((a, b) => String(b.followup_date || '').localeCompare(String(a.followup_date || '')) || b.Id - a.Id)[0];
+      c.latest_followup_date = followup?.followup_date || null;
+      c.next_followup_date = followup?.next_followup_date || null;
+    }
+    const key = params.p_sort_field;
+    const dir = params.p_sort_dir === 'asc' ? 1 : -1;
+    rows.sort((a, b) => {
+      const av = a[key], bv = b[key];
+      if (av == null && bv == null) return a.Id - b.Id;
+      if (av == null) return 1;
+      if (bv == null) return -1;
+      return (String(av).toLowerCase() < String(bv).toLowerCase() ? -1 :
+        String(av).toLowerCase() > String(bv).toLowerCase() ? 1 : 0) * dir || a.Id - b.Id;
+    });
+    return Promise.resolve({ data: {
+      rows: rows.slice((params.p_page - 1) * params.p_page_size, params.p_page * params.p_page_size),
+      total: rows.length, page: params.p_page, pageSize: params.p_page_size,
+    }, error: null });
+  }
   function from(table) {
     const name = table.startsWith('public.') ? table.slice(7) : table;
     if (name.includes('.') || name.startsWith('pr_') || !Object.hasOwn(data, name)) throw new Error('TABLE_NOT_ALLOWED: ' + table);
@@ -77,7 +107,7 @@ function createReadOnlyDb(data) {
     };
     return query;
   }
-  return { from, reads, writes };
+  return { from, rpc, reads, writes, rpcCalls };
 }
 
 async function invoke(root, name, event, data = database()) {
@@ -91,7 +121,7 @@ async function invoke(root, name, event, data = database()) {
     require: dependency => { if (dependency !== './db') throw new Error('DEPENDENCY_NOT_ALLOWED: ' + dependency); return db; } });
   new vm.Script(fs.readFileSync(path.join(root, 'cloudfunctions', name, 'index.js'), 'utf8'), { filename: name + '/index.js' }).runInContext(context, { timeout: 2000 });
   const result = await exports.main(event, {});
-  return { result, reads: rdb.reads, writes: rdb.writes };
+  return { result, reads: rdb.reads, writes: rdb.writes, rpcCalls: rdb.rpcCalls };
 }
 
 async function invokeRpc(root, name, event, rpcData) {
@@ -121,10 +151,18 @@ module.exports = async function backend(root, test) {
   };
   const check = (id, title, fn) => test(id, title, 'actual cloud function / in-memory read-only adapter', fn);
   await check('backend.customers', '客户列表排除软删除、搜索及分页', async () => {
-    const r = await run('customers', { action: 'list', pageSize: 1, sortField: 'Id', sortDir: 'asc' });
+    const call = await invoke(root, 'customers', { action: 'list', pageSize: 1, sortField: 'Id', sortDir: 'asc' });
+    const r = call.result;
+    assert.equal(call.rpcCalls[0].name, 'crm_customers_page_v1');
+    assert.equal(call.rpcCalls[0].params.p_page_size, 1);
+    assert.deepEqual(Array.from(call.reads), ['public.customers', 'public.followups']);
     assert.equal(r.total, 2); assert.equal(r.rows.length, 1); assert.equal(r.rows[0].Id, 910001);
     const search = await run('customers', { action: 'list', keyword: '客户乙' });
     assert.equal(search.rows.length, 1); assert.equal(search.rows[0].Id, 910002);
+    const exact = await run('customers', { action: 'list', exactName: marker + '客户乙', pageSize: 1 });
+    assert.equal(exact.total, 1); assert.equal(exact.rows[0].Id, 910002);
+    const second = await run('customers', { action: 'list', page: 2, pageSize: 1, sortField: 'Id', sortDir: 'asc' });
+    assert.equal(second.total, 2); assert.equal(second.rows[0].Id, 910002);
   });
   await check('backend.customer-detail', '客户详情关联正确跟进且排除软删除', async () => {
     const r = await run('customers', { action: 'get', id: 910001 });

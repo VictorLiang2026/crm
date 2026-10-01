@@ -1060,20 +1060,9 @@ function wbSortVal(c){
   return 500000 + d;
 }
 
-// 客户列表缓存：工作台与全部客户列表共用；客户/跟进等数据变更后调用 invalidateCustomers()
-var customersCache = null;
-async function loadCustomers(force){
-  if(customersCache && !force) return customersCache;
-  var r = await callFn('customers', {action:'list', page:1, pageSize:1000});
-  var todayStr = dayStr(new Date());
-  var rows = (r.rows || []).map(function(c){
-    c._wb = computeWbStatus(c, todayStr);
-    return c;
-  });
-  customersCache = rows;
-  return rows;
-}
-function invalidateCustomers(){ customersCache = null; }
+// 列表由数据库筛选、排序和分页；请求序号阻止旧搜索结果覆盖新页面。
+var customerListRequestId = 0;
+function invalidateCustomers(){ customerListRequestId++; }
 
 // 增员状态映射缓存：客户列表「增员状态」列 + 工作台统计卡共用
 // active: customer_id → 未删除候选人 id；deleted: 曾增员（软删除记录）标识
@@ -1144,20 +1133,21 @@ function priorityCell(c){
   return el('td', {}, wrap);
 }
 // 共享客户表格：9 列（优先级三合一 + 工作台状态 + 增员状态），表头可点击排序，每页 50 行分页
-function renderCustomerTable(card, rows, state, rerender, emptyText){
+function renderCustomerTable(card, rows, state, rerender, emptyText, serverTotal){
   card.innerHTML = '';
   if(!rows.length){
     card.appendChild(el('div', {class:'empty'}, emptyText || '暂无客户'));
     return;
   }
+  var serverPage = typeof serverTotal === 'number';
   var asc = state.sortDir !== 'desc';
-  var sorted = rows.slice().sort(function(a,b){ return cmpCustomerRows(a, b, state.sortField, asc); });
-  var total = sorted.length;
+  var sorted = serverPage ? rows : rows.slice().sort(function(a,b){ return cmpCustomerRows(a, b, state.sortField, asc); });
+  var total = serverPage ? serverTotal : sorted.length;
   var pages = Math.max(1, Math.ceil(total / LIST_PAGE_SIZE));
   if(state.page > pages) state.page = pages;
   if(state.page < 1) state.page = 1;
   var start = (state.page - 1) * LIST_PAGE_SIZE;
-  var pageRows = sorted.slice(start, start + LIST_PAGE_SIZE);
+  var pageRows = serverPage ? sorted : sorted.slice(start, start + LIST_PAGE_SIZE);
 
   var table = el('table');
   var thead = el('thead');
@@ -1870,17 +1860,20 @@ async function showList(){
   view.appendChild(card);
 
   try {
-    // 全量拉取（与工作台共用缓存），客户端搜索 / 排序 / 分页（每页 50 行）
-    var rows = await loadCustomers();
+    var requestId = ++customerListRequestId;
+    var todayStr = dayStr(new Date());
+    var result = await callFn('customers', {action:'list', page:listState.page, pageSize:LIST_PAGE_SIZE,
+      keyword:listState.keyword, sortField:listState.sortField, sortDir:listState.sortDir, today:todayStr});
+    if(requestId !== customerListRequestId || location.hash !== '#/customers') return;
+    if(result.error) throw new Error(result.error);
+    var total = Number(result.total) || 0;
+    var lastPage = Math.max(1, Math.ceil(total / LIST_PAGE_SIZE));
+    if(listState.page > lastPage){ listState.page = lastPage; showList(); return; }
+    var rows = (result.rows || []).map(function(c){ c._wb = computeWbStatus(c, todayStr); return c; });
     await loadRcMap();
-    var kw = listState.keyword.trim().toLowerCase();
-    var filtered = kw ? rows.filter(function(c){
-      return (c.customer_name && c.customer_name.toLowerCase().indexOf(kw) !== -1) ||
-             (c.phone && String(c.phone).indexOf(kw) !== -1) ||
-             (c.occupation && c.occupation.toLowerCase().indexOf(kw) !== -1);
-    }) : rows;
-    renderCustomerTable(card, filtered, listState, showList,
-      kw ? '没有找到匹配的客户' : '暂无客户');
+    if(requestId !== customerListRequestId || location.hash !== '#/customers') return;
+    renderCustomerTable(card, rows, listState, showList,
+      listState.keyword.trim() ? '没有找到匹配的客户' : '暂无客户', total);
   } catch(e){
     card.innerHTML = '';
     card.appendChild(el('div', {class:'empty'}, '加载失败：'+esc(e.message)));
@@ -4151,9 +4144,6 @@ var RC_PAGE_SIZE = 50;
 async function showRecruit(){
   var view = $('view');
   view.innerHTML = '';
-
-  // 确保客户缓存已加载（新增候选人时需要搜索客户列表）
-  if(!customersCache) { try { await loadCustomers(); } catch(e){} }
 
   var searchInput = el('input', {type:'search', placeholder:'搜索姓名/电话/职业/来源', value:rcState.keyword});
   function doSearch(){
@@ -8218,23 +8208,35 @@ function openCandidateForm(id, presetCust){
       custResult.appendChild(custInfoBox(c));
     }
 
-    custInput.addEventListener('blur', function(){
+    custInput.addEventListener('blur', async function(){
       var kw = custInput.value.trim().toLowerCase();
       selectedCust = null;
       custResult.innerHTML = '';
       if(!kw){ custResult.style.display = 'none'; return; }
-      var all = customersCache || [];
-      var matches = all.filter(function(c){ return (c.customer_name || '').toLowerCase() === kw; });
-      if(!matches.length){
-        matches = all.filter(function(c){ return (c.customer_name || '').toLowerCase().indexOf(kw) !== -1; });
+      var matches = [], matchTotal = 0;
+      try {
+        var exact = await callFn('customers', {action:'list', exactName:kw, pageSize:1});
+        if(exact.error) throw new Error(exact.error);
+        if(exact.total){ matches = exact.rows || []; matchTotal = Number(exact.total) || matches.length; }
+        else {
+          var similar = await callFn('customers', {action:'list', keyword:kw, pageSize:8});
+          if(similar.error) throw new Error(similar.error);
+          matches = similar.rows || [];
+          matchTotal = Number(similar.total) || matches.length;
+        }
+      } catch(e) {
+        custResult.style.display = 'block';
+        custResult.appendChild(el('div', {style:'font-size:13px;color:#dc2626'}, '客户查询失败：'+(e.message||e)));
+        return;
       }
+      if(custInput.value.trim().toLowerCase() !== kw) return;
       if(matches.length === 1){
         selectedCust = matches[0];
         custInput.value = matches[0].customer_name;
         showCustInfo(matches[0]);
       } else if(matches.length > 1){
         custResult.style.display = 'block';
-        custResult.appendChild(el('div', {style:'font-size:13px;color:#d97706;margin-bottom:4px'}, '找到 ' + matches.length + ' 位相似客户，请点击选择：'));
+        custResult.appendChild(el('div', {style:'font-size:13px;color:#d97706;margin-bottom:4px'}, '找到 ' + matchTotal + ' 位相似客户，请点击选择：'));
         matches.slice(0, 8).forEach(function(c){
           var item = el('div', {style:'padding:6px 10px;cursor:pointer;border:1px solid var(--border);border-radius:4px;margin-bottom:4px;font-size:13px'}, (c.customer_name || '') + '（' + (c.phone || '无电话') + '）');
           item.onmousedown = function(e){ e.preventDefault(); }; // 防止 blur 抢先触发导致列表重建

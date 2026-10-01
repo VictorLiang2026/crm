@@ -1,7 +1,7 @@
 /**
  * customers — 客户 CRUD（事件云函数，rdb() 版）
  * 入参 event: { action, ... }
- *   list:   { action:'list', page?, pageSize?, keyword? } → { rows, total, page, pageSize }
+ *   list:   { action:'list', page?, pageSize?, keyword?, exactName?, sortField?, sortDir?, today? } → { rows, total, page, pageSize }
  *   get:    { action:'get', id } → { customer, followups, products, gifts, photos, recommendations, reports }
  *           reports = 保单检视报告最近 10 条（按 report_date DESC, id DESC）
  *   create: { action:'create', data:{...} } → { id }
@@ -25,9 +25,7 @@ const FIELDS = [
   'profile', // 轻量客户画像 jsonb：{family,children,parents,career,needs,relationship,events[]}
 ];
 
-// 列表接口也返回所有客户字段（source/annual_income/additional_info 等），
-// 因为 AI 解析同名匹配时前端用 list 返回的对象作为 oldC，缺字段会导致合并时清空原值
-const LIST_COLS = 'Id, customer_name, phone, occupation, customer_stage, sales_priority, recruitment_priority, referral_priority, birthday, first_contact_date, gender, marital_status, hobbies, source, tags, annual_income, household_income, properties_info, additional_info, created_at, updated_at';
+// 分页 RPC 保持旧列表字段完整：AI 解析同名匹配仍把返回行作为 oldC。
 
 exports.main = async (event, context) => {
   try {
@@ -48,71 +46,25 @@ exports.main = async (event, context) => {
 };
 
 async function list(event) {
-  const page = Math.max(1, parseInt(event.page || 1, 10));
-  const pageSize = Math.min(1000, Math.max(1, parseInt(event.pageSize || 20, 10)));
-  const keyword = (event.keyword || '').trim();
-  const sortField = event.sortField || 'Id';
-  const sortDir = event.sortDir || 'desc';
-
-  // 查全部未删除客户
-  const custRes = assertOk(await rdb.from('customers')
-    .select(LIST_COLS)
-    .is('deleted_at', null));
-  let rows = custRes.data || [];
-
-  // 查全部跟进记录，取每个客户最新一条
-  let followups = [];
-  try {
-    const folRes = assertOk(await rdb.from('followups')
-      .select('customer_id, followup_date, next_followup_date')
-      .is('deleted_at', null)
-      .order('followup_date', { ascending: false, nullsFirst: false })
-      .order('Id', { ascending: false }));
-    followups = folRes.data || [];
-  } catch(e) { /* followups 查询失败不阻塞客户列表 */ }
-
-  const latestFol = {};
-  for (const f of followups) {
-    if (!latestFol[f.customer_id]) latestFol[f.customer_id] = f;
-  }
-
-  // 合并最新跟进日期到客户行
-  for (const r of rows) {
-    const fol = latestFol[r.Id];
-    r.latest_followup_date = fol ? fol.followup_date : null;
-    r.next_followup_date = fol ? fol.next_followup_date : null;
-  }
-
-  // 关键词过滤（部分匹配，不区分大小写）
-  if (keyword) {
-    const kw = keyword.toLowerCase();
-    rows = rows.filter(r =>
-      (r.customer_name && r.customer_name.toLowerCase().includes(kw)) ||
-      (r.phone && r.phone.includes(kw)) ||
-      (r.occupation && r.occupation.toLowerCase().includes(kw))
-    );
-  }
-
-  // 排序
-  const ascending = sortDir !== 'desc';
-  rows.sort((a, b) => {
-    let va = a[sortField], vb = b[sortField];
-    if (va == null && vb == null) return 0;
-    if (va == null) return 1;
-    if (vb == null) return -1;
-    if (typeof va === 'string') va = va.toLowerCase();
-    if (typeof vb === 'string') vb = vb.toLowerCase();
-    if (va < vb) return ascending ? -1 : 1;
-    if (va > vb) return ascending ? 1 : -1;
-    return 0;
-  });
-
-  // 分页
-  const total = rows.length;
-  const offset = (page - 1) * pageSize;
-  const pageRows = rows.slice(offset, offset + pageSize);
-
-  return { rows: pageRows, total, page, pageSize };
+  const parsedPage = parseInt(event.page, 10);
+  const parsedSize = parseInt(event.pageSize, 10);
+  const page = Number.isFinite(parsedPage) ? Math.max(1, Math.min(1000000, parsedPage)) : 1;
+  const pageSize = Number.isFinite(parsedSize) ? Math.max(1, Math.min(1000, parsedSize)) : 20;
+  const sortField = ['Id', 'customer_name', 'sales_priority', 'latest_followup_date',
+    'next_followup_date', 'wb_status'].includes(event.sortField) ? event.sortField : 'Id';
+  const sortDir = event.sortDir === 'asc' ? 'asc' : 'desc';
+  const today = typeof event.today === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(event.today)
+    ? event.today : null;
+  return rpcResult(await rdb.rpc('crm_customers_page_v1', {
+    p_page: page,
+    p_page_size: pageSize,
+    p_keyword: typeof event.keyword === 'string' ? event.keyword.trim() : '',
+    p_sort_field: sortField,
+    p_sort_dir: sortDir,
+    p_today: today,
+    p_exact_name: typeof event.exactName === 'string' && event.exactName.trim()
+      ? event.exactName.trim() : null,
+  }));
 }
 
 async function get(event) {

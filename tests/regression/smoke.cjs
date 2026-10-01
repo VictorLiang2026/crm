@@ -171,8 +171,10 @@ module.exports = async function smoke(root, test) {
     await check('customers.pagination', '客户分页每页最多50条且第二页可达', async () => {
       await open('#/customers', '[CRM_TEST_ONLY]客户', 'mode=pagination');
       assert.equal(await b.evaluate("document.querySelectorAll('#view tbody tr').length"), 50);
+      assert.equal(await b.evaluate("window.__crmTest.calls.find(c=>c.name==='customers' && c.action==='list').pageSize"), 50);
       await b.click('#view button', '下一页');
       await b.wait("document.querySelectorAll('#view tbody tr').length === 5");
+      assert.equal(await b.evaluate("window.__crmTest.calls.some(c=>c.name==='customers' && c.action==='list' && c.page===2)"), true);
     });
     await check('customers.search', '客户搜索无匹配提示', async () => {
       await open('#/customers', '[CRM_TEST_ONLY]客户甲');
@@ -316,6 +318,13 @@ module.exports = async function smoke(root, test) {
     await check('recruit.list', '增员列表与漏斗加载', async () => {
       await open('#/recruit', '[CRM_TEST_ONLY]候选人甲');
       await b.wait(called('recruit_candidates', 'funnel'));
+    });
+    await check('recruit.customer-lookup', '新增候选人通过有上限的服务端查询选择客户', async () => {
+      await b.click('#view button', '+ 新增候选人');
+      await b.evaluate("(() => { const x=document.querySelector('input[placeholder=\"输入客户姓名…\"]'); x.value='[CRM_TEST_ONLY]客户甲'; x.dispatchEvent(new Event('blur')); })()");
+      await b.wait("document.body.innerText.includes('✓ 已关联客户：[CRM_TEST_ONLY]客户甲')");
+      assert.equal(await b.evaluate("window.__crmTest.calls.some(c=>c.name==='customers' && c.action==='list' && c.exactName==='[crm_test_only]客户甲' && c.pageSize===1)"), true);
+      await b.click('body .card button', '取消');
     });
     await check('recruit.detail', '增员详情与增员跟进标签', async () => {
       await open('#/recruit/930001', '[CRM_TEST_ONLY]候选人甲');

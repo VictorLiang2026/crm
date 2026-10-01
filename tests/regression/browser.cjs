@@ -121,8 +121,9 @@ class Browser {
   }
   async open(hash, query = '') {
     this.runtimeErrors.length = 0;
-    await this.send('Page.navigate', { url: this.origin + '/admin.html?' + query + '&run=' + Date.now() + hash });
-    await this.wait('Boolean(window.__crmTest && document.getElementById("view"))');
+    const target = this.origin + '/admin.html?' + query + '&run=' + Date.now() + hash;
+    await this.send('Page.navigate', { url: target });
+    await this.wait('location.href === ' + JSON.stringify(target) + ' && Boolean(window.__crmTest && document.getElementById("view"))', 12000);
   }
   async click(selector, text) {
     await this.evaluate(`(() => { const e = [...document.querySelectorAll(${JSON.stringify(selector)})].find(e => e.textContent.includes(${JSON.stringify(text)})); if (!e) throw new Error('Control not found: ' + ${JSON.stringify(text)}); e.click(); })()`);

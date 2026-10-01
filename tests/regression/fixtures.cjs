@@ -55,9 +55,20 @@ function installFixtures() {
         whatChanged: [], relationshipsImproved: [], signalsAppeared: [], opportunitiesAppeared: [],
         followUpPeople: [], actionCandidates: [{ personId: '980001', personName: marker + '客户甲',
           title: marker + '核实需求', reason: marker + '活动后联系', sourceRefs: ['public.interactions#990001'] }] } }),
-    'customers:list': () => rows(mode === 'pagination'
-      ? Array.from({ length: 55 }, (_, i) => ({ ...customer, Id: 910001 + i, customer_name: marker + '客户' + String(i).padStart(2, '0') }))
-      : [customer]),
+    'customers:list': data => {
+      const all = mode === 'pagination'
+        ? Array.from({ length: 55 }, (_, i) => ({ ...customer, Id: 910001 + i, customer_name: marker + '客户' + String(i).padStart(2, '0') }))
+        : [customer];
+      const keyword = String(data.keyword || '').trim().toLowerCase();
+      const exact = String(data.exactName || '').trim().toLowerCase();
+      const matched = (mode === 'empty' ? [] : all).filter(c =>
+        (!exact || c.customer_name.toLowerCase() === exact) &&
+        (!keyword || [c.customer_name, c.phone, c.occupation].some(v => String(v || '').toLowerCase().includes(keyword))));
+      const page = Math.max(1, Number(data.page) || 1);
+      const pageSize = Math.max(1, Number(data.pageSize) || 20);
+      return { rows: matched.slice((page - 1) * pageSize, page * pageSize),
+        total: matched.length, page, pageSize };
+    },
     'customers:get': () => ({ customer, followups: mode === 'empty' ? [] : [followup], products: [], gifts: [], photos: [], recommendations: [], reports: [] }),
     'person_360:lookupCustomer': () => ({ personId: 980001 }),
     'assistant:opportunityCandidate': data => {
@@ -206,6 +217,8 @@ function installFixtures() {
       if (!Object.hasOwn(replies, key)) return fail('UNEXPECTED_OR_WRITE_ACTION: ' + key);
       calls.push({ name, action: data.action, operation: data.operation, stage: data.stage, id: data.id,
         customer_id: data.customer_id, candidate_id: data.candidate_id,
+        page: data.page, pageSize: data.pageSize, keyword: data.keyword, exactName: data.exactName,
+        sortField: data.sortField, sortDir: data.sortDir,
         candidateId:data.candidateId, personId: data.personId, version: data.version,
         payload: ['person_360:commitQuickCaptureV2', 'person_360:addCanonicalParticipant', 'person_360:recordActivityInteraction', 'person_360:createOpportunity',
           'person_360:updateOpportunity', 'person_360:createSpeakerProfile',
