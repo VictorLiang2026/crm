@@ -1,0 +1,37 @@
+/* Phase 14 navigation and read-only hubs. Legacy page styles remain in admin.html. */
+header .mod-switch{margin-left:auto;max-width:calc(100vw - 420px);overflow-x:auto;scrollbar-width:thin}
+header .mod-btn{flex:none;padding:8px 12px}
+header .mod-btn.active{background:var(--pri);color:#fff}
+.global-capture{flex:none;border:0;border-radius:8px;background:#059669;color:#fff;font-family:inherit;font-size:13px;font-weight:700;padding:9px 13px;cursor:pointer;white-space:nowrap}
+.global-capture:hover{background:#047857}
+.global-capture:focus-visible,.mod-btn:focus-visible,.phase14-page a:focus-visible,.phase14-page button:focus-visible{outline:3px solid #60a5fa;outline-offset:2px}
+.phase14-page{max-width:1100px;margin:auto}
+.phase14-intro{color:var(--text-secondary);margin:-8px 0 20px}
+.phase14-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.phase14-tile{display:flex;flex-direction:column;gap:6px;min-height:95px;padding:16px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);color:var(--pri);font-weight:700;text-decoration:none;box-shadow:var(--shadow)}
+.phase14-tile:hover,.phase14-row:hover{border-color:#bfdbfe;background:#f8fbff}
+.phase14-muted{font-size:13px;font-weight:400;color:var(--text-secondary)}
+.phase14-search{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:16px}
+.phase14-search input{width:min(100%,340px)}
+.phase14-list{display:grid;gap:8px}
+.phase14-row{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;padding:13px 16px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius)}
+.phase14-row-title{color:var(--pri);font-weight:650;text-decoration:none}
+.phase14-row-note{width:100%;font-size:13px;color:var(--text-secondary)}
+.phase14-pager{display:flex;align-items:center;justify-content:center;gap:12px;margin:16px 0}
+.phase14-error{color:#b91c1c;padding:12px;background:#fef2f2;border-radius:8px}
+@media(max-width:1050px){
+  header{flex-wrap:wrap}
+  header .mod-switch{order:3;margin-left:0;width:100%;max-width:100%;justify-content:flex-start}
+  header .user-info{margin-left:auto}
+  .global-capture{margin-left:auto}
+}
+@media(max-width:768px){
+  header{padding:9px 12px}
+  header .mod-switch{width:100%;max-width:100%;order:4}
+  header .mod-btn{flex:none;padding:9px 12px}
+  .global-capture{margin-left:auto}
+  .brand-name h1{font-size:14px}
+  .brand-name .env{display:none}
+  .phase14-grid{grid-template-columns:1fr 1fr}
+}
+@media(max-width:480px){.phase14-grid{grid-template-columns:1fr}}

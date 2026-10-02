@@ -71,6 +71,15 @@ function installFixtures() {
     },
     'customers:get': () => ({ customer, followups: mode === 'empty' ? [] : [followup], products: [], gifts: [], photos: [], recommendations: [], reports: [] }),
     'person_360:lookupCustomer': () => ({ personId: 980001 }),
+    'person_360:listPeople': data => ({ rows: mode === 'empty' ? [] : [
+      { id: 980001, display_name: marker + '客户甲', legacy_customer_id: customer.Id,
+        occupation: '顾问', organization: marker + '机构' },
+    ], page: Number(data.page) || 1, pageSize: Number(data.pageSize) || 20, hasMore: false }),
+    'person_360:listOpportunityDirectory': data => ({ rows: mode === 'empty' ? [] : [
+      { id: 961001, person_id: 980001, customer_id: null, opportunity_type: 'recruit',
+        status: '发现', next_action: marker + '联系候选人',
+        person: { id: 980001, display_name: marker + '客户甲' } },
+    ], page: Number(data.page) || 1, pageSize: Number(data.pageSize) || 20, hasMore: false }),
     'assistant:opportunityCandidate': data => {
       if (data.operation === 'list') return { ok:true,status:'listed',rows:mode==='candidate' ? [{
         id:880001,person_id:980001,status:'draft',evidence:['public.interactions#990001'],

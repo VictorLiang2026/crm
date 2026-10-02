@@ -40,9 +40,14 @@ export async function renderPerson360({ root, personId, callFn }) {
 
   const wrap = node('div', 'person360');
   const top = node('div', 'person360-toolbar');
-  const back = node('a', '', '← 返回客户详情');
-  back.href = model.person.legacy_customer_id ? `#/customer/${model.person.legacy_customer_id}` : '#/customers';
+  const back = node('a', '', '← 返回人物');
+  back.href = '#/people';
   top.append(back);
+  if (model.person.legacy_customer_id) {
+    const legacy = node('a', '', '查看传统客户详情');
+    legacy.href = `#/customer/${model.person.legacy_customer_id}`;
+    top.append(legacy);
+  }
   wrap.append(top, node('h2', '', `${model.person.display_name} · Person 360`));
 
   const decay = node('section', 'card person360-card person360-decay');

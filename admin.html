@@ -495,6 +495,7 @@
   .aif-item label{flex:1;cursor:pointer}
   .aif-hint{font-size:12px;color:var(--muted);margin-top:4px}
 </style>
+<link rel="stylesheet" href="/crm/css/phase14-navigation.css">
 </head>
 <body>
 <header>
@@ -504,11 +505,15 @@
     <span class="env" id="env-label">PersonalAIOperatingSystemforRelationship,Sales&amp;Growth</span>
   </div>
   <nav class="mod-switch" id="mod-switch">
-    <button type="button" class="mod-btn" data-mod="customer" onclick="location.hash='#/'">客户经营</button>
-    <button type="button" class="mod-btn mod-recruit" data-mod="recruit" onclick="location.hash='#/recruit'">组织发展</button>
-    <button type="button" class="mod-btn mod-activity" data-mod="activity" onclick="location.hash='#/activities'">活动经营</button>
-    <button type="button" id="qc-entry-btn" class="mod-btn" style="background:#059669;color:#fff;font-weight:700;margin-left:8px;">✍️ 快速记录</button>
+    <button type="button" class="mod-btn" data-mod="today" onclick="location.hash='#/today'">今日</button>
+    <button type="button" class="mod-btn" data-mod="ai" onclick="location.hash='#/ai'">AI助手</button>
+    <button type="button" class="mod-btn" data-mod="people" onclick="location.hash='#/people'">人</button>
+    <button type="button" class="mod-btn" data-mod="opportunities" onclick="location.hash='#/opportunities'">机会</button>
+    <button type="button" class="mod-btn" data-mod="activity" onclick="location.hash='#/activities'">活动</button>
+    <button type="button" class="mod-btn" data-mod="recruit" onclick="location.hash='#/recruit'">招募</button>
+    <button type="button" class="mod-btn" data-mod="more" onclick="location.hash='#/more'">更多</button>
   </nav>
+  <button type="button" id="qc-entry-btn" class="global-capture">＋ 快速记录</button>
 </header>
 <main id="view"><div class="loading">初始化中…</div></main>
 <div id="modal-root"></div>
@@ -964,6 +969,28 @@ function ensurePersonCustomer(name, sourceLabel){
 function route(){
   var hash = location.hash || '#/';
   updateModuleSwitch(hash);
+  if(hash === '#/ai') return import('/crm/js/modules/phase14-hubs.js').then(function(module){
+    if(location.hash !== hash) return;
+    return module.renderAssistantHub({root:$('view')});
+  }).catch(function(e){ $('view').textContent = 'AI助手加载失败：' + e.message; });
+  if(hash === '#/people') return import('/crm/js/modules/phase14-hubs.js').then(function(module){
+    if(location.hash !== hash) return;
+    return module.renderPeople({root:$('view'), callFn:callFn});
+  }).catch(function(e){ $('view').textContent = '人物目录加载失败：' + e.message; });
+  if(hash === '#/opportunities') return import('/crm/js/modules/phase14-hubs.js').then(function(module){
+    if(location.hash !== hash) return;
+    return module.renderOpportunities({root:$('view'), callFn:callFn});
+  }).catch(function(e){ $('view').textContent = '机会目录加载失败：' + e.message; });
+  if(hash === '#/more') return import('/crm/js/modules/phase14-hubs.js').then(function(module){
+    if(location.hash !== hash) return;
+    return module.renderMore({root:$('view')});
+  }).catch(function(e){ $('view').textContent = '更多功能加载失败：' + e.message; });
+  var moreFeature = hash.match(/^#\/more\/(followups|policy-review|products|gifts|photos|ocr)$/);
+  if(moreFeature) return import('/crm/js/modules/phase14-hubs.js').then(function(module){
+    if(location.hash !== hash) return;
+    return module.renderLegacyPicker({root:$('view'), callFn:callFn, feature:moreFeature[1],
+      openLegacyTab:function(id, tab){ detailState.tab=tab; location.hash='#/customer/'+id; }});
+  }).catch(function(e){ $('view').textContent = '旧功能入口加载失败：' + e.message; });
   if(hash === '#/assistant/actions/new') return import('/crm/js/modules/assistant-action-create.js').then(function(module){
     return module.renderAssistantActionCreate({root:$('view'), callFn:callFn});
   }).catch(function(e){ $('view').textContent = '新建行动加载失败：' + e.message; });
@@ -996,14 +1023,16 @@ function route(){
   showDashboard();
 }
 
-// 模块切换器高亮：客户经营 / 组织发展 / 活动经营 三态
-// 活动经营 = #/activities 列表 + #/activity/<数字> 详情；
-// 注意 #/activity/customer、#/activity/recruit 是"活动量日报"，分别归客户经营/组织发展
+// 主导航高亮；旧路由仍保持原地址和原处理函数。
 function currentModule(hash){
   hash = hash || location.hash || '#/';
-  if(hash.indexOf('#/recruit') === 0 || hash === '#/activity/recruit') return 'recruit';
-  if(hash === '#/activities' || hash === '#/speakers' || hash === '#/topics' || /^#\/activity\/\d+/.test(hash)) return 'activity';
-  return 'customer';
+  if(hash === '#/' || hash === '#/today') return 'today';
+  if(hash === '#/ai' || hash === '#/ai/search' || hash.indexOf('#/assistant/') === 0) return 'ai';
+  if(hash === '#/people' || /^#\/person\/\d+$/.test(hash)) return 'people';
+  if(hash === '#/opportunities') return 'opportunities';
+  if(hash === '#/activities' || /^#\/activity\/\d+$/.test(hash)) return 'activity';
+  if(hash === '#/recruit' || /^#\/recruit\/\d+$/.test(hash)) return 'recruit';
+  return 'more';
 }
 function updateModuleSwitch(hash){
   var cur = currentModule(hash);

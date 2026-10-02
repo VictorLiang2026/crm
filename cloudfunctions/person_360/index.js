@@ -41,6 +41,16 @@ function idOf(value) {
   return s;
 }
 
+function directoryPage(event) {
+  const page = Number(event?.page ?? 1);
+  const pageSize = Number(event?.pageSize ?? 20);
+  if (!Number.isInteger(page) || page < 1 || page > 1000 ||
+      !Number.isInteger(pageSize) || pageSize < 1 || pageSize > 50) {
+    throw new Error('Invalid directory page');
+  }
+  return { page, pageSize, offset: (page - 1) * pageSize };
+}
+
 function one(rows) { return Array.isArray(rows) ? rows[0] || null : null; }
 
 async function pgRequest(table, method, filters = {}, body) {
@@ -148,6 +158,49 @@ function createService({ request = pgRequest, rpc = pgRpc } = {}) {
     }));
     if (!person) throw new Error('This customer has no Person record yet');
     return { personId: String(person.id) };
+  }
+
+  async function listPeople(event = {}) {
+    const { page, pageSize, offset } = directoryPage(event);
+    const keyword = String(event.keyword || '').trim();
+    if (keyword.length > 40 || (keyword && !/^[\p{L}\p{N} （）()·.-]+$/u.test(keyword))) {
+      throw new Error('Invalid directory keyword');
+    }
+    const filters = {
+      select: 'id,display_name,occupation,organization,legacy_customer_id',
+      deleted_at: 'is.null', order: 'display_name.asc,id.asc',
+      limit: pageSize + 1, offset,
+    };
+    if (keyword) filters.display_name = `ilike.*${keyword}*`;
+    const rows = await request('persons', 'GET', filters);
+    return { rows: rows.slice(0, pageSize), page, pageSize, hasMore: rows.length > pageSize };
+  }
+
+  async function listOpportunityDirectory(event = {}) {
+    const { page, pageSize, offset } = directoryPage(event);
+    const rows = await request('opportunities', 'GET', {
+      select: 'id,person_id,customer_id,opportunity_type,status,next_action,updated_at',
+      deleted_at: 'is.null', order: 'updated_at.desc,id.desc',
+      limit: pageSize + 1, offset,
+    });
+    const pageRows = rows.slice(0, pageSize);
+    const personIds = [...new Set(pageRows.map(row => row.person_id).filter(Boolean).map(idOf))];
+    const customerIds = [...new Set(pageRows.map(row => row.customer_id).filter(Boolean).map(idOf))];
+    const [linked, legacy] = await Promise.all([
+      personIds.length ? request('persons', 'GET', {
+        select: 'id,display_name,legacy_customer_id', id: `in.(${personIds.join(',')})`,
+        deleted_at: 'is.null', limit: 50,
+      }) : [],
+      customerIds.length ? request('persons', 'GET', {
+        select: 'id,display_name,legacy_customer_id', legacy_customer_id: `in.(${customerIds.join(',')})`,
+        deleted_at: 'is.null', limit: 50,
+      }) : [],
+    ]);
+    const byPerson = new Map(linked.map(person => [String(person.id), person]));
+    const byCustomer = new Map(legacy.map(person => [String(person.legacy_customer_id), person]));
+    return { rows: pageRows.map(row => ({ ...row,
+      person: byPerson.get(String(row.person_id)) || byCustomer.get(String(row.customer_id)) || null,
+    })), page, pageSize, hasMore: rows.length > pageSize };
   }
 
   async function listOpportunities(personId) {
@@ -387,6 +440,7 @@ function createService({ request = pgRequest, rpc = pgRpc } = {}) {
   }
 
   return { get, lookupCustomer, search, saveFacts, addMember, removeMember,
+    listPeople, listOpportunityDirectory,
     listOpportunities, listRecruitContext, createOpportunity, updateOpportunity, closeOpportunity, removeOpportunity,
     getInsuranceContext,
     resolveQuickCaptureName, commitQuickCaptureV2 };
@@ -401,6 +455,8 @@ exports.main = async event => {
     switch (event?.action) {
       case 'get': return await service.get(event.personId);
       case 'lookupCustomer': return await service.lookupCustomer(event.customerId);
+      case 'listPeople': return await service.listPeople(event);
+      case 'listOpportunityDirectory': return await service.listOpportunityDirectory(event);
       case 'listOpportunities': return await service.listOpportunities(event.personId);
       case 'listRecruitContext': return await service.listRecruitContext(event.personId);
       case 'getInsuranceContext': return await service.getInsuranceContext(event.personId);
