@@ -3,6 +3,6 @@
   "version": "1.0.0",
   "main": "index.js",
   "dependencies": {
-    "@cloudbase/node-sdk": "^4.0.3"
+    "@cloudbase/node-sdk": "4.1.0"
   }
 }

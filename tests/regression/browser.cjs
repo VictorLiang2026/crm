@@ -18,7 +18,7 @@ class Browser {
       '/usr/bin/chromium', '/usr/bin/chromium-browser', '/usr/bin/google-chrome'].filter(Boolean).find(p => fs.existsSync(p));
     if (!executable) throw new Error('No browser: set CRM_TEST_BROWSER to a Chromium/Edge executable');
     const source = fs.readFileSync(path.join(this.root, 'admin.html'), 'utf8');
-    const sdk = /<script\s+src="https:\/\/static\.cloudbase\.net\/cloudbase-js-sdk\/latest\/cloudbase\.full\.js"><\/script>/g;
+    const sdk = /<script\s+src="https:\/\/static\.cloudbase\.net\/cloudbase-js-sdk\/3\.10\.1\/cloudbase\.full\.js"><\/script>/g;
     if ([...source.matchAll(sdk)].length !== 1) throw new Error('SDK injection anchor changed; refuse to serve production SDK');
     const html = source.replace(sdk, '<script src="/fixtures.js"></script>');
     this.server = http.createServer((req, res) => {
