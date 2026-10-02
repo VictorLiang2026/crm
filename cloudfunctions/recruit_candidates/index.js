@@ -18,6 +18,7 @@
  *            （客户列表「增员状态」列映射：含已删除记录用于「曾增员」标识）
  */
 'use strict';
+const testData = require('./test-data');
 
 const { rdb, nowIso, normFields, assertOk } = require('./db');
 
@@ -235,10 +236,10 @@ function rpcResult(response) {
 
 async function funnel(event) {
   const res = assertOk(await rdb.from('recruit_candidates')
-    .select('stage').is('deleted_at', null));
+    .select('id,stage').is('deleted_at', null));
   const funnel = {};
   for (const r of (res.data || [])) funnel[r.stage] = (funnel[r.stage] || 0) + 1;
-  return { funnel, total: (res.data || []).length };
+  return { funnel, total: (res.data || []).length, testData: await testData.disclose(testData.refsForRows('recruit_candidates', res.data), {rdb}) };
 }
 
 // rcMap：客户列表「增员状态」列映射（含已删除记录 → 曾增员标识）

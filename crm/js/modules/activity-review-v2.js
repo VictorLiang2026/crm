@@ -1,3 +1,4 @@
+import { renderTestDataNotice } from './test-data-notice.js';
 // AI-native activity review preview. The existing callFn bridge provides login.
 const SECTIONS = [
   ['whoMattered', 'Who mattered? · 哪些人值得关注'],
@@ -68,5 +69,6 @@ export async function renderActivityRelationshipReview({ root, activityId, callF
   card.append(actions);
   if (response.discarded_unsupported_items) card.append(node('p', 'activity-review-v2-note',
     `已过滤 ${response.discarded_unsupported_items} 条缺少有效来源或身份关联的 AI 内容。`));
+  renderTestDataNotice(card, response.testData);
   root.replaceChildren(card);
 }

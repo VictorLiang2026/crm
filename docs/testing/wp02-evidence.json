@@ -1,0 +1,215 @@
+{
+  "environment": "crm-d1gkae8ddc930d151",
+  "schema": "public",
+  "baseline": "fdf1268354c4c2f634c1b95b435f0a9cd3615fa7",
+  "migration": "20261002173000_test_sample_registry",
+  "counts": {
+    "before": {
+      "gifts": 189,
+      "photos": 6,
+      "actions": 0,
+      "ai_runs": 4,
+      "persons": 779,
+      "ai_tasks": 4,
+      "outcomes": 0,
+      "products": 0,
+      "customers": 778,
+      "followups": 248,
+      "learnings": 0,
+      "playbooks": 0,
+      "activities": 11,
+      "ai_results": 4,
+      "households": 0,
+      "commitments": 0,
+      "ocr_records": 6,
+      "interactions": 0,
+      "person_roles": 792,
+      "context_items": 0,
+      "opportunities": 6,
+      "recruit_goals": 14,
+      "relationships": 0,
+      "activity_tasks": 4,
+      "activity_topics": 4,
+      "knowledge_items": 0,
+      "activity_speakers": 10,
+      "household_members": 0,
+      "recruit_followups": 0,
+      "ai_recommendations": 26,
+      "recruit_candidates": 16,
+      "recruit_milestones": 16,
+      "activity_participants": 16,
+      "policy_review_reports": 1,
+      "opportunity_candidates": 0,
+      "recruit_goal_benchmarks": 7,
+      "assistant_action_commands": 0
+    },
+    "after": {
+      "gifts": 189,
+      "photos": 6,
+      "actions": 0,
+      "ai_runs": 4,
+      "persons": 779,
+      "ai_tasks": 4,
+      "outcomes": 0,
+      "products": 0,
+      "customers": 778,
+      "followups": 248,
+      "learnings": 0,
+      "playbooks": 0,
+      "activities": 11,
+      "ai_results": 4,
+      "households": 0,
+      "commitments": 0,
+      "ocr_records": 6,
+      "interactions": 0,
+      "person_roles": 792,
+      "context_items": 0,
+      "opportunities": 6,
+      "recruit_goals": 14,
+      "relationships": 0,
+      "activity_tasks": 4,
+      "activity_topics": 4,
+      "knowledge_items": 0,
+      "activity_speakers": 10,
+      "household_members": 0,
+      "recruit_followups": 0,
+      "ai_recommendations": 26,
+      "recruit_candidates": 16,
+      "recruit_milestones": 16,
+      "activity_participants": 16,
+      "policy_review_reports": 1,
+      "opportunity_candidates": 0,
+      "recruit_goal_benchmarks": 7,
+      "assistant_action_commands": 0
+    },
+    "changed": []
+  },
+  "registry": {
+    "batches": 0,
+    "records": 0
+  },
+  "permissionMatrix": "PASS: READ ONLY transaction; see tests/wp02/permissions-readonly.sql",
+  "anonymousSummaryHttp": 401,
+  "unit": 16,
+  "browser": 1,
+  "regression": {
+    "pass": 94,
+    "fail": 0,
+    "skip": 5
+  },
+  "extraTests": 19,
+  "catalogChecks": 620,
+  "anonymousChecks": 49,
+  "live": [
+    {
+      "function": "funnel_insight",
+      "action": "stats",
+      "status": "PASS",
+      "summary": "Live aggregate query; test count 0",
+      "requestId": "7c7e8c8d-3784-4ffe-85d0-21209a43f8e8"
+    },
+    {
+      "function": "activity_reports",
+      "action": "customer",
+      "mode": "read",
+      "status": "PASS",
+      "testData": {
+        "status": "verified",
+        "containsTestData": false,
+        "recordCount": 0,
+        "sources": []
+      },
+      "requestId": "d3e61a52-ab92-4948-b5db-3549eacb0fb3",
+      "durationMs": 1419
+    },
+    {
+      "function": "activity_reports",
+      "action": "recruit",
+      "mode": "read",
+      "status": "PASS",
+      "testData": {
+        "status": "verified",
+        "containsTestData": false,
+        "recordCount": 0,
+        "sources": []
+      },
+      "requestId": "9c388b5a-d67f-4b6e-b323-63b4756d9378",
+      "durationMs": 1033
+    },
+    {
+      "function": "recruit_goals",
+      "action": "getProgress",
+      "mode": "read",
+      "status": "PASS",
+      "testData": {
+        "status": "verified",
+        "containsTestData": false,
+        "recordCount": 0,
+        "sources": []
+      },
+      "requestId": "2463a5c8-71c5-4af3-87f8-e7982dcb18f3",
+      "durationMs": 370
+    },
+    {
+      "function": "recruit_candidates",
+      "action": "funnel",
+      "mode": "read",
+      "status": "PASS",
+      "testData": {
+        "status": "verified",
+        "containsTestData": false,
+        "recordCount": 0,
+        "sources": []
+      },
+      "requestId": "59eecb6c-dd30-4393-98bd-6f0bc8c4dd5c",
+      "durationMs": 702
+    },
+    {
+      "function": "assistant",
+      "action": "testSamples",
+      "mode": "deny",
+      "status": "PASS",
+      "error": {
+        "code": "UNAUTHORIZED",
+        "message": "Login required"
+      },
+      "requestId": "b66c22b4-0daf-4906-8bf9-f1f437d5419e",
+      "durationMs": 641
+    },
+    {
+      "function": "ai_activity",
+      "action": "postReviewV2",
+      "mode": "deny",
+      "status": "PASS",
+      "error": "UNAUTHORIZED",
+      "requestId": "5e559d77-b941-4de6-b35c-4f552e40bb4b",
+      "durationMs": 3592
+    },
+    {
+      "function": "person_360",
+      "action": "getRelationshipDecay",
+      "mode": "deny",
+      "status": "PASS",
+      "error": "UNAUTHORIZED",
+      "requestId": "3b5728b1-b54c-462d-91af-0814dafdfecf",
+      "durationMs": 4
+    },
+    {
+      "function": "today_coach",
+      "action": "candidates",
+      "mode": "deny",
+      "status": "PASS",
+      "error": "UNAUTHORIZED",
+      "requestId": "76b394af-b69d-4136-b968-f6394a4ecc64",
+      "durationMs": 4
+    }
+  ],
+  "releaseTag": "release-20261003-022730",
+  "release": "Effective only after tag push and successful three-way verification",
+  "open": [
+    "real user login for changed page",
+    "service-key HTTP path",
+    "production business writes and AI calls",
+    "mobile device"
+  ]
+}

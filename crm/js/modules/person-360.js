@@ -1,3 +1,4 @@
+import { renderTestDataNotice } from './test-data-notice.js';
 // Isolated Person 360 view. All data requests use the existing authenticated callFn bridge.
 import { renderOpportunityCandidates } from './opportunity-candidates.js';
 const ROLE_LABELS = { spouse: '配偶', child: '子女', parent: '父母', sibling: '兄弟姐妹', other: '其他' };
@@ -69,6 +70,7 @@ export async function renderPerson360({ root, personId, callFn }) {
     decayBody.replaceChildren(node('strong', '', status),
       node('p', '', `依据：${result.why}`),
       node('p', '', `建议行动：${result.recommended_action}`));
+    renderTestDataNotice(decayBody, result.testData);
     if (result.status === 'insufficient_evidence') {
       decayBody.append(node('p', 'person360-muted', '置信度：无法评估（证据不足）。'));
     } else if (Number.isFinite(result.confidence)) {

@@ -1,3 +1,4 @@
+import { renderTestDataNotice } from './test-data-notice.js';
 import { createApi } from '../core/api.js';
 
 const PAGE_HASH = '#/ai/search';
@@ -94,6 +95,7 @@ export function renderAiCrmSearch({ root, callFn }) {
       heading.append(node('strong', '', LABELS[result.criteria?.template] || '受限条件'),
         node('span', '', `最近 ${result.criteria?.months} 个月 · 数据库匹配 ${result.total} 人`));
       output.append(heading);
+      renderTestDataNotice(output, result.testData);
       for (const notice of result.notices || []) {
         output.append(node('p', 'crm-ai-search-alert', notice));
       }

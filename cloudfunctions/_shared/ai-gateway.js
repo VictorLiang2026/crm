@@ -1,5 +1,6 @@
 /** Provider-neutral AI Runtime for future server-side callers. No legacy function imports this file. */
 'use strict';
+const testData = require('./test-data');
 
 const { isDeepStrictEqual } = require('node:util');
 const { defaultRegistry, TIMEOUT_CLASS_MS, SkillValidationError } = require('./skill-registry');
@@ -220,10 +221,11 @@ function createAIGateway(options) {
     if (group !== 'cloudbase' && group !== 'hunyuan-exp' && !/^custom-[A-Za-z0-9_-]+$/.test(group)) {
       throw new AIGatewayError('INVALID_CONFIG', 'Unsupported CloudBase model group');
     }
-    const messages = [
+    const disclosure = await (options.testDataReader || testData.disclose)(testData.collectRefs(context));
+    const messages = testData.withMessages([
       { role: 'system', content: 'Return only JSON matching the supplied output schema. Do not change business records.' },
       { role: 'user', content: JSON.stringify({ taskType, skill, capability, context, input, outputSchema: schema }) },
-    ];
+    ], disclosure);
     let taskId;
     try { taskId = await store.createTask({
       task_type: taskType,
@@ -233,7 +235,7 @@ function createAIGateway(options) {
       status: 'running',
       capability,
       input_snapshot: input,
-      context_snapshot: { ...contextSnapshot, _skill: { name: skill, version: definition.version } },
+      context_snapshot: { ...contextSnapshot, _testData: disclosure, _skill: { name: skill, version: definition.version } },
       requires_confirmation: true,
     }); } catch (error) { throw auditError(error); }
 
@@ -282,7 +284,7 @@ function createAIGateway(options) {
         });
         await store.updateTask(taskId, { status: 'completed', completed_at: new Date().toISOString() });
       } catch (error) { await markFailed(taskId); throw auditError(error); }
-      return { taskId, runId, resultId, result, usage, skillVersion: definition.version,
+      return { taskId, runId, resultId, result, usage, testData: disclosure, skillVersion: definition.version,
         confirmationLevel: definition.confirmationLevel, requiresConfirmation: true };
     }
     throw new AIGatewayError('AI_REQUEST_FAILED', 'AI request failed');

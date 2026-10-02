@@ -40,6 +40,7 @@
  * 日期口径：与 activity_reports 一致，按北京日期（+08:00）归属；纯日期串直接用。
  */
 'use strict';
+const testData = require('./test-data');
 
 const { app, rdb, generateText, extractJson, assertOk, nowIso } = require('./db');
 const { readOpenActions, mapActions, scoreDimensions, fingerprint: actionFingerprint } = require('./action-facts');
@@ -83,11 +84,11 @@ async function loadAll() {
       'id, customer_id, stage, stage_changed_at, next_action_date, next_action, potential_score, created_at, updated_at'
     ).is('deleted_at', null),
     rdb.from('recruit_followups').select(
-      'candidate_id, followup_date, followup_notes, interest_level, next_followup_date, updated_at'
+      'id, candidate_id, followup_date, followup_notes, interest_level, next_followup_date, updated_at'
     ).is('deleted_at', null),
-    rdb.from('recruit_milestones').select('candidate_id, to_stage, happened_at'),
+    rdb.from('recruit_milestones').select('id, candidate_id, to_stage, happened_at'),
     // 详情页 Next Best Action（仅裁 NBA 相关列，按 created_at 倒序，取每人最新一条）
-    rdb.from('ai_recommendations').select('customer_id, nba, recommendation_date, created_at')
+    rdb.from('ai_recommendations').select('id, customer_id, nba, recommendation_date, created_at')
       .order('created_at', { ascending: false }),
     // 经营机会（v1.4：转介绍线索进入今日经营）
     rdb.from('opportunities').select(
@@ -1006,15 +1007,15 @@ function normReview(parsed) {
   };
 }
 
-async function dailyReview(d, period) {
+async function dailyReview(d, period, disclosure) {
   const today = todayStr();
   const { start, end } = reviewRange(period, today);
   const context = buildReviewContext(d, start, end);
-  const { text } = await generateText(buildReviewMessages(context), { timeout: 100000 });
+  const { text } = await generateText(testData.withMessages(buildReviewMessages(context), disclosure), { timeout: 100000 });
   const parsed = extractJson(text);
   const review = normReview(parsed);
   if (!review) throw new Error('AI 输出解析失败：' + cut(text, 120));
-  return { today, period, start, end, review, generated_at: nowIso() };
+  return { today, period, start, end, review, testData: disclosure, generated_at: nowIso() };
 }
 
 // ---------- v1.8 Sprint7：首页驾驶舱（经营趋势 + 提醒，纯规则事实，不调 AI） ----------
@@ -1200,6 +1201,16 @@ function buildCockpit(d, today) {
   return { trends: trends, reminders: reminders.slice(0, 4) };
 }
 
+async function testSummary(data, facts, extra) {
+  const map = {customers:'customers',followups:'followups',candidates:'recruit_candidates',
+    recruitFollowups:'recruit_followups',milestones:'recruit_milestones',aiRecs:'ai_recommendations',
+    opportunities:'opportunities',activities:'activities',activityTasks:'activity_tasks',
+    participants:'activity_participants',speakers:'activity_speakers'};
+  const refs = Object.entries(map).flatMap(([key,table]) => testData.refsForRows(table,data[key]));
+  refs.push(...testData.refsForRows('actions',facts?.rows),...testData.refsForRows('persons',facts?.persons));
+  refs.push(...testData.collectRefs(extra));
+  return testData.disclose(refs,{rdb});
+}
 // ---------- 入口 ----------
 exports.main = async (event, context) => {
   try {
@@ -1223,8 +1234,10 @@ exports.main = async (event, context) => {
       ]);
       const ranked = buildActionCandidates(data, indexFreshNba(data, today), today, openActions);
       const sections = buildMorningSections({ data, actions: ranked, facts: morningFacts, today });
+      const disclosure = await testSummary(data, openActions, sections);
+      sections.testData = disclosure;
       await enhanceGuidance(sections, generateText, extractJson);
-      return { view: 'morning', today, generated_at: nowIso(), sections };
+      return { view: 'morning', today, generated_at: nowIso(), sections, testData: disclosure };
     }
 
     const [d, facts] = await Promise.all([
@@ -1234,7 +1247,8 @@ exports.main = async (event, context) => {
         : Promise.resolve(null),
     ]);
     const today = todayStr();
-    const fingerprint = buildFingerprint(d, facts);
+    const disclosure = await testSummary(d, facts);
+    const fingerprint = buildFingerprint(d, facts) + JSON.stringify(disclosure);
     const custPool = scoreCustomers(d, today);
     const rcPool = scoreRecruits(d, today);
     const nbaIdx = indexFreshNba(d, today);
@@ -1242,18 +1256,18 @@ exports.main = async (event, context) => {
     const actionPool = scoreActivityActions(d, today, custPool, rcPool);
 
     if (action === 'candidates') {
-      return { today, fingerprint, customerPool: custPool, recruitPool: rcPool, activityPool: actionPool };
+      return { today, fingerprint, testData: disclosure, customerPool: custPool, recruitPool: rcPool, activityPool: actionPool };
     }
 
     // v1.8 Sprint7：首页驾驶舱（趋势+提醒，纯规则事实，不调 AI）
     if (action === 'cockpit') {
-      return { today, fingerprint, ...buildCockpit(d, today) };
+      return { today, fingerprint, testData: disclosure, ...buildCockpit(d, today) };
     }
 
     if (action === 'daily_review') {
       const period = (event && event.period) || 'today';
       if (period !== 'today' && period !== '7d') return { error: 'period must be today|7d' };
-      return await dailyReview(d, period);
+      return await dailyReview(d, period, disclosure);
     }
 
     // generate（v1.8 Sprint3 升级为 Today 5）：
@@ -1267,7 +1281,7 @@ exports.main = async (event, context) => {
     let today5 = null, source = 'rule', ai_error = '';
     if (shortlist.length) {
       try {
-        const { text } = await generateText(buildTodayFiveMessages(shortlist, today), { timeout: 40000 });
+        const { text } = await generateText(testData.withMessages(buildTodayFiveMessages(shortlist, today), disclosure), { timeout: 40000 });
         today5 = normTodayFive(extractJson(text), shortlist, today);
         if (today5 && today5.length) source = 'ai';
         else ai_error = 'AI 输出解析失败：' + cut(text, 120);
@@ -1280,7 +1294,7 @@ exports.main = async (event, context) => {
     const items = todayFiveToLegacy(today5);
     const all_actions = allActionsFact(allCands);
     const out = {
-      today, fingerprint, source, generated_at: nowIso(),
+      today, fingerprint, source, testData: disclosure, generated_at: nowIso(),
       today5, items,
       all_actions, all_actions_total: all_actions.length,
       quota: { must_do: T5_MUST, recommended: T5_REC, optional: T5_OPT },

@@ -118,7 +118,7 @@ async function invoke(root, name, event, data = database()) {
   const db = { rdb, assertOk: r => { if (r.error) throw new Error(r.error.message); return r; },
     nowIso: () => '2026-09-21T00:00:00Z', normFields: (value, fields) => Object.fromEntries(Object.entries(value).filter(([key]) => fields.includes(key))) };
   const context = vm.createContext({ exports, console: { log() {}, warn() {}, error() {} },
-    require: dependency => { if (dependency !== './db') throw new Error('DEPENDENCY_NOT_ALLOWED: ' + dependency); return db; } });
+    require: dependency => { if (dependency === './test-data') return require('../../cloudfunctions/_shared/test-data'); if (dependency !== './db') throw new Error('DEPENDENCY_NOT_ALLOWED: ' + dependency); return db; } });
   new vm.Script(fs.readFileSync(path.join(root, 'cloudfunctions', name, 'index.js'), 'utf8'), { filename: name + '/index.js' }).runInContext(context, { timeout: 2000 });
   const result = await exports.main(event, {});
   return { result, reads: rdb.reads, writes: rdb.writes, rpcCalls: rdb.rpcCalls };
@@ -137,7 +137,7 @@ async function invokeRpc(root, name, event, rpcData) {
   const db = { rdb, assertOk: r => { if (r.error) throw new Error(r.error.message); return r; },
     nowIso: () => '2026-09-21T00:00:00Z', normFields: (value, fields) => Object.fromEntries(Object.entries(value).filter(([key]) => fields.includes(key))) };
   const context = vm.createContext({ exports, console: { log() {}, warn() {}, error() {} },
-    require: dependency => { if (dependency !== './db') throw new Error('DEPENDENCY_NOT_ALLOWED: ' + dependency); return db; } });
+    require: dependency => { if (dependency === './test-data') return require('../../cloudfunctions/_shared/test-data'); if (dependency !== './db') throw new Error('DEPENDENCY_NOT_ALLOWED: ' + dependency); return db; } });
   new vm.Script(fs.readFileSync(path.join(root, 'cloudfunctions', name, 'index.js'), 'utf8'), { filename: name + '/index.js' }).runInContext(context, { timeout: 2000 });
   return { result: await exports.main(event, {}), calls };
 }

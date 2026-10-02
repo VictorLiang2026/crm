@@ -234,7 +234,16 @@ function installFixtures() {
           'person_360:linkSpeakerPerson'].includes(key) ? data.data : null });
       if (!loggedIn) return fail('CALL_BEFORE_LOGIN: ' + key);
       if (mode === 'error' && (!params.get('fail') || params.get('fail') === key)) return { result: { error: 'TEST_API_FAILURE' } };
-      return { result: structuredClone(replies[key](data)) };
+      const result = structuredClone(replies[key](data));
+      const testMode = params.get('wp02');
+      if (testMode) {
+        const summary = testMode === 'unknown' ? {status:'unverified',containsTestData:null,sources:[]} :
+          {status:'verified',containsTestData:testMode === 'mixed',recordCount:testMode === 'mixed' ? 1 : 0,
+           sources:testMode === 'mixed' ? [{batchKey:'crm_test_wp_two',table:'customers',count:1}] : []};
+        result.testData = summary;
+        if (result.funnels) result.funnels.forEach(f => { f.testData = summary; });
+      }
+      return { result };
     },
     rdb() { return fail('DIRECT_DATABASE_ACCESS'); },
     storage() { return fail('STORAGE_ACCESS'); }

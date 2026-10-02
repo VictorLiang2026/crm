@@ -19,6 +19,7 @@
 'use strict';
 
 const { rdb, generateText } = require('./db');
+const testData = require('./test-data');
 
 const META = {
   customer: { label: '客户经营漏斗', source: 'customers.customer_stage' },
@@ -155,7 +156,10 @@ function buildStats(rows) {
 }
 
 async function getStats() {
-  return buildStats(await loadRows());
+  const funnels = buildStats(await loadRows());
+  const summary = await testData.disclose([], {rdb, scope:'funnel'});
+  for (const funnel of funnels) funnel.testData = summary;
+  return funnels;
 }
 
 // ---------- AI 解读 ----------
@@ -301,23 +305,24 @@ function ruleExplain(funnels) {
 
 async function explain() {
   const funnels = await getStats();
+  const disclosure = funnels[0]?.testData;
   const today = new Date(Date.now() + 8 * 3600 * 1000).toISOString().slice(0, 10);
   try {
-    const messages = buildMessages(funnels, today);
+    const messages = testData.withMessages(buildMessages(funnels, today), funnels[0]?.testData);
     const task = generateText(messages, { temperature: 0.4, maxTokens: 900 });
     const timer = new Promise(function (resolve) { setTimeout(function () { resolve(null); }, AI_TIMEOUT_MS); });
     const res = await Promise.race([task, timer]);
     const text = res && String(res.text || '').trim();
     if (text && text.length >= 20) {
-      return { ok: true, text: text, source: 'ai', degraded: false, generated_at: new Date().toISOString() };
+      return { ok: true, testData: disclosure, text: text, source: 'ai', degraded: false, generated_at: new Date().toISOString() };
     }
     return {
-      ok: true, text: ruleExplain(funnels), source: 'rule', degraded: true,
+      ok: true, testData: disclosure, text: ruleExplain(funnels), source: 'rule', degraded: true,
       reason: 'AI 返回为空', generated_at: new Date().toISOString(),
     };
   } catch (e) {
     return {
-      ok: true, text: ruleExplain(funnels), source: 'rule', degraded: true,
+      ok: true, testData: disclosure, text: ruleExplain(funnels), source: 'rule', degraded: true,
       reason: String(e && e.message || e), generated_at: new Date().toISOString(),
     };
   }

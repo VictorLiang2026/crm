@@ -13,6 +13,7 @@
  *  - rdb 无 in()/聚合函数，采用全量裁列 select + JS 端按日分桶（与回收站 trashList 同模式，数据量级小）
  */
 'use strict';
+const testData = require('./test-data');
 
 const { app, rdb, assertOk } = require('./db');
 
@@ -242,6 +243,16 @@ async function customerReport(event) {
     range: { start, end, days },
     totals,
     daily,
+    testData: await testData.disclose([
+      ...testData.refsForRows('customers', customers.filter(c => [c.created_at,c.first_contact_date].some(d => inRange(toDayKey(d),start,end)))),
+      ...testData.refsForRows('followups', followups.filter(f => event.mode !== 'range' || [f.followup_date,f.next_followup_date].some(d => inRange(toDayKey(d),start,end)))),
+      ...testData.refsForRows('gifts',gifts.filter(r => inRange(toDayKey(r.given_date),start,end))),
+      ...testData.refsForRows('photos',photos.filter(r => inRange(toDayKey(r.created_at),start,end))),
+      ...testData.refsForRows('ocr_records',ocrs.filter(r => inRange(toDayKey(r.created_at),start,end))),
+      ...testData.refsForRows('ai_recommendations',aiRecs.filter(r => inRange(toDayKey(r.recommendation_date || r.created_at),start,end))),
+      ...testData.refsForRows('policy_review_reports',reviews.filter(r => inRange(toDayKey(r.report_date || r.created_at),start,end))),
+      ...testData.refsForRows('products',products.filter(r => inRange(toDayKey(r.updated_at),start,end))),
+    ], {rdb}),
     avg: avgOf(totals, days, CUSTOMER_AVG_KEYS),
     overdueNow,
     feed: feed.slice(0, 300),
@@ -402,6 +413,11 @@ async function recruitReport(event) {
     range: { start, end, days },
     totals,
     daily,
+    testData: await testData.disclose([
+      ...testData.refsForRows('recruit_candidates',activeCands.filter(r => inRange(toDayKey(r.created_at),start,end))),
+      ...testData.refsForRows('recruit_followups',fus.filter(r => [r.followup_date,r.next_followup_date].some(d => inRange(toDayKey(d),start,end)))),
+      ...testData.refsForRows('recruit_milestones',milestones.filter(r => activeCandIds.has(r.candidate_id) && STAGE_KEYS[r.to_stage] && inRange(toDayKey(r.happened_at),start,end))),
+    ], {rdb}),
     avg: avgOf(totals, days, RECRUIT_AVG_KEYS),
     goalProgress,
     feed: feed.slice(0, 300),

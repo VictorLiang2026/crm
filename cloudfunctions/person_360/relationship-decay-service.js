@@ -2,6 +2,7 @@
 'use strict';
 
 const { InteractionService } = require('./interaction-service');
+const testData = require('./test-data');
 const { evaluateRelationshipDecay } = require('./relationship-decay-core');
 
 const PRIORITY_IMPORTANCE = { A: 5, B: 4, C: 3, D: 2, E: 1 };
@@ -82,7 +83,8 @@ class RelationshipDecayService {
       lastMeaningfulAt: meaningful?.at,
       meaningfulSource: meaningful ? 'explicit' : 'unknown',
       interactionTimes: cadenceRows.map(row => row.interaction_at) });
-    return { ...result, person_id: person.id, candidate: result.status === 'signal',
+    const disclosure = await testData.disclose([...testData.refsForRows('persons',[person]), ...testData.refsForRows('customers',customers), ...testData.refsForRows('context_items',assessed), ...rows.flatMap(r => testData.refsForRows(r.virtual ? r.source_type : 'interactions',[{id:r.source_id || r.id}]))]);
+    return { ...result, testData: disclosure, person_id: person.id, candidate: result.status === 'signal',
       persisted: false, sources: {
         strength: strengthFact ? `public.context_items#${strengthFact.id}` : null,
         importance: importanceFact ? `public.context_items#${importanceFact.id}` :

@@ -20,6 +20,7 @@ function invoke(event, response) {
   vm.runInNewContext(source, {
     module, exports: module.exports,
     require(name) {
+      if (name === './test-data') return require('../../cloudfunctions/_shared/test-data');
       if (name !== './db') throw new Error('Unexpected module: ' + name);
       return {
         rdb,

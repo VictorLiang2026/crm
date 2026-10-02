@@ -73,7 +73,7 @@ async function run(event, { app, rdb, gateway, engine } = {}) {
   });
   const display = reviewForDisplay(task.result, built.context);
   return { activity_id: activityId, activity_name: activity.name,
-    task_id: task.taskId, result_id: task.resultId, review: display.review,
+    testData: task.testData, task_id: task.taskId, result_id: task.resultId, review: display.review,
     discarded_unsupported_items: display.discarded,
     requires_confirmation: true, business_data_written: false };
 }

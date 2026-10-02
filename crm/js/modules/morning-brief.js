@@ -1,3 +1,4 @@
+import { renderTestDataNotice } from './test-data-notice.js';
 import { createApi } from '/crm/js/core/api.js';
 
 const node = (tag, className, value) => {
@@ -71,6 +72,7 @@ function render(result, root) {
     '当前读取的记录中没有待审核的机会候选。')));
   if (value.limits?.needConfirmation) output.append(node('p', 'mb-limit', '待确认候选仅显示最近读取的部分记录。'));
   root.querySelector('.mb-output')?.remove();
+  renderTestDataNotice(output, result.testData);
   root.append(output);
 }
 

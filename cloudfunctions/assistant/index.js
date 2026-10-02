@@ -14,6 +14,11 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
     if (typeof identity?.uid !== 'string' || !identity.uid.trim() || identity.isAnonymous !== false) {
       return { ok: false, error: { code: 'UNAUTHORIZED', message: 'Login required' } };
     }
+    if (event?.action === 'testSamples') {
+      try { return await require('./test-seed-policy').seedRequest(event, identity, {
+        allowedUids: String(process.env.CRM_TEST_SEED_UIDS || '').split(',').map(s => s.trim()).filter(Boolean),
+      }); } catch (error) { return {ok:false,error:{code:error.code || 'SEED_DENIED',message:'测试种子入口未执行写入'}}; }
+    }
     if (event?.action === 'opportunityCandidate') {
       try { return await candidateRunner(event, identity.uid); }
       catch (error) {

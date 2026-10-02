@@ -160,7 +160,7 @@ async function enhanceGuidance(sections, generateText, extractJson) {
       instruction: '根据已记录数量选择一个最值得先处理的工作类别。逾期承诺优先。' }) },
   ];
   try {
-    const { text } = await generateText(messages, { timeout: 10000 });
+    const { text } = await generateText(require('./test-data').withMessages(messages, sections.testData), { timeout: 10000 });
     const focus = extractJson(text)?.focus;
     if (typeof focus === 'string' && Object.hasOwn(GUIDANCE, focus) &&
         (counts.overdueCommitments === 0 || focus === 'overdue_commitment')) {

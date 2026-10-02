@@ -11,6 +11,7 @@
  *   saveBenchmarks: { action:'saveBenchmarks', benchmarks:[{stage_from,stage_to,conversion_min,conversion_avg,conversion_good},...] } → { ok }
  */
 'use strict';
+const testData = require('./test-data');
 
 const { rdb, nowIso, normFields, assertOk } = require('./db');
 
@@ -79,7 +80,7 @@ async function getProgress(event) {
   const goalRows = goalRes.data || [];
 
   // 2. 查里程碑实际达成
-  var msQ = rdb.from('recruit_milestones').select('to_stage,happened_at');
+  var msQ = rdb.from('recruit_milestones').select('id,to_stage,happened_at');
   msQ = msQ.gte('happened_at', startMonth + '-01');
   // endMonth + '-01' 下个月1日
   var endParts = endMonth.split('-');
@@ -209,6 +210,7 @@ async function getProgress(event) {
   }
 
   return {
+    testData: await testData.disclose([...testData.refsForRows('recruit_goals',goalRows), ...testData.refsForRows('recruit_milestones',msRows), ...testData.refsForRows('recruit_goal_benchmarks',bmRows)], {rdb}),
     rows: rows,
     overall: {
       rate: overallRate,

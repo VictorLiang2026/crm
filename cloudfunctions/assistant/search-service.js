@@ -2,6 +2,7 @@
 'use strict';
 
 const { createAIGateway } = require('./ai-gateway');
+const testData = require('./test-data');
 const { createSearchData } = require('./search-data');
 
 const GUIDANCE = Object.freeze({
@@ -45,7 +46,14 @@ async function runSearch(event, { app, data, gateway } = {}) {
       execution: { modelCalled: true, businessDataRead: false, businessDataWritten: false } };
   }
   const found = await database.search(template, months, 30);
+  const refs = found.rows.flatMap(row => [
+    ['persons',row.person_id],['customers',row.legacy_customer_id],['activity_participants',row.participant_id],
+    ['activities',row.activity_id],['household_members',row.child_member_id],['relationships',row.relationship_id],
+    [row.education_source_table,row.education_source_id],
+  ].filter(([table,id]) => testData.TABLES.has(table) && id != null).map(([table,id]) => ({table,id:String(id)})));
+  const disclosure = await (database.testDataReader || testData.disclose)(refs);
   const notices = [];
+  if (found.total > found.rows.length) notices.push('测试来源提示仅核对当前返回名单及其证据；未显示结果的测试来源尚未核验。');
   if (found.coverage.rows === 0) {
     notices.push({
       activity_no_followup: '所选时间内没有记录为“已参加”的活动人员；“已邀请”不算到场。',
@@ -58,7 +66,7 @@ async function runSearch(event, { app, data, gateway } = {}) {
   }
   return { ok: true, status: 'complete', taskId: task.taskId, resultId: task.resultId,
     criteria: { template, months }, total: found.total, rows: found.rows,
-    coverage: found.coverage, notices, resultSource: 'public.crm_search_people_v1',
+    testData: disclosure, coverage: found.coverage, notices, resultSource: 'public.crm_search_people_v1',
     execution: { modelCalled: true, businessDataRead: true, businessDataWritten: false } };
 }
 
