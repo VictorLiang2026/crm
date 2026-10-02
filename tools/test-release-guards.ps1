@@ -18,6 +18,20 @@ AssertRejected 'Release stops on Git failure' @"
 function global:git { `$global:LASTEXITCODE = 128; 'simulated failure' }
 & '$toolRoot/release.ps1' -Message test -Tag release-20990101-000000
 "@ 'failed.'
+AssertRejected 'WP01 rejection stops release before fetch, commit or push' @"
+function global:git {
+  `$global:LASTEXITCODE = 0
+  switch (`$args[0]) {
+    branch { return 'master' }
+    remote { return 'https://github.com/VictorLiang2026/crm.git' }
+    tag { return }
+    'ls-remote' { return }
+    default { throw 'Publish command reached after blocked gate' }
+  }
+}
+function global:node { `$global:LASTEXITCODE = 1; 'simulated WP01 gate failure' }
+& '$toolRoot/release.ps1' -Message test -Tag release-20990101-000000
+"@ 'WP01 safety gate blocked release'
 AssertRejected 'Remote query failure cannot report matching revisions' @"
 function global:git {
   `$global:LASTEXITCODE = 0

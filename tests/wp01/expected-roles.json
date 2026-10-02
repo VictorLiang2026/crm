@@ -1,0 +1,20 @@
+[
+  {
+    "name": "anon",
+    "inherit": true,
+    "superuser": false,
+    "bypass_rls": false
+  },
+  {
+    "name": "authenticated",
+    "inherit": true,
+    "superuser": false,
+    "bypass_rls": false
+  },
+  {
+    "name": "service_role",
+    "inherit": true,
+    "superuser": false,
+    "bypass_rls": true
+  }
+]

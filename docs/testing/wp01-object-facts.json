@@ -1,0 +1,5887 @@
+{
+  "environment": "crm-d1gkae8ddc930d151",
+  "observedAt": "2026-10-03T00:48:08.49863+08:00",
+  "schema": "public",
+  "counts": {
+    "tables": 37,
+    "views": 10,
+    "columns": 767,
+    "indexes": 129,
+    "constraints": 212,
+    "sequences": 36,
+    "routines": 14
+  },
+  "roles": [
+    {
+      "name": "anon",
+      "inherit": true,
+      "superuser": false,
+      "bypass_rls": false
+    },
+    {
+      "name": "authenticated",
+      "inherit": true,
+      "superuser": false,
+      "bypass_rls": false
+    },
+    {
+      "name": "service_role",
+      "inherit": true,
+      "superuser": false,
+      "bypass_rls": true
+    }
+  ],
+  "relations": [
+    {
+      "name": "actions",
+      "type": "r",
+      "columns": [
+        {
+          "name": "id",
+          "type": "bigint",
+          "nullable": "NO"
+        },
+        {
+          "name": "person_id",
+          "type": "bigint",
+          "nullable": "NO"
+        },
+        {
+          "name": "opportunity_id",
+          "type": "bigint",
+          "nullable": "YES"
+        },
+        {
+          "name": "interaction_id",
+          "type": "bigint",
+          "nullable": "YES"
+        },
+        {
+          "name": "activity_id",
+          "type": "bigint",
+          "nullable": "YES"
+        },
+        {
+          "name": "action_type",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "title",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "due_at",
+          "type": "timestamp with time zone",
+          "nullable": "YES"
+        },
+        {
+          "name": "priority",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "source",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "urgency_score",
+          "type": "numeric",
+          "nullable": "YES"
+        },
+        {
+          "name": "impact_score",
+          "type": "numeric",
+          "nullable": "YES"
+        },
+        {
+          "name": "confidence_score",
+          "type": "numeric",
+          "nullable": "YES"
+        },
+        {
+          "name": "effort_score",
+          "type": "numeric",
+          "nullable": "YES"
+        },
+        {
+          "name": "priority_score",
+          "type": "numeric",
+          "nullable": "YES"
+        },
+        {
+          "name": "completed_at",
+          "type": "timestamp with time zone",
+          "nullable": "YES"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": "NO"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": "NO"
+        },
+        {
+          "name": "created_by_uid",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "completed_by_uid",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "confirmed_by_uid",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "confirmed_at",
+          "type": "timestamp with time zone",
+          "nullable": "YES"
+        }
+      ],
+      "rls": true,
+      "security_invoker": false,
+      "grants": {
+        "anon": [],
+        "service_role": [
+          "INSERT",
+          "SELECT",
+          "UPDATE"
+        ],
+        "authenticated": []
+      }
+    },
+    {
+      "name": "activities",
+      "type": "r",
+      "columns": [
+        {
+          "name": "id",
+          "type": "bigint",
+          "nullable": "NO"
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "activity_date",
+          "type": "date",
+          "nullable": "YES"
+        },
+        {
+          "name": "activity_type",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "location",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": "NO"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": "NO"
+        },
+        {
+          "name": "deleted_at",
+          "type": "timestamp with time zone",
+          "nullable": "YES"
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "goal_types",
+          "type": "jsonb",
+          "nullable": "NO"
+        },
+        {
+          "name": "target_participants",
+          "type": "integer",
+          "nullable": "YES"
+        },
+        {
+          "name": "actual_participants",
+          "type": "integer",
+          "nullable": "YES"
+        },
+        {
+          "name": "topic_ids",
+          "type": "jsonb",
+          "nullable": "NO"
+        },
+        {
+          "name": "review_summary",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "review_notes",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "review_score",
+          "type": "smallint",
+          "nullable": "YES"
+        },
+        {
+          "name": "reviewed_at",
+          "type": "timestamp with time zone",
+          "nullable": "YES"
+        }
+      ],
+      "rls": true,
+      "security_invoker": false,
+      "grants": {
+        "anon": [
+          "DELETE",
+          "INSERT",
+          "SELECT",
+          "UPDATE"
+        ],
+        "service_role": [
+          "DELETE",
+          "INSERT",
+          "MAINTAIN",
+          "REFERENCES",
+          "SELECT",
+          "TRIGGER",
+          "TRUNCATE",
+          "UPDATE"
+        ],
+        "authenticated": []
+      }
+    },
+    {
+      "name": "activity_participants",
+      "type": "r",
+      "columns": [
+        {
+          "name": "id",
+          "type": "bigint",
+          "nullable": "NO"
+        },
+        {
+          "name": "activity_id",
+          "type": "integer",
+          "nullable": "NO"
+        },
+        {
+          "name": "person_type",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "person_id",
+          "type": "bigint",
+          "nullable": "YES"
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "relationship_note",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "ai_followup_suggestion",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": "NO"
+        },
+        {
+          "name": "deleted_at",
+          "type": "timestamp with time zone",
+          "nullable": "YES"
+        },
+        {
+          "name": "person_name",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "participant_role",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "followup_status",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": "NO"
+        },
+        {
+          "name": "canonical_person_id",
+          "type": "bigint",
+          "nullable": "YES"
+        }
+      ],
+      "rls": true,
+      "security_invoker": false,
+      "grants": {
+        "anon": [
+          "DELETE",
+          "INSERT",
+          "SELECT",
+          "UPDATE"
+        ],
+        "service_role": [
+          "DELETE",
+          "INSERT",
+          "MAINTAIN",
+          "REFERENCES",
+          "SELECT",
+          "TRIGGER",
+          "TRUNCATE",
+          "UPDATE"
+        ],
+        "authenticated": []
+      }
+    },
+    {
+      "name": "activity_speakers",
+      "type": "r",
+      "columns": [
+        {
+          "name": "id",
+          "type": "bigint",
+          "nullable": "NO"
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "phone",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "wechat",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "organization",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "position",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "relationship_stage",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "expertise",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "topic_summary",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "source",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "last_contact_date",
+          "type": "date",
+          "nullable": "YES"
+        },
+        {
+          "name": "next_contact_date",
+          "type": "date",
+          "nullable": "YES"
+        },
+        {
+          "name": "last_contact_note",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "cooperation_count",
+          "type": "integer",
+          "nullable": "NO"
+        },
+        {
+          "name": "preferred_format",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "customer_id",
+          "type": "bigint",
+          "nullable": "YES"
+        },
+        {
+          "name": "recruit_candidate_id",
+          "type": "bigint",
+          "nullable": "YES"
+        },
+        {
+          "name": "notes",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": "NO"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": "NO"
+        },
+        {
+          "name": "deleted_at",
+          "type": "timestamp with time zone",
+          "nullable": "YES"
+        },
+        {
+          "name": "person_id",
+          "type": "bigint",
+          "nullable": "YES"
+        }
+      ],
+      "rls": true,
+      "security_invoker": false,
+      "grants": {
+        "anon": [
+          "DELETE",
+          "INSERT",
+          "SELECT",
+          "UPDATE"
+        ],
+        "service_role": [
+          "DELETE",
+          "INSERT",
+          "MAINTAIN",
+          "REFERENCES",
+          "SELECT",
+          "TRIGGER",
+          "TRUNCATE",
+          "UPDATE"
+        ],
+        "authenticated": []
+      }
+    },
+    {
+      "name": "activity_tasks",
+      "type": "r",
+      "columns": [
+        {
+          "name": "id",
+          "type": "bigint",
+          "nullable": "NO"
+        },
+        {
+          "name": "activity_id",
+          "type": "bigint",
+          "nullable": "NO"
+        },
+        {
+          "name": "task_title",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "task_type",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "priority",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "due_date",
+          "type": "date",
+          "nullable": "YES"
+        },
+        {
+          "name": "completed_at",
+          "type": "timestamp with time zone",
+          "nullable": "YES"
+        },
+        {
+          "name": "related_type",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "related_id",
+          "type": "bigint",
+          "nullable": "YES"
+        },
+        {
+          "name": "note",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "source",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": "NO"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": "NO"
+        }
+      ],
+      "rls": true,
+      "security_invoker": false,
+      "grants": {
+        "anon": [
+          "DELETE",
+          "INSERT",
+          "SELECT",
+          "UPDATE"
+        ],
+        "service_role": [
+          "DELETE",
+          "INSERT",
+          "MAINTAIN",
+          "REFERENCES",
+          "SELECT",
+          "TRIGGER",
+          "TRUNCATE",
+          "UPDATE"
+        ],
+        "authenticated": []
+      }
+    },
+    {
+      "name": "activity_topics",
+      "type": "r",
+      "columns": [
+        {
+          "name": "id",
+          "type": "bigint",
+          "nullable": "NO"
+        },
+        {
+          "name": "topic_name",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "category",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "target_audience",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "keywords",
+          "type": "jsonb",
+          "nullable": "NO"
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "last_used_date",
+          "type": "date",
+          "nullable": "YES"
+        },
+        {
+          "name": "use_count",
+          "type": "integer",
+          "nullable": "NO"
+        },
+        {
+          "name": "ai_summary",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "notes",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": "NO"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": "NO"
+        },
+        {
+          "name": "deleted_at",
+          "type": "timestamp with time zone",
+          "nullable": "YES"
+        }
+      ],
+      "rls": true,
+      "security_invoker": false,
+      "grants": {
+        "anon": [
+          "DELETE",
+          "INSERT",
+          "SELECT",
+          "UPDATE"
+        ],
+        "service_role": [
+          "DELETE",
+          "INSERT",
+          "MAINTAIN",
+          "REFERENCES",
+          "SELECT",
+          "TRIGGER",
+          "TRUNCATE",
+          "UPDATE"
+        ],
+        "authenticated": []
+      }
+    },
+    {
+      "name": "ai_recommendations",
+      "type": "r",
+      "columns": [
+        {
+          "name": "id",
+          "type": "bigint",
+          "nullable": "NO"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": "YES"
+        },
+        {
+          "name": "customer_name",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "recommendation_date",
+          "type": "date",
+          "nullable": "NO"
+        },
+        {
+          "name": "suggested_followup_date",
+          "type": "date",
+          "nullable": "YES"
+        },
+        {
+          "name": "suggested_message",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "suggested_strategy",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "suggested_customer_stage",
+          "type": "USER-DEFINED",
+          "nullable": "YES"
+        },
+        {
+          "name": "suggested_followup_goal",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "customer_id",
+          "type": "integer",
+          "nullable": "NO"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": "NO"
+        },
+        {
+          "name": "nba",
+          "type": "jsonb",
+          "nullable": "YES"
+        }
+      ],
+      "rls": true,
+      "security_invoker": false,
+      "grants": {
+        "anon": [
+          "DELETE",
+          "INSERT",
+          "SELECT",
+          "UPDATE"
+        ],
+        "service_role": [
+          "DELETE",
+          "INSERT",
+          "MAINTAIN",
+          "REFERENCES",
+          "SELECT",
+          "TRIGGER",
+          "TRUNCATE",
+          "UPDATE"
+        ],
+        "authenticated": []
+      }
+    },
+    {
+      "name": "ai_recommendations_view",
+      "type": "v",
+      "columns": [
+        {
+          "name": "id",
+          "type": "bigint",
+          "nullable": "YES"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": "YES"
+        },
+        {
+          "name": "customer_name",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "recommendation_date",
+          "type": "date",
+          "nullable": "YES"
+        },
+        {
+          "name": "suggested_followup_date",
+          "type": "date",
+          "nullable": "YES"
+        },
+        {
+          "name": "suggested_message",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "suggested_strategy",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "suggested_customer_stage",
+          "type": "USER-DEFINED",
+          "nullable": "YES"
+        },
+        {
+          "name": "suggested_followup_goal",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "nba",
+          "type": "jsonb",
+          "nullable": "YES"
+        },
+        {
+          "name": "customer_id",
+          "type": "integer",
+          "nullable": "YES"
+        },
+        {
+          "name": "gender",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "occupation",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "tags",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "customer_stage",
+          "type": "USER-DEFINED",
+          "nullable": "YES"
+        },
+        {
+          "name": "followup_notes",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "followup_date",
+          "type": "date",
+          "nullable": "YES"
+        },
+        {
+          "name": "next_followup_date",
+          "type": "date",
+          "nullable": "YES"
+        },
+        {
+          "name": "gift_name",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "quantity",
+          "type": "smallint",
+          "nullable": "YES"
+        },
+        {
+          "name": "given_date",
+          "type": "date",
+          "nullable": "YES"
+        }
+      ],
+      "rls": false,
+      "security_invoker": true,
+      "grants": {
+        "anon": [
+          "SELECT"
+        ],
+        "service_role": [
+          "DELETE",
+          "INSERT",
+          "MAINTAIN",
+          "REFERENCES",
+          "SELECT",
+          "TRIGGER",
+          "TRUNCATE",
+          "UPDATE"
+        ],
+        "authenticated": []
+      }
+    },
+    {
+      "name": "ai_results",
+      "type": "r",
+      "columns": [
+        {
+          "name": "id",
+          "type": "bigint",
+          "nullable": "NO"
+        },
+        {
+          "name": "task_id",
+          "type": "bigint",
+          "nullable": "NO"
+        },
+        {
+          "name": "run_id",
+          "type": "bigint",
+          "nullable": "NO"
+        },
+        {
+          "name": "result_json",
+          "type": "jsonb",
+          "nullable": "NO"
+        },
+        {
+          "name": "rank",
+          "type": "integer",
+          "nullable": "NO"
+        },
+        {
+          "name": "is_recommended",
+          "type": "boolean",
+          "nullable": "NO"
+        },
+        {
+          "name": "user_selected",
+          "type": "boolean",
+          "nullable": "NO"
+        },
+        {
+          "name": "user_edited",
+          "type": "boolean",
+          "nullable": "NO"
+        },
+        {
+          "name": "final_result_json",
+          "type": "jsonb",
+          "nullable": "YES"
+        },
+        {
+          "name": "feedback",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": "NO"
+        }
+      ],
+      "rls": true,
+      "security_invoker": false,
+      "grants": {
+        "anon": [],
+        "service_role": [
+          "DELETE",
+          "INSERT",
+          "MAINTAIN",
+          "REFERENCES",
+          "SELECT",
+          "TRIGGER",
+          "TRUNCATE",
+          "UPDATE"
+        ],
+        "authenticated": []
+      }
+    },
+    {
+      "name": "ai_runs",
+      "type": "r",
+      "columns": [
+        {
+          "name": "id",
+          "type": "bigint",
+          "nullable": "NO"
+        },
+        {
+          "name": "task_id",
+          "type": "bigint",
+          "nullable": "NO"
+        },
+        {
+          "name": "provider",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "model",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "input_tokens",
+          "type": "bigint",
+          "nullable": "YES"
+        },
+        {
+          "name": "output_tokens",
+          "type": "bigint",
+          "nullable": "YES"
+        },
+        {
+          "name": "cached_tokens",
+          "type": "bigint",
+          "nullable": "YES"
+        },
+        {
+          "name": "latency_ms",
+          "type": "bigint",
+          "nullable": "YES"
+        },
+        {
+          "name": "success",
+          "type": "boolean",
+          "nullable": "YES"
+        },
+        {
+          "name": "error",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "cost",
+          "type": "numeric",
+          "nullable": "YES"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": "NO"
+        }
+      ],
+      "rls": true,
+      "security_invoker": false,
+      "grants": {
+        "anon": [],
+        "service_role": [
+          "DELETE",
+          "INSERT",
+          "MAINTAIN",
+          "REFERENCES",
+          "SELECT",
+          "TRIGGER",
+          "TRUNCATE",
+          "UPDATE"
+        ],
+        "authenticated": []
+      }
+    },
+    {
+      "name": "ai_tasks",
+      "type": "r",
+      "columns": [
+        {
+          "name": "id",
+          "type": "bigint",
+          "nullable": "NO"
+        },
+        {
+          "name": "task_type",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "skill_name",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "subject_type",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "subject_id",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "capability",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "input_snapshot",
+          "type": "jsonb",
+          "nullable": "NO"
+        },
+        {
+          "name": "context_snapshot",
+          "type": "jsonb",
+          "nullable": "NO"
+        },
+        {
+          "name": "requires_confirmation",
+          "type": "boolean",
+          "nullable": "NO"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": "NO"
+        },
+        {
+          "name": "completed_at",
+          "type": "timestamp with time zone",
+          "nullable": "YES"
+        }
+      ],
+      "rls": true,
+      "security_invoker": false,
+      "grants": {
+        "anon": [],
+        "service_role": [
+          "DELETE",
+          "INSERT",
+          "MAINTAIN",
+          "REFERENCES",
+          "SELECT",
+          "TRIGGER",
+          "TRUNCATE",
+          "UPDATE"
+        ],
+        "authenticated": []
+      }
+    },
+    {
+      "name": "assistant_action_commands",
+      "type": "r",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": "NO"
+        },
+        {
+          "name": "actor_uid",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "person_id",
+          "type": "bigint",
+          "nullable": "NO"
+        },
+        {
+          "name": "draft",
+          "type": "jsonb",
+          "nullable": "NO"
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "version",
+          "type": "integer",
+          "nullable": "NO"
+        },
+        {
+          "name": "preview_json",
+          "type": "jsonb",
+          "nullable": "YES"
+        },
+        {
+          "name": "preview_hash",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "person_updated_at",
+          "type": "timestamp with time zone",
+          "nullable": "YES"
+        },
+        {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "nullable": "NO"
+        },
+        {
+          "name": "confirmed_by_uid",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "confirmed_at",
+          "type": "timestamp with time zone",
+          "nullable": "YES"
+        },
+        {
+          "name": "executed_action_id",
+          "type": "bigint",
+          "nullable": "YES"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": "NO"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": "NO"
+        }
+      ],
+      "rls": true,
+      "security_invoker": false,
+      "grants": {
+        "anon": [],
+        "service_role": [
+          "INSERT",
+          "SELECT",
+          "UPDATE"
+        ],
+        "authenticated": []
+      }
+    },
+    {
+      "name": "commitments",
+      "type": "r",
+      "columns": [
+        {
+          "name": "id",
+          "type": "bigint",
+          "nullable": "NO"
+        },
+        {
+          "name": "person_id",
+          "type": "bigint",
+          "nullable": "NO"
+        },
+        {
+          "name": "interaction_id",
+          "type": "bigint",
+          "nullable": "YES"
+        },
+        {
+          "name": "commitment_type",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "content",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "due_at",
+          "type": "timestamp with time zone",
+          "nullable": "YES"
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "source",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": "NO"
+        },
+        {
+          "name": "completed_at",
+          "type": "timestamp with time zone",
+          "nullable": "YES"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": "NO"
+        },
+        {
+          "name": "created_by_uid",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "completed_by_uid",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "confirmed_by_uid",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "confirmed_at",
+          "type": "timestamp with time zone",
+          "nullable": "YES"
+        }
+      ],
+      "rls": true,
+      "security_invoker": false,
+      "grants": {
+        "anon": [],
+        "service_role": [
+          "INSERT",
+          "SELECT",
+          "UPDATE"
+        ],
+        "authenticated": []
+      }
+    },
+    {
+      "name": "context_items",
+      "type": "r",
+      "columns": [
+        {
+          "name": "id",
+          "type": "bigint",
+          "nullable": "NO"
+        },
+        {
+          "name": "person_id",
+          "type": "bigint",
+          "nullable": "NO"
+        },
+        {
+          "name": "interaction_id",
+          "type": "bigint",
+          "nullable": "YES"
+        },
+        {
+          "name": "item_type",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "category",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "content",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "structured_value",
+          "type": "jsonb",
+          "nullable": "YES"
+        },
+        {
+          "name": "source_type",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "source_id",
+          "type": "bigint",
+          "nullable": "YES"
+        },
+        {
+          "name": "confidence",
+          "type": "numeric",
+          "nullable": "YES"
+        },
+        {
+          "name": "confirmed",
+          "type": "boolean",
+          "nullable": "NO"
+        },
+        {
+          "name": "confirmed_by_uid",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "confirmed_at",
+          "type": "timestamp with time zone",
+          "nullable": "YES"
+        },
+        {
+          "name": "valid_from",
+          "type": "timestamp with time zone",
+          "nullable": "YES"
+        },
+        {
+          "name": "valid_to",
+          "type": "timestamp with time zone",
+          "nullable": "YES"
+        },
+        {
+          "name": "last_verified_at",
+          "type": "timestamp with time zone",
+          "nullable": "YES"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": "NO"
+        }
+      ],
+      "rls": true,
+      "security_invoker": false,
+      "grants": {
+        "anon": [],
+        "service_role": [
+          "INSERT",
+          "SELECT"
+        ],
+        "authenticated": []
+      }
+    },
+    {
+      "name": "customers",
+      "type": "r",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "integer",
+          "nullable": "NO"
+        },
+        {
+          "name": "customer_name",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "sales_priority",
+          "type": "USER-DEFINED",
+          "nullable": "YES"
+        },
+        {
+          "name": "recruitment_priority",
+          "type": "USER-DEFINED",
+          "nullable": "YES"
+        },
+        {
+          "name": "referral_priority",
+          "type": "USER-DEFINED",
+          "nullable": "YES"
+        },
+        {
+          "name": "hobbies",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "additional_info",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "gender",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "source",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "tags",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "marital_status",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "properties_info",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "occupation",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "annual_income",
+          "type": "integer",
+          "nullable": "YES"
+        },
+        {
+          "name": "household_income",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": "YES"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": "YES"
+        },
+        {
+          "name": "first_contact_date",
+          "type": "date",
+          "nullable": "YES"
+        },
+        {
+          "name": "birthday",
+          "type": "date",
+          "nullable": "YES"
+        },
+        {
+          "name": "customer_stage",
+          "type": "USER-DEFINED",
+          "nullable": "YES"
+        },
+        {
+          "name": "phone",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "deleted_at",
+          "type": "timestamp without time zone",
+          "nullable": "YES"
+        },
+        {
+          "name": "wx_account",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "education",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "mbti",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "profile",
+          "type": "jsonb",
+          "nullable": "YES"
+        },
+        {
+          "name": "next_action",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "next_action_date",
+          "type": "date",
+          "nullable": "YES"
+        },
+        {
+          "name": "delete_batch_id",
+          "type": "uuid",
+          "nullable": "YES"
+        }
+      ],
+      "rls": true,
+      "security_invoker": false,
+      "grants": {
+        "anon": [
+          "DELETE",
+          "INSERT",
+          "SELECT",
+          "UPDATE"
+        ],
+        "service_role": [
+          "DELETE",
+          "INSERT",
+          "MAINTAIN",
+          "REFERENCES",
+          "SELECT",
+          "TRIGGER",
+          "TRUNCATE",
+          "UPDATE"
+        ],
+        "authenticated": []
+      }
+    },
+    {
+      "name": "customers_view",
+      "type": "v",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "integer",
+          "nullable": "YES"
+        },
+        {
+          "name": "customer_name",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "sales_priority",
+          "type": "USER-DEFINED",
+          "nullable": "YES"
+        },
+        {
+          "name": "recruitment_priority",
+          "type": "USER-DEFINED",
+          "nullable": "YES"
+        },
+        {
+          "name": "referral_priority",
+          "type": "USER-DEFINED",
+          "nullable": "YES"
+        },
+        {
+          "name": "hobbies",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "additional_info",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "gender",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "source",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "tags",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "marital_status",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "properties_info",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "occupation",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "annual_income",
+          "type": "integer",
+          "nullable": "YES"
+        },
+        {
+          "name": "household_income",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": "YES"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": "YES"
+        },
+        {
+          "name": "first_contact_date",
+          "type": "date",
+          "nullable": "YES"
+        },
+        {
+          "name": "birthday",
+          "type": "date",
+          "nullable": "YES"
+        },
+        {
+          "name": "customer_stage",
+          "type": "USER-DEFINED",
+          "nullable": "YES"
+        },
+        {
+          "name": "phone",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "profile",
+          "type": "jsonb",
+          "nullable": "YES"
+        },
+        {
+          "name": "deleted_at",
+          "type": "timestamp without time zone",
+          "nullable": "YES"
+        },
+        {
+          "name": "age",
+          "type": "integer",
+          "nullable": "YES"
+        },
+        {
+          "name": "contact_years",
+          "type": "integer",
+          "nullable": "YES"
+        },
+        {
+          "name": "gift_name",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "gift_quantity",
+          "type": "smallint",
+          "nullable": "YES"
+        },
+        {
+          "name": "gift_notes",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "given_date",
+          "type": "date",
+          "nullable": "YES"
+        },
+        {
+          "name": "followup_notes",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "followup_date",
+          "type": "date",
+          "nullable": "YES"
+        },
+        {
+          "name": "next_followup_date",
+          "type": "date",
+          "nullable": "YES"
+        },
+        {
+          "name": "next_followup_goal",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "recommendation_date",
+          "type": "date",
+          "nullable": "YES"
+        },
+        {
+          "name": "suggested_followup_date",
+          "type": "date",
+          "nullable": "YES"
+        },
+        {
+          "name": "suggested_message",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "suggested_strategy",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "suggested_customer_stage",
+          "type": "USER-DEFINED",
+          "nullable": "YES"
+        },
+        {
+          "name": "suggested_followup_goal",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "photo_url",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "thumbnail_url",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "file_name",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "content_type",
+          "type": "text",
+          "nullable": "YES"
+        }
+      ],
+      "rls": false,
+      "security_invoker": true,
+      "grants": {
+        "anon": [
+          "SELECT"
+        ],
+        "service_role": [
+          "DELETE",
+          "INSERT",
+          "MAINTAIN",
+          "REFERENCES",
+          "SELECT",
+          "TRIGGER",
+          "TRUNCATE",
+          "UPDATE"
+        ],
+        "authenticated": []
+      }
+    },
+    {
+      "name": "followups",
+      "type": "r",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "integer",
+          "nullable": "NO"
+        },
+        {
+          "name": "customer_name",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "followup_notes",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "followup_date",
+          "type": "date",
+          "nullable": "YES"
+        },
+        {
+          "name": "next_followup_date",
+          "type": "date",
+          "nullable": "YES"
+        },
+        {
+          "name": "next_followup_goal",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "customer_id",
+          "type": "integer",
+          "nullable": "NO"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": "YES"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp without time zone",
+          "nullable": "YES"
+        },
+        {
+          "name": "deleted_at",
+          "type": "timestamp with time zone",
+          "nullable": "YES"
+        },
+        {
+          "name": "recommendation_id",
+          "type": "integer",
+          "nullable": "YES"
+        },
+        {
+          "name": "activity_id",
+          "type": "integer",
+          "nullable": "YES"
+        },
+        {
+          "name": "interaction_summary",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "next_action",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "next_action_date",
+          "type": "date",
+          "nullable": "YES"
+        },
+        {
+          "name": "delete_batch_id",
+          "type": "uuid",
+          "nullable": "YES"
+        }
+      ],
+      "rls": true,
+      "security_invoker": false,
+      "grants": {
+        "anon": [
+          "DELETE",
+          "INSERT",
+          "SELECT",
+          "UPDATE"
+        ],
+        "service_role": [
+          "DELETE",
+          "INSERT",
+          "MAINTAIN",
+          "REFERENCES",
+          "SELECT",
+          "TRIGGER",
+          "TRUNCATE",
+          "UPDATE"
+        ],
+        "authenticated": []
+      }
+    },
+    {
+      "name": "followups_view",
+      "type": "v",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "integer",
+          "nullable": "YES"
+        },
+        {
+          "name": "customer_name",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "followup_notes",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "followup_date",
+          "type": "date",
+          "nullable": "YES"
+        },
+        {
+          "name": "next_followup_date",
+          "type": "date",
+          "nullable": "YES"
+        },
+        {
+          "name": "next_followup_goal",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "customer_id",
+          "type": "integer",
+          "nullable": "YES"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": "YES"
+        },
+        {
+          "name": "gender",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "occupation",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "tags",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "customer_stage",
+          "type": "USER-DEFINED",
+          "nullable": "YES"
+        },
+        {
+          "name": "gift_name",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "quantity",
+          "type": "smallint",
+          "nullable": "YES"
+        },
+        {
+          "name": "given_date",
+          "type": "date",
+          "nullable": "YES"
+        },
+        {
+          "name": "suggested_message",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "suggested_strategy",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "suggested_followup_date",
+          "type": "date",
+          "nullable": "YES"
+        }
+      ],
+      "rls": false,
+      "security_invoker": true,
+      "grants": {
+        "anon": [
+          "SELECT"
+        ],
+        "service_role": [
+          "DELETE",
+          "INSERT",
+          "MAINTAIN",
+          "REFERENCES",
+          "SELECT",
+          "TRIGGER",
+          "TRUNCATE",
+          "UPDATE"
+        ],
+        "authenticated": []
+      }
+    },
+    {
+      "name": "gifts",
+      "type": "r",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "bigint",
+          "nullable": "NO"
+        },
+        {
+          "name": "customer_name",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "gift_name",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "quantity",
+          "type": "smallint",
+          "nullable": "YES"
+        },
+        {
+          "name": "notes",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "given_date",
+          "type": "date",
+          "nullable": "YES"
+        },
+        {
+          "name": "customer_id",
+          "type": "integer",
+          "nullable": "NO"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": "YES"
+        },
+        {
+          "name": "deleted_at",
+          "type": "timestamp with time zone",
+          "nullable": "YES"
+        },
+        {
+          "name": "delete_batch_id",
+          "type": "uuid",
+          "nullable": "YES"
+        }
+      ],
+      "rls": true,
+      "security_invoker": false,
+      "grants": {
+        "anon": [
+          "DELETE",
+          "INSERT",
+          "SELECT",
+          "UPDATE"
+        ],
+        "service_role": [
+          "DELETE",
+          "INSERT",
+          "MAINTAIN",
+          "REFERENCES",
+          "SELECT",
+          "TRIGGER",
+          "TRUNCATE",
+          "UPDATE"
+        ],
+        "authenticated": []
+      }
+    },
+    {
+      "name": "gifts_view",
+      "type": "v",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "bigint",
+          "nullable": "YES"
+        },
+        {
+          "name": "customer_name",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "gift_name",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "quantity",
+          "type": "smallint",
+          "nullable": "YES"
+        },
+        {
+          "name": "notes",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "given_date",
+          "type": "date",
+          "nullable": "YES"
+        },
+        {
+          "name": "customer_id",
+          "type": "integer",
+          "nullable": "YES"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": "YES"
+        },
+        {
+          "name": "gender",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "occupation",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "tags",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "customer_stage",
+          "type": "USER-DEFINED",
+          "nullable": "YES"
+        },
+        {
+          "name": "source",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "followup_notes",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "followup_date",
+          "type": "date",
+          "nullable": "YES"
+        },
+        {
+          "name": "next_followup_date",
+          "type": "date",
+          "nullable": "YES"
+        },
+        {
+          "name": "next_followup_goal",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "recommendation_date",
+          "type": "date",
+          "nullable": "YES"
+        },
+        {
+          "name": "suggested_followup_date",
+          "type": "date",
+          "nullable": "YES"
+        },
+        {
+          "name": "suggested_message",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "suggested_strategy",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "suggested_customer_stage",
+          "type": "USER-DEFINED",
+          "nullable": "YES"
+        },
+        {
+          "name": "suggested_followup_goal",
+          "type": "text",
+          "nullable": "YES"
+        }
+      ],
+      "rls": false,
+      "security_invoker": true,
+      "grants": {
+        "anon": [
+          "SELECT"
+        ],
+        "service_role": [
+          "DELETE",
+          "INSERT",
+          "MAINTAIN",
+          "REFERENCES",
+          "SELECT",
+          "TRIGGER",
+          "TRUNCATE",
+          "UPDATE"
+        ],
+        "authenticated": []
+      }
+    },
+    {
+      "name": "household_members",
+      "type": "r",
+      "columns": [
+        {
+          "name": "id",
+          "type": "bigint",
+          "nullable": "NO"
+        },
+        {
+          "name": "household_id",
+          "type": "bigint",
+          "nullable": "NO"
+        },
+        {
+          "name": "person_id",
+          "type": "bigint",
+          "nullable": "NO"
+        },
+        {
+          "name": "relationship_to_anchor",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "confirmed_at",
+          "type": "timestamp with time zone",
+          "nullable": "NO"
+        },
+        {
+          "name": "confirmed_by_uid",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": "NO"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": "NO"
+        },
+        {
+          "name": "deleted_at",
+          "type": "timestamp with time zone",
+          "nullable": "YES"
+        }
+      ],
+      "rls": true,
+      "security_invoker": false,
+      "grants": {
+        "anon": [],
+        "service_role": [
+          "DELETE",
+          "INSERT",
+          "MAINTAIN",
+          "REFERENCES",
+          "SELECT",
+          "TRIGGER",
+          "TRUNCATE",
+          "UPDATE"
+        ],
+        "authenticated": []
+      }
+    },
+    {
+      "name": "households",
+      "type": "r",
+      "columns": [
+        {
+          "name": "id",
+          "type": "bigint",
+          "nullable": "NO"
+        },
+        {
+          "name": "anchor_person_id",
+          "type": "bigint",
+          "nullable": "NO"
+        },
+        {
+          "name": "important_facts",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": "NO"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": "NO"
+        },
+        {
+          "name": "deleted_at",
+          "type": "timestamp with time zone",
+          "nullable": "YES"
+        }
+      ],
+      "rls": true,
+      "security_invoker": false,
+      "grants": {
+        "anon": [],
+        "service_role": [
+          "DELETE",
+          "INSERT",
+          "MAINTAIN",
+          "REFERENCES",
+          "SELECT",
+          "TRIGGER",
+          "TRUNCATE",
+          "UPDATE"
+        ],
+        "authenticated": []
+      }
+    },
+    {
+      "name": "interactions",
+      "type": "r",
+      "columns": [
+        {
+          "name": "id",
+          "type": "bigint",
+          "nullable": "NO"
+        },
+        {
+          "name": "person_id",
+          "type": "bigint",
+          "nullable": "NO"
+        },
+        {
+          "name": "interaction_type",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "interaction_at",
+          "type": "timestamp with time zone",
+          "nullable": "NO"
+        },
+        {
+          "name": "channel",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "summary",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "raw_note",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "activity_id",
+          "type": "bigint",
+          "nullable": "YES"
+        },
+        {
+          "name": "source_type",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "source_id",
+          "type": "bigint",
+          "nullable": "YES"
+        },
+        {
+          "name": "importance",
+          "type": "smallint",
+          "nullable": "NO"
+        },
+        {
+          "name": "created_by_uid",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": "NO"
+        }
+      ],
+      "rls": true,
+      "security_invoker": false,
+      "grants": {
+        "anon": [],
+        "service_role": [
+          "DELETE",
+          "INSERT",
+          "MAINTAIN",
+          "REFERENCES",
+          "SELECT",
+          "TRIGGER",
+          "TRUNCATE",
+          "UPDATE"
+        ],
+        "authenticated": []
+      }
+    },
+    {
+      "name": "knowledge_items",
+      "type": "r",
+      "columns": [
+        {
+          "name": "id",
+          "type": "bigint",
+          "nullable": "NO"
+        },
+        {
+          "name": "item_type",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "source",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "source_date",
+          "type": "date",
+          "nullable": "YES"
+        },
+        {
+          "name": "valid_from",
+          "type": "date",
+          "nullable": "YES"
+        },
+        {
+          "name": "valid_to",
+          "type": "date",
+          "nullable": "YES"
+        },
+        {
+          "name": "verified",
+          "type": "boolean",
+          "nullable": "NO"
+        },
+        {
+          "name": "confidence",
+          "type": "numeric",
+          "nullable": "YES"
+        },
+        {
+          "name": "content",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "metadata",
+          "type": "jsonb",
+          "nullable": "NO"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": "NO"
+        }
+      ],
+      "rls": true,
+      "security_invoker": false,
+      "grants": {
+        "anon": [],
+        "service_role": [
+          "INSERT",
+          "SELECT",
+          "UPDATE"
+        ],
+        "authenticated": []
+      }
+    },
+    {
+      "name": "learnings",
+      "type": "r",
+      "columns": [
+        {
+          "name": "id",
+          "type": "bigint",
+          "nullable": "NO"
+        },
+        {
+          "name": "source_type",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "source_table",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "source_id",
+          "type": "bigint",
+          "nullable": "YES"
+        },
+        {
+          "name": "situation",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "ai_recommendation",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "user_decision",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "actual_action",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "outcome",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "learning",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "confidence",
+          "type": "numeric",
+          "nullable": "YES"
+        },
+        {
+          "name": "scope",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "confirmed",
+          "type": "boolean",
+          "nullable": "NO"
+        },
+        {
+          "name": "confirmed_by_uid",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "confirmed_at",
+          "type": "timestamp with time zone",
+          "nullable": "YES"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": "NO"
+        }
+      ],
+      "rls": true,
+      "security_invoker": false,
+      "grants": {
+        "anon": [],
+        "service_role": [
+          "INSERT",
+          "SELECT",
+          "UPDATE"
+        ],
+        "authenticated": []
+      }
+    },
+    {
+      "name": "ocr_records",
+      "type": "r",
+      "columns": [
+        {
+          "name": "id",
+          "type": "bigint",
+          "nullable": "NO"
+        },
+        {
+          "name": "customer_id",
+          "type": "bigint",
+          "nullable": "NO"
+        },
+        {
+          "name": "summary",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "raw_text",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "file_ids",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "file_names",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": "YES"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": "YES"
+        },
+        {
+          "name": "customer_snapshot",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "deleted_at",
+          "type": "timestamp with time zone",
+          "nullable": "YES"
+        },
+        {
+          "name": "delete_batch_id",
+          "type": "uuid",
+          "nullable": "YES"
+        }
+      ],
+      "rls": true,
+      "security_invoker": false,
+      "grants": {
+        "anon": [
+          "DELETE",
+          "INSERT",
+          "SELECT",
+          "UPDATE"
+        ],
+        "service_role": [
+          "DELETE",
+          "INSERT",
+          "MAINTAIN",
+          "REFERENCES",
+          "SELECT",
+          "TRIGGER",
+          "TRUNCATE",
+          "UPDATE"
+        ],
+        "authenticated": []
+      }
+    },
+    {
+      "name": "opportunities",
+      "type": "r",
+      "columns": [
+        {
+          "name": "id",
+          "type": "bigint",
+          "nullable": "NO"
+        },
+        {
+          "name": "customer_id",
+          "type": "integer",
+          "nullable": "YES"
+        },
+        {
+          "name": "opportunity_type",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "discovered_at",
+          "type": "date",
+          "nullable": "YES"
+        },
+        {
+          "name": "last_progress",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "next_action",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "ai_summary",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": "NO"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": "NO"
+        },
+        {
+          "name": "deleted_at",
+          "type": "timestamp with time zone",
+          "nullable": "YES"
+        },
+        {
+          "name": "referred_name",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "referred_relation",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "next_action_date",
+          "type": "date",
+          "nullable": "YES"
+        },
+        {
+          "name": "person_id",
+          "type": "bigint",
+          "nullable": "YES"
+        }
+      ],
+      "rls": true,
+      "security_invoker": false,
+      "grants": {
+        "anon": [
+          "DELETE",
+          "INSERT",
+          "SELECT",
+          "UPDATE"
+        ],
+        "service_role": [
+          "DELETE",
+          "INSERT",
+          "MAINTAIN",
+          "REFERENCES",
+          "SELECT",
+          "TRIGGER",
+          "TRUNCATE",
+          "UPDATE"
+        ],
+        "authenticated": []
+      }
+    },
+    {
+      "name": "opportunity_candidates",
+      "type": "r",
+      "columns": [
+        {
+          "name": "id",
+          "type": "bigint",
+          "nullable": "NO"
+        },
+        {
+          "name": "person_id",
+          "type": "bigint",
+          "nullable": "NO"
+        },
+        {
+          "name": "ai_result_id",
+          "type": "bigint",
+          "nullable": "NO"
+        },
+        {
+          "name": "created_by_uid",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "reviewed_by_uid",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "draft",
+          "type": "jsonb",
+          "nullable": "NO"
+        },
+        {
+          "name": "evidence",
+          "type": "jsonb",
+          "nullable": "NO"
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "version",
+          "type": "integer",
+          "nullable": "NO"
+        },
+        {
+          "name": "preview_json",
+          "type": "jsonb",
+          "nullable": "YES"
+        },
+        {
+          "name": "preview_hash",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "person_updated_at",
+          "type": "timestamp with time zone",
+          "nullable": "YES"
+        },
+        {
+          "name": "preview_expires_at",
+          "type": "timestamp with time zone",
+          "nullable": "YES"
+        },
+        {
+          "name": "confirmed_at",
+          "type": "timestamp with time zone",
+          "nullable": "YES"
+        },
+        {
+          "name": "opportunity_id",
+          "type": "bigint",
+          "nullable": "YES"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": "NO"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": "NO"
+        }
+      ],
+      "rls": true,
+      "security_invoker": false,
+      "grants": {
+        "anon": [],
+        "service_role": [
+          "INSERT",
+          "SELECT",
+          "UPDATE"
+        ],
+        "authenticated": []
+      }
+    },
+    {
+      "name": "outcomes",
+      "type": "r",
+      "columns": [
+        {
+          "name": "id",
+          "type": "bigint",
+          "nullable": "NO"
+        },
+        {
+          "name": "action_id",
+          "type": "bigint",
+          "nullable": "YES"
+        },
+        {
+          "name": "opportunity_id",
+          "type": "bigint",
+          "nullable": "YES"
+        },
+        {
+          "name": "interaction_id",
+          "type": "bigint",
+          "nullable": "YES"
+        },
+        {
+          "name": "activity_id",
+          "type": "bigint",
+          "nullable": "YES"
+        },
+        {
+          "name": "recruit_candidate_id",
+          "type": "bigint",
+          "nullable": "YES"
+        },
+        {
+          "name": "outcome_type",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "result",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "sentiment",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "relationship_change",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "opportunity_change",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "business_value",
+          "type": "numeric",
+          "nullable": "YES"
+        },
+        {
+          "name": "notes",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "occurred_at",
+          "type": "timestamp with time zone",
+          "nullable": "NO"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": "NO"
+        }
+      ],
+      "rls": true,
+      "security_invoker": false,
+      "grants": {
+        "anon": [],
+        "service_role": [
+          "INSERT",
+          "SELECT",
+          "UPDATE"
+        ],
+        "authenticated": []
+      }
+    },
+    {
+      "name": "person_roles",
+      "type": "r",
+      "columns": [
+        {
+          "name": "id",
+          "type": "bigint",
+          "nullable": "NO"
+        },
+        {
+          "name": "person_id",
+          "type": "bigint",
+          "nullable": "NO"
+        },
+        {
+          "name": "role",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "origin",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": "NO"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": "NO"
+        }
+      ],
+      "rls": true,
+      "security_invoker": false,
+      "grants": {
+        "anon": [],
+        "service_role": [
+          "DELETE",
+          "INSERT",
+          "MAINTAIN",
+          "REFERENCES",
+          "SELECT",
+          "TRIGGER",
+          "TRUNCATE",
+          "UPDATE"
+        ],
+        "authenticated": []
+      }
+    },
+    {
+      "name": "persons",
+      "type": "r",
+      "columns": [
+        {
+          "name": "id",
+          "type": "bigint",
+          "nullable": "NO"
+        },
+        {
+          "name": "display_name",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "name_key",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "phone",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "wechat",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "gender",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "birthday",
+          "type": "date",
+          "nullable": "YES"
+        },
+        {
+          "name": "occupation",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "organization",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "education",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "source",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "notes",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "legacy_customer_id",
+          "type": "integer",
+          "nullable": "YES"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": "NO"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": "NO"
+        },
+        {
+          "name": "deleted_at",
+          "type": "timestamp without time zone",
+          "nullable": "YES"
+        }
+      ],
+      "rls": true,
+      "security_invoker": false,
+      "grants": {
+        "anon": [],
+        "service_role": [
+          "DELETE",
+          "INSERT",
+          "MAINTAIN",
+          "REFERENCES",
+          "SELECT",
+          "TRIGGER",
+          "TRUNCATE",
+          "UPDATE"
+        ],
+        "authenticated": []
+      }
+    },
+    {
+      "name": "photos",
+      "type": "r",
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "nullable": "NO"
+        },
+        {
+          "name": "customer_id",
+          "type": "integer",
+          "nullable": "NO"
+        },
+        {
+          "name": "photo_url",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "thumbnail_url",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "file_name",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "content_type",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "sort_order",
+          "type": "integer",
+          "nullable": "YES"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": "YES"
+        },
+        {
+          "name": "customer_name",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "photo_notes",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "category",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "deleted_at",
+          "type": "timestamp with time zone",
+          "nullable": "YES"
+        },
+        {
+          "name": "delete_batch_id",
+          "type": "uuid",
+          "nullable": "YES"
+        }
+      ],
+      "rls": true,
+      "security_invoker": false,
+      "grants": {
+        "anon": [
+          "DELETE",
+          "INSERT",
+          "SELECT",
+          "UPDATE"
+        ],
+        "service_role": [
+          "DELETE",
+          "INSERT",
+          "MAINTAIN",
+          "REFERENCES",
+          "SELECT",
+          "TRIGGER",
+          "TRUNCATE",
+          "UPDATE"
+        ],
+        "authenticated": []
+      }
+    },
+    {
+      "name": "photos_view",
+      "type": "v",
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "nullable": "YES"
+        },
+        {
+          "name": "customer_id",
+          "type": "integer",
+          "nullable": "YES"
+        },
+        {
+          "name": "photo_url",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "thumbnail_url",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "file_name",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "content_type",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "sort_order",
+          "type": "integer",
+          "nullable": "YES"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": "YES"
+        },
+        {
+          "name": "customer_name",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "gender",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "occupation",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "tags",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "customer_stage",
+          "type": "USER-DEFINED",
+          "nullable": "YES"
+        },
+        {
+          "name": "source",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "Id",
+          "type": "integer",
+          "nullable": "YES"
+        }
+      ],
+      "rls": false,
+      "security_invoker": true,
+      "grants": {
+        "anon": [],
+        "service_role": [
+          "DELETE",
+          "INSERT",
+          "MAINTAIN",
+          "REFERENCES",
+          "SELECT",
+          "TRIGGER",
+          "TRUNCATE",
+          "UPDATE"
+        ],
+        "authenticated": []
+      }
+    },
+    {
+      "name": "playbooks",
+      "type": "r",
+      "columns": [
+        {
+          "name": "id",
+          "type": "bigint",
+          "nullable": "NO"
+        },
+        {
+          "name": "scenario",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "objection",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "possible_underlying_reasons",
+          "type": "ARRAY",
+          "nullable": "NO"
+        },
+        {
+          "name": "clarifying_questions",
+          "type": "ARRAY",
+          "nullable": "NO"
+        },
+        {
+          "name": "response_logic",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "evidence_refs",
+          "type": "ARRAY",
+          "nullable": "NO"
+        },
+        {
+          "name": "case_refs",
+          "type": "ARRAY",
+          "nullable": "NO"
+        },
+        {
+          "name": "story_refs",
+          "type": "ARRAY",
+          "nullable": "NO"
+        },
+        {
+          "name": "do_not_say",
+          "type": "ARRAY",
+          "nullable": "NO"
+        },
+        {
+          "name": "next_objective",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": "NO"
+        }
+      ],
+      "rls": true,
+      "security_invoker": false,
+      "grants": {
+        "anon": [],
+        "service_role": [
+          "INSERT",
+          "SELECT",
+          "UPDATE"
+        ],
+        "authenticated": []
+      }
+    },
+    {
+      "name": "policy_review_reports",
+      "type": "r",
+      "columns": [
+        {
+          "name": "id",
+          "type": "bigint",
+          "nullable": "NO"
+        },
+        {
+          "name": "customer_id",
+          "type": "bigint",
+          "nullable": "NO"
+        },
+        {
+          "name": "customer_name",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "report_date",
+          "type": "date",
+          "nullable": "NO"
+        },
+        {
+          "name": "report_type",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "gaps_found",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "recommendations",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "asset_allocation",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "next_action",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "summary",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "raw",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "edited_summary",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "edited_gaps",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "edited_recommendations",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "edited_asset_allocation",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "edited_next_action",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": "NO"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": "NO"
+        },
+        {
+          "name": "deleted_at",
+          "type": "timestamp with time zone",
+          "nullable": "YES"
+        },
+        {
+          "name": "delete_batch_id",
+          "type": "uuid",
+          "nullable": "YES"
+        }
+      ],
+      "rls": true,
+      "security_invoker": false,
+      "grants": {
+        "anon": [
+          "DELETE",
+          "INSERT",
+          "SELECT",
+          "UPDATE"
+        ],
+        "service_role": [
+          "DELETE",
+          "INSERT",
+          "MAINTAIN",
+          "REFERENCES",
+          "SELECT",
+          "TRIGGER",
+          "TRUNCATE",
+          "UPDATE"
+        ],
+        "authenticated": []
+      }
+    },
+    {
+      "name": "products",
+      "type": "r",
+      "columns": [
+        {
+          "name": "id",
+          "type": "bigint",
+          "nullable": "NO"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": "NO"
+        },
+        {
+          "name": "customer_id",
+          "type": "bigint",
+          "nullable": "YES"
+        },
+        {
+          "name": "customer_name",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "ap_ipa",
+          "type": "bigint",
+          "nullable": "YES"
+        },
+        {
+          "name": "ap_ltc",
+          "type": "bigint",
+          "nullable": "YES"
+        },
+        {
+          "name": "ap_ann",
+          "type": "bigint",
+          "nullable": "YES"
+        },
+        {
+          "name": "ap_life",
+          "type": "bigint",
+          "nullable": "YES"
+        },
+        {
+          "name": "ap_term",
+          "type": "bigint",
+          "nullable": "YES"
+        },
+        {
+          "name": "ap_wl",
+          "type": "bigint",
+          "nullable": "YES"
+        },
+        {
+          "name": "ap_pa",
+          "type": "bigint",
+          "nullable": "YES"
+        },
+        {
+          "name": "ap_ci",
+          "type": "bigint",
+          "nullable": "YES"
+        },
+        {
+          "name": "ap_hi",
+          "type": "bigint",
+          "nullable": "YES"
+        },
+        {
+          "name": "ap_all",
+          "type": "bigint",
+          "nullable": "YES"
+        },
+        {
+          "name": "items",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "ap_ppa",
+          "type": "bigint",
+          "nullable": "YES"
+        },
+        {
+          "name": "deleted_at",
+          "type": "timestamp with time zone",
+          "nullable": "YES"
+        },
+        {
+          "name": "delete_batch_id",
+          "type": "uuid",
+          "nullable": "YES"
+        }
+      ],
+      "rls": true,
+      "security_invoker": false,
+      "grants": {
+        "anon": [
+          "DELETE",
+          "INSERT",
+          "SELECT",
+          "UPDATE"
+        ],
+        "service_role": [
+          "DELETE",
+          "INSERT",
+          "MAINTAIN",
+          "REFERENCES",
+          "SELECT",
+          "TRIGGER",
+          "TRUNCATE",
+          "UPDATE"
+        ],
+        "authenticated": []
+      }
+    },
+    {
+      "name": "products_view",
+      "type": "v",
+      "columns": [
+        {
+          "name": "id",
+          "type": "bigint",
+          "nullable": "YES"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": "YES"
+        },
+        {
+          "name": "customer_id",
+          "type": "bigint",
+          "nullable": "YES"
+        },
+        {
+          "name": "customer_name",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "ap_ipa",
+          "type": "bigint",
+          "nullable": "YES"
+        },
+        {
+          "name": "ap_ltc",
+          "type": "bigint",
+          "nullable": "YES"
+        },
+        {
+          "name": "ap_ann",
+          "type": "bigint",
+          "nullable": "YES"
+        },
+        {
+          "name": "ap_life",
+          "type": "bigint",
+          "nullable": "YES"
+        },
+        {
+          "name": "ap_term",
+          "type": "bigint",
+          "nullable": "YES"
+        },
+        {
+          "name": "ap_wl",
+          "type": "bigint",
+          "nullable": "YES"
+        },
+        {
+          "name": "ap_pa",
+          "type": "bigint",
+          "nullable": "YES"
+        },
+        {
+          "name": "ap_ci",
+          "type": "bigint",
+          "nullable": "YES"
+        },
+        {
+          "name": "ap_hi",
+          "type": "bigint",
+          "nullable": "YES"
+        },
+        {
+          "name": "ap_all",
+          "type": "bigint",
+          "nullable": "YES"
+        },
+        {
+          "name": "gender",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "occupation",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "tags",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "customer_stage",
+          "type": "USER-DEFINED",
+          "nullable": "YES"
+        },
+        {
+          "name": "source",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "followup_notes",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "followup_date",
+          "type": "date",
+          "nullable": "YES"
+        },
+        {
+          "name": "next_followup_date",
+          "type": "date",
+          "nullable": "YES"
+        },
+        {
+          "name": "next_followup_goal",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "recommendation_date",
+          "type": "date",
+          "nullable": "YES"
+        },
+        {
+          "name": "suggested_followup_date",
+          "type": "date",
+          "nullable": "YES"
+        },
+        {
+          "name": "suggested_message",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "suggested_strategy",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "suggested_customer_stage",
+          "type": "USER-DEFINED",
+          "nullable": "YES"
+        },
+        {
+          "name": "suggested_followup_goal",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "gift_name",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "gift_quantity",
+          "type": "smallint",
+          "nullable": "YES"
+        },
+        {
+          "name": "given_date",
+          "type": "date",
+          "nullable": "YES"
+        },
+        {
+          "name": "gift_notes",
+          "type": "text",
+          "nullable": "YES"
+        }
+      ],
+      "rls": false,
+      "security_invoker": true,
+      "grants": {
+        "anon": [
+          "SELECT"
+        ],
+        "service_role": [
+          "DELETE",
+          "INSERT",
+          "MAINTAIN",
+          "REFERENCES",
+          "SELECT",
+          "TRIGGER",
+          "TRUNCATE",
+          "UPDATE"
+        ],
+        "authenticated": []
+      }
+    },
+    {
+      "name": "recruit_candidates",
+      "type": "r",
+      "columns": [
+        {
+          "name": "id",
+          "type": "bigint",
+          "nullable": "NO"
+        },
+        {
+          "name": "customer_id",
+          "type": "bigint",
+          "nullable": "NO"
+        },
+        {
+          "name": "education",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "mbti",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "motivation",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "concerns",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "recommender_id",
+          "type": "bigint",
+          "nullable": "YES"
+        },
+        {
+          "name": "stage",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "stage_changed_at",
+          "type": "timestamp with time zone",
+          "nullable": "YES"
+        },
+        {
+          "name": "potential_score",
+          "type": "integer",
+          "nullable": "YES"
+        },
+        {
+          "name": "potential_reason",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "operator",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": "NO"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": "NO"
+        },
+        {
+          "name": "deleted_at",
+          "type": "timestamp with time zone",
+          "nullable": "YES"
+        },
+        {
+          "name": "work_experience",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "family_situation",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "personality_tags",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "career_plan",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "next_action_date",
+          "type": "date",
+          "nullable": "YES"
+        },
+        {
+          "name": "next_action",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "activity_history",
+          "type": "jsonb",
+          "nullable": "YES"
+        },
+        {
+          "name": "radar_image_file_id",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "radar_image_name",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "winner_report_file_id",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "winner_report_name",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "profile",
+          "type": "jsonb",
+          "nullable": "YES"
+        },
+        {
+          "name": "delete_batch_id",
+          "type": "uuid",
+          "nullable": "YES"
+        },
+        {
+          "name": "person_id",
+          "type": "bigint",
+          "nullable": "NO"
+        }
+      ],
+      "rls": true,
+      "security_invoker": false,
+      "grants": {
+        "anon": [
+          "DELETE",
+          "INSERT",
+          "SELECT",
+          "UPDATE"
+        ],
+        "service_role": [
+          "DELETE",
+          "INSERT",
+          "MAINTAIN",
+          "REFERENCES",
+          "SELECT",
+          "TRIGGER",
+          "TRUNCATE",
+          "UPDATE"
+        ],
+        "authenticated": []
+      }
+    },
+    {
+      "name": "recruit_followups",
+      "type": "r",
+      "columns": [
+        {
+          "name": "id",
+          "type": "bigint",
+          "nullable": "NO"
+        },
+        {
+          "name": "candidate_id",
+          "type": "bigint",
+          "nullable": "NO"
+        },
+        {
+          "name": "contact_method",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "followup_notes",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "followup_date",
+          "type": "date",
+          "nullable": "NO"
+        },
+        {
+          "name": "interest_level",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "concern_feedback",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "next_followup_date",
+          "type": "date",
+          "nullable": "YES"
+        },
+        {
+          "name": "next_followup_goal",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "operator",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": "NO"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": "NO"
+        },
+        {
+          "name": "deleted_at",
+          "type": "timestamp with time zone",
+          "nullable": "YES"
+        },
+        {
+          "name": "interaction_summary",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "next_action",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "next_action_date",
+          "type": "date",
+          "nullable": "YES"
+        },
+        {
+          "name": "delete_batch_id",
+          "type": "uuid",
+          "nullable": "YES"
+        }
+      ],
+      "rls": true,
+      "security_invoker": false,
+      "grants": {
+        "anon": [
+          "DELETE",
+          "INSERT",
+          "SELECT",
+          "UPDATE"
+        ],
+        "service_role": [
+          "DELETE",
+          "INSERT",
+          "MAINTAIN",
+          "REFERENCES",
+          "SELECT",
+          "TRIGGER",
+          "TRUNCATE",
+          "UPDATE"
+        ],
+        "authenticated": []
+      }
+    },
+    {
+      "name": "recruit_goal_benchmarks",
+      "type": "r",
+      "columns": [
+        {
+          "name": "id",
+          "type": "bigint",
+          "nullable": "NO"
+        },
+        {
+          "name": "stage_from",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "stage_to",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "conversion_min",
+          "type": "numeric",
+          "nullable": "NO"
+        },
+        {
+          "name": "conversion_avg",
+          "type": "numeric",
+          "nullable": "NO"
+        },
+        {
+          "name": "conversion_good",
+          "type": "numeric",
+          "nullable": "NO"
+        },
+        {
+          "name": "source",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "note",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": "NO"
+        }
+      ],
+      "rls": true,
+      "security_invoker": false,
+      "grants": {
+        "anon": [
+          "DELETE",
+          "INSERT",
+          "SELECT",
+          "UPDATE"
+        ],
+        "service_role": [
+          "DELETE",
+          "INSERT",
+          "MAINTAIN",
+          "REFERENCES",
+          "SELECT",
+          "TRIGGER",
+          "TRUNCATE",
+          "UPDATE"
+        ],
+        "authenticated": []
+      }
+    },
+    {
+      "name": "recruit_goals",
+      "type": "r",
+      "columns": [
+        {
+          "name": "id",
+          "type": "bigint",
+          "nullable": "NO"
+        },
+        {
+          "name": "goal_month",
+          "type": "date",
+          "nullable": "NO"
+        },
+        {
+          "name": "stage",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "target_count",
+          "type": "integer",
+          "nullable": "NO"
+        },
+        {
+          "name": "note",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "operator",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": "NO"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": "NO"
+        }
+      ],
+      "rls": true,
+      "security_invoker": false,
+      "grants": {
+        "anon": [
+          "DELETE",
+          "INSERT",
+          "SELECT",
+          "UPDATE"
+        ],
+        "service_role": [
+          "DELETE",
+          "INSERT",
+          "MAINTAIN",
+          "REFERENCES",
+          "SELECT",
+          "TRIGGER",
+          "TRUNCATE",
+          "UPDATE"
+        ],
+        "authenticated": []
+      }
+    },
+    {
+      "name": "recruit_milestones",
+      "type": "r",
+      "columns": [
+        {
+          "name": "id",
+          "type": "bigint",
+          "nullable": "NO"
+        },
+        {
+          "name": "candidate_id",
+          "type": "bigint",
+          "nullable": "NO"
+        },
+        {
+          "name": "from_stage",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "to_stage",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "happened_at",
+          "type": "timestamp with time zone",
+          "nullable": "NO"
+        },
+        {
+          "name": "note",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "operator",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": "NO"
+        }
+      ],
+      "rls": true,
+      "security_invoker": false,
+      "grants": {
+        "anon": [
+          "DELETE",
+          "INSERT",
+          "SELECT",
+          "UPDATE"
+        ],
+        "service_role": [
+          "DELETE",
+          "INSERT",
+          "MAINTAIN",
+          "REFERENCES",
+          "SELECT",
+          "TRIGGER",
+          "TRUNCATE",
+          "UPDATE"
+        ],
+        "authenticated": []
+      }
+    },
+    {
+      "name": "relationships",
+      "type": "r",
+      "columns": [
+        {
+          "name": "id",
+          "type": "bigint",
+          "nullable": "NO"
+        },
+        {
+          "name": "from_person_id",
+          "type": "bigint",
+          "nullable": "NO"
+        },
+        {
+          "name": "to_person_id",
+          "type": "bigint",
+          "nullable": "NO"
+        },
+        {
+          "name": "relationship_type",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "name": "relationship_stage",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "strength",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "trust_level",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "trend",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "introduced_by_person_id",
+          "type": "bigint",
+          "nullable": "YES"
+        },
+        {
+          "name": "context",
+          "type": "jsonb",
+          "nullable": "NO"
+        },
+        {
+          "name": "last_meaningful_interaction_at",
+          "type": "timestamp with time zone",
+          "nullable": "YES"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": "NO"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": "NO"
+        },
+        {
+          "name": "deleted_at",
+          "type": "timestamp with time zone",
+          "nullable": "YES"
+        }
+      ],
+      "rls": true,
+      "security_invoker": false,
+      "grants": {
+        "anon": [],
+        "service_role": [
+          "DELETE",
+          "INSERT",
+          "MAINTAIN",
+          "REFERENCES",
+          "SELECT",
+          "TRIGGER",
+          "TRUNCATE",
+          "UPDATE"
+        ],
+        "authenticated": []
+      }
+    },
+    {
+      "name": "v_action_center",
+      "type": "v",
+      "columns": [
+        {
+          "name": "action_id",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "action_type",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "person_type",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "person_id",
+          "type": "bigint",
+          "nullable": "YES"
+        },
+        {
+          "name": "person_name",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "title",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "next_action",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "action_date",
+          "type": "date",
+          "nullable": "YES"
+        },
+        {
+          "name": "priority",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "source",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "stage",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "days_until",
+          "type": "integer",
+          "nullable": "YES"
+        },
+        {
+          "name": "last_followup_date",
+          "type": "date",
+          "nullable": "YES"
+        }
+      ],
+      "rls": false,
+      "security_invoker": true,
+      "grants": {
+        "anon": [
+          "SELECT"
+        ],
+        "service_role": [
+          "DELETE",
+          "INSERT",
+          "MAINTAIN",
+          "REFERENCES",
+          "SELECT",
+          "TRIGGER",
+          "TRUNCATE",
+          "UPDATE"
+        ],
+        "authenticated": []
+      }
+    },
+    {
+      "name": "v_funnel_stats",
+      "type": "v",
+      "columns": [
+        {
+          "name": "funnel",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "stage",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "stage_order",
+          "type": "integer",
+          "nullable": "YES"
+        },
+        {
+          "name": "kind",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "current_count",
+          "type": "bigint",
+          "nullable": "YES"
+        },
+        {
+          "name": "entered_30d",
+          "type": "bigint",
+          "nullable": "YES"
+        },
+        {
+          "name": "moved_30d",
+          "type": "bigint",
+          "nullable": "YES"
+        },
+        {
+          "name": "overdue_count",
+          "type": "bigint",
+          "nullable": "YES"
+        },
+        {
+          "name": "dwell_median_days",
+          "type": "integer",
+          "nullable": "YES"
+        },
+        {
+          "name": "stuck_count",
+          "type": "bigint",
+          "nullable": "YES"
+        }
+      ],
+      "rls": false,
+      "security_invoker": true,
+      "grants": {
+        "anon": [
+          "SELECT"
+        ],
+        "service_role": [
+          "DELETE",
+          "INSERT",
+          "MAINTAIN",
+          "REFERENCES",
+          "SELECT",
+          "TRIGGER",
+          "TRUNCATE",
+          "UPDATE"
+        ],
+        "authenticated": []
+      }
+    },
+    {
+      "name": "v_recruit_candidates",
+      "type": "v",
+      "columns": [
+        {
+          "name": "candidate_id",
+          "type": "bigint",
+          "nullable": "YES"
+        },
+        {
+          "name": "customer_id",
+          "type": "bigint",
+          "nullable": "YES"
+        },
+        {
+          "name": "customer_name",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "gender",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "birthday",
+          "type": "date",
+          "nullable": "YES"
+        },
+        {
+          "name": "phone",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "wx_account",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "occupation",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "annual_income",
+          "type": "integer",
+          "nullable": "YES"
+        },
+        {
+          "name": "education",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "mbti",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "source",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "marital_status",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "hobbies",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "additional_info",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "recommender_id",
+          "type": "bigint",
+          "nullable": "YES"
+        },
+        {
+          "name": "stage",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "stage_changed_at",
+          "type": "timestamp with time zone",
+          "nullable": "YES"
+        },
+        {
+          "name": "potential_score",
+          "type": "integer",
+          "nullable": "YES"
+        },
+        {
+          "name": "potential_reason",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "motivation",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "concerns",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "work_experience",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "family_situation",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "personality_tags",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "career_plan",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "next_action_date",
+          "type": "date",
+          "nullable": "YES"
+        },
+        {
+          "name": "next_action",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "activity_history",
+          "type": "jsonb",
+          "nullable": "YES"
+        },
+        {
+          "name": "radar_image_file_id",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "radar_image_name",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "winner_report_file_id",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "winner_report_name",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "operator",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": "YES"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": "YES"
+        },
+        {
+          "name": "idle_days",
+          "type": "integer",
+          "nullable": "YES"
+        },
+        {
+          "name": "profile",
+          "type": "jsonb",
+          "nullable": "YES"
+        },
+        {
+          "name": "person_id",
+          "type": "bigint",
+          "nullable": "YES"
+        }
+      ],
+      "rls": false,
+      "security_invoker": true,
+      "grants": {
+        "anon": [
+          "SELECT"
+        ],
+        "service_role": [
+          "DELETE",
+          "INSERT",
+          "MAINTAIN",
+          "REFERENCES",
+          "SELECT",
+          "TRIGGER",
+          "TRUNCATE",
+          "UPDATE"
+        ],
+        "authenticated": []
+      }
+    },
+    {
+      "name": "v_recruit_candidates_trash",
+      "type": "v",
+      "columns": [
+        {
+          "name": "candidate_id",
+          "type": "bigint",
+          "nullable": "YES"
+        },
+        {
+          "name": "customer_id",
+          "type": "bigint",
+          "nullable": "YES"
+        },
+        {
+          "name": "customer_name",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "phone",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "occupation",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "stage",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "operator",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": "YES"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": "YES"
+        },
+        {
+          "name": "candidate_deleted_at",
+          "type": "timestamp with time zone",
+          "nullable": "YES"
+        },
+        {
+          "name": "customer_deleted_at",
+          "type": "timestamp without time zone",
+          "nullable": "YES"
+        },
+        {
+          "name": "person_id",
+          "type": "bigint",
+          "nullable": "YES"
+        }
+      ],
+      "rls": false,
+      "security_invoker": true,
+      "grants": {
+        "anon": [
+          "SELECT"
+        ],
+        "service_role": [
+          "DELETE",
+          "INSERT",
+          "MAINTAIN",
+          "REFERENCES",
+          "SELECT",
+          "TRIGGER",
+          "TRUNCATE",
+          "UPDATE"
+        ],
+        "authenticated": []
+      }
+    }
+  ],
+  "indexes": [
+    {
+      "name": "actions_activity_idx",
+      "table": "actions",
+      "definition": "CREATE INDEX actions_activity_idx ON public.actions USING btree (activity_id) WHERE (activity_id IS NOT NULL)"
+    },
+    {
+      "name": "actions_interaction_idx",
+      "table": "actions",
+      "definition": "CREATE INDEX actions_interaction_idx ON public.actions USING btree (interaction_id) WHERE (interaction_id IS NOT NULL)"
+    },
+    {
+      "name": "actions_open_due_idx",
+      "table": "actions",
+      "definition": "CREATE INDEX actions_open_due_idx ON public.actions USING btree (due_at, id) WHERE (status = ANY (ARRAY['open'::text, 'in_progress'::text]))"
+    },
+    {
+      "name": "actions_opportunity_idx",
+      "table": "actions",
+      "definition": "CREATE INDEX actions_opportunity_idx ON public.actions USING btree (opportunity_id) WHERE (opportunity_id IS NOT NULL)"
+    },
+    {
+      "name": "actions_person_status_due_idx",
+      "table": "actions",
+      "definition": "CREATE INDEX actions_person_status_due_idx ON public.actions USING btree (person_id, status, due_at, id)"
+    },
+    {
+      "name": "actions_pkey",
+      "table": "actions",
+      "definition": "CREATE UNIQUE INDEX actions_pkey ON public.actions USING btree (id)"
+    },
+    {
+      "name": "activities_pkey",
+      "table": "activities",
+      "definition": "CREATE UNIQUE INDEX activities_pkey ON public.activities USING btree (id)"
+    },
+    {
+      "name": "idx_activities_date",
+      "table": "activities",
+      "definition": "CREATE INDEX idx_activities_date ON public.activities USING btree (activity_date) WHERE (deleted_at IS NULL)"
+    },
+    {
+      "name": "activity_participants_canonical_active_uq",
+      "table": "activity_participants",
+      "definition": "CREATE UNIQUE INDEX activity_participants_canonical_active_uq ON public.activity_participants USING btree (activity_id, canonical_person_id) WHERE ((deleted_at IS NULL) AND (canonical_person_id IS NOT NULL))"
+    },
+    {
+      "name": "activity_participants_pkey",
+      "table": "activity_participants",
+      "definition": "CREATE UNIQUE INDEX activity_participants_pkey ON public.activity_participants USING btree (id)"
+    },
+    {
+      "name": "idx_participants_activity",
+      "table": "activity_participants",
+      "definition": "CREATE INDEX idx_participants_activity ON public.activity_participants USING btree (activity_id) WHERE (deleted_at IS NULL)"
+    },
+    {
+      "name": "idx_participants_person",
+      "table": "activity_participants",
+      "definition": "CREATE INDEX idx_participants_person ON public.activity_participants USING btree (person_type, person_id) WHERE (deleted_at IS NULL)"
+    },
+    {
+      "name": "activity_speakers_person_active_idx",
+      "table": "activity_speakers",
+      "definition": "CREATE UNIQUE INDEX activity_speakers_person_active_idx ON public.activity_speakers USING btree (person_id) WHERE ((deleted_at IS NULL) AND (person_id IS NOT NULL))"
+    },
+    {
+      "name": "activity_speakers_pkey",
+      "table": "activity_speakers",
+      "definition": "CREATE UNIQUE INDEX activity_speakers_pkey ON public.activity_speakers USING btree (id)"
+    },
+    {
+      "name": "idx_activity_speakers_name",
+      "table": "activity_speakers",
+      "definition": "CREATE INDEX idx_activity_speakers_name ON public.activity_speakers USING btree (name)"
+    },
+    {
+      "name": "idx_activity_speakers_org",
+      "table": "activity_speakers",
+      "definition": "CREATE INDEX idx_activity_speakers_org ON public.activity_speakers USING btree (organization)"
+    },
+    {
+      "name": "idx_activity_speakers_status",
+      "table": "activity_speakers",
+      "definition": "CREATE INDEX idx_activity_speakers_status ON public.activity_speakers USING btree (status)"
+    },
+    {
+      "name": "activity_tasks_pkey",
+      "table": "activity_tasks",
+      "definition": "CREATE UNIQUE INDEX activity_tasks_pkey ON public.activity_tasks USING btree (id)"
+    },
+    {
+      "name": "idx_activity_tasks_activity",
+      "table": "activity_tasks",
+      "definition": "CREATE INDEX idx_activity_tasks_activity ON public.activity_tasks USING btree (activity_id)"
+    },
+    {
+      "name": "idx_activity_tasks_related",
+      "table": "activity_tasks",
+      "definition": "CREATE INDEX idx_activity_tasks_related ON public.activity_tasks USING btree (related_type, related_id)"
+    },
+    {
+      "name": "idx_activity_tasks_status_due",
+      "table": "activity_tasks",
+      "definition": "CREATE INDEX idx_activity_tasks_status_due ON public.activity_tasks USING btree (status, due_date)"
+    },
+    {
+      "name": "activity_topics_pkey",
+      "table": "activity_topics",
+      "definition": "CREATE UNIQUE INDEX activity_topics_pkey ON public.activity_topics USING btree (id)"
+    },
+    {
+      "name": "idx_activity_topics_category",
+      "table": "activity_topics",
+      "definition": "CREATE INDEX idx_activity_topics_category ON public.activity_topics USING btree (category)"
+    },
+    {
+      "name": "idx_activity_topics_name",
+      "table": "activity_topics",
+      "definition": "CREATE INDEX idx_activity_topics_name ON public.activity_topics USING btree (topic_name)"
+    },
+    {
+      "name": "idx_activity_topics_status",
+      "table": "activity_topics",
+      "definition": "CREATE INDEX idx_activity_topics_status ON public.activity_topics USING btree (status)"
+    },
+    {
+      "name": "AI建议_pkey",
+      "table": "ai_recommendations",
+      "definition": "CREATE UNIQUE INDEX \"AI建议_pkey\" ON public.ai_recommendations USING btree (id)"
+    },
+    {
+      "name": "idx_ai_customer_created",
+      "table": "ai_recommendations",
+      "definition": "CREATE INDEX idx_ai_customer_created ON public.ai_recommendations USING btree (customer_id, created_at DESC)"
+    },
+    {
+      "name": "ai_results_pkey",
+      "table": "ai_results",
+      "definition": "CREATE UNIQUE INDEX ai_results_pkey ON public.ai_results USING btree (id)"
+    },
+    {
+      "name": "ai_results_run_task_idx",
+      "table": "ai_results",
+      "definition": "CREATE INDEX ai_results_run_task_idx ON public.ai_results USING btree (run_id, task_id)"
+    },
+    {
+      "name": "ai_results_selected_idx",
+      "table": "ai_results",
+      "definition": "CREATE INDEX ai_results_selected_idx ON public.ai_results USING btree (task_id, created_at DESC) WHERE user_selected"
+    },
+    {
+      "name": "ai_results_task_rank_idx",
+      "table": "ai_results",
+      "definition": "CREATE INDEX ai_results_task_rank_idx ON public.ai_results USING btree (task_id, rank, id)"
+    },
+    {
+      "name": "ai_runs_id_task_unique",
+      "table": "ai_runs",
+      "definition": "CREATE UNIQUE INDEX ai_runs_id_task_unique ON public.ai_runs USING btree (id, task_id)"
+    },
+    {
+      "name": "ai_runs_pkey",
+      "table": "ai_runs",
+      "definition": "CREATE UNIQUE INDEX ai_runs_pkey ON public.ai_runs USING btree (id)"
+    },
+    {
+      "name": "ai_runs_task_created_idx",
+      "table": "ai_runs",
+      "definition": "CREATE INDEX ai_runs_task_created_idx ON public.ai_runs USING btree (task_id, created_at DESC)"
+    },
+    {
+      "name": "ai_tasks_pkey",
+      "table": "ai_tasks",
+      "definition": "CREATE UNIQUE INDEX ai_tasks_pkey ON public.ai_tasks USING btree (id)"
+    },
+    {
+      "name": "ai_tasks_status_created_idx",
+      "table": "ai_tasks",
+      "definition": "CREATE INDEX ai_tasks_status_created_idx ON public.ai_tasks USING btree (status, created_at DESC)"
+    },
+    {
+      "name": "ai_tasks_subject_created_idx",
+      "table": "ai_tasks",
+      "definition": "CREATE INDEX ai_tasks_subject_created_idx ON public.ai_tasks USING btree (subject_type, subject_id, created_at DESC) WHERE (subject_type IS NOT NULL)"
+    },
+    {
+      "name": "assistant_action_commands_actor_idx",
+      "table": "assistant_action_commands",
+      "definition": "CREATE INDEX assistant_action_commands_actor_idx ON public.assistant_action_commands USING btree (actor_uid, created_at DESC)"
+    },
+    {
+      "name": "assistant_action_commands_executed_action_id_key",
+      "table": "assistant_action_commands",
+      "definition": "CREATE UNIQUE INDEX assistant_action_commands_executed_action_id_key ON public.assistant_action_commands USING btree (executed_action_id)"
+    },
+    {
+      "name": "assistant_action_commands_expiry_idx",
+      "table": "assistant_action_commands",
+      "definition": "CREATE INDEX assistant_action_commands_expiry_idx ON public.assistant_action_commands USING btree (expires_at) WHERE (status <> 'executed'::text)"
+    },
+    {
+      "name": "assistant_action_commands_pkey",
+      "table": "assistant_action_commands",
+      "definition": "CREATE UNIQUE INDEX assistant_action_commands_pkey ON public.assistant_action_commands USING btree (id)"
+    },
+    {
+      "name": "commitments_interaction_idx",
+      "table": "commitments",
+      "definition": "CREATE INDEX commitments_interaction_idx ON public.commitments USING btree (interaction_id) WHERE (interaction_id IS NOT NULL)"
+    },
+    {
+      "name": "commitments_open_due_idx",
+      "table": "commitments",
+      "definition": "CREATE INDEX commitments_open_due_idx ON public.commitments USING btree (due_at, id) WHERE ((status = 'open'::text) AND (due_at IS NOT NULL))"
+    },
+    {
+      "name": "commitments_person_status_due_idx",
+      "table": "commitments",
+      "definition": "CREATE INDEX commitments_person_status_due_idx ON public.commitments USING btree (person_id, status, due_at, id)"
+    },
+    {
+      "name": "commitments_pkey",
+      "table": "commitments",
+      "definition": "CREATE UNIQUE INDEX commitments_pkey ON public.commitments USING btree (id)"
+    },
+    {
+      "name": "context_items_fact_candidates_idx",
+      "table": "context_items",
+      "definition": "CREATE INDEX context_items_fact_candidates_idx ON public.context_items USING btree (person_id, created_at DESC) WHERE ((item_type = 'fact'::text) AND (NOT confirmed))"
+    },
+    {
+      "name": "context_items_interaction_idx",
+      "table": "context_items",
+      "definition": "CREATE INDEX context_items_interaction_idx ON public.context_items USING btree (interaction_id) WHERE (interaction_id IS NOT NULL)"
+    },
+    {
+      "name": "context_items_person_created_idx",
+      "table": "context_items",
+      "definition": "CREATE INDEX context_items_person_created_idx ON public.context_items USING btree (person_id, created_at DESC, id DESC)"
+    },
+    {
+      "name": "context_items_pkey",
+      "table": "context_items",
+      "definition": "CREATE UNIQUE INDEX context_items_pkey ON public.context_items USING btree (id)"
+    },
+    {
+      "name": "context_items_source_idx",
+      "table": "context_items",
+      "definition": "CREATE INDEX context_items_source_idx ON public.context_items USING btree (source_type, source_id) WHERE (source_id IS NOT NULL)"
+    },
+    {
+      "name": "客户列表_Id_key",
+      "table": "customers",
+      "definition": "CREATE UNIQUE INDEX \"客户列表_Id_key\" ON public.customers USING btree (\"Id\")"
+    },
+    {
+      "name": "客户列表_pkey",
+      "table": "customers",
+      "definition": "CREATE UNIQUE INDEX \"客户列表_pkey\" ON public.customers USING btree (\"Id\")"
+    },
+    {
+      "name": "客户列表_姓名_key",
+      "table": "customers",
+      "definition": "CREATE UNIQUE INDEX \"客户列表_姓名_key\" ON public.customers USING btree (customer_name)"
+    },
+    {
+      "name": "idx_followups_active_customer_date_id",
+      "table": "followups",
+      "definition": "CREATE INDEX idx_followups_active_customer_date_id ON public.followups USING btree (customer_id, followup_date DESC NULLS LAST, \"Id\" DESC) WHERE (deleted_at IS NULL)"
+    },
+    {
+      "name": "idx_followups_customer_created",
+      "table": "followups",
+      "definition": "CREATE INDEX idx_followups_customer_created ON public.followups USING btree (customer_id, created_at DESC)"
+    },
+    {
+      "name": "跟进日志_pkey",
+      "table": "followups",
+      "definition": "CREATE UNIQUE INDEX \"跟进日志_pkey\" ON public.followups USING btree (\"Id\")"
+    },
+    {
+      "name": "idx_gifts_active_customer_date_id",
+      "table": "gifts",
+      "definition": "CREATE INDEX idx_gifts_active_customer_date_id ON public.gifts USING btree (customer_id, given_date DESC NULLS LAST, \"Id\" DESC) WHERE (deleted_at IS NULL)"
+    },
+    {
+      "name": "idx_gifts_customer_created",
+      "table": "gifts",
+      "definition": "CREATE INDEX idx_gifts_customer_created ON public.gifts USING btree (customer_id, created_at DESC)"
+    },
+    {
+      "name": "伴手礼_pkey",
+      "table": "gifts",
+      "definition": "CREATE UNIQUE INDEX \"伴手礼_pkey\" ON public.gifts USING btree (\"Id\")"
+    },
+    {
+      "name": "household_members_active_person_key",
+      "table": "household_members",
+      "definition": "CREATE UNIQUE INDEX household_members_active_person_key ON public.household_members USING btree (household_id, person_id) WHERE (deleted_at IS NULL)"
+    },
+    {
+      "name": "household_members_person_idx",
+      "table": "household_members",
+      "definition": "CREATE INDEX household_members_person_idx ON public.household_members USING btree (person_id) WHERE (deleted_at IS NULL)"
+    },
+    {
+      "name": "household_members_pkey",
+      "table": "household_members",
+      "definition": "CREATE UNIQUE INDEX household_members_pkey ON public.household_members USING btree (id)"
+    },
+    {
+      "name": "households_active_anchor_key",
+      "table": "households",
+      "definition": "CREATE UNIQUE INDEX households_active_anchor_key ON public.households USING btree (anchor_person_id) WHERE (deleted_at IS NULL)"
+    },
+    {
+      "name": "households_pkey",
+      "table": "households",
+      "definition": "CREATE UNIQUE INDEX households_pkey ON public.households USING btree (id)"
+    },
+    {
+      "name": "interactions_activity_idx",
+      "table": "interactions",
+      "definition": "CREATE INDEX interactions_activity_idx ON public.interactions USING btree (activity_id) WHERE (activity_id IS NOT NULL)"
+    },
+    {
+      "name": "interactions_person_time_idx",
+      "table": "interactions",
+      "definition": "CREATE INDEX interactions_person_time_idx ON public.interactions USING btree (person_id, interaction_at DESC, id DESC)"
+    },
+    {
+      "name": "interactions_pkey",
+      "table": "interactions",
+      "definition": "CREATE UNIQUE INDEX interactions_pkey ON public.interactions USING btree (id)"
+    },
+    {
+      "name": "interactions_source_key",
+      "table": "interactions",
+      "definition": "CREATE UNIQUE INDEX interactions_source_key ON public.interactions USING btree (source_type, source_id) WHERE (source_id IS NOT NULL)"
+    },
+    {
+      "name": "knowledge_items_pkey",
+      "table": "knowledge_items",
+      "definition": "CREATE UNIQUE INDEX knowledge_items_pkey ON public.knowledge_items USING btree (id)"
+    },
+    {
+      "name": "knowledge_items_source_date_idx",
+      "table": "knowledge_items",
+      "definition": "CREATE INDEX knowledge_items_source_date_idx ON public.knowledge_items USING btree (source_date DESC, id DESC)"
+    },
+    {
+      "name": "knowledge_items_type_verified_valid_to_idx",
+      "table": "knowledge_items",
+      "definition": "CREATE INDEX knowledge_items_type_verified_valid_to_idx ON public.knowledge_items USING btree (item_type, verified, valid_to)"
+    },
+    {
+      "name": "learnings_pkey",
+      "table": "learnings",
+      "definition": "CREATE UNIQUE INDEX learnings_pkey ON public.learnings USING btree (id)"
+    },
+    {
+      "name": "learnings_scope_confirmed_idx",
+      "table": "learnings",
+      "definition": "CREATE INDEX learnings_scope_confirmed_idx ON public.learnings USING btree (scope, confirmed, created_at DESC, id DESC)"
+    },
+    {
+      "name": "learnings_source_idx",
+      "table": "learnings",
+      "definition": "CREATE INDEX learnings_source_idx ON public.learnings USING btree (source_type, source_table, source_id) WHERE (source_id IS NOT NULL)"
+    },
+    {
+      "name": "idx_ocr_records_customer",
+      "table": "ocr_records",
+      "definition": "CREATE INDEX idx_ocr_records_customer ON public.ocr_records USING btree (customer_id, created_at DESC)"
+    },
+    {
+      "name": "ocr_records_pkey",
+      "table": "ocr_records",
+      "definition": "CREATE UNIQUE INDEX ocr_records_pkey ON public.ocr_records USING btree (id)"
+    },
+    {
+      "name": "idx_opportunities_customer",
+      "table": "opportunities",
+      "definition": "CREATE INDEX idx_opportunities_customer ON public.opportunities USING btree (customer_id) WHERE (deleted_at IS NULL)"
+    },
+    {
+      "name": "idx_opportunities_status",
+      "table": "opportunities",
+      "definition": "CREATE INDEX idx_opportunities_status ON public.opportunities USING btree (status) WHERE (deleted_at IS NULL)"
+    },
+    {
+      "name": "opportunities_person_active_idx",
+      "table": "opportunities",
+      "definition": "CREATE INDEX opportunities_person_active_idx ON public.opportunities USING btree (person_id, updated_at DESC, id DESC) WHERE ((deleted_at IS NULL) AND (person_id IS NOT NULL))"
+    },
+    {
+      "name": "opportunities_pkey",
+      "table": "opportunities",
+      "definition": "CREATE UNIQUE INDEX opportunities_pkey ON public.opportunities USING btree (id)"
+    },
+    {
+      "name": "opportunity_candidates_ai_result_id_key",
+      "table": "opportunity_candidates",
+      "definition": "CREATE UNIQUE INDEX opportunity_candidates_ai_result_id_key ON public.opportunity_candidates USING btree (ai_result_id)"
+    },
+    {
+      "name": "opportunity_candidates_opportunity_id_key",
+      "table": "opportunity_candidates",
+      "definition": "CREATE UNIQUE INDEX opportunity_candidates_opportunity_id_key ON public.opportunity_candidates USING btree (opportunity_id)"
+    },
+    {
+      "name": "opportunity_candidates_pending_idx",
+      "table": "opportunity_candidates",
+      "definition": "CREATE INDEX opportunity_candidates_pending_idx ON public.opportunity_candidates USING btree (status, preview_expires_at) WHERE (status = ANY (ARRAY['draft'::text, 'previewed'::text, 'confirmed'::text]))"
+    },
+    {
+      "name": "opportunity_candidates_person_idx",
+      "table": "opportunity_candidates",
+      "definition": "CREATE INDEX opportunity_candidates_person_idx ON public.opportunity_candidates USING btree (person_id, created_at DESC, id DESC)"
+    },
+    {
+      "name": "opportunity_candidates_pkey",
+      "table": "opportunity_candidates",
+      "definition": "CREATE UNIQUE INDEX opportunity_candidates_pkey ON public.opportunity_candidates USING btree (id)"
+    },
+    {
+      "name": "outcomes_action_idx",
+      "table": "outcomes",
+      "definition": "CREATE INDEX outcomes_action_idx ON public.outcomes USING btree (action_id, occurred_at DESC) WHERE (action_id IS NOT NULL)"
+    },
+    {
+      "name": "outcomes_activity_idx",
+      "table": "outcomes",
+      "definition": "CREATE INDEX outcomes_activity_idx ON public.outcomes USING btree (activity_id, occurred_at DESC) WHERE (activity_id IS NOT NULL)"
+    },
+    {
+      "name": "outcomes_interaction_idx",
+      "table": "outcomes",
+      "definition": "CREATE INDEX outcomes_interaction_idx ON public.outcomes USING btree (interaction_id, occurred_at DESC) WHERE (interaction_id IS NOT NULL)"
+    },
+    {
+      "name": "outcomes_occurred_at_idx",
+      "table": "outcomes",
+      "definition": "CREATE INDEX outcomes_occurred_at_idx ON public.outcomes USING btree (occurred_at DESC, id DESC)"
+    },
+    {
+      "name": "outcomes_opportunity_idx",
+      "table": "outcomes",
+      "definition": "CREATE INDEX outcomes_opportunity_idx ON public.outcomes USING btree (opportunity_id, occurred_at DESC) WHERE (opportunity_id IS NOT NULL)"
+    },
+    {
+      "name": "outcomes_pkey",
+      "table": "outcomes",
+      "definition": "CREATE UNIQUE INDEX outcomes_pkey ON public.outcomes USING btree (id)"
+    },
+    {
+      "name": "outcomes_recruit_candidate_idx",
+      "table": "outcomes",
+      "definition": "CREATE INDEX outcomes_recruit_candidate_idx ON public.outcomes USING btree (recruit_candidate_id, occurred_at DESC) WHERE (recruit_candidate_id IS NOT NULL)"
+    },
+    {
+      "name": "person_roles_person_role_key",
+      "table": "person_roles",
+      "definition": "CREATE UNIQUE INDEX person_roles_person_role_key ON public.person_roles USING btree (person_id, role)"
+    },
+    {
+      "name": "person_roles_pkey",
+      "table": "person_roles",
+      "definition": "CREATE UNIQUE INDEX person_roles_pkey ON public.person_roles USING btree (id)"
+    },
+    {
+      "name": "person_roles_role_person_idx",
+      "table": "person_roles",
+      "definition": "CREATE INDEX person_roles_role_person_idx ON public.person_roles USING btree (role, person_id)"
+    },
+    {
+      "name": "persons_active_name_idx",
+      "table": "persons",
+      "definition": "CREATE INDEX persons_active_name_idx ON public.persons USING btree (name_key, id) WHERE (deleted_at IS NULL)"
+    },
+    {
+      "name": "persons_legacy_customer_id_id_unique",
+      "table": "persons",
+      "definition": "CREATE UNIQUE INDEX persons_legacy_customer_id_id_unique ON public.persons USING btree (legacy_customer_id, id)"
+    },
+    {
+      "name": "persons_legacy_customer_id_key",
+      "table": "persons",
+      "definition": "CREATE UNIQUE INDEX persons_legacy_customer_id_key ON public.persons USING btree (legacy_customer_id)"
+    },
+    {
+      "name": "persons_name_key_idx",
+      "table": "persons",
+      "definition": "CREATE INDEX persons_name_key_idx ON public.persons USING btree (name_key)"
+    },
+    {
+      "name": "persons_pkey",
+      "table": "persons",
+      "definition": "CREATE UNIQUE INDEX persons_pkey ON public.persons USING btree (id)"
+    },
+    {
+      "name": "idx_photos_active_customer_sort_id",
+      "table": "photos",
+      "definition": "CREATE INDEX idx_photos_active_customer_sort_id ON public.photos USING btree (customer_id, sort_order, id) WHERE (deleted_at IS NULL)"
+    },
+    {
+      "name": "photos_pkey",
+      "table": "photos",
+      "definition": "CREATE UNIQUE INDEX photos_pkey ON public.photos USING btree (id)"
+    },
+    {
+      "name": "playbooks_pkey",
+      "table": "playbooks",
+      "definition": "CREATE UNIQUE INDEX playbooks_pkey ON public.playbooks USING btree (id)"
+    },
+    {
+      "name": "playbooks_scenario_idx",
+      "table": "playbooks",
+      "definition": "CREATE INDEX playbooks_scenario_idx ON public.playbooks USING btree (scenario)"
+    },
+    {
+      "name": "idx_policy_review_reports_customer_id",
+      "table": "policy_review_reports",
+      "definition": "CREATE INDEX idx_policy_review_reports_customer_id ON public.policy_review_reports USING btree (customer_id)"
+    },
+    {
+      "name": "idx_policy_review_reports_date",
+      "table": "policy_review_reports",
+      "definition": "CREATE INDEX idx_policy_review_reports_date ON public.policy_review_reports USING btree (report_date DESC, id DESC)"
+    },
+    {
+      "name": "policy_review_reports_pkey",
+      "table": "policy_review_reports",
+      "definition": "CREATE UNIQUE INDEX policy_review_reports_pkey ON public.policy_review_reports USING btree (id)"
+    },
+    {
+      "name": "customer_products_pkey",
+      "table": "products",
+      "definition": "CREATE UNIQUE INDEX customer_products_pkey ON public.products USING btree (id)"
+    },
+    {
+      "name": "idx_recruit_candidates_recommender",
+      "table": "recruit_candidates",
+      "definition": "CREATE INDEX idx_recruit_candidates_recommender ON public.recruit_candidates USING btree (recommender_id) WHERE (deleted_at IS NULL)"
+    },
+    {
+      "name": "idx_recruit_candidates_stage",
+      "table": "recruit_candidates",
+      "definition": "CREATE INDEX idx_recruit_candidates_stage ON public.recruit_candidates USING btree (stage) WHERE (deleted_at IS NULL)"
+    },
+    {
+      "name": "recruit_candidates_person_id_idx",
+      "table": "recruit_candidates",
+      "definition": "CREATE INDEX recruit_candidates_person_id_idx ON public.recruit_candidates USING btree (person_id)"
+    },
+    {
+      "name": "recruit_candidates_pkey",
+      "table": "recruit_candidates",
+      "definition": "CREATE UNIQUE INDEX recruit_candidates_pkey ON public.recruit_candidates USING btree (id)"
+    },
+    {
+      "name": "uq_recruit_candidates_customer_active",
+      "table": "recruit_candidates",
+      "definition": "CREATE UNIQUE INDEX uq_recruit_candidates_customer_active ON public.recruit_candidates USING btree (customer_id) WHERE (deleted_at IS NULL)"
+    },
+    {
+      "name": "idx_recruit_followups_candidate",
+      "table": "recruit_followups",
+      "definition": "CREATE INDEX idx_recruit_followups_candidate ON public.recruit_followups USING btree (candidate_id)"
+    },
+    {
+      "name": "idx_recruit_followups_date",
+      "table": "recruit_followups",
+      "definition": "CREATE INDEX idx_recruit_followups_date ON public.recruit_followups USING btree (followup_date DESC)"
+    },
+    {
+      "name": "recruit_followups_pkey",
+      "table": "recruit_followups",
+      "definition": "CREATE UNIQUE INDEX recruit_followups_pkey ON public.recruit_followups USING btree (id)"
+    },
+    {
+      "name": "recruit_goal_benchmarks_pkey",
+      "table": "recruit_goal_benchmarks",
+      "definition": "CREATE UNIQUE INDEX recruit_goal_benchmarks_pkey ON public.recruit_goal_benchmarks USING btree (id)"
+    },
+    {
+      "name": "recruit_goal_benchmarks_stage_from_stage_to_key",
+      "table": "recruit_goal_benchmarks",
+      "definition": "CREATE UNIQUE INDEX recruit_goal_benchmarks_stage_from_stage_to_key ON public.recruit_goal_benchmarks USING btree (stage_from, stage_to)"
+    },
+    {
+      "name": "idx_recruit_goals_month",
+      "table": "recruit_goals",
+      "definition": "CREATE INDEX idx_recruit_goals_month ON public.recruit_goals USING btree (goal_month)"
+    },
+    {
+      "name": "idx_recruit_goals_stage",
+      "table": "recruit_goals",
+      "definition": "CREATE INDEX idx_recruit_goals_stage ON public.recruit_goals USING btree (stage)"
+    },
+    {
+      "name": "recruit_goals_goal_month_stage_key",
+      "table": "recruit_goals",
+      "definition": "CREATE UNIQUE INDEX recruit_goals_goal_month_stage_key ON public.recruit_goals USING btree (goal_month, stage)"
+    },
+    {
+      "name": "recruit_goals_pkey",
+      "table": "recruit_goals",
+      "definition": "CREATE UNIQUE INDEX recruit_goals_pkey ON public.recruit_goals USING btree (id)"
+    },
+    {
+      "name": "idx_recruit_milestones_candidate",
+      "table": "recruit_milestones",
+      "definition": "CREATE INDEX idx_recruit_milestones_candidate ON public.recruit_milestones USING btree (candidate_id)"
+    },
+    {
+      "name": "recruit_milestones_pkey",
+      "table": "recruit_milestones",
+      "definition": "CREATE UNIQUE INDEX recruit_milestones_pkey ON public.recruit_milestones USING btree (id)"
+    },
+    {
+      "name": "relationships_directed_active_key",
+      "table": "relationships",
+      "definition": "CREATE UNIQUE INDEX relationships_directed_active_key ON public.relationships USING btree (from_person_id, to_person_id, relationship_type) WHERE (deleted_at IS NULL)"
+    },
+    {
+      "name": "relationships_from_active_idx",
+      "table": "relationships",
+      "definition": "CREATE INDEX relationships_from_active_idx ON public.relationships USING btree (from_person_id, updated_at DESC) WHERE (deleted_at IS NULL)"
+    },
+    {
+      "name": "relationships_introducer_idx",
+      "table": "relationships",
+      "definition": "CREATE INDEX relationships_introducer_idx ON public.relationships USING btree (introduced_by_person_id) WHERE ((introduced_by_person_id IS NOT NULL) AND (deleted_at IS NULL))"
+    },
+    {
+      "name": "relationships_pkey",
+      "table": "relationships",
+      "definition": "CREATE UNIQUE INDEX relationships_pkey ON public.relationships USING btree (id)"
+    },
+    {
+      "name": "relationships_to_active_idx",
+      "table": "relationships",
+      "definition": "CREATE INDEX relationships_to_active_idx ON public.relationships USING btree (to_person_id, updated_at DESC) WHERE (deleted_at IS NULL)"
+    }
+  ],
+  "views": [
+    {
+      "name": "ai_recommendations_view",
+      "definition_hash": "f9fbd420e26538feb4720e9310e0ea54"
+    },
+    {
+      "name": "customers_view",
+      "definition_hash": "432635058b99bb0a513fc30eb96f84a5"
+    },
+    {
+      "name": "followups_view",
+      "definition_hash": "444a187a1a5b38bb12efff81f055a566"
+    },
+    {
+      "name": "gifts_view",
+      "definition_hash": "3176674b0d9eb6bd0c192a0324ecbb49"
+    },
+    {
+      "name": "photos_view",
+      "definition_hash": "88d43786d6b6de4d35b2813ef6d80e37"
+    },
+    {
+      "name": "products_view",
+      "definition_hash": "c11770ea8080e0a397cc220dae751d00"
+    },
+    {
+      "name": "v_action_center",
+      "definition_hash": "6351b1ae4909e1a1850bc9cf0e1aad32"
+    },
+    {
+      "name": "v_funnel_stats",
+      "definition_hash": "f8767019a4072d1c012e6e9518a79ecf"
+    },
+    {
+      "name": "v_recruit_candidates",
+      "definition_hash": "f11fc6d2a822ea0ae22745d2b1615efd"
+    },
+    {
+      "name": "v_recruit_candidates_trash",
+      "definition_hash": "b946b2b0730260aac60027434aab6985"
+    }
+  ],
+  "functions": [
+    {
+      "name": "assistant",
+      "namespace": "crm-d1gkae8ddc930d151",
+      "runtime": "Nodejs18.15",
+      "timeout": 90,
+      "status": "Active",
+      "modifiedAt": "2026-10-02 08:39:21"
+    },
+    {
+      "name": "activities",
+      "namespace": "crm-d1gkae8ddc930d151",
+      "runtime": "Nodejs18.15",
+      "timeout": 10,
+      "status": "Active",
+      "modifiedAt": "2026-10-02 08:39:31"
+    },
+    {
+      "name": "activity_reports",
+      "namespace": "crm-d1gkae8ddc930d151",
+      "runtime": "Nodejs18.15",
+      "timeout": 15,
+      "status": "Active",
+      "modifiedAt": "2026-10-02 08:39:41"
+    },
+    {
+      "name": "activity_speakers",
+      "namespace": "crm-d1gkae8ddc930d151",
+      "runtime": "Nodejs18.15",
+      "timeout": 20,
+      "status": "Active",
+      "modifiedAt": "2026-10-02 08:39:50"
+    },
+    {
+      "name": "activity_tasks",
+      "namespace": "crm-d1gkae8ddc930d151",
+      "runtime": "Nodejs20.19",
+      "timeout": 10,
+      "status": "Active",
+      "modifiedAt": "2026-10-02 08:40:00"
+    },
+    {
+      "name": "activity_topics",
+      "namespace": "crm-d1gkae8ddc930d151",
+      "runtime": "Nodejs20.19",
+      "timeout": 10,
+      "status": "Active",
+      "modifiedAt": "2026-10-02 08:40:12"
+    },
+    {
+      "name": "ai_activity",
+      "namespace": "crm-d1gkae8ddc930d151",
+      "runtime": "Nodejs18.15",
+      "timeout": 120,
+      "status": "Active",
+      "modifiedAt": "2026-10-02 08:40:23"
+    },
+    {
+      "name": "ai_followup",
+      "namespace": "crm-d1gkae8ddc930d151",
+      "runtime": "Nodejs18.15",
+      "timeout": 60,
+      "status": "Active",
+      "modifiedAt": "2026-10-02 08:40:34"
+    },
+    {
+      "name": "ai_parse",
+      "namespace": "crm-d1gkae8ddc930d151",
+      "runtime": "Nodejs18.15",
+      "timeout": 120,
+      "status": "Active",
+      "modifiedAt": "2026-10-02 08:40:44"
+    },
+    {
+      "name": "ai_recommend",
+      "namespace": "crm-d1gkae8ddc930d151",
+      "runtime": "Nodejs18.15",
+      "timeout": 120,
+      "status": "Active",
+      "modifiedAt": "2026-10-02 08:40:54"
+    },
+    {
+      "name": "ai_recommendations",
+      "namespace": "crm-d1gkae8ddc930d151",
+      "runtime": "Nodejs18.15",
+      "timeout": 60,
+      "status": "Active",
+      "modifiedAt": "2026-10-02 08:41:05"
+    },
+    {
+      "name": "ai_referral",
+      "namespace": "crm-d1gkae8ddc930d151",
+      "runtime": "Nodejs18.15",
+      "timeout": 60,
+      "status": "Active",
+      "modifiedAt": "2026-10-02 08:41:14"
+    },
+    {
+      "name": "customers",
+      "namespace": "crm-d1gkae8ddc930d151",
+      "runtime": "Nodejs18.15",
+      "timeout": 10,
+      "status": "Active",
+      "modifiedAt": "2026-10-02 08:41:23"
+    },
+    {
+      "name": "followups",
+      "namespace": "crm-d1gkae8ddc930d151",
+      "runtime": "Nodejs18.15",
+      "timeout": 10,
+      "status": "Active",
+      "modifiedAt": "2026-10-02 08:41:34"
+    },
+    {
+      "name": "funnel_insight",
+      "namespace": "crm-d1gkae8ddc930d151",
+      "runtime": "Nodejs20.19",
+      "timeout": 60,
+      "status": "Active",
+      "modifiedAt": "2026-10-02 08:41:44"
+    },
+    {
+      "name": "gifts",
+      "namespace": "crm-d1gkae8ddc930d151",
+      "runtime": "Nodejs18.15",
+      "timeout": 10,
+      "status": "Active",
+      "modifiedAt": "2026-10-02 08:41:54"
+    },
+    {
+      "name": "ocr_records",
+      "namespace": "crm-d1gkae8ddc930d151",
+      "runtime": "Nodejs18.15",
+      "timeout": 20,
+      "status": "Active",
+      "modifiedAt": "2026-10-02 08:42:03"
+    },
+    {
+      "name": "opportunities",
+      "namespace": "crm-d1gkae8ddc930d151",
+      "runtime": "Nodejs18.15",
+      "timeout": 60,
+      "status": "Active",
+      "modifiedAt": "2026-10-02 08:42:14"
+    },
+    {
+      "name": "photos",
+      "namespace": "crm-d1gkae8ddc930d151",
+      "runtime": "Nodejs18.15",
+      "timeout": 10,
+      "status": "Active",
+      "modifiedAt": "2026-10-02 08:42:23"
+    },
+    {
+      "name": "person_360",
+      "namespace": "crm-d1gkae8ddc930d151",
+      "runtime": "Nodejs20.19",
+      "timeout": 20,
+      "status": "Active",
+      "modifiedAt": "2026-10-02 21:50:48"
+    },
+    {
+      "name": "policy_review_reports",
+      "namespace": "crm-d1gkae8ddc930d151",
+      "runtime": "Nodejs18.15",
+      "timeout": 150,
+      "status": "Active",
+      "modifiedAt": "2026-10-02 08:42:43"
+    },
+    {
+      "name": "products",
+      "namespace": "crm-d1gkae8ddc930d151",
+      "runtime": "Nodejs18.15",
+      "timeout": 10,
+      "status": "Active",
+      "modifiedAt": "2026-10-02 08:38:15"
+    },
+    {
+      "name": "recruit_candidates",
+      "namespace": "crm-d1gkae8ddc930d151",
+      "runtime": "Nodejs18.15",
+      "timeout": 30,
+      "status": "Active",
+      "modifiedAt": "2026-10-02 08:42:52"
+    },
+    {
+      "name": "recruit_followups",
+      "namespace": "crm-d1gkae8ddc930d151",
+      "runtime": "Nodejs18.15",
+      "timeout": 3,
+      "status": "Active",
+      "modifiedAt": "2026-10-02 08:43:01"
+    },
+    {
+      "name": "recruit_goals",
+      "namespace": "crm-d1gkae8ddc930d151",
+      "runtime": "Nodejs18.15",
+      "timeout": 30,
+      "status": "Active",
+      "modifiedAt": "2026-10-02 08:43:10"
+    },
+    {
+      "name": "recruit_recommend",
+      "namespace": "crm-d1gkae8ddc930d151",
+      "runtime": "Nodejs18.15",
+      "timeout": 120,
+      "status": "Active",
+      "modifiedAt": "2026-10-02 08:43:20"
+    },
+    {
+      "name": "recruit_score",
+      "namespace": "crm-d1gkae8ddc930d151",
+      "runtime": "Nodejs18.15",
+      "timeout": 60,
+      "status": "Active",
+      "modifiedAt": "2026-10-02 08:43:29"
+    },
+    {
+      "name": "today_coach",
+      "namespace": "crm-d1gkae8ddc930d151",
+      "runtime": "Nodejs18.15",
+      "timeout": 60,
+      "status": "Active",
+      "modifiedAt": "2026-10-02 08:43:39"
+    }
+  ]
+}

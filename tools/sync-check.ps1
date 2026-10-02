@@ -36,6 +36,8 @@ try {
   finally { $sha.Dispose() }
   if ($onlineHash -ne (Get-FileHash (Join-Path $repo 'admin.html') -Algorithm SHA256).Hash) { throw 'Online admin.html differs from local.' }
   Write-Host '[OK] Online admin.html HTTP 200 and SHA-256 match'
+  & node (Join-Path $PSScriptRoot '../tests/wp01/static.cjs')
+  if ($LASTEXITCODE -ne 0) { throw 'Online frontend module/style verification failed.' }
   $dirs = @(Get-ChildItem (Join-Path $repo 'cloudfunctions') -Directory | Where-Object Name -ne '_shared')
   $names = @($config.functions | ForEach-Object { $_.name })
   if (@(Compare-Object @($dirs.Name | Sort-Object) @($names | Sort-Object)).Count) { throw 'Function manifest does not match local directories.' }

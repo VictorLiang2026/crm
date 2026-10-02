@@ -14,6 +14,8 @@ try {
   if ($LASTEXITCODE -ne 0) { throw 'Shared module sync failed; deployment blocked.' }
   & node (Join-Path $PSScriptRoot 'sync-shared.cjs') --check
   if ($LASTEXITCODE -ne 0) { throw 'Shared module hash check failed; deployment blocked.' }
+  & node (Join-Path $PSScriptRoot '../tests/wp01/run.cjs') --assert-release
+  if ($LASTEXITCODE -ne 0) { throw 'WP01 safety gate blocked deployment. Run npm run test:wp01 after shared source sync.' }
   $directory = Join-Path (Join-Path $repo 'cloudfunctions') $Function
   & (Join-Path $PSScriptRoot 'tcb.ps1') -CliArgs @('fn','code','update',$Function,'--dir',$directory,'-e',$config.envId,'--json')
   if ($LASTEXITCODE -ne 0) { throw 'CloudBase code update failed.' }

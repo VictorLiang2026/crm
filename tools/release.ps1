@@ -15,6 +15,8 @@ try {
   $existing = @(GitChecked @('tag','-l',$Tag))
   $remoteTag = @(GitChecked @('ls-remote','--tags','origin',"refs/tags/$Tag"))
   if ($existing.Count -or $remoteTag.Count) { throw 'Tag exists; use a new release tag.' }
+  & node (Join-Path $PSScriptRoot '../tests/wp01/run.cjs') --assert-release
+  if ($LASTEXITCODE -ne 0) { throw 'WP01 safety gate blocked release. Run npm run test:wp01 and resolve the reported blocker.' }
   GitChecked @('fetch','origin','master') | Out-Host
   GitChecked @('merge-base','--is-ancestor','origin/master','HEAD') | Out-Null
   # A failed cloud check prevents committing/pushing a release with undeployed code.

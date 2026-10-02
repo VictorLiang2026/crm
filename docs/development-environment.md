@@ -31,6 +31,8 @@ PowerShell 示例：`& .\tools\tcb.ps1 -CliArgs @('fn','list','-e','crm-d1gkae8d
 
 ## 每轮发布
 
+2026-10-03 WP01 补充：运行 `npm run test:wp01` 取得一小时内有效的安全报告；数据库快照准备与真实账号登录见 `tests/wp01/README.md`。页面/模块上传前执行 `npm run check:release-gate`；单函数部署和 Git 发布脚本已自动调用该门槛。权限漂移、回归失败、关键证据缺失/过期或测试后文件变化均停止发布。登录/服务角色/写入等未验证项须单列，不视为端到端通过。完整 sync-check 现在同时核对主页面实际引用的 JS/CSS。
+
 1. 改动前运行 `powershell -NoProfile -ExecutionPolicy Bypass -File tools/sync-check.ps1`；默认包括云函数源码核对。确认影响范围及必要的用户确认。
 2. 开发、语法检查、针对性回归；更新本轮发布记录（变更、影响、测试、回滚、未验证项）。
 3. 部署变更产物。云函数源码更新使用 `tools/deploy-function.ps1 -Function <清单中的函数名>`，入口会先从 `cloudfunctions/_shared` 同步 `db.js` / `ai.js`，核验 52 份副本的 SHA-256，再仅上传指定函数；失败即停止。其他部署方式也必须先运行 `npm run build:shared` 与 `npm run check:shared`。旧页面只上传 `admin.html` 到 `/crm/admin.html`；新 AI-native 前端静态文件按实际变更逐个上传到 `/crm/js/`、`/crm/css/`，不上传整个项目目录。

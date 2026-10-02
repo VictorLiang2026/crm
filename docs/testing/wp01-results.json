@@ -1,0 +1,1527 @@
+{
+  "gate": {
+    "version": 1,
+    "environment": "crm-d1gkae8ddc930d151",
+    "startedFingerprint": "e07c0c46b10cae34a4d68136bf087ed2bda5c3313b43db41060ee17489a6bb0d",
+    "fingerprint": "e07c0c46b10cae34a4d68136bf087ed2bda5c3313b43db41060ee17489a6bb0d",
+    "head": "c525f5b614f46a55121e08fb85ecdcef4f880265",
+    "finishedAt": "2026-10-02T16:58:46.740Z",
+    "catalogObservedAt": "2026-10-03T00:48:08.49863+08:00",
+    "catalogHash": "b4253ad71682e93ac602b749f0a16e2d8c8101c0d97a9afb32b85e9d4cf6b2fe",
+    "loginHash": "04362eebdacf4195a492145802a197bd5ad3075aea493a68593909542cbd6e48",
+    "checks": [
+      {
+        "id": "catalog",
+        "status": "PASS",
+        "detail": {
+          "checks": 596,
+          "failures": [],
+          "counts": {
+            "tables": 37,
+            "views": 10,
+            "sequences": 36,
+            "routines": 14
+          }
+        }
+      },
+      {
+        "id": "guard-tests",
+        "status": "PASS",
+        "detail": "Offline fixtures; see per-case report"
+      },
+      {
+        "id": "regression",
+        "status": "PASS",
+        "detail": "Offline fixtures; see per-case report"
+      },
+      {
+        "id": "anonymous",
+        "status": "PASS",
+        "detail": {
+          "checked": 47,
+          "passed": 47,
+          "failed": 0
+        }
+      },
+      {
+        "id": "login",
+        "status": "PASS",
+        "detail": "Real getSession; separate test profile"
+      },
+      {
+        "id": "authenticated",
+        "status": "PASS",
+        "detail": "47 HEAD reads denied with authenticated JWT; not a write test"
+      },
+      {
+        "id": "function-read",
+        "status": "PASS",
+        "detail": "Existing customers.list, unique fictional keyword, zero rows"
+      },
+      {
+        "id": "service-runtime",
+        "status": "UNVERIFIED",
+        "detail": "Service_role catalog grants checked; no service key or write probe executed"
+      },
+      {
+        "id": "live-writes",
+        "status": "UNVERIFIED",
+        "detail": "No production create/update/delete/restore, AI or external messages"
+      },
+      {
+        "id": "mobile",
+        "status": "UNVERIFIED",
+        "detail": "Isolated desktop smoke is not real mobile visual acceptance"
+      }
+    ],
+    "blockers": [],
+    "releaseGate": "PASS_WITH_LIMITATIONS"
+  },
+  "regression": {
+    "startedAt": "2026-10-02T16:58:13.399Z",
+    "finishedAt": "2026-10-02T16:58:32.198Z",
+    "head": "c525f5b614f46a55121e08fb85ecdcef4f880265",
+    "sourceHash": "a3df3084fd83e5e933758454702b406f6661360f80e7bfcd6489d2432e7f32bc",
+    "mode": "all",
+    "safety": "Offline fixtures only. No production SDK, database connection, cloud function invocation or remote data mutation.",
+    "counts": {
+      "PASS": 94,
+      "FAIL": 0,
+      "SKIP": 5
+    },
+    "results": [
+      {
+        "id": "backend.customers",
+        "title": "客户列表排除软删除、搜索及分页",
+        "layer": "actual cloud function / in-memory read-only adapter",
+        "status": "PASS",
+        "durationMs": 48
+      },
+      {
+        "id": "backend.customer-detail",
+        "title": "客户详情关联正确跟进且排除软删除",
+        "layer": "actual cloud function / in-memory read-only adapter",
+        "status": "PASS",
+        "durationMs": 1
+      },
+      {
+        "id": "backend.followups",
+        "title": "跟进查询按客户隔离、日期倒序",
+        "layer": "actual cloud function / in-memory read-only adapter",
+        "status": "PASS",
+        "durationMs": 2
+      },
+      {
+        "id": "backend.opportunities",
+        "title": "机会列表按客户隔离且排除软删除",
+        "layer": "actual cloud function / in-memory read-only adapter",
+        "status": "PASS",
+        "durationMs": 1
+      },
+      {
+        "id": "backend.activities",
+        "title": "活动列表排除软删除",
+        "layer": "actual cloud function / in-memory read-only adapter",
+        "status": "PASS",
+        "durationMs": 1
+      },
+      {
+        "id": "backend.activity-detail",
+        "title": "活动详情与已具名参与人读取",
+        "layer": "actual cloud function / in-memory read-only adapter",
+        "status": "PASS",
+        "durationMs": 1
+      },
+      {
+        "id": "backend.activity-readonly",
+        "title": "活动详情缺姓名旧记录：读取不应尝试写入",
+        "layer": "actual cloud function / in-memory read-only adapter",
+        "status": "PASS",
+        "durationMs": 1
+      },
+      {
+        "id": "backend.recruit",
+        "title": "增员列表和详情使用候选人ID关联里程碑",
+        "layer": "actual cloud function / in-memory read-only adapter",
+        "status": "PASS",
+        "durationMs": 3
+      },
+      {
+        "id": "backend.recruit-followups",
+        "title": "增员跟进绑定候选人",
+        "layer": "actual cloud function / in-memory read-only adapter",
+        "status": "PASS",
+        "durationMs": 2
+      },
+      {
+        "id": "backend.recycle",
+        "title": "客户与增员回收站只读列表",
+        "layer": "actual cloud function / in-memory read-only adapter",
+        "status": "PASS",
+        "durationMs": 3
+      },
+      {
+        "id": "backend.delete-batch-rpc",
+        "title": "客户/候选人删除恢复统一调用批次事务并保持返回结构",
+        "layer": "actual cloud function / in-memory read-only adapter",
+        "status": "PASS",
+        "durationMs": 3
+      },
+      {
+        "id": "backend.not-found",
+        "title": "客户、活动、增员缺失ID返回错误",
+        "layer": "actual cloud function / in-memory read-only adapter",
+        "status": "PASS",
+        "durationMs": 4
+      },
+      {
+        "id": "guard.boundaries",
+        "title": "测试适配器拒绝非public、写操作和未知函数",
+        "layer": "actual cloud function / in-memory read-only adapter",
+        "status": "PASS",
+        "durationMs": 1
+      },
+      {
+        "id": "browser.start",
+        "title": "隔离浏览器启动",
+        "layer": "harness",
+        "status": "PASS",
+        "durationMs": 1941
+      },
+      {
+        "id": "login.empty",
+        "title": "登录入口：空字段不发起认证",
+        "layer": "browser / isolated fixtures",
+        "status": "PASS",
+        "durationMs": 204
+      },
+      {
+        "id": "login.denied",
+        "title": "错误凭据保持登录页并显示失败",
+        "layer": "browser / isolated fixtures",
+        "status": "PASS",
+        "durationMs": 11
+      },
+      {
+        "id": "login.success",
+        "title": "模拟登录成功后进入原目标路由",
+        "layer": "browser / isolated fixtures",
+        "status": "PASS",
+        "durationMs": 35
+      },
+      {
+        "id": "phase14.navigation",
+        "title": "七项主导航和全局快速记录始终可见",
+        "layer": "browser / isolated fixtures",
+        "status": "PASS",
+        "durationMs": 158
+      },
+      {
+        "id": "phase14.people",
+        "title": "人物目录以只读方式进入 Person 360",
+        "layer": "browser / isolated fixtures",
+        "status": "PASS",
+        "durationMs": 304
+      },
+      {
+        "id": "phase14.opportunities",
+        "title": "机会目录包含 Person 专属机会和人工入口",
+        "layer": "browser / isolated fixtures",
+        "status": "PASS",
+        "durationMs": 176
+      },
+      {
+        "id": "phase14.ai-more",
+        "title": "AI助手与更多保留旧入口",
+        "layer": "browser / isolated fixtures",
+        "status": "PASS",
+        "durationMs": 859
+      },
+      {
+        "id": "ai.search.entry",
+        "title": "AI CRM 搜索独立页面展示固定示例，进入页面不执行搜索",
+        "layer": "browser / isolated fixtures",
+        "status": "PASS",
+        "durationMs": 287
+      },
+      {
+        "id": "assistant.action.create",
+        "title": "Action 必须人工选人、预览、确认后才执行",
+        "layer": "browser / isolated fixtures",
+        "status": "PASS",
+        "durationMs": 397
+      },
+      {
+        "id": "customers.list",
+        "title": "客户列表显示记录与客户详情导航",
+        "layer": "browser / isolated fixtures",
+        "status": "PASS",
+        "durationMs": 304
+      },
+      {
+        "id": "customer.detail",
+        "title": "客户详情及跟进下一步展示",
+        "layer": "browser / isolated fixtures",
+        "status": "PASS",
+        "durationMs": 202
+      },
+      {
+        "id": "person360.family",
+        "title": "Person 360 独立入口显示家庭成员与事实且只读加载",
+        "layer": "browser / isolated fixtures",
+        "status": "PASS",
+        "durationMs": 138
+      },
+      {
+        "id": "person360.relationship-decay",
+        "title": "关系节奏候选只读显示依据、置信度与人工建议",
+        "layer": "browser / isolated fixtures",
+        "status": "PASS",
+        "durationMs": 26
+      },
+      {
+        "id": "person360.opportunities",
+        "title": "Person 360 显示旧客户及 Person 专属机会",
+        "layer": "browser / isolated fixtures",
+        "status": "PASS",
+        "durationMs": 39
+      },
+      {
+        "id": "person360.opportunity-candidate-preview",
+        "title": "机会候选显示来源；预览与取消确认不会创建正式机会",
+        "layer": "browser / isolated fixtures",
+        "status": "PASS",
+        "durationMs": 1323
+      },
+      {
+        "id": "person360.recruit",
+        "title": "Person 360 显示招募资料和原详情入口，只读加载",
+        "layer": "browser / isolated fixtures",
+        "status": "PASS",
+        "durationMs": 49
+      },
+      {
+        "id": "person360.insurance",
+        "title": "Person 360 分源显示六块只读保险概览，旧保单检视入口保留",
+        "layer": "browser / isolated fixtures",
+        "status": "PASS",
+        "durationMs": 14
+      },
+      {
+        "id": "person360.opportunity-create",
+        "title": "Person 机会先人工填写再通过登录接口创建",
+        "layer": "browser / isolated fixtures",
+        "status": "PASS",
+        "durationMs": 61
+      },
+      {
+        "id": "person360.opportunity-edit",
+        "title": "Person 专属机会可编辑，旧客户机会仅跳转原详情",
+        "layer": "browser / isolated fixtures",
+        "status": "PASS",
+        "durationMs": 21
+      },
+      {
+        "id": "person360.search",
+        "title": "家庭成员只能搜索并选择已有 Person",
+        "layer": "browser / isolated fixtures",
+        "status": "PASS",
+        "durationMs": 143
+      },
+      {
+        "id": "person360.details",
+        "title": "Person 360 显示已确认成员与重要家庭事实",
+        "layer": "browser / isolated fixtures",
+        "status": "PASS",
+        "durationMs": 407
+      },
+      {
+        "id": "person360.relationship-decay-insufficient",
+        "title": "缺少依据时明确不判断且不显示伪造置信度",
+        "layer": "browser / isolated fixtures",
+        "status": "PASS",
+        "durationMs": 420
+      },
+      {
+        "id": "customer.policy-review",
+        "title": "原客户详情的保单检视页签和生成入口保留",
+        "layer": "browser / isolated fixtures",
+        "status": "PASS",
+        "durationMs": 52
+      },
+      {
+        "id": "followups.tab",
+        "title": "跟进标签显示跟进记录",
+        "layer": "browser / isolated fixtures",
+        "status": "PASS",
+        "durationMs": 42
+      },
+      {
+        "id": "opportunities.tab",
+        "title": "机会标签加载当前客户的经营机会",
+        "layer": "browser / isolated fixtures",
+        "status": "PASS",
+        "durationMs": 48
+      },
+      {
+        "id": "customers.pagination",
+        "title": "客户分页每页最多50条且第二页可达",
+        "layer": "browser / isolated fixtures",
+        "status": "PASS",
+        "durationMs": 246
+      },
+      {
+        "id": "customers.search",
+        "title": "客户搜索无匹配提示",
+        "layer": "browser / isolated fixtures",
+        "status": "PASS",
+        "durationMs": 213
+      },
+      {
+        "id": "today.page",
+        "title": "今日经营页使用隔离建议响应",
+        "layer": "browser / isolated fixtures",
+        "status": "PASS",
+        "durationMs": 318
+      },
+      {
+        "id": "today.action_fields",
+        "title": "Today 五项输出和 Person 跳转",
+        "layer": "browser / isolated fixtures",
+        "status": "PASS",
+        "durationMs": 420
+      },
+      {
+        "id": "today.commitment_link",
+        "title": "承诺提醒可进入独立 Person 360",
+        "layer": "browser / isolated fixtures",
+        "status": "PASS",
+        "durationMs": 333
+      },
+      {
+        "id": "today.morning_brief",
+        "title": "晨间简报按需生成七段且旧 Today 5 仍显示",
+        "layer": "browser / isolated fixtures",
+        "status": "PASS",
+        "durationMs": 334
+      },
+      {
+        "id": "today.legacy_review",
+        "title": "旧版今日复盘入口与返回字段继续可用",
+        "layer": "browser / isolated fixtures",
+        "status": "PASS",
+        "durationMs": 203
+      },
+      {
+        "id": "funnels.page",
+        "title": "漏斗事实卡展示三个漏斗，不调用AI解读",
+        "layer": "browser / isolated fixtures",
+        "status": "PASS",
+        "durationMs": 239
+      },
+      {
+        "id": "activities.list",
+        "title": "活动列表点击进入活动详情",
+        "layer": "browser / isolated fixtures",
+        "status": "PASS",
+        "durationMs": 222
+      },
+      {
+        "id": "activity.detail",
+        "title": "活动详情显示参与人及异步待办区",
+        "layer": "browser / isolated fixtures",
+        "status": "PASS",
+        "durationMs": 319
+      },
+      {
+        "id": "activity.relationship-review-preview",
+        "title": "关系复盘只生成有来源的行动候选，不触发业务写入",
+        "layer": "browser / isolated fixtures",
+        "status": "PASS",
+        "durationMs": 339
+      },
+      {
+        "id": "activity.important-interaction",
+        "title": "重要互动必须填写结果与摘要并人工确认",
+        "layer": "browser / isolated fixtures",
+        "status": "PASS",
+        "durationMs": 259
+      },
+      {
+        "id": "activity.person-first-add",
+        "title": "活动新增参与者先人工选择 Person 再提交",
+        "layer": "browser / isolated fixtures",
+        "status": "PASS",
+        "durationMs": 458
+      },
+      {
+        "id": "speaker.person-first-create",
+        "title": "嘉宾专业档案先选择 Person 再保存",
+        "layer": "browser / isolated fixtures",
+        "status": "PASS",
+        "durationMs": 579
+      },
+      {
+        "id": "speaker.person-link",
+        "title": "旧嘉宾必须人工选择 Person 才能关联",
+        "layer": "browser / isolated fixtures",
+        "status": "PASS",
+        "durationMs": 604
+      },
+      {
+        "id": "recruit.list",
+        "title": "增员列表与漏斗加载",
+        "layer": "browser / isolated fixtures",
+        "status": "PASS",
+        "durationMs": 200
+      },
+      {
+        "id": "recruit.customer-lookup",
+        "title": "新增候选人通过有上限的服务端查询选择客户",
+        "layer": "browser / isolated fixtures",
+        "status": "PASS",
+        "durationMs": 97
+      },
+      {
+        "id": "recruit.detail",
+        "title": "增员详情与增员跟进标签",
+        "layer": "browser / isolated fixtures",
+        "status": "PASS",
+        "durationMs": 183
+      },
+      {
+        "id": "recycle.customers",
+        "title": "回收站只读展示：customers",
+        "layer": "browser / isolated fixtures",
+        "status": "PASS",
+        "durationMs": 231
+      },
+      {
+        "id": "recycle.recruit",
+        "title": "回收站只读展示：recruit",
+        "layer": "browser / isolated fixtures",
+        "status": "PASS",
+        "durationMs": 204
+      },
+      {
+        "id": "empty.customers",
+        "title": "空数据状态：customers",
+        "layer": "browser / isolated fixtures",
+        "status": "PASS",
+        "durationMs": 150
+      },
+      {
+        "id": "empty.activities",
+        "title": "空数据状态：activities",
+        "layer": "browser / isolated fixtures",
+        "status": "PASS",
+        "durationMs": 157
+      },
+      {
+        "id": "empty.recycle",
+        "title": "空数据状态：recycle",
+        "layer": "browser / isolated fixtures",
+        "status": "PASS",
+        "durationMs": 248
+      },
+      {
+        "id": "empty.funnels",
+        "title": "空数据状态：funnels",
+        "layer": "browser / isolated fixtures",
+        "status": "PASS",
+        "durationMs": 198
+      },
+      {
+        "id": "error.customer",
+        "title": "接口错误可见：customer",
+        "layer": "browser / isolated fixtures",
+        "status": "PASS",
+        "durationMs": 179
+      },
+      {
+        "id": "error.activities",
+        "title": "接口错误可见：activities",
+        "layer": "browser / isolated fixtures",
+        "status": "PASS",
+        "durationMs": 166
+      },
+      {
+        "id": "error.activity",
+        "title": "接口错误可见：activity",
+        "layer": "browser / isolated fixtures",
+        "status": "PASS",
+        "durationMs": 175
+      },
+      {
+        "id": "error.recruit",
+        "title": "接口错误可见：recruit",
+        "layer": "browser / isolated fixtures",
+        "status": "PASS",
+        "durationMs": 201
+      },
+      {
+        "id": "error.funnels",
+        "title": "接口错误可见：funnels",
+        "layer": "browser / isolated fixtures",
+        "status": "PASS",
+        "durationMs": 190
+      },
+      {
+        "id": "error.opportunities",
+        "title": "接口错误可见：opportunities",
+        "layer": "browser / isolated fixtures",
+        "status": "PASS",
+        "durationMs": 249
+      },
+      {
+        "id": "quickcapture.preserve",
+        "title": "快速录入点击背景保留草稿",
+        "layer": "browser / isolated fixtures",
+        "status": "PASS",
+        "durationMs": 274
+      },
+      {
+        "id": "quickcapture.v2.confirm",
+        "title": "V2 默认隔离，手选 Person 并编辑后才提交允许的候选项",
+        "layer": "browser / isolated fixtures",
+        "status": "PASS",
+        "durationMs": 539
+      },
+      {
+        "id": "activity-schema.task-recruit-name",
+        "title": "task-recruit-name",
+        "layer": "real cloud function / strict synthetic schema",
+        "status": "PASS",
+        "durationMs": 5
+      },
+      {
+        "id": "activity-schema.participant-search-id",
+        "title": "participant-search-id",
+        "layer": "real cloud function / strict synthetic schema",
+        "status": "PASS",
+        "durationMs": 4
+      },
+      {
+        "id": "activity-schema.prepare-context",
+        "title": "prepare-context",
+        "layer": "real cloud function / strict synthetic schema",
+        "status": "PASS",
+        "durationMs": 6
+      },
+      {
+        "id": "activity-schema.prepare",
+        "title": "prepare",
+        "layer": "real cloud function / strict synthetic schema",
+        "status": "PASS",
+        "durationMs": 6
+      },
+      {
+        "id": "activity-schema.decompose",
+        "title": "decompose",
+        "layer": "real cloud function / strict synthetic schema",
+        "status": "PASS",
+        "durationMs": 2
+      },
+      {
+        "id": "activity-schema.analyze",
+        "title": "analyze",
+        "layer": "real cloud function / strict synthetic schema",
+        "status": "PASS",
+        "durationMs": 3
+      },
+      {
+        "id": "activity-schema.postReview",
+        "title": "postReview",
+        "layer": "real cloud function / strict synthetic schema",
+        "status": "PASS",
+        "durationMs": 4
+      },
+      {
+        "id": "activity-schema.participantReview",
+        "title": "participantReview",
+        "layer": "real cloud function / strict synthetic schema",
+        "status": "PASS",
+        "durationMs": 41
+      },
+      {
+        "id": "activity-schema.speaker-recruit-link",
+        "title": "speaker-recruit-link",
+        "layer": "real cloud function / strict synthetic schema",
+        "status": "PASS",
+        "durationMs": 47
+      },
+      {
+        "id": "activity-schema.participant-add",
+        "title": "participant-add",
+        "layer": "real cloud function / strict synthetic schema",
+        "status": "PASS",
+        "durationMs": 3
+      },
+      {
+        "id": "activity-schema.participant-link",
+        "title": "participant-link",
+        "layer": "real cloud function / strict synthetic schema",
+        "status": "PASS",
+        "durationMs": 2
+      },
+      {
+        "id": "activity-schema.deleted-customers",
+        "title": "deleted-customers",
+        "layer": "real cloud function / strict synthetic schema",
+        "status": "PASS",
+        "durationMs": 4
+      },
+      {
+        "id": "activity-schema.deleted-recruit_candidates",
+        "title": "deleted-recruit_candidates",
+        "layer": "real cloud function / strict synthetic schema",
+        "status": "PASS",
+        "durationMs": 4
+      },
+      {
+        "id": "activity-schema.unlinked-participant",
+        "title": "unlinked-participant",
+        "layer": "real cloud function / strict synthetic schema",
+        "status": "PASS",
+        "durationMs": 2
+      },
+      {
+        "id": "activity-schema.missing-customer",
+        "title": "missing-customer",
+        "layer": "real cloud function / strict synthetic schema",
+        "status": "PASS",
+        "durationMs": 2
+      },
+      {
+        "id": "activity-canonical.requires-human-selection",
+        "title": "requires-human-selection",
+        "layer": "offline identity / write fixture",
+        "status": "PASS",
+        "durationMs": 48
+      },
+      {
+        "id": "activity-canonical.maps-active-customer-id",
+        "title": "maps-active-customer-id",
+        "layer": "offline identity / write fixture",
+        "status": "PASS",
+        "durationMs": 1
+      },
+      {
+        "id": "activity-canonical.person-only-preserves-legacy-null",
+        "title": "person-only-preserves-legacy-null",
+        "layer": "offline identity / write fixture",
+        "status": "PASS",
+        "durationMs": 0
+      },
+      {
+        "id": "activity-canonical.rejects-deleted-activity-and-duplicate-legacy-row",
+        "title": "rejects-deleted-activity-and-duplicate-legacy-row",
+        "layer": "offline identity / write fixture",
+        "status": "PASS",
+        "durationMs": 1
+      },
+      {
+        "id": "speaker.person.create",
+        "title": "已确认 Person 可建立独立专业档案",
+        "layer": "backend",
+        "status": "PASS",
+        "durationMs": 1
+      },
+      {
+        "id": "speaker.person.no_auto_identity",
+        "title": "未确认、伪选和重复关联均拒绝",
+        "layer": "backend",
+        "status": "PASS",
+        "durationMs": 1
+      },
+      {
+        "id": "speaker.person.link",
+        "title": "旧嘉宾只可关联同一客户的 Person",
+        "layer": "backend",
+        "status": "PASS",
+        "durationMs": 1
+      },
+      {
+        "id": "speaker.person.profile_validation",
+        "title": "专业字段白名单及校验",
+        "layer": "backend",
+        "status": "PASS",
+        "durationMs": 0
+      },
+      {
+        "id": "live.login",
+        "title": "真实 CloudBase 账号、SDK 与会话认证",
+        "layer": "not exercised",
+        "status": "SKIP"
+      },
+      {
+        "id": "live.database",
+        "title": "线上public对象SQL检查（需通过只读管理工具单独执行 database-readonly.sql）",
+        "layer": "not exercised",
+        "status": "SKIP"
+      },
+      {
+        "id": "live.ai",
+        "title": "真实 Today / 漏斗 AI 生成与计费链路",
+        "layer": "not exercised",
+        "status": "SKIP"
+      },
+      {
+        "id": "live.writes",
+        "title": "新增、编辑、删除、恢复和级联写入；本骨架不提供线上写模式",
+        "layer": "not exercised",
+        "status": "SKIP"
+      },
+      {
+        "id": "live.mobile",
+        "title": "真实移动设备及视觉布局回归",
+        "layer": "not exercised",
+        "status": "SKIP"
+      }
+    ]
+  },
+  "anonymous": {
+    "environment": "crm-d1gkae8ddc930d151",
+    "checked": 47,
+    "passed": 47,
+    "failed": 0,
+    "status": "PASS",
+    "results": [
+      {
+        "object": "actions",
+        "status": 401,
+        "empty": false,
+        "expected": "denied",
+        "pass": true
+      },
+      {
+        "object": "activities",
+        "status": 200,
+        "empty": true,
+        "expected": "authorized, zero visible rows",
+        "pass": true
+      },
+      {
+        "object": "activity_participants",
+        "status": 200,
+        "empty": true,
+        "expected": "authorized, zero visible rows",
+        "pass": true
+      },
+      {
+        "object": "activity_speakers",
+        "status": 200,
+        "empty": true,
+        "expected": "authorized, zero visible rows",
+        "pass": true
+      },
+      {
+        "object": "activity_tasks",
+        "status": 200,
+        "empty": true,
+        "expected": "authorized, zero visible rows",
+        "pass": true
+      },
+      {
+        "object": "activity_topics",
+        "status": 200,
+        "empty": true,
+        "expected": "authorized, zero visible rows",
+        "pass": true
+      },
+      {
+        "object": "ai_recommendations",
+        "status": 200,
+        "empty": true,
+        "expected": "authorized, zero visible rows",
+        "pass": true
+      },
+      {
+        "object": "ai_recommendations_view",
+        "status": 200,
+        "empty": true,
+        "expected": "authorized, zero visible rows",
+        "pass": true
+      },
+      {
+        "object": "ai_results",
+        "status": 401,
+        "empty": false,
+        "expected": "denied",
+        "pass": true
+      },
+      {
+        "object": "ai_runs",
+        "status": 401,
+        "empty": false,
+        "expected": "denied",
+        "pass": true
+      },
+      {
+        "object": "ai_tasks",
+        "status": 401,
+        "empty": false,
+        "expected": "denied",
+        "pass": true
+      },
+      {
+        "object": "assistant_action_commands",
+        "status": 401,
+        "empty": false,
+        "expected": "denied",
+        "pass": true
+      },
+      {
+        "object": "commitments",
+        "status": 401,
+        "empty": false,
+        "expected": "denied",
+        "pass": true
+      },
+      {
+        "object": "context_items",
+        "status": 401,
+        "empty": false,
+        "expected": "denied",
+        "pass": true
+      },
+      {
+        "object": "customers",
+        "status": 200,
+        "empty": true,
+        "expected": "authorized, zero visible rows",
+        "pass": true
+      },
+      {
+        "object": "customers_view",
+        "status": 200,
+        "empty": true,
+        "expected": "authorized, zero visible rows",
+        "pass": true
+      },
+      {
+        "object": "followups",
+        "status": 200,
+        "empty": true,
+        "expected": "authorized, zero visible rows",
+        "pass": true
+      },
+      {
+        "object": "followups_view",
+        "status": 200,
+        "empty": true,
+        "expected": "authorized, zero visible rows",
+        "pass": true
+      },
+      {
+        "object": "gifts",
+        "status": 200,
+        "empty": true,
+        "expected": "authorized, zero visible rows",
+        "pass": true
+      },
+      {
+        "object": "gifts_view",
+        "status": 200,
+        "empty": true,
+        "expected": "authorized, zero visible rows",
+        "pass": true
+      },
+      {
+        "object": "household_members",
+        "status": 401,
+        "empty": false,
+        "expected": "denied",
+        "pass": true
+      },
+      {
+        "object": "households",
+        "status": 401,
+        "empty": false,
+        "expected": "denied",
+        "pass": true
+      },
+      {
+        "object": "interactions",
+        "status": 401,
+        "empty": false,
+        "expected": "denied",
+        "pass": true
+      },
+      {
+        "object": "knowledge_items",
+        "status": 401,
+        "empty": false,
+        "expected": "denied",
+        "pass": true
+      },
+      {
+        "object": "learnings",
+        "status": 401,
+        "empty": false,
+        "expected": "denied",
+        "pass": true
+      },
+      {
+        "object": "ocr_records",
+        "status": 200,
+        "empty": true,
+        "expected": "authorized, zero visible rows",
+        "pass": true
+      },
+      {
+        "object": "opportunities",
+        "status": 200,
+        "empty": true,
+        "expected": "authorized, zero visible rows",
+        "pass": true
+      },
+      {
+        "object": "opportunity_candidates",
+        "status": 401,
+        "empty": false,
+        "expected": "denied",
+        "pass": true
+      },
+      {
+        "object": "outcomes",
+        "status": 401,
+        "empty": false,
+        "expected": "denied",
+        "pass": true
+      },
+      {
+        "object": "person_roles",
+        "status": 401,
+        "empty": false,
+        "expected": "denied",
+        "pass": true
+      },
+      {
+        "object": "persons",
+        "status": 401,
+        "empty": false,
+        "expected": "denied",
+        "pass": true
+      },
+      {
+        "object": "photos",
+        "status": 200,
+        "empty": true,
+        "expected": "authorized, zero visible rows",
+        "pass": true
+      },
+      {
+        "object": "photos_view",
+        "status": 401,
+        "empty": false,
+        "expected": "denied",
+        "pass": true
+      },
+      {
+        "object": "playbooks",
+        "status": 401,
+        "empty": false,
+        "expected": "denied",
+        "pass": true
+      },
+      {
+        "object": "policy_review_reports",
+        "status": 200,
+        "empty": true,
+        "expected": "authorized, zero visible rows",
+        "pass": true
+      },
+      {
+        "object": "products",
+        "status": 200,
+        "empty": true,
+        "expected": "authorized, zero visible rows",
+        "pass": true
+      },
+      {
+        "object": "products_view",
+        "status": 200,
+        "empty": true,
+        "expected": "authorized, zero visible rows",
+        "pass": true
+      },
+      {
+        "object": "recruit_candidates",
+        "status": 200,
+        "empty": true,
+        "expected": "authorized, zero visible rows",
+        "pass": true
+      },
+      {
+        "object": "recruit_followups",
+        "status": 200,
+        "empty": true,
+        "expected": "authorized, zero visible rows",
+        "pass": true
+      },
+      {
+        "object": "recruit_goal_benchmarks",
+        "status": 200,
+        "empty": true,
+        "expected": "authorized, zero visible rows",
+        "pass": true
+      },
+      {
+        "object": "recruit_goals",
+        "status": 200,
+        "empty": true,
+        "expected": "authorized, zero visible rows",
+        "pass": true
+      },
+      {
+        "object": "recruit_milestones",
+        "status": 200,
+        "empty": true,
+        "expected": "authorized, zero visible rows",
+        "pass": true
+      },
+      {
+        "object": "relationships",
+        "status": 401,
+        "empty": false,
+        "expected": "denied",
+        "pass": true
+      },
+      {
+        "object": "v_action_center",
+        "status": 200,
+        "empty": true,
+        "expected": "authorized, zero visible rows",
+        "pass": true
+      },
+      {
+        "object": "v_funnel_stats",
+        "status": 200,
+        "empty": false,
+        "expected": "fixed dimensions, zero aggregate metrics",
+        "pass": true
+      },
+      {
+        "object": "v_recruit_candidates",
+        "status": 200,
+        "empty": true,
+        "expected": "authorized, zero visible rows",
+        "pass": true
+      },
+      {
+        "object": "v_recruit_candidates_trash",
+        "status": 200,
+        "empty": true,
+        "expected": "authorized, zero visible rows",
+        "pass": true
+      }
+    ]
+  },
+  "login": {
+    "environment": "crm-d1gkae8ddc930d151",
+    "observedAt": "2026-10-02T16:31:33.596Z",
+    "adminHash": "a3df3084fd83e5e933758454702b406f6661360f80e7bfcd6489d2432e7f32bc",
+    "results": [
+      {
+        "id": "live.login",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.actions",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.activities",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.activity_participants",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.activity_speakers",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.activity_tasks",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.activity_topics",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.ai_recommendations",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.ai_recommendations_view",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.ai_results",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.ai_runs",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.ai_tasks",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.assistant_action_commands",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.commitments",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.context_items",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.customers",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.customers_view",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.followups",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.followups_view",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.gifts",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.gifts_view",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.household_members",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.households",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.interactions",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.knowledge_items",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.learnings",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.ocr_records",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.opportunities",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.opportunity_candidates",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.outcomes",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.person_roles",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.persons",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.photos",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.photos_view",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.playbooks",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.policy_review_reports",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.products",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.products_view",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.recruit_candidates",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.recruit_followups",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.recruit_goal_benchmarks",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.recruit_goals",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.recruit_milestones",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.relationships",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.v_action_center",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.v_funnel_stats",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.v_recruit_candidates",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.v_recruit_candidates_trash",
+        "status": "PASS"
+      },
+      {
+        "id": "live.function.customers",
+        "status": "PASS"
+      }
+    ]
+  },
+  "firstLoginAttempt": {
+    "environment": "crm-d1gkae8ddc930d151",
+    "observedAt": "2026-10-02T16:28:52.724Z",
+    "adminHash": "a3df3084fd83e5e933758454702b406f6661360f80e7bfcd6489d2432e7f32bc",
+    "results": [
+      {
+        "id": "live.login",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.actions",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.activities",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.activity_participants",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.activity_speakers",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.activity_tasks",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.activity_topics",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.ai_recommendations",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.ai_recommendations_view",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.ai_results",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.ai_runs",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.ai_tasks",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.assistant_action_commands",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.commitments",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.context_items",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.customers",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.customers_view",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.followups",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.followups_view",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.gifts",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.gifts_view",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.household_members",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.households",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.interactions",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.knowledge_items",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.learnings",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.ocr_records",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.opportunities",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.opportunity_candidates",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.outcomes",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.person_roles",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.persons",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.photos",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.photos_view",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.playbooks",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.policy_review_reports",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.products",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.products_view",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.recruit_candidates",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.recruit_followups",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.recruit_goal_benchmarks",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.recruit_goals",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.recruit_milestones",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.relationships",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.v_action_center",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.v_funnel_stats",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.v_recruit_candidates",
+        "status": "PASS"
+      },
+      {
+        "id": "authenticated.v_recruit_candidates_trash",
+        "status": "PASS"
+      },
+      {
+        "id": "live.function.customers",
+        "status": "FAIL"
+      }
+    ]
+  }
+}
