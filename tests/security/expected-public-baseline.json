@@ -1,0 +1,2300 @@
+{
+  "schema": "public",
+  "objects": [
+    {
+      "kind": "relation",
+      "name": "actions",
+      "detail": {
+        "rls": true,
+        "type": "r",
+        "policies": [
+          {
+            "name": "actions_service_only",
+            "roles": [
+              "service_role"
+            ],
+            "command": "*",
+            "check_hash": "b326b5062b2f0e69046810717534cb09",
+            "permissive": true,
+            "using_hash": "b326b5062b2f0e69046810717534cb09"
+          }
+        ],
+        "force_rls": true,
+        "privileges": {
+          "anon": [],
+          "service_role": [
+            "INSERT",
+            "SELECT",
+            "UPDATE"
+          ],
+          "authenticated": []
+        },
+        "security_invoker": false
+      }
+    },
+    {
+      "kind": "relation",
+      "name": "activities",
+      "detail": {
+        "rls": true,
+        "type": "r",
+        "policies": [
+          {
+            "name": "activities_fn_only",
+            "roles": [
+              "anon"
+            ],
+            "command": "*",
+            "check_hash": "056f5b11b5da515a7b30f25e7f91b05b",
+            "permissive": true,
+            "using_hash": "056f5b11b5da515a7b30f25e7f91b05b"
+          }
+        ],
+        "force_rls": false,
+        "privileges": {
+          "anon": [
+            "DELETE",
+            "INSERT",
+            "SELECT",
+            "UPDATE"
+          ],
+          "service_role": [
+            "DELETE",
+            "INSERT",
+            "MAINTAIN",
+            "REFERENCES",
+            "SELECT",
+            "TRIGGER",
+            "TRUNCATE",
+            "UPDATE"
+          ],
+          "authenticated": []
+        },
+        "security_invoker": false
+      }
+    },
+    {
+      "kind": "relation",
+      "name": "activity_participants",
+      "detail": {
+        "rls": true,
+        "type": "r",
+        "policies": [
+          {
+            "name": "activity_participants_fn_only",
+            "roles": [
+              "anon"
+            ],
+            "command": "*",
+            "check_hash": "056f5b11b5da515a7b30f25e7f91b05b",
+            "permissive": true,
+            "using_hash": "056f5b11b5da515a7b30f25e7f91b05b"
+          }
+        ],
+        "force_rls": false,
+        "privileges": {
+          "anon": [
+            "DELETE",
+            "INSERT",
+            "SELECT",
+            "UPDATE"
+          ],
+          "service_role": [
+            "DELETE",
+            "INSERT",
+            "MAINTAIN",
+            "REFERENCES",
+            "SELECT",
+            "TRIGGER",
+            "TRUNCATE",
+            "UPDATE"
+          ],
+          "authenticated": []
+        },
+        "security_invoker": false
+      }
+    },
+    {
+      "kind": "relation",
+      "name": "activity_speakers",
+      "detail": {
+        "rls": true,
+        "type": "r",
+        "policies": [
+          {
+            "name": "activity_speakers_fn_only",
+            "roles": [
+              "anon"
+            ],
+            "command": "*",
+            "check_hash": "056f5b11b5da515a7b30f25e7f91b05b",
+            "permissive": true,
+            "using_hash": "056f5b11b5da515a7b30f25e7f91b05b"
+          }
+        ],
+        "force_rls": false,
+        "privileges": {
+          "anon": [
+            "DELETE",
+            "INSERT",
+            "SELECT",
+            "UPDATE"
+          ],
+          "service_role": [
+            "DELETE",
+            "INSERT",
+            "MAINTAIN",
+            "REFERENCES",
+            "SELECT",
+            "TRIGGER",
+            "TRUNCATE",
+            "UPDATE"
+          ],
+          "authenticated": []
+        },
+        "security_invoker": false
+      }
+    },
+    {
+      "kind": "relation",
+      "name": "activity_tasks",
+      "detail": {
+        "rls": true,
+        "type": "r",
+        "policies": [
+          {
+            "name": "activity_tasks_fn_only",
+            "roles": [
+              "anon"
+            ],
+            "command": "*",
+            "check_hash": "056f5b11b5da515a7b30f25e7f91b05b",
+            "permissive": true,
+            "using_hash": "056f5b11b5da515a7b30f25e7f91b05b"
+          }
+        ],
+        "force_rls": false,
+        "privileges": {
+          "anon": [
+            "DELETE",
+            "INSERT",
+            "SELECT",
+            "UPDATE"
+          ],
+          "service_role": [
+            "DELETE",
+            "INSERT",
+            "MAINTAIN",
+            "REFERENCES",
+            "SELECT",
+            "TRIGGER",
+            "TRUNCATE",
+            "UPDATE"
+          ],
+          "authenticated": []
+        },
+        "security_invoker": false
+      }
+    },
+    {
+      "kind": "relation",
+      "name": "activity_topics",
+      "detail": {
+        "rls": true,
+        "type": "r",
+        "policies": [
+          {
+            "name": "activity_topics_fn_only",
+            "roles": [
+              "anon"
+            ],
+            "command": "*",
+            "check_hash": "056f5b11b5da515a7b30f25e7f91b05b",
+            "permissive": true,
+            "using_hash": "056f5b11b5da515a7b30f25e7f91b05b"
+          }
+        ],
+        "force_rls": false,
+        "privileges": {
+          "anon": [
+            "DELETE",
+            "INSERT",
+            "SELECT",
+            "UPDATE"
+          ],
+          "service_role": [
+            "DELETE",
+            "INSERT",
+            "MAINTAIN",
+            "REFERENCES",
+            "SELECT",
+            "TRIGGER",
+            "TRUNCATE",
+            "UPDATE"
+          ],
+          "authenticated": []
+        },
+        "security_invoker": false
+      }
+    },
+    {
+      "kind": "relation",
+      "name": "ai_recommendations",
+      "detail": {
+        "rls": true,
+        "type": "r",
+        "policies": [
+          {
+            "name": "ai_recommendations_fn_only",
+            "roles": [
+              "anon"
+            ],
+            "command": "*",
+            "check_hash": "056f5b11b5da515a7b30f25e7f91b05b",
+            "permissive": true,
+            "using_hash": "056f5b11b5da515a7b30f25e7f91b05b"
+          }
+        ],
+        "force_rls": false,
+        "privileges": {
+          "anon": [
+            "DELETE",
+            "INSERT",
+            "SELECT",
+            "UPDATE"
+          ],
+          "service_role": [
+            "DELETE",
+            "INSERT",
+            "MAINTAIN",
+            "REFERENCES",
+            "SELECT",
+            "TRIGGER",
+            "TRUNCATE",
+            "UPDATE"
+          ],
+          "authenticated": []
+        },
+        "security_invoker": false
+      }
+    },
+    {
+      "kind": "relation",
+      "name": "ai_recommendations_view",
+      "detail": {
+        "rls": false,
+        "type": "v",
+        "policies": [],
+        "force_rls": false,
+        "privileges": {
+          "anon": [
+            "SELECT"
+          ],
+          "service_role": [
+            "DELETE",
+            "INSERT",
+            "MAINTAIN",
+            "REFERENCES",
+            "SELECT",
+            "TRIGGER",
+            "TRUNCATE",
+            "UPDATE"
+          ],
+          "authenticated": []
+        },
+        "security_invoker": true
+      }
+    },
+    {
+      "kind": "relation",
+      "name": "ai_results",
+      "detail": {
+        "rls": true,
+        "type": "r",
+        "policies": [
+          {
+            "name": "ai_results_service_only",
+            "roles": [
+              "service_role"
+            ],
+            "command": "*",
+            "check_hash": "b326b5062b2f0e69046810717534cb09",
+            "permissive": true,
+            "using_hash": "b326b5062b2f0e69046810717534cb09"
+          }
+        ],
+        "force_rls": false,
+        "privileges": {
+          "anon": [],
+          "service_role": [
+            "DELETE",
+            "INSERT",
+            "MAINTAIN",
+            "REFERENCES",
+            "SELECT",
+            "TRIGGER",
+            "TRUNCATE",
+            "UPDATE"
+          ],
+          "authenticated": []
+        },
+        "security_invoker": false
+      }
+    },
+    {
+      "kind": "relation",
+      "name": "ai_runs",
+      "detail": {
+        "rls": true,
+        "type": "r",
+        "policies": [
+          {
+            "name": "ai_runs_service_only",
+            "roles": [
+              "service_role"
+            ],
+            "command": "*",
+            "check_hash": "b326b5062b2f0e69046810717534cb09",
+            "permissive": true,
+            "using_hash": "b326b5062b2f0e69046810717534cb09"
+          }
+        ],
+        "force_rls": false,
+        "privileges": {
+          "anon": [],
+          "service_role": [
+            "DELETE",
+            "INSERT",
+            "MAINTAIN",
+            "REFERENCES",
+            "SELECT",
+            "TRIGGER",
+            "TRUNCATE",
+            "UPDATE"
+          ],
+          "authenticated": []
+        },
+        "security_invoker": false
+      }
+    },
+    {
+      "kind": "relation",
+      "name": "ai_tasks",
+      "detail": {
+        "rls": true,
+        "type": "r",
+        "policies": [
+          {
+            "name": "ai_tasks_service_only",
+            "roles": [
+              "service_role"
+            ],
+            "command": "*",
+            "check_hash": "b326b5062b2f0e69046810717534cb09",
+            "permissive": true,
+            "using_hash": "b326b5062b2f0e69046810717534cb09"
+          }
+        ],
+        "force_rls": false,
+        "privileges": {
+          "anon": [],
+          "service_role": [
+            "DELETE",
+            "INSERT",
+            "MAINTAIN",
+            "REFERENCES",
+            "SELECT",
+            "TRIGGER",
+            "TRUNCATE",
+            "UPDATE"
+          ],
+          "authenticated": []
+        },
+        "security_invoker": false
+      }
+    },
+    {
+      "kind": "relation",
+      "name": "assistant_action_commands",
+      "detail": {
+        "rls": true,
+        "type": "r",
+        "policies": [
+          {
+            "name": "assistant_action_commands_service_only",
+            "roles": [
+              "service_role"
+            ],
+            "command": "*",
+            "check_hash": "b326b5062b2f0e69046810717534cb09",
+            "permissive": true,
+            "using_hash": "b326b5062b2f0e69046810717534cb09"
+          }
+        ],
+        "force_rls": true,
+        "privileges": {
+          "anon": [],
+          "service_role": [
+            "INSERT",
+            "SELECT",
+            "UPDATE"
+          ],
+          "authenticated": []
+        },
+        "security_invoker": false
+      }
+    },
+    {
+      "kind": "relation",
+      "name": "commitments",
+      "detail": {
+        "rls": true,
+        "type": "r",
+        "policies": [
+          {
+            "name": "commitments_service_insert",
+            "roles": [
+              "service_role"
+            ],
+            "command": "a",
+            "check_hash": "b326b5062b2f0e69046810717534cb09",
+            "permissive": true,
+            "using_hash": "d41d8cd98f00b204e9800998ecf8427e"
+          },
+          {
+            "name": "commitments_service_read",
+            "roles": [
+              "service_role"
+            ],
+            "command": "r",
+            "check_hash": "d41d8cd98f00b204e9800998ecf8427e",
+            "permissive": true,
+            "using_hash": "b326b5062b2f0e69046810717534cb09"
+          },
+          {
+            "name": "commitments_service_update",
+            "roles": [
+              "service_role"
+            ],
+            "command": "w",
+            "check_hash": "b326b5062b2f0e69046810717534cb09",
+            "permissive": true,
+            "using_hash": "b326b5062b2f0e69046810717534cb09"
+          }
+        ],
+        "force_rls": true,
+        "privileges": {
+          "anon": [],
+          "service_role": [
+            "INSERT",
+            "SELECT",
+            "UPDATE"
+          ],
+          "authenticated": []
+        },
+        "security_invoker": false
+      }
+    },
+    {
+      "kind": "relation",
+      "name": "context_items",
+      "detail": {
+        "rls": true,
+        "type": "r",
+        "policies": [
+          {
+            "name": "context_items_service_only",
+            "roles": [
+              "service_role"
+            ],
+            "command": "*",
+            "check_hash": "b326b5062b2f0e69046810717534cb09",
+            "permissive": true,
+            "using_hash": "b326b5062b2f0e69046810717534cb09"
+          }
+        ],
+        "force_rls": true,
+        "privileges": {
+          "anon": [],
+          "service_role": [
+            "INSERT",
+            "SELECT"
+          ],
+          "authenticated": []
+        },
+        "security_invoker": false
+      }
+    },
+    {
+      "kind": "relation",
+      "name": "customers",
+      "detail": {
+        "rls": true,
+        "type": "r",
+        "policies": [
+          {
+            "name": "customers_fn_only",
+            "roles": [
+              "anon"
+            ],
+            "command": "*",
+            "check_hash": "056f5b11b5da515a7b30f25e7f91b05b",
+            "permissive": true,
+            "using_hash": "056f5b11b5da515a7b30f25e7f91b05b"
+          }
+        ],
+        "force_rls": false,
+        "privileges": {
+          "anon": [
+            "DELETE",
+            "INSERT",
+            "SELECT",
+            "UPDATE"
+          ],
+          "service_role": [
+            "DELETE",
+            "INSERT",
+            "MAINTAIN",
+            "REFERENCES",
+            "SELECT",
+            "TRIGGER",
+            "TRUNCATE",
+            "UPDATE"
+          ],
+          "authenticated": []
+        },
+        "security_invoker": false
+      }
+    },
+    {
+      "kind": "relation",
+      "name": "customers_view",
+      "detail": {
+        "rls": false,
+        "type": "v",
+        "policies": [],
+        "force_rls": false,
+        "privileges": {
+          "anon": [
+            "SELECT"
+          ],
+          "service_role": [
+            "DELETE",
+            "INSERT",
+            "MAINTAIN",
+            "REFERENCES",
+            "SELECT",
+            "TRIGGER",
+            "TRUNCATE",
+            "UPDATE"
+          ],
+          "authenticated": []
+        },
+        "security_invoker": true
+      }
+    },
+    {
+      "kind": "relation",
+      "name": "followups",
+      "detail": {
+        "rls": true,
+        "type": "r",
+        "policies": [
+          {
+            "name": "followups_fn_only",
+            "roles": [
+              "anon"
+            ],
+            "command": "*",
+            "check_hash": "056f5b11b5da515a7b30f25e7f91b05b",
+            "permissive": true,
+            "using_hash": "056f5b11b5da515a7b30f25e7f91b05b"
+          }
+        ],
+        "force_rls": false,
+        "privileges": {
+          "anon": [
+            "DELETE",
+            "INSERT",
+            "SELECT",
+            "UPDATE"
+          ],
+          "service_role": [
+            "DELETE",
+            "INSERT",
+            "MAINTAIN",
+            "REFERENCES",
+            "SELECT",
+            "TRIGGER",
+            "TRUNCATE",
+            "UPDATE"
+          ],
+          "authenticated": []
+        },
+        "security_invoker": false
+      }
+    },
+    {
+      "kind": "relation",
+      "name": "followups_view",
+      "detail": {
+        "rls": false,
+        "type": "v",
+        "policies": [],
+        "force_rls": false,
+        "privileges": {
+          "anon": [
+            "SELECT"
+          ],
+          "service_role": [
+            "DELETE",
+            "INSERT",
+            "MAINTAIN",
+            "REFERENCES",
+            "SELECT",
+            "TRIGGER",
+            "TRUNCATE",
+            "UPDATE"
+          ],
+          "authenticated": []
+        },
+        "security_invoker": true
+      }
+    },
+    {
+      "kind": "relation",
+      "name": "gifts",
+      "detail": {
+        "rls": true,
+        "type": "r",
+        "policies": [
+          {
+            "name": "gifts_fn_only",
+            "roles": [
+              "anon"
+            ],
+            "command": "*",
+            "check_hash": "056f5b11b5da515a7b30f25e7f91b05b",
+            "permissive": true,
+            "using_hash": "056f5b11b5da515a7b30f25e7f91b05b"
+          }
+        ],
+        "force_rls": false,
+        "privileges": {
+          "anon": [
+            "DELETE",
+            "INSERT",
+            "SELECT",
+            "UPDATE"
+          ],
+          "service_role": [
+            "DELETE",
+            "INSERT",
+            "MAINTAIN",
+            "REFERENCES",
+            "SELECT",
+            "TRIGGER",
+            "TRUNCATE",
+            "UPDATE"
+          ],
+          "authenticated": []
+        },
+        "security_invoker": false
+      }
+    },
+    {
+      "kind": "relation",
+      "name": "gifts_view",
+      "detail": {
+        "rls": false,
+        "type": "v",
+        "policies": [],
+        "force_rls": false,
+        "privileges": {
+          "anon": [
+            "SELECT"
+          ],
+          "service_role": [
+            "DELETE",
+            "INSERT",
+            "MAINTAIN",
+            "REFERENCES",
+            "SELECT",
+            "TRIGGER",
+            "TRUNCATE",
+            "UPDATE"
+          ],
+          "authenticated": []
+        },
+        "security_invoker": true
+      }
+    },
+    {
+      "kind": "relation",
+      "name": "household_members",
+      "detail": {
+        "rls": true,
+        "type": "r",
+        "policies": [
+          {
+            "name": "household_members_service_only",
+            "roles": [
+              "service_role"
+            ],
+            "command": "*",
+            "check_hash": "b326b5062b2f0e69046810717534cb09",
+            "permissive": true,
+            "using_hash": "b326b5062b2f0e69046810717534cb09"
+          }
+        ],
+        "force_rls": false,
+        "privileges": {
+          "anon": [],
+          "service_role": [
+            "DELETE",
+            "INSERT",
+            "MAINTAIN",
+            "REFERENCES",
+            "SELECT",
+            "TRIGGER",
+            "TRUNCATE",
+            "UPDATE"
+          ],
+          "authenticated": []
+        },
+        "security_invoker": false
+      }
+    },
+    {
+      "kind": "relation",
+      "name": "households",
+      "detail": {
+        "rls": true,
+        "type": "r",
+        "policies": [
+          {
+            "name": "households_service_only",
+            "roles": [
+              "service_role"
+            ],
+            "command": "*",
+            "check_hash": "b326b5062b2f0e69046810717534cb09",
+            "permissive": true,
+            "using_hash": "b326b5062b2f0e69046810717534cb09"
+          }
+        ],
+        "force_rls": false,
+        "privileges": {
+          "anon": [],
+          "service_role": [
+            "DELETE",
+            "INSERT",
+            "MAINTAIN",
+            "REFERENCES",
+            "SELECT",
+            "TRIGGER",
+            "TRUNCATE",
+            "UPDATE"
+          ],
+          "authenticated": []
+        },
+        "security_invoker": false
+      }
+    },
+    {
+      "kind": "relation",
+      "name": "interactions",
+      "detail": {
+        "rls": true,
+        "type": "r",
+        "policies": [
+          {
+            "name": "interactions_service_only",
+            "roles": [
+              "service_role"
+            ],
+            "command": "*",
+            "check_hash": "b326b5062b2f0e69046810717534cb09",
+            "permissive": true,
+            "using_hash": "b326b5062b2f0e69046810717534cb09"
+          }
+        ],
+        "force_rls": true,
+        "privileges": {
+          "anon": [],
+          "service_role": [
+            "DELETE",
+            "INSERT",
+            "MAINTAIN",
+            "REFERENCES",
+            "SELECT",
+            "TRIGGER",
+            "TRUNCATE",
+            "UPDATE"
+          ],
+          "authenticated": []
+        },
+        "security_invoker": false
+      }
+    },
+    {
+      "kind": "relation",
+      "name": "knowledge_items",
+      "detail": {
+        "rls": true,
+        "type": "r",
+        "policies": [
+          {
+            "name": "knowledge_items_service_insert",
+            "roles": [
+              "service_role"
+            ],
+            "command": "a",
+            "check_hash": "b326b5062b2f0e69046810717534cb09",
+            "permissive": true,
+            "using_hash": "d41d8cd98f00b204e9800998ecf8427e"
+          },
+          {
+            "name": "knowledge_items_service_read",
+            "roles": [
+              "service_role"
+            ],
+            "command": "r",
+            "check_hash": "d41d8cd98f00b204e9800998ecf8427e",
+            "permissive": true,
+            "using_hash": "b326b5062b2f0e69046810717534cb09"
+          },
+          {
+            "name": "knowledge_items_service_update",
+            "roles": [
+              "service_role"
+            ],
+            "command": "w",
+            "check_hash": "b326b5062b2f0e69046810717534cb09",
+            "permissive": true,
+            "using_hash": "b326b5062b2f0e69046810717534cb09"
+          }
+        ],
+        "force_rls": true,
+        "privileges": {
+          "anon": [],
+          "service_role": [
+            "INSERT",
+            "SELECT",
+            "UPDATE"
+          ],
+          "authenticated": []
+        },
+        "security_invoker": false
+      }
+    },
+    {
+      "kind": "relation",
+      "name": "learnings",
+      "detail": {
+        "rls": true,
+        "type": "r",
+        "policies": [
+          {
+            "name": "learnings_service_insert",
+            "roles": [
+              "service_role"
+            ],
+            "command": "a",
+            "check_hash": "b326b5062b2f0e69046810717534cb09",
+            "permissive": true,
+            "using_hash": "d41d8cd98f00b204e9800998ecf8427e"
+          },
+          {
+            "name": "learnings_service_read",
+            "roles": [
+              "service_role"
+            ],
+            "command": "r",
+            "check_hash": "d41d8cd98f00b204e9800998ecf8427e",
+            "permissive": true,
+            "using_hash": "b326b5062b2f0e69046810717534cb09"
+          },
+          {
+            "name": "learnings_service_update",
+            "roles": [
+              "service_role"
+            ],
+            "command": "w",
+            "check_hash": "b326b5062b2f0e69046810717534cb09",
+            "permissive": true,
+            "using_hash": "b326b5062b2f0e69046810717534cb09"
+          }
+        ],
+        "force_rls": true,
+        "privileges": {
+          "anon": [],
+          "service_role": [
+            "INSERT",
+            "SELECT",
+            "UPDATE"
+          ],
+          "authenticated": []
+        },
+        "security_invoker": false
+      }
+    },
+    {
+      "kind": "relation",
+      "name": "ocr_records",
+      "detail": {
+        "rls": true,
+        "type": "r",
+        "policies": [
+          {
+            "name": "ocr_records_fn_only",
+            "roles": [
+              "anon"
+            ],
+            "command": "*",
+            "check_hash": "056f5b11b5da515a7b30f25e7f91b05b",
+            "permissive": true,
+            "using_hash": "056f5b11b5da515a7b30f25e7f91b05b"
+          }
+        ],
+        "force_rls": false,
+        "privileges": {
+          "anon": [
+            "DELETE",
+            "INSERT",
+            "SELECT",
+            "UPDATE"
+          ],
+          "service_role": [
+            "DELETE",
+            "INSERT",
+            "MAINTAIN",
+            "REFERENCES",
+            "SELECT",
+            "TRIGGER",
+            "TRUNCATE",
+            "UPDATE"
+          ],
+          "authenticated": []
+        },
+        "security_invoker": false
+      }
+    },
+    {
+      "kind": "relation",
+      "name": "opportunities",
+      "detail": {
+        "rls": true,
+        "type": "r",
+        "policies": [
+          {
+            "name": "opportunities_fn_only",
+            "roles": [
+              "anon"
+            ],
+            "command": "*",
+            "check_hash": "98a39095796678ae206fc605137d1014",
+            "permissive": true,
+            "using_hash": "98a39095796678ae206fc605137d1014"
+          },
+          {
+            "name": "opportunities_service_only",
+            "roles": [
+              "service_role"
+            ],
+            "command": "*",
+            "check_hash": "b326b5062b2f0e69046810717534cb09",
+            "permissive": true,
+            "using_hash": "b326b5062b2f0e69046810717534cb09"
+          }
+        ],
+        "force_rls": false,
+        "privileges": {
+          "anon": [
+            "DELETE",
+            "INSERT",
+            "SELECT",
+            "UPDATE"
+          ],
+          "service_role": [
+            "DELETE",
+            "INSERT",
+            "MAINTAIN",
+            "REFERENCES",
+            "SELECT",
+            "TRIGGER",
+            "TRUNCATE",
+            "UPDATE"
+          ],
+          "authenticated": []
+        },
+        "security_invoker": false
+      }
+    },
+    {
+      "kind": "relation",
+      "name": "opportunity_candidates",
+      "detail": {
+        "rls": true,
+        "type": "r",
+        "policies": [
+          {
+            "name": "opportunity_candidates_service_only",
+            "roles": [
+              "service_role"
+            ],
+            "command": "*",
+            "check_hash": "b326b5062b2f0e69046810717534cb09",
+            "permissive": true,
+            "using_hash": "b326b5062b2f0e69046810717534cb09"
+          }
+        ],
+        "force_rls": true,
+        "privileges": {
+          "anon": [],
+          "service_role": [
+            "INSERT",
+            "SELECT",
+            "UPDATE"
+          ],
+          "authenticated": []
+        },
+        "security_invoker": false
+      }
+    },
+    {
+      "kind": "relation",
+      "name": "outcomes",
+      "detail": {
+        "rls": true,
+        "type": "r",
+        "policies": [
+          {
+            "name": "outcomes_service_insert",
+            "roles": [
+              "service_role"
+            ],
+            "command": "a",
+            "check_hash": "b326b5062b2f0e69046810717534cb09",
+            "permissive": true,
+            "using_hash": "d41d8cd98f00b204e9800998ecf8427e"
+          },
+          {
+            "name": "outcomes_service_read",
+            "roles": [
+              "service_role"
+            ],
+            "command": "r",
+            "check_hash": "d41d8cd98f00b204e9800998ecf8427e",
+            "permissive": true,
+            "using_hash": "b326b5062b2f0e69046810717534cb09"
+          },
+          {
+            "name": "outcomes_service_update",
+            "roles": [
+              "service_role"
+            ],
+            "command": "w",
+            "check_hash": "b326b5062b2f0e69046810717534cb09",
+            "permissive": true,
+            "using_hash": "b326b5062b2f0e69046810717534cb09"
+          }
+        ],
+        "force_rls": true,
+        "privileges": {
+          "anon": [],
+          "service_role": [
+            "INSERT",
+            "SELECT",
+            "UPDATE"
+          ],
+          "authenticated": []
+        },
+        "security_invoker": false
+      }
+    },
+    {
+      "kind": "relation",
+      "name": "person_roles",
+      "detail": {
+        "rls": true,
+        "type": "r",
+        "policies": [
+          {
+            "name": "person_roles_service_only",
+            "roles": [
+              "service_role"
+            ],
+            "command": "*",
+            "check_hash": "b326b5062b2f0e69046810717534cb09",
+            "permissive": true,
+            "using_hash": "b326b5062b2f0e69046810717534cb09"
+          }
+        ],
+        "force_rls": false,
+        "privileges": {
+          "anon": [],
+          "service_role": [
+            "DELETE",
+            "INSERT",
+            "MAINTAIN",
+            "REFERENCES",
+            "SELECT",
+            "TRIGGER",
+            "TRUNCATE",
+            "UPDATE"
+          ],
+          "authenticated": []
+        },
+        "security_invoker": false
+      }
+    },
+    {
+      "kind": "relation",
+      "name": "persons",
+      "detail": {
+        "rls": true,
+        "type": "r",
+        "policies": [
+          {
+            "name": "persons_service_only",
+            "roles": [
+              "service_role"
+            ],
+            "command": "*",
+            "check_hash": "b326b5062b2f0e69046810717534cb09",
+            "permissive": true,
+            "using_hash": "b326b5062b2f0e69046810717534cb09"
+          }
+        ],
+        "force_rls": false,
+        "privileges": {
+          "anon": [],
+          "service_role": [
+            "DELETE",
+            "INSERT",
+            "MAINTAIN",
+            "REFERENCES",
+            "SELECT",
+            "TRIGGER",
+            "TRUNCATE",
+            "UPDATE"
+          ],
+          "authenticated": []
+        },
+        "security_invoker": false
+      }
+    },
+    {
+      "kind": "relation",
+      "name": "photos",
+      "detail": {
+        "rls": true,
+        "type": "r",
+        "policies": [
+          {
+            "name": "photos_fn_only",
+            "roles": [
+              "anon"
+            ],
+            "command": "*",
+            "check_hash": "056f5b11b5da515a7b30f25e7f91b05b",
+            "permissive": true,
+            "using_hash": "056f5b11b5da515a7b30f25e7f91b05b"
+          }
+        ],
+        "force_rls": false,
+        "privileges": {
+          "anon": [
+            "DELETE",
+            "INSERT",
+            "SELECT",
+            "UPDATE"
+          ],
+          "service_role": [
+            "DELETE",
+            "INSERT",
+            "MAINTAIN",
+            "REFERENCES",
+            "SELECT",
+            "TRIGGER",
+            "TRUNCATE",
+            "UPDATE"
+          ],
+          "authenticated": []
+        },
+        "security_invoker": false
+      }
+    },
+    {
+      "kind": "relation",
+      "name": "photos_view",
+      "detail": {
+        "rls": false,
+        "type": "v",
+        "policies": [],
+        "force_rls": false,
+        "privileges": {
+          "anon": [],
+          "service_role": [
+            "DELETE",
+            "INSERT",
+            "MAINTAIN",
+            "REFERENCES",
+            "SELECT",
+            "TRIGGER",
+            "TRUNCATE",
+            "UPDATE"
+          ],
+          "authenticated": []
+        },
+        "security_invoker": true
+      }
+    },
+    {
+      "kind": "relation",
+      "name": "playbooks",
+      "detail": {
+        "rls": true,
+        "type": "r",
+        "policies": [
+          {
+            "name": "playbooks_service_insert",
+            "roles": [
+              "service_role"
+            ],
+            "command": "a",
+            "check_hash": "b326b5062b2f0e69046810717534cb09",
+            "permissive": true,
+            "using_hash": "d41d8cd98f00b204e9800998ecf8427e"
+          },
+          {
+            "name": "playbooks_service_read",
+            "roles": [
+              "service_role"
+            ],
+            "command": "r",
+            "check_hash": "d41d8cd98f00b204e9800998ecf8427e",
+            "permissive": true,
+            "using_hash": "b326b5062b2f0e69046810717534cb09"
+          },
+          {
+            "name": "playbooks_service_update",
+            "roles": [
+              "service_role"
+            ],
+            "command": "w",
+            "check_hash": "b326b5062b2f0e69046810717534cb09",
+            "permissive": true,
+            "using_hash": "b326b5062b2f0e69046810717534cb09"
+          }
+        ],
+        "force_rls": true,
+        "privileges": {
+          "anon": [],
+          "service_role": [
+            "INSERT",
+            "SELECT",
+            "UPDATE"
+          ],
+          "authenticated": []
+        },
+        "security_invoker": false
+      }
+    },
+    {
+      "kind": "relation",
+      "name": "policy_review_reports",
+      "detail": {
+        "rls": true,
+        "type": "r",
+        "policies": [
+          {
+            "name": "policy_review_reports_fn_only",
+            "roles": [
+              "anon"
+            ],
+            "command": "*",
+            "check_hash": "056f5b11b5da515a7b30f25e7f91b05b",
+            "permissive": true,
+            "using_hash": "056f5b11b5da515a7b30f25e7f91b05b"
+          }
+        ],
+        "force_rls": false,
+        "privileges": {
+          "anon": [
+            "DELETE",
+            "INSERT",
+            "SELECT",
+            "UPDATE"
+          ],
+          "service_role": [
+            "DELETE",
+            "INSERT",
+            "MAINTAIN",
+            "REFERENCES",
+            "SELECT",
+            "TRIGGER",
+            "TRUNCATE",
+            "UPDATE"
+          ],
+          "authenticated": []
+        },
+        "security_invoker": false
+      }
+    },
+    {
+      "kind": "relation",
+      "name": "products",
+      "detail": {
+        "rls": true,
+        "type": "r",
+        "policies": [
+          {
+            "name": "products_fn_only",
+            "roles": [
+              "anon"
+            ],
+            "command": "*",
+            "check_hash": "056f5b11b5da515a7b30f25e7f91b05b",
+            "permissive": true,
+            "using_hash": "056f5b11b5da515a7b30f25e7f91b05b"
+          }
+        ],
+        "force_rls": false,
+        "privileges": {
+          "anon": [
+            "DELETE",
+            "INSERT",
+            "SELECT",
+            "UPDATE"
+          ],
+          "service_role": [
+            "DELETE",
+            "INSERT",
+            "MAINTAIN",
+            "REFERENCES",
+            "SELECT",
+            "TRIGGER",
+            "TRUNCATE",
+            "UPDATE"
+          ],
+          "authenticated": []
+        },
+        "security_invoker": false
+      }
+    },
+    {
+      "kind": "relation",
+      "name": "products_view",
+      "detail": {
+        "rls": false,
+        "type": "v",
+        "policies": [],
+        "force_rls": false,
+        "privileges": {
+          "anon": [
+            "SELECT"
+          ],
+          "service_role": [
+            "DELETE",
+            "INSERT",
+            "MAINTAIN",
+            "REFERENCES",
+            "SELECT",
+            "TRIGGER",
+            "TRUNCATE",
+            "UPDATE"
+          ],
+          "authenticated": []
+        },
+        "security_invoker": true
+      }
+    },
+    {
+      "kind": "relation",
+      "name": "recruit_candidates",
+      "detail": {
+        "rls": true,
+        "type": "r",
+        "policies": [
+          {
+            "name": "recruit_candidates_fn_only",
+            "roles": [
+              "anon"
+            ],
+            "command": "*",
+            "check_hash": "056f5b11b5da515a7b30f25e7f91b05b",
+            "permissive": true,
+            "using_hash": "056f5b11b5da515a7b30f25e7f91b05b"
+          }
+        ],
+        "force_rls": false,
+        "privileges": {
+          "anon": [
+            "DELETE",
+            "INSERT",
+            "SELECT",
+            "UPDATE"
+          ],
+          "service_role": [
+            "DELETE",
+            "INSERT",
+            "MAINTAIN",
+            "REFERENCES",
+            "SELECT",
+            "TRIGGER",
+            "TRUNCATE",
+            "UPDATE"
+          ],
+          "authenticated": []
+        },
+        "security_invoker": false
+      }
+    },
+    {
+      "kind": "relation",
+      "name": "recruit_followups",
+      "detail": {
+        "rls": true,
+        "type": "r",
+        "policies": [
+          {
+            "name": "recruit_followups_fn_only",
+            "roles": [
+              "anon"
+            ],
+            "command": "*",
+            "check_hash": "056f5b11b5da515a7b30f25e7f91b05b",
+            "permissive": true,
+            "using_hash": "056f5b11b5da515a7b30f25e7f91b05b"
+          }
+        ],
+        "force_rls": false,
+        "privileges": {
+          "anon": [
+            "DELETE",
+            "INSERT",
+            "SELECT",
+            "UPDATE"
+          ],
+          "service_role": [
+            "DELETE",
+            "INSERT",
+            "MAINTAIN",
+            "REFERENCES",
+            "SELECT",
+            "TRIGGER",
+            "TRUNCATE",
+            "UPDATE"
+          ],
+          "authenticated": []
+        },
+        "security_invoker": false
+      }
+    },
+    {
+      "kind": "relation",
+      "name": "recruit_goal_benchmarks",
+      "detail": {
+        "rls": true,
+        "type": "r",
+        "policies": [
+          {
+            "name": "recruit_goal_benchmarks_fn_only",
+            "roles": [
+              "anon"
+            ],
+            "command": "*",
+            "check_hash": "056f5b11b5da515a7b30f25e7f91b05b",
+            "permissive": true,
+            "using_hash": "056f5b11b5da515a7b30f25e7f91b05b"
+          }
+        ],
+        "force_rls": false,
+        "privileges": {
+          "anon": [
+            "DELETE",
+            "INSERT",
+            "SELECT",
+            "UPDATE"
+          ],
+          "service_role": [
+            "DELETE",
+            "INSERT",
+            "MAINTAIN",
+            "REFERENCES",
+            "SELECT",
+            "TRIGGER",
+            "TRUNCATE",
+            "UPDATE"
+          ],
+          "authenticated": []
+        },
+        "security_invoker": false
+      }
+    },
+    {
+      "kind": "relation",
+      "name": "recruit_goals",
+      "detail": {
+        "rls": true,
+        "type": "r",
+        "policies": [
+          {
+            "name": "recruit_goals_fn_only",
+            "roles": [
+              "anon"
+            ],
+            "command": "*",
+            "check_hash": "056f5b11b5da515a7b30f25e7f91b05b",
+            "permissive": true,
+            "using_hash": "056f5b11b5da515a7b30f25e7f91b05b"
+          }
+        ],
+        "force_rls": false,
+        "privileges": {
+          "anon": [
+            "DELETE",
+            "INSERT",
+            "SELECT",
+            "UPDATE"
+          ],
+          "service_role": [
+            "DELETE",
+            "INSERT",
+            "MAINTAIN",
+            "REFERENCES",
+            "SELECT",
+            "TRIGGER",
+            "TRUNCATE",
+            "UPDATE"
+          ],
+          "authenticated": []
+        },
+        "security_invoker": false
+      }
+    },
+    {
+      "kind": "relation",
+      "name": "recruit_milestones",
+      "detail": {
+        "rls": true,
+        "type": "r",
+        "policies": [
+          {
+            "name": "recruit_milestones_fn_only",
+            "roles": [
+              "anon"
+            ],
+            "command": "*",
+            "check_hash": "056f5b11b5da515a7b30f25e7f91b05b",
+            "permissive": true,
+            "using_hash": "056f5b11b5da515a7b30f25e7f91b05b"
+          }
+        ],
+        "force_rls": false,
+        "privileges": {
+          "anon": [
+            "DELETE",
+            "INSERT",
+            "SELECT",
+            "UPDATE"
+          ],
+          "service_role": [
+            "DELETE",
+            "INSERT",
+            "MAINTAIN",
+            "REFERENCES",
+            "SELECT",
+            "TRIGGER",
+            "TRUNCATE",
+            "UPDATE"
+          ],
+          "authenticated": []
+        },
+        "security_invoker": false
+      }
+    },
+    {
+      "kind": "relation",
+      "name": "relationships",
+      "detail": {
+        "rls": true,
+        "type": "r",
+        "policies": [
+          {
+            "name": "relationships_service_only",
+            "roles": [
+              "service_role"
+            ],
+            "command": "*",
+            "check_hash": "b326b5062b2f0e69046810717534cb09",
+            "permissive": true,
+            "using_hash": "b326b5062b2f0e69046810717534cb09"
+          }
+        ],
+        "force_rls": false,
+        "privileges": {
+          "anon": [],
+          "service_role": [
+            "DELETE",
+            "INSERT",
+            "MAINTAIN",
+            "REFERENCES",
+            "SELECT",
+            "TRIGGER",
+            "TRUNCATE",
+            "UPDATE"
+          ],
+          "authenticated": []
+        },
+        "security_invoker": false
+      }
+    },
+    {
+      "kind": "relation",
+      "name": "v_action_center",
+      "detail": {
+        "rls": false,
+        "type": "v",
+        "policies": [],
+        "force_rls": false,
+        "privileges": {
+          "anon": [
+            "SELECT"
+          ],
+          "service_role": [
+            "DELETE",
+            "INSERT",
+            "MAINTAIN",
+            "REFERENCES",
+            "SELECT",
+            "TRIGGER",
+            "TRUNCATE",
+            "UPDATE"
+          ],
+          "authenticated": []
+        },
+        "security_invoker": true
+      }
+    },
+    {
+      "kind": "relation",
+      "name": "v_funnel_stats",
+      "detail": {
+        "rls": false,
+        "type": "v",
+        "policies": [],
+        "force_rls": false,
+        "privileges": {
+          "anon": [
+            "SELECT"
+          ],
+          "service_role": [
+            "DELETE",
+            "INSERT",
+            "MAINTAIN",
+            "REFERENCES",
+            "SELECT",
+            "TRIGGER",
+            "TRUNCATE",
+            "UPDATE"
+          ],
+          "authenticated": []
+        },
+        "security_invoker": true
+      }
+    },
+    {
+      "kind": "relation",
+      "name": "v_recruit_candidates",
+      "detail": {
+        "rls": false,
+        "type": "v",
+        "policies": [],
+        "force_rls": false,
+        "privileges": {
+          "anon": [
+            "SELECT"
+          ],
+          "service_role": [
+            "DELETE",
+            "INSERT",
+            "MAINTAIN",
+            "REFERENCES",
+            "SELECT",
+            "TRIGGER",
+            "TRUNCATE",
+            "UPDATE"
+          ],
+          "authenticated": []
+        },
+        "security_invoker": true
+      }
+    },
+    {
+      "kind": "relation",
+      "name": "v_recruit_candidates_trash",
+      "detail": {
+        "rls": false,
+        "type": "v",
+        "policies": [],
+        "force_rls": false,
+        "privileges": {
+          "anon": [
+            "SELECT"
+          ],
+          "service_role": [
+            "DELETE",
+            "INSERT",
+            "MAINTAIN",
+            "REFERENCES",
+            "SELECT",
+            "TRIGGER",
+            "TRUNCATE",
+            "UPDATE"
+          ],
+          "authenticated": []
+        },
+        "security_invoker": true
+      }
+    },
+    {
+      "kind": "routine",
+      "name": "actions_guard()",
+      "detail": {
+        "anon_execute": false,
+        "service_execute": true,
+        "security_definer": false,
+        "authenticated_execute": false
+      }
+    },
+    {
+      "kind": "routine",
+      "name": "activity_participants_canonical_guard()",
+      "detail": {
+        "anon_execute": true,
+        "service_execute": true,
+        "security_definer": false,
+        "authenticated_execute": true
+      }
+    },
+    {
+      "kind": "routine",
+      "name": "activity_speakers_person_guard()",
+      "detail": {
+        "anon_execute": true,
+        "service_execute": true,
+        "security_definer": false,
+        "authenticated_execute": true
+      }
+    },
+    {
+      "kind": "routine",
+      "name": "assistant_action_command_v1(p_stage text, p_actor_uid text, p_command_id uuid, p_person_id bigint, p_draft jsonb, p_preview_hash text)",
+      "detail": {
+        "anon_execute": false,
+        "service_execute": true,
+        "security_definer": false,
+        "authenticated_execute": false
+      }
+    },
+    {
+      "kind": "routine",
+      "name": "commitments_guard()",
+      "detail": {
+        "anon_execute": false,
+        "service_execute": true,
+        "security_definer": false,
+        "authenticated_execute": false
+      }
+    },
+    {
+      "kind": "routine",
+      "name": "context_items_validate()",
+      "detail": {
+        "anon_execute": false,
+        "service_execute": true,
+        "security_definer": false,
+        "authenticated_execute": false
+      }
+    },
+    {
+      "kind": "routine",
+      "name": "crm_customers_page_v1(p_page integer, p_page_size integer, p_keyword text, p_sort_field text, p_sort_dir text, p_today date, p_exact_name text)",
+      "detail": {
+        "anon_execute": true,
+        "service_execute": true,
+        "security_definer": false,
+        "authenticated_execute": false
+      }
+    },
+    {
+      "kind": "routine",
+      "name": "crm_delete_batch(p_kind text, p_action text, p_ids bigint[])",
+      "detail": {
+        "anon_execute": true,
+        "service_execute": true,
+        "security_definer": false,
+        "authenticated_execute": false
+      }
+    },
+    {
+      "kind": "routine",
+      "name": "crm_recruit_goals_save_v1(p_goal_month text, p_goals jsonb, p_operator text)",
+      "detail": {
+        "anon_execute": true,
+        "service_execute": true,
+        "security_definer": false,
+        "authenticated_execute": false
+      }
+    },
+    {
+      "kind": "routine",
+      "name": "crm_search_people_v1(p_template text, p_months integer, p_limit integer)",
+      "detail": {
+        "anon_execute": false,
+        "service_execute": true,
+        "security_definer": false,
+        "authenticated_execute": false
+      }
+    },
+    {
+      "kind": "routine",
+      "name": "learnings_guard()",
+      "detail": {
+        "anon_execute": false,
+        "service_execute": true,
+        "security_definer": false,
+        "authenticated_execute": false
+      }
+    },
+    {
+      "kind": "routine",
+      "name": "opportunity_candidate_v1(p_operation text, p_actor_uid text, p_candidate_id bigint, p_person_id bigint, p_ai_result_id bigint, p_draft jsonb, p_evidence jsonb, p_preview_hash text)",
+      "detail": {
+        "anon_execute": false,
+        "service_execute": true,
+        "security_definer": false,
+        "authenticated_execute": false
+      }
+    },
+    {
+      "kind": "routine",
+      "name": "quick_capture_v2_commit(p_person_id bigint, p_selected_display_name text, p_actor_uid text, p_interaction jsonb, p_facts jsonb, p_signals jsonb)",
+      "detail": {
+        "anon_execute": false,
+        "service_execute": true,
+        "security_definer": false,
+        "authenticated_execute": false
+      }
+    },
+    {
+      "kind": "routine",
+      "name": "recruit_candidate_person_sync()",
+      "detail": {
+        "anon_execute": false,
+        "service_execute": true,
+        "security_definer": true,
+        "authenticated_execute": false
+      }
+    },
+    {
+      "kind": "sequence",
+      "name": "AI建议_id_seq",
+      "detail": {
+        "anon_read": true,
+        "anon_usage": true,
+        "service_usage": true,
+        "authenticated_read": true,
+        "authenticated_usage": true
+      }
+    },
+    {
+      "kind": "sequence",
+      "name": "actions_id_seq",
+      "detail": {
+        "anon_read": false,
+        "anon_usage": false,
+        "service_usage": true,
+        "authenticated_read": false,
+        "authenticated_usage": false
+      }
+    },
+    {
+      "kind": "sequence",
+      "name": "activities_id_seq",
+      "detail": {
+        "anon_read": true,
+        "anon_usage": true,
+        "service_usage": true,
+        "authenticated_read": true,
+        "authenticated_usage": true
+      }
+    },
+    {
+      "kind": "sequence",
+      "name": "activity_participants_id_seq",
+      "detail": {
+        "anon_read": true,
+        "anon_usage": true,
+        "service_usage": true,
+        "authenticated_read": true,
+        "authenticated_usage": true
+      }
+    },
+    {
+      "kind": "sequence",
+      "name": "activity_speakers_id_seq",
+      "detail": {
+        "anon_read": true,
+        "anon_usage": true,
+        "service_usage": true,
+        "authenticated_read": true,
+        "authenticated_usage": true
+      }
+    },
+    {
+      "kind": "sequence",
+      "name": "activity_tasks_id_seq",
+      "detail": {
+        "anon_read": true,
+        "anon_usage": true,
+        "service_usage": true,
+        "authenticated_read": true,
+        "authenticated_usage": true
+      }
+    },
+    {
+      "kind": "sequence",
+      "name": "activity_topics_id_seq",
+      "detail": {
+        "anon_read": true,
+        "anon_usage": true,
+        "service_usage": true,
+        "authenticated_read": true,
+        "authenticated_usage": true
+      }
+    },
+    {
+      "kind": "sequence",
+      "name": "ai_results_id_seq",
+      "detail": {
+        "anon_read": false,
+        "anon_usage": false,
+        "service_usage": true,
+        "authenticated_read": false,
+        "authenticated_usage": false
+      }
+    },
+    {
+      "kind": "sequence",
+      "name": "ai_runs_id_seq",
+      "detail": {
+        "anon_read": false,
+        "anon_usage": false,
+        "service_usage": true,
+        "authenticated_read": false,
+        "authenticated_usage": false
+      }
+    },
+    {
+      "kind": "sequence",
+      "name": "ai_tasks_id_seq",
+      "detail": {
+        "anon_read": false,
+        "anon_usage": false,
+        "service_usage": true,
+        "authenticated_read": false,
+        "authenticated_usage": false
+      }
+    },
+    {
+      "kind": "sequence",
+      "name": "commitments_id_seq",
+      "detail": {
+        "anon_read": false,
+        "anon_usage": false,
+        "service_usage": true,
+        "authenticated_read": false,
+        "authenticated_usage": false
+      }
+    },
+    {
+      "kind": "sequence",
+      "name": "context_items_id_seq",
+      "detail": {
+        "anon_read": false,
+        "anon_usage": false,
+        "service_usage": true,
+        "authenticated_read": false,
+        "authenticated_usage": false
+      }
+    },
+    {
+      "kind": "sequence",
+      "name": "customer_products_id_seq",
+      "detail": {
+        "anon_read": true,
+        "anon_usage": true,
+        "service_usage": true,
+        "authenticated_read": true,
+        "authenticated_usage": true
+      }
+    },
+    {
+      "kind": "sequence",
+      "name": "household_members_id_seq",
+      "detail": {
+        "anon_read": false,
+        "anon_usage": false,
+        "service_usage": true,
+        "authenticated_read": false,
+        "authenticated_usage": false
+      }
+    },
+    {
+      "kind": "sequence",
+      "name": "households_id_seq",
+      "detail": {
+        "anon_read": false,
+        "anon_usage": false,
+        "service_usage": true,
+        "authenticated_read": false,
+        "authenticated_usage": false
+      }
+    },
+    {
+      "kind": "sequence",
+      "name": "interactions_id_seq",
+      "detail": {
+        "anon_read": false,
+        "anon_usage": false,
+        "service_usage": true,
+        "authenticated_read": false,
+        "authenticated_usage": false
+      }
+    },
+    {
+      "kind": "sequence",
+      "name": "knowledge_items_id_seq",
+      "detail": {
+        "anon_read": false,
+        "anon_usage": false,
+        "service_usage": true,
+        "authenticated_read": false,
+        "authenticated_usage": false
+      }
+    },
+    {
+      "kind": "sequence",
+      "name": "learnings_id_seq",
+      "detail": {
+        "anon_read": false,
+        "anon_usage": false,
+        "service_usage": true,
+        "authenticated_read": false,
+        "authenticated_usage": false
+      }
+    },
+    {
+      "kind": "sequence",
+      "name": "ocr_records_id_seq",
+      "detail": {
+        "anon_read": true,
+        "anon_usage": true,
+        "service_usage": true,
+        "authenticated_read": true,
+        "authenticated_usage": true
+      }
+    },
+    {
+      "kind": "sequence",
+      "name": "opportunities_id_seq",
+      "detail": {
+        "anon_read": true,
+        "anon_usage": true,
+        "service_usage": true,
+        "authenticated_read": true,
+        "authenticated_usage": true
+      }
+    },
+    {
+      "kind": "sequence",
+      "name": "opportunity_candidates_id_seq",
+      "detail": {
+        "anon_read": false,
+        "anon_usage": false,
+        "service_usage": true,
+        "authenticated_read": false,
+        "authenticated_usage": false
+      }
+    },
+    {
+      "kind": "sequence",
+      "name": "outcomes_id_seq",
+      "detail": {
+        "anon_read": false,
+        "anon_usage": false,
+        "service_usage": true,
+        "authenticated_read": false,
+        "authenticated_usage": false
+      }
+    },
+    {
+      "kind": "sequence",
+      "name": "person_roles_id_seq",
+      "detail": {
+        "anon_read": false,
+        "anon_usage": false,
+        "service_usage": true,
+        "authenticated_read": false,
+        "authenticated_usage": false
+      }
+    },
+    {
+      "kind": "sequence",
+      "name": "persons_id_seq",
+      "detail": {
+        "anon_read": false,
+        "anon_usage": false,
+        "service_usage": true,
+        "authenticated_read": false,
+        "authenticated_usage": false
+      }
+    },
+    {
+      "kind": "sequence",
+      "name": "photos_id_seq",
+      "detail": {
+        "anon_read": true,
+        "anon_usage": true,
+        "service_usage": true,
+        "authenticated_read": true,
+        "authenticated_usage": true
+      }
+    },
+    {
+      "kind": "sequence",
+      "name": "playbooks_id_seq",
+      "detail": {
+        "anon_read": false,
+        "anon_usage": false,
+        "service_usage": true,
+        "authenticated_read": false,
+        "authenticated_usage": false
+      }
+    },
+    {
+      "kind": "sequence",
+      "name": "policy_review_reports_id_seq",
+      "detail": {
+        "anon_read": true,
+        "anon_usage": true,
+        "service_usage": true,
+        "authenticated_read": true,
+        "authenticated_usage": true
+      }
+    },
+    {
+      "kind": "sequence",
+      "name": "recruit_candidates_id_seq",
+      "detail": {
+        "anon_read": true,
+        "anon_usage": true,
+        "service_usage": true,
+        "authenticated_read": true,
+        "authenticated_usage": true
+      }
+    },
+    {
+      "kind": "sequence",
+      "name": "recruit_followups_id_seq",
+      "detail": {
+        "anon_read": true,
+        "anon_usage": true,
+        "service_usage": true,
+        "authenticated_read": true,
+        "authenticated_usage": true
+      }
+    },
+    {
+      "kind": "sequence",
+      "name": "recruit_goal_benchmarks_id_seq",
+      "detail": {
+        "anon_read": true,
+        "anon_usage": true,
+        "service_usage": true,
+        "authenticated_read": true,
+        "authenticated_usage": true
+      }
+    },
+    {
+      "kind": "sequence",
+      "name": "recruit_goals_id_seq",
+      "detail": {
+        "anon_read": true,
+        "anon_usage": true,
+        "service_usage": true,
+        "authenticated_read": true,
+        "authenticated_usage": true
+      }
+    },
+    {
+      "kind": "sequence",
+      "name": "recruit_milestones_id_seq",
+      "detail": {
+        "anon_read": true,
+        "anon_usage": true,
+        "service_usage": true,
+        "authenticated_read": true,
+        "authenticated_usage": true
+      }
+    },
+    {
+      "kind": "sequence",
+      "name": "relationships_id_seq",
+      "detail": {
+        "anon_read": false,
+        "anon_usage": false,
+        "service_usage": true,
+        "authenticated_read": false,
+        "authenticated_usage": false
+      }
+    },
+    {
+      "kind": "sequence",
+      "name": "伴手礼_Id_seq",
+      "detail": {
+        "anon_read": true,
+        "anon_usage": true,
+        "service_usage": true,
+        "authenticated_read": true,
+        "authenticated_usage": true
+      }
+    },
+    {
+      "kind": "sequence",
+      "name": "客户列表_Id_seq",
+      "detail": {
+        "anon_read": true,
+        "anon_usage": true,
+        "service_usage": true,
+        "authenticated_read": true,
+        "authenticated_usage": true
+      }
+    },
+    {
+      "kind": "sequence",
+      "name": "跟进日志_Id_seq",
+      "detail": {
+        "anon_read": true,
+        "anon_usage": true,
+        "service_usage": true,
+        "authenticated_read": true,
+        "authenticated_usage": true
+      }
+    }
+  ]
+}

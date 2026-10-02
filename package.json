@@ -4,6 +4,8 @@
     "build:shared": "node tools/sync-shared.cjs --sync",
     "check:shared": "node tools/sync-shared.cjs --check",
     "check:sdk-pins": "node --test tests/tooling/cloudbase-sdk-pins.cjs",
+    "test:security": "node --test tests/security/run.test.cjs",
+    "test:security:gateway": "node tests/security/gateway-probe.cjs",
     "test:modular": "node tests/tooling/modular-frontend.mjs",
     "test:ai-gateway": "node --test tests/ai-gateway/run.cjs tests/ai-gateway/activity-review-v2.cjs",
     "test:ai-skills": "node --test tests/ai-gateway/skill-registry.cjs",
