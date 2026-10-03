@@ -107,6 +107,10 @@ function installFixtures() {
       household: mode === 'family' ? { id: 981001, important_facts: marker + '周末一起探望父母' } : null,
       members: mode === 'family' ? [{ id: 982001, person_id: 980002, relationship_to_anchor: 'spouse',
         person: { id: 980002, display_name: marker + '家人乙' } }] : [] }),
+    'person_360:getCustomerProfile': () => ({ personId:'980001', customerId:String(customer.Id), status:'linked',
+      source:'public.customers', fields:{...customer}, roles:[{role:'customer',origin:'legacy_backfill'}],
+      contactAllowed:false, testData:{status:'verified',containsTestData:true,recordCount:1,
+        sources:[{batchKey:'crm_test_fixture',table:'customers',count:1}]} }),
     'person_360:getRelationshipDecay': () => mode === 'empty' ? ({
       status: 'insufficient_evidence', why: '缺少明确的关系强度、最近一次重要互动，暂不能判断关系是否衰减。',
       confidence: 0, recommended_action: '先核实并补录真实的关系和互动信息，不要仅因经过的天数打扰对方。',

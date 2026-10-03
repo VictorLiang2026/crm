@@ -1,4 +1,5 @@
 import { renderTestDataNotice } from './test-data-notice.js';
+import { renderPersonProfile } from './person-profile.js';
 // Isolated Person 360 view. All data requests use the existing authenticated callFn bridge.
 import { renderOpportunityCandidates } from './opportunity-candidates.js';
 const ROLE_LABELS = { spouse: '配偶', child: '子女', parent: '父母', sibling: '兄弟姐妹', other: '其他' };
@@ -23,7 +24,7 @@ function button(label, onClick, className = '') {
   return element;
 }
 
-export async function renderPerson360({ root, personId, callFn }) {
+export async function renderPerson360({ root, personId, callFn, openLegacyTab }) {
   const hash = `#/person/${personId}`;
   root.replaceChildren(node('div', 'loading', '正在加载 Person 360…'));
   const request = async (action, data = {}) => {
@@ -50,6 +51,10 @@ export async function renderPerson360({ root, personId, callFn }) {
     top.append(legacy);
   }
   wrap.append(top, node('h2', '', `${model.person.display_name} · Person 360`));
+  const profile = node('section', 'card person360-card person360-profile');
+  wrap.append(profile);
+  void renderPersonProfile({ root: profile, personId, callFn, openLegacyTab,
+    isCurrent: () => location.hash === hash });
 
   const decay = node('section', 'card person360-card person360-decay');
   decay.append(node('h3', '', '关系节奏提醒'));

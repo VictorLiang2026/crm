@@ -1003,7 +1003,11 @@ function route(){
   }).catch(function(e){ $('view').textContent = 'AI CRM 搜索加载失败：' + e.message; });
   var person360 = hash.match(/^#\/person\/(\d+)$/);
   if(person360) return import('/crm/js/modules/person-360.js').then(function(module){
-    return module.renderPerson360({root:$('view'), personId:person360[1], callFn:callFn});
+    return module.renderPerson360({root:$('view'), personId:person360[1], callFn:callFn,
+      openLegacyTab:function(id, tab){
+        if(!/^[1-9]\d*$/.test(String(id)) || ['info','profile'].indexOf(tab) === -1) return;
+        detailState.tab=tab; location.hash='#/customer/'+id;
+      }});
   }).catch(function(e){ $('view').textContent = 'Person 360 加载失败：' + e.message; });
   var m = hash.match(/^#\/customer\/(\d+)$/);
   if(m) return showDetail(parseInt(m[1],10));

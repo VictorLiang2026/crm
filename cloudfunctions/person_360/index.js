@@ -10,6 +10,7 @@ const { InsuranceContextService } = require('./insurance-context-service');
 const { ParticipantService } = require('./participant-service');
 const { SpeakerProfileService } = require('./speaker-profile-service');
 const { RelationshipDecayService } = require('./relationship-decay-service');
+const { getCustomerProfile } = require('./customer-profile-service');
 
 const app = cloudbase.init({ env: process.env.TCB_ENV });
 const LEGACY_INTERACTION_TABLES = new Set([
@@ -19,7 +20,7 @@ const LEGACY_INTERACTION_TABLES = new Set([
 const INSURANCE_READ_TABLES = new Set([
   'products', 'policy_review_reports', 'ocr_records', 'photos', 'actions',
 ]);
-const RELATIONSHIP_READ_TABLES = new Set(['context_items']);
+const RELATIONSHIP_READ_TABLES = new Set(['context_items', 'person_roles']);
 const TABLES = new Set([
   'persons', 'households', 'household_members', 'interactions', 'commitments',
   'opportunities',
@@ -454,6 +455,7 @@ exports.main = async event => {
     const service = createService();
     switch (event?.action) {
       case 'get': return await service.get(event.personId);
+      case 'getCustomerProfile': return await getCustomerProfile(event.personId, { request: pgRequest });
       case 'lookupCustomer': return await service.lookupCustomer(event.customerId);
       case 'listPeople': return await service.listPeople(event);
       case 'listOpportunityDirectory': return await service.listOpportunityDirectory(event);
