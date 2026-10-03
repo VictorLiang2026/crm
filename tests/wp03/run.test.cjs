@@ -1,11 +1,41 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict');
+require('./today-timeout.test.cjs');
 const {runScenario,createScenarioData,NAME}=require('../../cloudfunctions/assistant/test-scenario-service');
 const uid='crm_test_actor',id='00000000-0000-4000-8000-000000000003',hash='a'.repeat(32);
 function fixture(ready=false){const calls=[];return {calls,run:async(stage,actor,previewId,previewHash)=>{
  calls.push({stage,actor,previewId,previewHash});return {ok:true,ready,targets:{personId:'91'}};
 },resolve:async()=>({status:ready?'confirm_existing':'available',hasMore:false,candidates:ready?[{id:'91'}]:[]})};}
 const identity={uid,isAnonymous:false};
+test('read-only acceptance honors the existing UI lock before accessing the SDK',async()=>{
+ const vm=require('node:vm'),{probe}=require('./readonly-live.cjs');
+ for(const locked of [true,false]){
+  let sdkCalls=0;
+  const context={Date,localStorage:{getItem:()=>String(Date.now()-(locked?0:300001))},
+   document:{querySelector:()=>locked?{offsetParent:{}}:null},cloudbase:{init:()=>{sdkCalls++;throw Error('must not start')}}};
+  const r=await vm.runInNewContext('('+probe.toString()+')([])',context);
+  assert.equal(r.checks[0].status,'MANUAL_LOGIN');assert.equal(sdkCalls,0);
+ }
+});
+test('read-only acceptance issues HEAD checks and only malformed seed requests',async()=>{
+ const vm=require('node:vm'),{probe}=require('./readonly-live.cjs'),requests=[],calls=[];
+ const token='header.'+Buffer.from(JSON.stringify({role:'authenticated',exp:Math.floor(Date.now()/1000)+600})).toString('base64url')+'.fixture';
+ const state={ok:true,ready:true,initialCount:10,derivedCount:2,auditCount:3,targets:{personId:'91',customerId:'92',activityId:'93'}};
+ const context={Date,AbortSignal,localStorage:{getItem:()=>String(Date.now())},document:{querySelector:()=>null},
+  atob:s=>Buffer.from(s,'base64').toString(),fetch:async(url,init)=>{requests.push({url,init});return {status:403}},
+  cloudbase:{init:()=>({auth:()=>({getSession:async()=>({data:{session:{access_token:token}}})}),callFunction:async({name,data})=>{
+   calls.push({name,data});return {result:data.stage==='status'?state:data.stage==='dryRun'?{ok:false,error:{code:'SEED_INVALID_REQUEST'}}:
+    data.stage==='execute'?{ok:false,error:{code:'CONFIRMATION_REQUIRED'}}:{testData:{status:'verified',containsTestData:true,sources:[{batchKey:'crm_test_main_v1'}]}}};
+  }})}};
+ const r=await vm.runInNewContext('('+probe.toString()+')(["persons","crm_test_records"])',context);
+ assert.ok(r.checks.every(c=>c.status==='PASS'));assert.equal(requests.length,2);
+ assert.ok(requests.every(r=>r.init.method==='HEAD'&&r.init.headers['Accept-Profile']==='public'));
+ assert.equal(calls.filter(c=>c.data.stage==='dryRun').length,4);
+ assert.ok(calls.filter(c=>c.data.stage==='dryRun').every(c=>Object.keys(c.data).length===3));
+ assert.equal(calls.find(c=>c.data.stage==='execute').data.previewId,'invalid');
+ assert.ok(!calls.some(c=>c.data.stage==='confirm'||c.data.action==='generate'));
+ assert.ok(!JSON.stringify(r).includes(token));
+});
 test('public assistant entry rejects caller-supplied seed counts and identities before database access',async()=>{
  const {createMain}=require('../../cloudfunctions/assistant');
  const prior=process.env.CRM_TEST_SEED_UIDS;

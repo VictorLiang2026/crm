@@ -41,6 +41,7 @@
  */
 'use strict';
 const testData = require('./test-data');
+const { waitForTodayAi } = require('./ai-wait');
 
 const { app, rdb, generateText, extractJson, assertOk, nowIso } = require('./db');
 const { readOpenActions, mapActions, scoreDimensions, fingerprint: actionFingerprint } = require('./action-facts');
@@ -1213,6 +1214,7 @@ async function testSummary(data, facts, extra) {
 }
 // ---------- 入口 ----------
 exports.main = async (event, context) => {
+  const startedAt = Date.now();
   try {
     const identity = app.auth().getUserInfo();
     if (!identity || typeof identity.uid !== 'string' || !identity.uid.trim() || identity.isAnonymous === true) {
@@ -1281,7 +1283,9 @@ exports.main = async (event, context) => {
     let today5 = null, source = 'rule', ai_error = '';
     if (shortlist.length) {
       try {
-        const { text } = await generateText(testData.withMessages(buildTodayFiveMessages(shortlist, today), disclosure), { timeout: 40000 });
+        const { text } = await waitForTodayAi(() => generateText(
+          testData.withMessages(buildTodayFiveMessages(shortlist, today), disclosure), { timeout: 40000 }
+        ), startedAt);
         today5 = normTodayFive(extractJson(text), shortlist, today);
         if (today5 && today5.length) source = 'ai';
         else ai_error = 'AI 输出解析失败：' + cut(text, 120);
