@@ -111,6 +111,13 @@ function installFixtures() {
       source:'public.customers', fields:{...customer}, roles:[{role:'customer',origin:'legacy_backfill'}],
       contactAllowed:false, testData:{status:'verified',containsTestData:true,recordCount:1,
         sources:[{batchKey:'crm_test_fixture',table:'customers',count:1}]} }),
+    'person_360:getTimelinePage': () => ({ rows: mode === 'empty' ? [] : [{
+      id:'followups:920001', type:'followup', at:'2026-09-28T08:00:00Z',
+      summary:marker+'虚构客户跟进', source:'public.followups#920001', customerId:String(customer.Id) }],
+      page:1,pageSize:10,hasMore:false,testData:{status:'verified',containsTestData:mode !== 'empty',
+        recordCount:mode === 'empty'?0:1,sources:mode === 'empty'?[]:[{batchKey:'crm_test_fixture',table:'followups',count:1}]} }),
+    'person_360:getContextGroups': () => ({ groups:{fact:[],signal:[],inference:[]},
+      testData:{status:'verified',containsTestData:false,recordCount:0,sources:[]} }),
     'person_360:getRelationshipDecay': () => mode === 'empty' ? ({
       status: 'insufficient_evidence', why: '缺少明确的关系强度、最近一次重要互动，暂不能判断关系是否衰减。',
       confidence: 0, recommended_action: '先核实并补录真实的关系和互动信息，不要仅因经过的天数打扰对方。',

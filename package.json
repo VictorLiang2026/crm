@@ -1,6 +1,7 @@
 {
   "name": "crm",
   "scripts": {
+    "test:wp06": "node --test tests/wp06/insights.test.cjs tests/wp06/browser.test.cjs",
     "test:wp05": "node --test tests/wp05/profile.test.cjs tests/wp05/browser.test.cjs",
     "test:wp05": "node --test tests/wp05/profile.test.cjs tests/wp05/browser.test.cjs",
     "test:wp04": "node tests/wp04/run.cjs",

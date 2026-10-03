@@ -8,7 +8,7 @@ const baseline = require('../security/expected-public-baseline.json');
 const now = Date.now();
 const date = new Date(now).toISOString();
 const report = () => ({ version:1, environment:'crm-d1gkae8ddc930d151', fingerprint:'same',
-  finishedAt:date, catalogObservedAt:date, checks:['catalog','regression','guard-tests','anonymous','wp02-fixtures','wp03-fixtures','wp04-identity','wp05-profile'].map(id => ({id,status:'PASS'})) });
+  finishedAt:date, catalogObservedAt:date, checks:['catalog','regression','guard-tests','anonymous','wp02-fixtures','wp03-fixtures','wp04-identity','wp05-profile','wp06-insights'].map(id => ({id,status:'PASS'})) });
 test('gate accepts explicit gaps but never failure, missing critical check or stale evidence', () => {
   const r = report();
   r.checks.push({id:'login',status:'MANUAL_LOGIN'},{id:'service-runtime',status:'UNVERIFIED'});

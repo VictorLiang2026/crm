@@ -12,7 +12,7 @@ const maxAgeMs = 60 * 60 * 1000;
 const reportFile = path.join(dir, 'wp01-report.json');
 const catalogFile = path.join(dir, 'wp01-catalog.json');
 const labels = { PASS: '自动通过', FAIL: '失败', MANUAL_LOGIN: '需人工登录', UNVERIFIED: '未验证' };
-const critical = ['catalog', 'regression', 'guard-tests', 'anonymous', 'wp02-fixtures', 'wp03-fixtures', 'wp04-identity', 'wp05-profile'];
+const critical = ['catalog', 'regression', 'guard-tests', 'anonymous', 'wp02-fixtures', 'wp03-fixtures', 'wp04-identity', 'wp05-profile', 'wp06-insights'];
 const sha = input => crypto.createHash('sha256').update(input).digest('hex');
 function fresh(date, now = Date.now()) {
   const age = now - Date.parse(date);
@@ -127,6 +127,7 @@ async function main(args = process.argv.slice(2)) {
       ['wp03-fixtures', ['--test','tests/wp03/run.test.cjs','tests/wp03/browser.test.cjs']],
       ['wp04-identity', ['tests/wp04/run.cjs']],
       ['wp05-profile', ['--test','tests/wp05/profile.test.cjs','tests/wp05/browser.test.cjs']],
+      ['wp06-insights', ['--test','tests/wp06/insights.test.cjs','tests/wp06/browser.test.cjs']],
       ['regression', ['tests/regression/run.cjs']]
     ]) {
       try { runNode(args); add(id, 'PASS', id === 'wp04-identity' ? 'Fresh public read-only identity audit plus offline fixtures; explicit exceptions retained in wp04-report.json' : 'Offline fixtures; see per-case report'); }

@@ -11,6 +11,7 @@ const { ParticipantService } = require('./participant-service');
 const { SpeakerProfileService } = require('./speaker-profile-service');
 const { RelationshipDecayService } = require('./relationship-decay-service');
 const { getCustomerProfile } = require('./customer-profile-service');
+const { PersonInsightsService } = require('./person-insights-service');
 
 const app = cloudbase.init({ env: process.env.TCB_ENV });
 const LEGACY_INTERACTION_TABLES = new Set([
@@ -476,6 +477,10 @@ exports.main = async event => {
       case 'removeMember': return await service.removeMember(event.personId, event.membershipId, event.confirmed);
       case 'listInteractions': return await new InteractionService({ request: pgRequest })
         .listForPerson(event.personId, { limit: event.limit });
+      case 'getTimelinePage': return await new PersonInsightsService({ request: pgRequest })
+        .timeline(event.personId, { page: event.page, pageSize: event.pageSize });
+      case 'getContextGroups': return await new PersonInsightsService({ request: pgRequest })
+        .context(event.personId);
       case 'listDueCommitments': return await new CommitmentService({ request: pgRequest }).listDue();
       case 'createInteraction': return await new InteractionService({ request: pgRequest })
         .createManual(event.personId, event.data, uid);

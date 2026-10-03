@@ -32,6 +32,7 @@ class Browser {
       }
       else if (pathname === '/fixtures.js') { res.setHeader('Content-Type', 'text/javascript; charset=utf-8'); res.end('(' + installFixtures.toString() + ')();'); }
       else if (pathname === '/crm/js/modules/person-360.js') { res.setHeader('Content-Type', 'text/javascript; charset=utf-8'); res.end(fs.readFileSync(path.join(this.root, 'crm/js/modules/person-360.js'))); }
+      else if (pathname === '/crm/js/modules/person-insights.js') { res.setHeader('Content-Type', 'text/javascript; charset=utf-8'); res.end(fs.readFileSync(path.join(this.root, 'crm/js/modules/person-insights.js'))); }
       else if (pathname === '/crm/js/modules/person-profile.js') { res.setHeader('Content-Type', 'text/javascript; charset=utf-8'); res.end(fs.readFileSync(path.join(this.root, 'crm/js/modules/person-profile.js'))); }
       else if (pathname === '/crm/js/modules/phase14-hubs.js') { res.setHeader('Content-Type', 'text/javascript; charset=utf-8'); res.end(fs.readFileSync(path.join(this.root, 'crm/js/modules/phase14-hubs.js'))); }
       else if (pathname === '/crm/css/phase14-navigation.css') { res.setHeader('Content-Type', 'text/css; charset=utf-8'); res.end(fs.readFileSync(path.join(this.root, 'crm/css/phase14-navigation.css'))); }
@@ -109,7 +110,10 @@ class Browser {
   send(method, params = {}) {
     const id = ++this.serial;
     return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => { this.pending.delete(id); reject(new Error('CDP timeout: ' + method)); }, 15000);
+      // Cold Edge profiles can stall a single DevTools reply while the machine is
+      // under load. Keep a finite failure bound without flagging a 15s stall as
+      // an application regression; route expectations retain their own limit.
+      const timer = setTimeout(() => { this.pending.delete(id); reject(new Error('CDP timeout: ' + method)); }, 45000);
       this.pending.set(id, { resolve, reject, timer });
       this.socket.send(JSON.stringify({ id, method, params }));
     });

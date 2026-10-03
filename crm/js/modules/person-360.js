@@ -1,5 +1,6 @@
 import { renderTestDataNotice } from './test-data-notice.js';
 import { renderPersonProfile } from './person-profile.js';
+import { renderPersonInsights } from './person-insights.js';
 // Isolated Person 360 view. All data requests use the existing authenticated callFn bridge.
 import { renderOpportunityCandidates } from './opportunity-candidates.js';
 const ROLE_LABELS = { spouse: '配偶', child: '子女', parent: '父母', sibling: '兄弟姐妹', other: '其他' };
@@ -55,6 +56,8 @@ export async function renderPerson360({ root, personId, callFn, openLegacyTab })
   wrap.append(profile);
   void renderPersonProfile({ root: profile, personId, callFn, openLegacyTab,
     isCurrent: () => location.hash === hash });
+  renderPersonInsights({ root: wrap, personId, customerId: model.person.legacy_customer_id,
+    callFn, openLegacyTab, isCurrent: () => location.hash === hash });
 
   const decay = node('section', 'card person360-card person360-decay');
   decay.append(node('h3', '', '关系节奏提醒'));
@@ -125,7 +128,7 @@ export async function renderPerson360({ root, personId, callFn, openLegacyTab })
   opportunities.append(formHost);
   wrap.append(opportunities);
   renderOpportunityCandidates({root:wrap,personId,callFn,
-    onCreated:()=>{if(location.hash===hash)void renderPerson360({root,personId,callFn});}});
+    onCreated:()=>{if(location.hash===hash)void renderPerson360({root,personId,callFn,openLegacyTab});}});
 
   function showOpportunityForm(opportunity) {
     formHost.replaceChildren();
@@ -188,7 +191,7 @@ export async function renderPerson360({ root, personId, callFn, openLegacyTab })
         };
         await request(opportunity ? 'updateOpportunity' : 'createOpportunity',
           opportunity ? { personId, id: opportunity.id, data } : { personId, data });
-        await renderPerson360({ root, personId, callFn });
+        await renderPerson360({ root, personId, callFn, openLegacyTab });
       } catch (cause) {
         error.textContent = `保存失败：${cause.message}`;
         save.disabled = false;
@@ -298,7 +301,7 @@ export async function renderPerson360({ root, personId, callFn, openLegacyTab })
       if (!window.confirm(`确认移除 ${name} 的家庭关联？Person 记录不会删除。`)) return;
       try {
         await request('removeMember', { personId, membershipId: member.id, confirmed: true });
-        await renderPerson360({ root, personId, callFn });
+        await renderPerson360({ root, personId, callFn, openLegacyTab });
       } catch (error) { window.alert(`移除失败：${error.message}`); }
     }, 'person360-remove'));
     family.append(row);
@@ -350,7 +353,7 @@ export async function renderPerson360({ root, personId, callFn, openLegacyTab })
         personId, memberId: chosen.id, relationship: role.value,
         selectedDisplayName: chosen.display_name, confirmed: true,
       });
-      await renderPerson360({ root, personId, callFn });
+      await renderPerson360({ root, personId, callFn, openLegacyTab });
     } catch (error) { window.alert(`关联失败：${error.message}`); }
   }, 'btn-primary'));
   add.append(attachLine);
@@ -367,7 +370,7 @@ export async function renderPerson360({ root, personId, callFn, openLegacyTab })
   facts.append(button('保存事实', async () => {
     try {
       await request('saveFacts', { personId, facts: textarea.value });
-      await renderPerson360({ root, personId, callFn });
+      await renderPerson360({ root, personId, callFn, openLegacyTab });
     } catch (error) { window.alert(`保存失败：${error.message}`); }
   }, 'btn-primary'));
   wrap.append(facts);
