@@ -29,7 +29,7 @@ function addCss() {
   document.head.append(link);
 }
 
-export function renderAssistantActionCreate({ root, callFn }) {
+export function renderAssistantActionCreate({ root, callFn, scenario = false }) {
   addCss();
   const api = createApi(callFn);
   const page = el('section', 'crm-action-create');
@@ -78,7 +78,7 @@ export function renderAssistantActionCreate({ root, callFn }) {
   let previewHash = null;
   let busy = false;
   let executed = false;
-  const active = () => location.hash === PAGE;
+  const active = () => location.hash === (scenario ? '#/test-scenario/action' : PAGE);
   function status(message, isError = false) {
     notice.textContent = message;
     notice.classList.toggle('error', isError);
@@ -178,4 +178,16 @@ export function renderAssistantActionCreate({ root, callFn }) {
     previewButton.disabled = confirmButton.disabled = executeButton.disabled = planButton.disabled = true;
     status(`行动已创建：#${result.actionId}。可在今日经营查看。`);
   }));
+  if(scenario) {
+    planButton.disabled=searchButton.disabled=true;
+    void api.call('assistant',{action:'testSamples',stage:'status'}).then(result=>{
+      if(!active())return;
+      if(!result?.ok||!result.ready)throw Error('SEED_FORBIDDEN');
+      name.value='【系统测试·勿联系】虚构体验甲';
+      title.value='【系统测试·勿联系】下一步体验行动';
+      description.value='【系统测试·勿联系】仅在系统内验证正常确认流程，不联系、不外发。';
+      type.value='other';planButton.disabled=searchButton.disabled=false;
+      status('已预填测试内容。请点击查找并确认人物，然后按原流程规划、预览、确认与执行。');
+    }).catch(()=>{if(active())status('请先用授权测试账号生成场景。',true);});
+  }
 }

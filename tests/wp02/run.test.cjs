@@ -56,7 +56,7 @@ test('AI Search includes marked matching rows without altering SQL criteria or t
  const db=fixtureDb({},[{batchKey:batch,table:'customers',id:'920001'}]),calls=[];
  const response=await runSearch({query:marker+'最近关系下降的重点客户'},{app:{},
   gateway:{runAITask:async()=>({result:{template:'declining_priority',months:3},taskId:'fixture-task',resultId:'fixture-result'})},
-  data:{search:async(...args)=>{calls.push(args);return {rows,total:1,coverage:{rows:1}};},testDataReader:refs=>TD.disclose(refs,{rdb:db})}});
+  data:{search:async(...args)=>{calls.push(args);return {rows,total:1,coverage:{rows:1}};},linkTestAudit:async()=>({ok:true}),testDataReader:refs=>TD.disclose(refs,{rdb:db})}});
  assert.deepEqual(calls,[['declining_priority',3,30]]);assert.equal(response.total,1);
  assert.deepEqual(response.rows,rows);assert.equal(response.testData.containsTestData,true);assert.equal(response.execution.businessDataWritten,false);
 });

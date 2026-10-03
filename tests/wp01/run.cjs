@@ -12,7 +12,7 @@ const maxAgeMs = 60 * 60 * 1000;
 const reportFile = path.join(dir, 'wp01-report.json');
 const catalogFile = path.join(dir, 'wp01-catalog.json');
 const labels = { PASS: '自动通过', FAIL: '失败', MANUAL_LOGIN: '需人工登录', UNVERIFIED: '未验证' };
-const critical = ['catalog', 'regression', 'guard-tests', 'anonymous', 'wp02-fixtures'];
+const critical = ['catalog', 'regression', 'guard-tests', 'anonymous', 'wp02-fixtures', 'wp03-fixtures'];
 const sha = input => crypto.createHash('sha256').update(input).digest('hex');
 function fresh(date, now = Date.now()) {
   const age = now - Date.parse(date);
@@ -118,6 +118,7 @@ async function main(args = process.argv.slice(2)) {
     for (const [id, args] of [
       ['guard-tests', ['--test','tests/security/run.test.cjs','tests/wp01/gate.test.cjs','tests/tooling/cloudbase-sdk-pins.cjs','tests/recruit-goals/transactional-save.cjs']],
       ['wp02-fixtures', ['--test','tests/wp02/run.test.cjs','tests/wp02/browser.test.cjs']],
+      ['wp03-fixtures', ['--test','tests/wp03/run.test.cjs','tests/wp03/browser.test.cjs']],
       ['regression', ['tests/regression/run.cjs']]
     ]) {
       try { runNode(args); add(id, 'PASS', 'Offline fixtures; see per-case report'); }

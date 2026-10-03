@@ -15,9 +15,15 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
       return { ok: false, error: { code: 'UNAUTHORIZED', message: 'Login required' } };
     }
     if (event?.action === 'testSamples') {
-      try { return await require('./test-seed-policy').seedRequest(event, identity, {
+      try { return await require('./test-scenario-service').runScenario({action:event.action,stage:event.stage,
+        ...(event.previewId === undefined ? {} : {previewId:event.previewId}),
+        ...(event.previewHash === undefined ? {} : {previewHash:event.previewHash}),
+        ...(event.confirmed === undefined ? {} : {confirmed:event.confirmed}),
+        ...(event.plan === undefined ? {} : {plan:event.plan}),
+        ...Object.fromEntries(['count','counts','personId','customerId','batchKey','rows']
+          .filter(key => event[key] !== undefined).map(key => [key,event[key]]))}, identity, {
         allowedUids: String(process.env.CRM_TEST_SEED_UIDS || '').split(',').map(s => s.trim()).filter(Boolean),
-      }); } catch (error) { return {ok:false,error:{code:error.code || 'SEED_DENIED',message:'测试种子入口未执行写入'}}; }
+      }); } catch (error) { return {ok:false,error:{code:error.code || 'SEED_DENIED',message:'测试场景操作未完成，请核对预览或权限'}}; }
     }
     if (event?.action === 'opportunityCandidate') {
       try { return await candidateRunner(event, identity.uid); }

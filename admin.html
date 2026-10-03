@@ -991,8 +991,12 @@ function route(){
     return module.renderLegacyPicker({root:$('view'), callFn:callFn, feature:moreFeature[1],
       openLegacyTab:function(id, tab){ detailState.tab=tab; location.hash='#/customer/'+id; }});
   }).catch(function(e){ $('view').textContent = '旧功能入口加载失败：' + e.message; });
-  if(hash === '#/assistant/actions/new') return import('/crm/js/modules/assistant-action-create.js').then(function(module){
-    return module.renderAssistantActionCreate({root:$('view'), callFn:callFn});
+  if(hash === '#/test-scenario') return import('/crm/js/modules/test-scenario.js').then(function(module){
+    if(location.hash !== hash) return;
+    return module.renderTestScenario({root:$('view'), callFn:callFn});
+  }).catch(function(e){ $('view').textContent = '测试场景加载失败：' + e.message; });
+  if(hash === '#/assistant/actions/new' || hash === '#/test-scenario/action') return import('/crm/js/modules/assistant-action-create.js').then(function(module){
+    return module.renderAssistantActionCreate({root:$('view'), callFn:callFn, scenario:hash === '#/test-scenario/action'});
   }).catch(function(e){ $('view').textContent = '新建行动加载失败：' + e.message; });
   if(hash === '#/ai/search') return import('/crm/js/modules/ai-crm-search.js').then(function(module){
     return module.renderAiCrmSearch({root:$('view'), callFn:callFn});

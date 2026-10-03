@@ -52,6 +52,10 @@ async function runSearch(event, { app, data, gateway } = {}) {
     [row.education_source_table,row.education_source_id],
   ].filter(([table,id]) => testData.TABLES.has(table) && id != null).map(([table,id]) => ({table,id:String(id)})));
   const disclosure = await (database.testDataReader || testData.disclose)(refs);
+  if(disclosure.containsTestData===true) {
+    if(typeof database.linkTestAudit!=='function') throw new Error('Test audit tracking is unavailable');
+    await database.linkTestAudit(task.taskId,refs);
+  }
   const notices = [];
   if (found.total > found.rows.length) notices.push('测试来源提示仅核对当前返回名单及其证据；未显示结果的测试来源尚未核验。');
   if (found.coverage.rows === 0) {

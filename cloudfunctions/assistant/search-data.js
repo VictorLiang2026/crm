@@ -73,7 +73,13 @@ function createSearchData({ env, key, fetchImpl = fetch } = {}) {
     return value;
   }
 
-  return { auditRdb, search };
+  async function linkTestAudit(taskId,refs) {
+    if(!/^[1-9][0-9]*$/.test(String(taskId)) || !Array.isArray(refs) || refs.length>2000) throw Error('Invalid audit provenance');
+    const result=await request('rpc/crm_test_link_ai_v1','POST',{}, {p_task_id:taskId,p_refs:refs});
+    if(result?.ok!==true) throw Error('Audit provenance was not saved');
+    return result;
+  }
+  return { auditRdb, search, linkTestAudit };
 }
 
 module.exports = { createSearchData };
