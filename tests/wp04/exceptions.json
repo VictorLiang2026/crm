@@ -1,0 +1,4 @@
+[
+  {"kind":"customers","id":"786","issue":"UNMAPPED_CUSTOMER","reason":"身份尚未人工确认。同名 Person 754 已绑定客户 760，显示名称不同，禁止据姓名合并。"},
+  {"kind":"participants","id":"14","issue":"NAME_ONLY_UNCONFIRMED","reason":"活动 2 的旧姓名暂存参与者，无旧人员 ID 或 canonical Person；待用户明确选人，保留 Legacy 邀请记录。"}
+]

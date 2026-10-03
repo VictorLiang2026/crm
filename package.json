@@ -1,6 +1,7 @@
 {
   "name": "crm",
   "scripts": {
+    "test:wp04": "node tests/wp04/run.cjs",
     "test:wp01": "node tests/wp01/run.cjs",
     "test:wp01:login": "node tests/wp01/login.cjs",
     "check:release-gate": "node tests/wp01/run.cjs --assert-release",

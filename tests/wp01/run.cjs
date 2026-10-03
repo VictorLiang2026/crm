@@ -12,7 +12,7 @@ const maxAgeMs = 60 * 60 * 1000;
 const reportFile = path.join(dir, 'wp01-report.json');
 const catalogFile = path.join(dir, 'wp01-catalog.json');
 const labels = { PASS: '自动通过', FAIL: '失败', MANUAL_LOGIN: '需人工登录', UNVERIFIED: '未验证' };
-const critical = ['catalog', 'regression', 'guard-tests', 'anonymous', 'wp02-fixtures', 'wp03-fixtures'];
+const critical = ['catalog', 'regression', 'guard-tests', 'anonymous', 'wp02-fixtures', 'wp03-fixtures', 'wp04-identity'];
 const sha = input => crypto.createHash('sha256').update(input).digest('hex');
 function fresh(date, now = Date.now()) {
   const age = now - Date.parse(date);
@@ -87,6 +87,12 @@ async function main(args = process.argv.slice(2)) {
     }
     const loginFile = path.join(dir, 'wp01-login.json');
     if ((fs.existsSync(loginFile) ? sha(fs.readFileSync(loginFile)) : null) !== report.loginHash) reasons.push('Login evidence changed; rerun gate');
+    const identityFile = path.join(dir,'wp04-audit.json');
+    if (!fs.existsSync(identityFile) || sha(fs.readFileSync(identityFile)) !== report.identityHash) reasons.push('WP04 identity evidence changed/missing');
+    if (fs.existsSync(identityFile)) {
+      try { reasons.push(...require('../wp04/audit.cjs').evaluate(JSON.parse(fs.readFileSync(identityFile,'utf8')),require('../wp04/exceptions.json')).failures); }
+      catch { reasons.push('Invalid WP04 identity evidence'); }
+    }
     if (reasons.length) throw Error(reasons.join('; '));
     console.log('WP01 gate PASS. Open verification items: ' + report.checks.filter(r => r.status !== 'PASS').map(r => r.id).join(', '));
     return;
@@ -119,9 +125,10 @@ async function main(args = process.argv.slice(2)) {
       ['guard-tests', ['--test','tests/security/run.test.cjs','tests/wp01/gate.test.cjs','tests/tooling/cloudbase-sdk-pins.cjs','tests/recruit-goals/transactional-save.cjs']],
       ['wp02-fixtures', ['--test','tests/wp02/run.test.cjs','tests/wp02/browser.test.cjs']],
       ['wp03-fixtures', ['--test','tests/wp03/run.test.cjs','tests/wp03/browser.test.cjs']],
+      ['wp04-identity', ['tests/wp04/run.cjs']],
       ['regression', ['tests/regression/run.cjs']]
     ]) {
-      try { runNode(args); add(id, 'PASS', 'Offline fixtures; see per-case report'); }
+      try { runNode(args); add(id, 'PASS', id === 'wp04-identity' ? 'Fresh public read-only identity audit plus offline fixtures; explicit exceptions retained in wp04-report.json' : 'Offline fixtures; see per-case report'); }
       catch(e) { add(id, 'FAIL', e.message); break; }
     }
   }
@@ -147,6 +154,8 @@ async function main(args = process.argv.slice(2)) {
     head:execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8'}).trim(),
     finishedAt:new Date().toISOString(), catalogObservedAt, catalogHash,
     loginHash:fs.existsSync(loginFile) ? sha(fs.readFileSync(loginFile)) : null, checks };
+  const identityFile = path.join(dir,'wp04-audit.json');
+  report.identityHash = fs.existsSync(identityFile) ? sha(fs.readFileSync(identityFile)) : null;
   report.blockers = blockers(report, current);
   report.releaseGate = report.blockers.length ? 'BLOCKED' : 'PASS_WITH_LIMITATIONS';
   fs.writeFileSync(reportFile, JSON.stringify(report,null,2) + '\n');

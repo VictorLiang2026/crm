@@ -17,6 +17,8 @@
 3. 匿名探针使用既有 `tests/permissions/.results/public-key.txt`；也可由 `CRM_PUBLIC_KEY_FILE` 指向受保护本地文件。不要提交 Key。
 4. 一键运行 `npm run test:wp01`。数据库证据和发布报告有效期均为一小时；缺失或过期会阻断发布并提示重采集。
 
+WP04 起，运行第 4 步前还须通过同一只读入口执行 `../wp04/audit.sql`，验证完整结果后将解析的 snapshot 保存至 `tests/security/.results/wp04-audit.json`。身份覆盖证据也只有效一小时；已列明的待确认身份与新增遗漏/冲突分别处理，详见 [WP04 复跑说明](../wp04/README.md)。下方 `--psql` 只刷新权限目录，不自动刷新身份快照。
+
 有已获授权的只读 PG 连接及 psql 时，将连接串放在当前进程的 `CRM_SECURITY_PG_URL` 环境变量，可用 `npm run test:wp01 -- --psql` 自动刷新目录后执行整套检查。连接串不放在命令行、仓库或报告里，查询强制只读事务。此次未验证此可选连接方式。
 
 真实登录单独运行 `npm run test:wp01:login`，在独立窗口输入测试账号。它提取当前 admin.html 的登录实现并使用同一固定 SDK；有效 getSession 后只以 HEAD 请求检查 public 的 47 个对象，并通过 customers.list 查询唯一虚构关键词。页面不加载业务路由，不发起 AI 或写入。报告仅保留预定义检查 ID、状态、时间与页面哈希；不保存凭据/身份/客户内容。结束后退出此测试会话。没有人工参与或证据过期时，主报告显示“需人工登录”。此手动步骤无法由自动化代替。
