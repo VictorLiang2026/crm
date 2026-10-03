@@ -35,7 +35,11 @@ export function openQuickCaptureV2({ callFn, scenario }) {
   };
   const call = async (fn, data) => {
     const result = await api.call(fn, data);
-    if (!result || result.ok === false || result.error) throw new Error(result?.error?.code || result?.error || '请求失败');
+    if (!result || result.ok === false || result.error) {
+      const code = result?.error?.code || result?.error || '请求失败';
+      const task = result?.error?.auditTaskId;
+      throw new Error(task ? `${code}（AI task #${task}，请勿重复解析）` : code);
+    }
     return result;
   };
   const section = (title, hint) => {

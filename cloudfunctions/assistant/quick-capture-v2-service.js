@@ -3,6 +3,7 @@
 const { PersonService } = require('./person-service');
 const { createAIGateway } = require('./ai-gateway');
 const { createSearchData } = require('./search-data');
+const { createScenarioData } = require('./test-scenario-service');
 const { normalizeDraft, prompt } = require('./quick-capture-v2-parser');
 const UUID=/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i;
 const MD5=/^[0-9a-f]{32}$/;
@@ -45,7 +46,7 @@ function createData({env,key,fetchImpl=fetch}={}){
           p_person_id:null,p_selected_display_name:null,p_draft:null,
           p_preview_hash:args.previewHash||null,p_ai_task_id:null,p_ai_result_id:null})};
 }
-async function runQuickCaptureV2(event,identity,{data,gateway}={}){
+async function runQuickCaptureV2(event,identity,{data,gateway,scenarioData,linkAudit}={}){
   const allowed=String(process.env.CRM_TEST_SEED_UIDS||'').split(',').map(s=>s.trim()).filter(Boolean);
   if(identity?.isAnonymous!==false||typeof identity.uid!=='string'||!allowed.includes(identity.uid))fail('FORBIDDEN');
   if(!event||event.action!=='quickCaptureV2'||
@@ -59,6 +60,12 @@ async function runQuickCaptureV2(event,identity,{data,gateway}={}){
   if(stage==='parse'){
     if(typeof event.text!=='string'||!event.text.includes(MARKER)||
       !event.text.trim()||event.text.length>10000)fail('INVALID_INPUT');
+    const scene=scenarioData||createScenarioData({env:process.env.TCB_ENV,
+      key:process.env.CRM_ASSISTANT_DB_API_KEY});
+    const state=await scene.run('status',identity.uid);
+    if(state?.ok!==true||state.ready!==true||!ID.test(String(state.targets?.personId||'')))
+      fail('TEST_SCENE_NOT_READY');
+    const scenePersonId=numberId(state.targets.personId);
     const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai',year:'numeric',
       month:'2-digit',day:'2-digit'}).format(new Date());
     const ai=gateway||createAIGateway({
@@ -69,6 +76,15 @@ async function runQuickCaptureV2(event,identity,{data,gateway}={}){
     const task=await ai.runAITask({taskType:'quick_capture_v2',skill:'quick_capture_v2',
       capability:'structured_extraction',input:{text:event.text},
       context:{guidance:prompt(today),today,actor_uid:identity.uid}});
+    const link=linkAudit||createSearchData({env:process.env.TCB_ENV,
+      key:process.env.CRM_ASSISTANT_DB_API_KEY}).linkTestAudit;
+    try{
+      const linked=await link(task.taskId,[{table:'persons',id:String(scenePersonId)}]);
+      if(!linked||linked.linkedBatches<1)fail('AI_AUDIT_LINK_FAILED');
+    }catch(error){
+      const failure=new Error('AI_AUDIT_LINK_FAILED');failure.code='AI_AUDIT_LINK_FAILED';
+      failure.auditTaskId=task.taskId;throw failure;
+    }
     return {ok:true,stage,preview:normalizeDraft(task.result),today,
       aiTaskId:task.taskId,aiRunId:task.runId,aiResultId:task.resultId,
       notice:'AI 草稿待人工核对；含测试数据',businessDataWritten:false};

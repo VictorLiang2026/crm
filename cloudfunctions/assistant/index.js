@@ -28,7 +28,9 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
     if (event?.action === 'quickCaptureV2') {
       try { return await require('./quick-capture-v2-service').runQuickCaptureV2(event,identity); }
       catch (error) { return {ok:false,error:{code:error.code || 'QUICK_CAPTURE_FAILED',
-        message:'快速记录 V2 操作未完成，请核对身份、预览或权限'}}; }
+        message:'快速记录 V2 操作未完成，请核对身份、预览或权限',
+        ...(Number.isSafeInteger(Number(error.auditTaskId)) && Number(error.auditTaskId)>0 ?
+          {auditTaskId:Number(error.auditTaskId)} : {})}}; }
     }
     if (event?.action === 'opportunityCandidate') {
       try { return await candidateRunner(event, identity.uid); }

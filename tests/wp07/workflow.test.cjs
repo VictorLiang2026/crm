@@ -19,8 +19,15 @@ test('anonymous and non-allowlisted callers cannot touch V2',async()=>{
     {uid:'another',isAnonymous:false},{data}),{code:'FORBIDDEN'});
   assert.equal(called,0);
 });
-test('AI parse returns audit IDs and no business write',async()=>{
+test('AI parse links every audit ID to the ready test scene before returning',async()=>{
   let writes=0;const data={run:async()=>{writes++;}};
+  const scenarioData={run:async(stage,actor)=>{
+    assert.equal(stage,'status');assert.equal(actor,uid);
+    return {ok:true,ready:true,targets:{personId:42}};
+  }};
+  const links=[];const linkAudit=async(...args)=>{
+    links.push(args);return {ok:true,linkedBatches:1};
+  };
   const gateway={runAITask:async request=>{
     assert.equal(request.skill,'quick_capture_v2');assert.equal(request.context.actor_uid,uid);
     return {taskId:101,runId:102,resultId:103,result:{person_name:name,
@@ -29,9 +36,23 @@ test('AI parse returns audit IDs and no business write',async()=>{
       commitment_candidates:[],evidence:[]}};
   }};
   const result=await runQuickCaptureV2({action:'quickCaptureV2',stage:'parse',text:name},
-    identity,{data,gateway});
+    identity,{data,gateway,scenarioData,linkAudit});
   assert.equal(result.businessDataWritten,false);assert.equal(result.aiTaskId,101);
   assert.equal(result.preview.facts.length,1);assert.equal(writes,0);
+  assert.deepEqual(links,[[101,[{table:'persons',id:'42'}]]]);
+});
+test('parse refuses an unready scene before model use and exposes an orphan audit ID on link failure',async()=>{
+  let called=0;
+  const gateway={runAITask:async()=>{called++;return {taskId:101,result:{}};}};
+  await assert.rejects(runQuickCaptureV2({action:'quickCaptureV2',stage:'parse',text:name},
+    identity,{data:{},gateway,scenarioData:{run:async()=>({ok:true,ready:false})}}),
+    {code:'TEST_SCENE_NOT_READY'});
+  assert.equal(called,0);
+  await assert.rejects(runQuickCaptureV2({action:'quickCaptureV2',stage:'parse',text:name},
+    identity,{data:{},gateway,scenarioData:{run:async()=>({ok:true,ready:true,targets:{personId:42}})},
+      linkAudit:async()=>{throw Error('store unavailable');}}),
+    {code:'AI_AUDIT_LINK_FAILED',auditTaskId:101});
+  assert.equal(called,1);
 });
 test('plan rejects same-name ID mismatch and leaves audit to the atomic database plan',async()=>{
   const calls=[];const data={resolve:async()=>({candidates:[{id:'42',displayName:name}]}),
