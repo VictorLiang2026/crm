@@ -126,7 +126,10 @@ class Browser {
   async wait(expression, timeout = 6000) {
     const end = Date.now() + timeout;
     while (Date.now() < end) { if (await this.evaluate(expression)) return; await delay(50); }
-    throw new Error('Timed out: ' + expression + '\nView: ' + (await this.evaluate("document.getElementById('view')?.innerText"))?.slice(0, 1400));
+    throw new Error('Timed out: ' + expression + '\nActual URL: ' +
+      await this.evaluate('location.href') + '\nFixture/view: ' +
+      JSON.stringify(await this.evaluate('({fixture:!!window.__crmTest,view:!!document.getElementById("view"),ready:document.readyState})')) + '\nView: ' +
+      (await this.evaluate("document.getElementById('view')?.innerText"))?.slice(0, 1400));
   }
   async open(hash, query = '') {
     this.runtimeErrors.length = 0;

@@ -1,4 +1,8 @@
 [
   {"kind":"customers","id":"786","issue":"UNMAPPED_CUSTOMER","reason":"身份尚未人工确认。同名 Person 754 已绑定客户 760，显示名称不同，禁止据姓名合并。"},
-  {"kind":"participants","id":"14","issue":"NAME_ONLY_UNCONFIRMED","reason":"活动 2 的旧姓名暂存参与者，无旧人员 ID 或 canonical Person；待用户明确选人，保留 Legacy 邀请记录。"}
+  {"kind":"customers","id":"789","issue":"UNMAPPED_CUSTOMER","reason":"2026-10-04 用户确认这是手工录入的客户，可暂缓身份映射；无招募或活动参与关联，不按姓名自动合并。"},
+  {"kind":"customers","id":"790","issue":"UNMAPPED_CUSTOMER","reason":"2026-10-04 用户确认这是手工录入的客户，可暂缓身份映射；无招募或活动参与关联，不按姓名自动合并。"},
+  {"kind":"participants","id":"14","issue":"NAME_ONLY_UNCONFIRMED","reason":"活动 2 的旧姓名暂存参与者，无旧人员 ID 或 canonical Person；待用户明确选人，保留 Legacy 邀请记录。"},
+  {"kind":"participants","id":"19","issue":"NAME_ONLY_UNCONFIRMED","reason":"2026-10-04 用户确认可暂缓处理；活动有效，但旧式姓名暂存记录未指定 Person，不按姓名自动合并。"},
+  {"kind":"participants","id":"20","issue":"NAME_ONLY_UNCONFIRMED","reason":"2026-10-04 用户确认可暂缓处理；活动有效，但旧式姓名暂存记录未指定 Person，不按姓名自动合并。"}
 ]

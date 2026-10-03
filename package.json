@@ -24,6 +24,7 @@
     "test:recruit-goals": "node --test tests/recruit-goals/transactional-save.cjs",
     "test:commitments": "node --test tests/commitments/commitment-service.cjs tests/interactions/person360-dispatch.cjs",
     "test:quick-capture-v2": "node --test tests/quick-capture-v2/server.cjs",
+    "test:wp07": "node --test tests/wp07/workflow.test.cjs",
     "test": "node tests/regression/run.cjs",
     "test:backend": "node tests/regression/run.cjs --backend-only",
     "test:browser": "node tests/regression/run.cjs --browser-only",

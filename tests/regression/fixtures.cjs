@@ -17,6 +17,7 @@ function installFixtures() {
     description: marker + '活动说明', topic_ids: [], deleted_at: null };
   const calls = [], violations = [], errors = [];
   let actionCommandStage = null;
+  let qcV2Stage = null;
   let loggedIn = params.get('login') !== 'required';
   window.__crmTest = { calls, violations, errors, loginAttempts: 0 };
   addEventListener('error', e => errors.push(e.message));
@@ -25,6 +26,40 @@ function installFixtures() {
   const fail = message => { violations.push(message); throw new Error(message); };
   const rows = value => ({ rows: mode === 'empty' ? [] : value, total: mode === 'empty' ? 0 : value.length, page: 1, pageSize: 50 });
   const replies = {
+    'assistant:testSamples': () => ({ok:true,ready:params.get('v2')==='1',
+      targets:{personId:'980001'},marker:'【系统测试·勿联系】'}),
+    'assistant:quickCaptureV2': data => {
+      if(data.stage==='parse') return {ok:true,stage:'parse',today:'2026-10-03',
+        aiTaskId:990101,aiRunId:990102,aiResultId:990103,preview:{
+          personName:'【系统测试·勿联系】虚构体验甲',
+          interaction:{type:'微信',date:'2026-10-03',channel:'微信',
+            summary:'【系统测试·勿联系】沟通摘要'},
+          facts:['【系统测试·勿联系】明确事实'],signals:['【系统测试·勿联系】观察线索'],
+          opportunityCandidates:['【系统测试·勿联系】机会推断'],
+          actionCandidates:['【系统测试·勿联系】整理反馈'],
+          commitmentCandidates:['【系统测试·勿联系】核对材料'],evidence:[]}};
+      if(data.stage==='resolve') return {ok:true,stage:'resolve',resolution:{hasMore:false,
+        candidates:[{id:'980001',displayName:'【系统测试·勿联系】虚构体验甲',organization:'虚构机构'}]}};
+      if(data.stage==='plan'&&data.personId==='980001'&&data.aiTaskId===990101){
+        qcV2Stage='planned';return {ok:true,status:'planned',commandId:'22222222-2222-4222-8222-222222222222'};
+      }
+      if(data.stage==='preview'&&qcV2Stage==='planned'){
+        qcV2Stage='previewed';return {ok:true,status:'previewed',
+          commandId:'22222222-2222-4222-8222-222222222222',previewHash:'b'.repeat(32),
+          expiresAt:'2026-10-03T12:15:00+08:00',preview:{personId:'980001',
+            displayName:'【系统测试·勿联系】虚构体验甲',interaction:data.draft||{},
+            facts:['【系统测试·勿联系】人工编辑的事实'],signals:['【系统测试·勿联系】观察线索'],
+            actions:[{title:'【系统测试·勿联系】整理反馈'}],commitments:[{content:'【系统测试·勿联系】核对材料'}]}};
+      }
+      if(data.stage==='confirm'&&qcV2Stage==='previewed'){
+        qcV2Stage='confirmed';return {ok:true,status:'confirmed'};
+      }
+      if(data.stage==='execute'&&qcV2Stage==='confirmed'){
+        qcV2Stage='executed';return {ok:true,status:'executed',resultIds:{interactionId:990001,
+          contextItemIds:[990201,990202],actionIds:[990301],commitmentIds:[990401]}};
+      }
+      return fail('UNEXPECTED_QUICK_CAPTURE_STAGE: '+data.stage);
+    },
     'assistant:command': data => {
       if (data.stage === 'plan' && data.command?.personId === 980002) {
         actionCommandStage = 'planned';
@@ -240,9 +275,9 @@ function installFixtures() {
         page: data.page, pageSize: data.pageSize, keyword: data.keyword, exactName: data.exactName,
         sortField: data.sortField, sortDir: data.sortDir,
         candidateId:data.candidateId, personId: data.personId, version: data.version,
-        payload: ['person_360:commitQuickCaptureV2', 'person_360:addCanonicalParticipant', 'person_360:recordActivityInteraction', 'person_360:createOpportunity',
+        payload: ['assistant:quickCaptureV2', 'person_360:commitQuickCaptureV2', 'person_360:addCanonicalParticipant', 'person_360:recordActivityInteraction', 'person_360:createOpportunity',
           'person_360:updateOpportunity', 'person_360:createSpeakerProfile',
-          'person_360:linkSpeakerPerson'].includes(key) ? data.data : null });
+          'person_360:linkSpeakerPerson'].includes(key) ? (key==='assistant:quickCaptureV2'?data:data.data) : null });
       if (!loggedIn) return fail('CALL_BEFORE_LOGIN: ' + key);
       if (mode === 'error' && (!params.get('fail') || params.get('fail') === key)) return { result: { error: 'TEST_API_FAILURE' } };
       const result = structuredClone(replies[key](data));

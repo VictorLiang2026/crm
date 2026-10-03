@@ -16,6 +16,22 @@ const recipe = (required, optional = [], limits = {}) => ({ required, optional, 
 
 const SKILLS = [
   {
+    name: 'quick_capture_v2', version: '2.0.0', capability: 'structured_extraction',
+    contextRecipe: recipe(['guidance','today'],['actor_uid']),
+    inputSchema: object({ text: text(10000) }, ['text']),
+    outputSchema: object({
+      person_name: {type:'string',maxLength:160},
+      interaction: object({type:text(64),date:{type:'string',maxLength:10},
+        channel:{type:'string',maxLength:100},summary:text(2000)},
+        ['type','date','channel','summary']),
+      facts: strings(20,500),signals:strings(12,500),
+      opportunity_candidates:strings(10,500),action_candidates:strings(10,500),
+      commitment_candidates:strings(10,500),evidence:strings(12,500),
+    }, ['person_name','interaction','facts','signals','opportunity_candidates',
+      'action_candidates','commitment_candidates','evidence']),
+    confirmationLevel:'confirm_before_write',timeoutClass:'standard',
+  },
+  {
     name: 'quick_capture', version: '1.0.0', capability: 'structured_extraction',
     contextRecipe: recipe([], ['operator_profile']),
     inputSchema: object({ text: text(12000) }, ['text']),

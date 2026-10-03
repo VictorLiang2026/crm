@@ -518,7 +518,7 @@
 <main id="view"><div class="loading">初始化中…</div></main>
 <div id="modal-root"></div>
 <div id="toast-root"></div>
-<script>window.APP_CONFIG = { envId: 'crm-d1gkae8ddc930d151', operator: { name: 'Victor', gender: '男', birthday: '1976-10' }, featureFlags: { quick_capture_v2: false } };</script>
+<script>window.APP_CONFIG = { envId: 'crm-d1gkae8ddc930d151', operator: { name: 'Victor', gender: '男', birthday: '1976-10' }, featureFlags: { quick_capture_v2: true } };</script>
 <script src="https://static.cloudbase.net/cloudbase-js-sdk/3.10.1/cloudbase.full.js"></script>
 <script>
 (function(){
@@ -8463,7 +8463,7 @@ function openCandidateForm(id, presetCust){
 // ==================== 启动 ====================
 window.addEventListener('hashchange', route);
 (async function(){
-  if(await initSdk()) route();
+  if(await initSdk()) { route(); if(window.refreshQcv2) window.refreshQcv2(); }
   else { /* initSdk 已渲染提示 */ }
 })();
 
@@ -8732,12 +8732,24 @@ var qcEntryBtn = document.getElementById('qc-entry-btn');
 if(qcEntryBtn) qcEntryBtn.addEventListener('click', openQuickCapture);
 if(qcEntryBtn && CONFIG.featureFlags && CONFIG.featureFlags.quick_capture_v2 === true){
   var qcV2Btn = el('button', {type:'button', class:'mod-btn'}, '快速记录 V2');
+  qcV2Btn.style.display = 'none';
+  var qcV2Scenario = null;
+  window.refreshQcv2 = async function(){
+    qcV2Btn.style.display = 'none';
+    try {
+      var result = await callFn('assistant', {action:'testSamples',stage:'status'});
+      if(result && result.ok === true && result.ready === true && result.targets && result.targets.personId){
+        qcV2Scenario = result; qcV2Btn.style.display = '';
+      }
+    } catch(e) { qcV2Scenario = null; }
+  };
   qcV2Btn.addEventListener('click', async function(){
     try{
       var featureModule = await import('/crm/js/core/feature-flags.js');
       if(!featureModule.createFeatureFlags(CONFIG.featureFlags).isEnabled('quick_capture_v2')) return;
       var module = await import('/crm/js/modules/quick-capture-v2.js');
-      module.openQuickCaptureV2({callFn:callFn});
+      if(!qcV2Scenario) return;
+      module.openQuickCaptureV2({callFn:callFn,scenario:qcV2Scenario});
     }catch(e){ toast('快速记录 V2 加载失败：' + e.message, 'err'); }
   });
   qcEntryBtn.after(qcV2Btn);

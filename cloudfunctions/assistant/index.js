@@ -25,6 +25,11 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
         allowedUids: String(process.env.CRM_TEST_SEED_UIDS || '').split(',').map(s => s.trim()).filter(Boolean),
       }); } catch (error) { return {ok:false,error:{code:error.code || 'SEED_DENIED',message:'测试场景操作未完成，请核对预览或权限'}}; }
     }
+    if (event?.action === 'quickCaptureV2') {
+      try { return await require('./quick-capture-v2-service').runQuickCaptureV2(event,identity); }
+      catch (error) { return {ok:false,error:{code:error.code || 'QUICK_CAPTURE_FAILED',
+        message:'快速记录 V2 操作未完成，请核对身份、预览或权限'}}; }
+    }
     if (event?.action === 'opportunityCandidate') {
       try { return await candidateRunner(event, identity.uid); }
       catch (error) {

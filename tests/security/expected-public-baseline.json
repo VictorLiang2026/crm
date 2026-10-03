@@ -1506,6 +1506,37 @@
     },
     {
       "kind": "relation",
+      "name": "quick_capture_v2_commands",
+      "detail": {
+        "rls": true,
+        "type": "r",
+        "policies": [
+          {
+            "name": "quick_capture_v2_commands_service_only",
+            "roles": [
+              "service_role"
+            ],
+            "command": "*",
+            "check_hash": "b326b5062b2f0e69046810717534cb09",
+            "permissive": true,
+            "using_hash": "b326b5062b2f0e69046810717534cb09"
+          }
+        ],
+        "force_rls": true,
+        "privileges": {
+          "anon": [],
+          "service_role": [
+            "INSERT",
+            "SELECT",
+            "UPDATE"
+          ],
+          "authenticated": []
+        },
+        "security_invoker": false
+      }
+    },
+    {
+      "kind": "relation",
       "name": "recruit_candidates",
       "detail": {
         "rls": true,
@@ -2016,6 +2047,26 @@
     {
       "kind": "routine",
       "name": "opportunity_candidate_v1(p_operation text, p_actor_uid text, p_candidate_id bigint, p_person_id bigint, p_ai_result_id bigint, p_draft jsonb, p_evidence jsonb, p_preview_hash text)",
+      "detail": {
+        "anon_execute": false,
+        "service_execute": true,
+        "security_definer": false,
+        "authenticated_execute": false
+      }
+    },
+    {
+      "kind": "routine",
+      "name": "quick_capture_v2_command_v1(p_stage text, p_actor_uid text, p_command_id uuid, p_person_id bigint, p_selected_display_name text, p_draft jsonb, p_preview_hash text, p_ai_task_id bigint, p_ai_result_id bigint)",
+      "detail": {
+        "anon_execute": false,
+        "service_execute": true,
+        "security_definer": false,
+        "authenticated_execute": false
+      }
+    },
+    {
+      "kind": "routine",
+      "name": "quick_capture_v2_plan_v1(p_actor_uid text, p_person_id bigint, p_selected_display_name text, p_draft jsonb, p_ai_task_id bigint, p_ai_result_id bigint)",
       "detail": {
         "anon_execute": false,
         "service_execute": true,

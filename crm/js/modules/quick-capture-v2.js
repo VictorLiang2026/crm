@@ -6,9 +6,9 @@ const make = (tag, text = '', cls = '') => {
   el.className = cls;
   return el;
 };
-const lines = text => text.split(/\r?\n/u).map(x => x.trim()).filter(Boolean);
+const MARKER = '【系统测试·勿联系】';
 
-export function openQuickCaptureV2({ callFn }) {
+export function openQuickCaptureV2({ callFn, scenario }) {
   const api = createApi(callFn);
   if (!document.getElementById('qcv2-style')) {
     const link = make('link'); link.id = 'qcv2-style'; link.rel = 'stylesheet';
@@ -22,10 +22,12 @@ export function openQuickCaptureV2({ callFn }) {
   const top = make('div', '', 'qcv2-row'); top.append(title, close);
   const notice = make('p', '先确认人物身份，再编辑草稿。保存后事实与信号仍待独立核验。', 'qcv2-hint');
   const raw = make('textarea'); raw.maxLength = 10000; raw.placeholder = '输入刚发生的沟通、观察或约定';
+  const preset = make('button', '使用预填测试场景', 'btn'); preset.type = 'button';
+  preset.onclick = () => { raw.value = `${MARKER}虚构体验甲参加了虚构活动。我们讨论了下周整理活动反馈，约定双方周五核对材料。我需要记录行动：整理反馈。`; raw.focus(); };
   const parse = make('button', '解析为草稿', 'btn btn-ai'); parse.type = 'button';
   const status = make('p', '', 'qcv2-status'); status.setAttribute('role', 'status');
   const preview = make('div', '', 'qcv2-preview');
-  box.append(top, notice, raw, parse, status, preview); overlay.append(box);
+  box.append(top, notice, preset, raw, parse, status, preview); overlay.append(box);
   document.getElementById('modal-root').append(overlay); raw.focus();
 
   const setStatus = (text, error = false) => {
@@ -33,7 +35,7 @@ export function openQuickCaptureV2({ callFn }) {
   };
   const call = async (fn, data) => {
     const result = await api.call(fn, data);
-    if (!result || result.error) throw new Error(result?.error || '请求失败');
+    if (!result || result.ok === false || result.error) throw new Error(result?.error?.code || result?.error || '请求失败');
     return result;
   };
   const section = (title, hint) => {
@@ -51,18 +53,18 @@ export function openQuickCaptureV2({ callFn }) {
     if (!text) return setStatus('请先输入原话。', true);
     parse.disabled = true; preview.replaceChildren(); setStatus('正在生成候选项…');
     try {
-      const result = await call('ai_parse', { action: 'quick_capture', version: 2, text });
-      render(result.preview, result.today, text);
+      const result = await call('assistant', { action: 'quickCaptureV2', stage: 'parse', text });
+      render(result.preview, result.today, text, result.aiTaskId, result.aiResultId);
       setStatus('草稿已生成。请确认身份并逐项检查。');
     } catch (error) { setStatus(`解析失败：${error.message}`, true); }
     finally { parse.disabled = false; }
   };
 
-  function render(draft, today, text) {
+  function render(draft, today, text, aiTaskId, aiResultId) {
     if (!draft?.interaction) throw new Error('草稿格式无效');
     preview.replaceChildren();
     const identity = section('1 · 人物身份', '必须手动选择已有 Person；AI 不会认定身份。本版不自动创建人物。');
-    const name = field(identity, '姓名', draft.personName, 160);
+    const name = field(identity, '姓名', scenario?.targets?.personId ? `${MARKER}虚构体验甲` : draft.personName, 160);
     const search = make('button', '查找 Person', 'btn'); search.type = 'button'; identity.append(search);
     const matches = make('div', '', 'qcv2-matches'); identity.append(matches);
     let chosen = null;
@@ -72,10 +74,11 @@ export function openQuickCaptureV2({ callFn }) {
       if (!name.value.trim()) return setStatus('请先输入姓名。', true);
       search.disabled = true;
       try {
-        const result = await call('person_360', { action: 'resolveQuickCaptureName', name: name.value.trim() });
-        if (!result.candidates.length) matches.append(make('p', '没有找到现有 Person，请先在 CRM 中建档。', 'qcv2-hint'));
-        if (result.hasMore) matches.append(make('p', '仅显示前 10 位；如未找到目标，请增加括号限定后重试。', 'qcv2-hint'));
-        for (const candidate of result.candidates) {
+        const result = await call('assistant', { action:'quickCaptureV2', stage:'resolve', name:name.value.trim() });
+        if (!result.resolution.candidates.length) matches.append(make('p', '没有找到现有 Person。', 'qcv2-hint'));
+        if (result.resolution.hasMore) matches.append(make('p', '仅显示前 10 位；请增加括号限定后重试。', 'qcv2-hint'));
+        if (result.resolution.candidates.length > 1) matches.append(make('p', '同名冲突：必须人工选择正确的 Person。', 'qcv2-hint'));
+        for (const candidate of result.resolution.candidates) {
           const label = make('label', '', 'qcv2-match');
           const radio = make('input'); radio.type = 'radio'; radio.name = 'qcv2-person';
           radio.onchange = () => { chosen = candidate; };
@@ -90,35 +93,85 @@ export function openQuickCaptureV2({ callFn }) {
     const date = field(interaction, '日期', draft.interaction.date || today, 10); date.type = 'date';
     const channel = field(interaction, '渠道', draft.interaction.channel, 100);
     const summary = field(interaction, '摘要', draft.interaction.summary, 2000, 'textarea');
-    const facts = field(section('3 · 事实候选', '每行一条；保存后仍是未确认的 AI Fact Candidate。'),
-      '事实', (draft.facts || []).join('\n'), 10000, 'textarea');
-    const signals = field(section('4 · 信号候选', '观察线索不等于事实。'),
-      '信号', (draft.signals || []).join('\n'), 6000, 'textarea');
-    for (const [title, key] of [['5 · 机会候选', 'opportunityCandidates'],
-      ['6 · 行动候选', 'actionCandidates'], ['7 · 承诺候选', 'commitmentCandidates']]) {
-      field(section(title, '本版仅预览与编辑，不写旧业务表。'), '候选项',
-        (draft[key] || []).join('\n'), 6000, 'textarea');
-    }
+    const candidates = (title, hint, values, { writable = true, commitment = false } = {}) => {
+      const panel = section(title, hint), entries = [];
+      for (const value of values || []) {
+        const row = make('div', '', 'qcv2-candidate');
+        const choose = make('input'); choose.type = 'checkbox'; choose.checked = false;
+        choose.disabled = !writable;
+        const edit = make('textarea'); edit.value = value; edit.maxLength = commitment ? 4000 : 500;
+        edit.readOnly = !writable;
+        row.append(choose, edit);
+        let kind;
+        if (commitment) {
+          kind = make('select');
+          for (const [key, label] of [['', '请选择承诺方'], ['I_PROMISED', '我承诺'],
+            ['THEY_PROMISED', '对方承诺'], ['MUTUAL', '双方约定']]) {
+            const option = make('option', label); option.value = key; kind.append(option);
+          }
+          row.append(kind);
+        }
+        panel.append(row); entries.push({ choose, edit, kind });
+      }
+      if (!entries.length) panel.append(make('p', '未提取候选项。', 'qcv2-hint'));
+      return () => entries.filter(x => x.choose.checked && x.edit.value.trim()).map(x => ({
+        text: x.edit.value.trim(), type: x.kind?.value,
+      }));
+    };
+    const facts = candidates('3 · 事实候选', '逐条勾选与编辑；写入后仍为未确认的 AI Fact Candidate。', draft.facts);
+    const signals = candidates('4 · 信号候选', '观察线索不等于事实。', draft.signals);
+    candidates('5 · 机会候选', '仅供人工查看；本工作包不写入机会。',
+      draft.opportunityCandidates, { writable: false });
+    const actions = candidates('6 · 行动候选', '勾选的行动会在最终确认后写入。', draft.actionCandidates);
+    const commitments = candidates('7 · 承诺候选', '勾选后必须选择承诺方；最终确认后写入。',
+      draft.commitmentCandidates, { commitment: true });
     if (draft.evidence?.length) field(section('原话依据', '核对候选内容的依据。'),
       '依据', draft.evidence.join('\n'), 6000, 'textarea');
-    const save = make('button', '确认身份与内容并保存', 'btn btn-primary'); save.type = 'button';
+    const save = make('button', '生成服务端预览', 'btn btn-primary'); save.type = 'button';
     preview.append(save);
     save.onclick = async () => {
       if (!chosen) return setStatus('请先手动选择已有 Person。', true);
+      if (raw.value.trim() !== text) return setStatus('原话已变更，请重新解析后预览。', true);
       if (!date.value || !type.value.trim() || !summary.value.trim()) return setStatus('请填写互动方式、日期和摘要。', true);
-      if (!window.confirm(`确认保存到 ${chosen.displayName}？机会、行动和承诺不会写入业务表。`)) return;
-      save.disabled = true; setStatus('正在保存，请勿重复提交…');
+      const factItems = facts(), signalItems = signals(), actionItems = actions(), commitmentItems = commitments();
+      if (commitmentItems.some(x => !x.type)) return setStatus('请为每条选中的承诺选择承诺方。', true);
+      save.disabled = true; setStatus('正在核实人物及生成服务端预览…');
       try {
-        const result = await call('person_360', { action: 'commitQuickCaptureV2', data: {
-          personId: chosen.id, selectedDisplayName: chosen.displayName, confirmed: true,
-          interaction: { type: type.value.trim(), at: `${date.value}T12:00:00+08:00`,
-            channel: channel.value.trim(), summary: summary.value.trim(), rawNote: text },
-          facts: lines(facts.value), signals: lines(signals.value),
-        } });
-        preview.replaceChildren(make('p', `已保存互动 #${result.interactionId} 和 ${result.contextItemCount} 条未确认候选项。`, 'qcv2-success'));
-        setStatus('保存完成。');
+        const planned = await call('assistant', { action:'quickCaptureV2', stage:'plan',
+          personId:chosen.id, selectedDisplayName:chosen.displayName, aiTaskId, aiResultId,
+          draft:{interaction:{type:type.value.trim(),at:`${date.value}T12:00:00+08:00`,
+            channel:channel.value.trim(),summary:summary.value.trim(),rawNote:text},
+            facts:factItems.map(x=>x.text), signals:signalItems.map(x=>x.text),
+            actions:actionItems.map(x=>({title:x.text,description:'',dueAt:null,priority:'medium'})),
+            commitments:commitmentItems.map(x=>({type:x.type,content:x.text,dueAt:null}))} });
+        const receipt = await call('assistant', {action:'quickCaptureV2',stage:'preview',commandId:planned.commandId});
+        for (const control of preview.querySelectorAll('input,textarea,select,button')) control.disabled = true;
+        const review = make('section', '', 'qcv2-section');
+        review.append(make('h4', '服务端预览 · 含测试数据'),
+          make('p', `Person #${receipt.preview.personId} · ${receipt.preview.displayName}`),
+          make('p', `互动 1 条；未确认事实/信号 ${receipt.preview.facts.length + receipt.preview.signals.length} 条；行动 ${receipt.preview.actions.length} 条；承诺 ${receipt.preview.commitments.length} 条。`),
+          make('p', `有效期至 ${receipt.expiresAt}。未确认前不写入业务表。`, 'qcv2-hint'));
+        const detail = make('pre', JSON.stringify(receipt.preview, null, 2), 'qcv2-json'); review.append(detail);
+        const confirm = make('button', '确认以上内容并写入', 'btn btn-primary'); confirm.type='button';
+        review.append(confirm); preview.append(review);
+        confirm.onclick = async () => {
+          confirm.disabled = true; setStatus('正在确认并写入…');
+          try {
+            await call('assistant', {action:'quickCaptureV2',stage:'confirm',
+              commandId:receipt.commandId,previewHash:receipt.previewHash});
+            const result = await call('assistant', {action:'quickCaptureV2',stage:'execute',
+              commandId:receipt.commandId});
+            preview.replaceChildren(make('p', `已保存互动 #${result.resultIds.interactionId}；行动 ${result.resultIds.actionIds.length} 条；承诺 ${result.resultIds.commitmentIds.length} 条。含测试数据。`, 'qcv2-success'));
+            setStatus('保存完成。衍生记录和 AI 审计 ID 已登记。');
+          } catch (error) {
+            setStatus(`结果待核对：${error.message}。请在原预览上重试，不要新建草稿。`, true);
+            confirm.textContent = '重试同一预览'; confirm.disabled = false;
+          }
+        };
+        setStatus('服务端预览完成，请逐项核对后确认。');
       } catch (error) {
-        setStatus(`保存结果未确认：${error.message}。请先到 Person 360 核对，避免重复提交。`, true);
+        save.disabled = false;
+        setStatus(`预览失败：${error.message}`, true);
       }
     };
   }

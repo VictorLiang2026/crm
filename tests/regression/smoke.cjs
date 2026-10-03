@@ -67,7 +67,7 @@ module.exports = async function smoke(root, test) {
     await check('ai.search.entry', 'AI CRM 搜索独立页面展示固定示例，进入页面不执行搜索', async () => {
       await open('#/ai/search', 'AI CRM 搜索');
       await b.wait(text('最近三个月参加过活动'));
-      assert.equal(await b.evaluate("window.__crmTest.calls.some(c=>c.name==='assistant')"), false);
+      assert.equal(await b.evaluate("window.__crmTest.calls.some(c=>c.name==='assistant' && c.action!=='testSamples')"), false);
     });
     await check('assistant.action.create', 'Action 必须人工选人、预览、确认后才执行', async () => {
       await open('#/assistant/actions/new', '新建行动');
@@ -393,34 +393,39 @@ module.exports = async function smoke(root, test) {
     });
     await check('quickcapture.preserve', '快速录入点击背景保留草稿', async () => {
       await open('#/customers', '[CRM_TEST_ONLY]客户甲');
-      assert.equal(await b.evaluate("[...document.querySelectorAll('button')].some(x=>x.textContent==='快速记录 V2')"), false);
+      assert.equal(await b.evaluate("[...document.querySelectorAll('button')].some(x=>x.textContent==='快速记录 V2' && x.style.display!=='none')"), false);
       await b.evaluate("document.getElementById('qc-entry-btn').click()");
       await b.wait("Boolean(document.querySelector('.modal-overlay textarea'))");
       await b.evaluate("document.querySelector('.modal-overlay textarea').value='[CRM_TEST_ONLY]未保存草稿'; document.querySelector('.modal-overlay').click()");
       assert.equal(await b.evaluate("document.querySelector('.modal-overlay textarea')?.value"), '[CRM_TEST_ONLY]未保存草稿');
     });
-    await check('quickcapture.v2.confirm', 'V2 默认隔离，手选 Person 并编辑后才提交允许的候选项', async () => {
+    await check('quickcapture.v2.confirm', 'V2 测试账号手选 Person、逐项编辑、服务端预览后写入', async () => {
       await open('#/customers', '[CRM_TEST_ONLY]客户甲', 'v2=1');
-      await b.wait("[...document.querySelectorAll('button')].some(x=>x.textContent==='快速记录 V2')");
+      await b.wait("[...document.querySelectorAll('button')].some(x=>x.textContent==='快速记录 V2' && x.style.display!=='none')");
       await b.click('button', '快速记录 V2');
       await b.wait("Boolean(document.querySelector('.qcv2-modal>textarea'))");
-      await b.evaluate("document.querySelector('.qcv2-modal>textarea').value='[CRM_TEST_ONLY]原话'");
+      await b.click('button', '使用预填测试场景');
       await b.click('button', '解析为草稿');
       await b.wait("document.querySelector('.qcv2-preview')?.innerText.includes('事实候选')");
-      assert.equal(await b.evaluate(called('person_360', 'commitQuickCaptureV2')), false);
-      await b.click('button', '确认身份与内容并保存');
+      assert.equal(await b.evaluate("window.__crmTest.calls.some(c=>c.action==='quickCaptureV2' && c.stage==='execute')"), false);
+      await b.click('button', '生成服务端预览');
       await b.wait("document.querySelector('.qcv2-status')?.textContent.includes('手动选择')");
-      assert.equal(await b.evaluate(called('person_360', 'commitQuickCaptureV2')), false);
+      assert.equal(await b.evaluate("window.__crmTest.calls.some(c=>c.action==='quickCaptureV2' && c.stage==='plan')"), false);
       await b.click('button', '查找 Person');
       await b.wait("Boolean(document.querySelector('.qcv2-match input'))");
-      await b.evaluate("document.querySelector('.qcv2-match input').click(); document.querySelector('.qcv2-preview section:nth-of-type(3) textarea').value='[CRM_TEST_ONLY]人工编辑的事实'; window.confirm=()=>true");
-      await b.click('button', '确认身份与内容并保存');
+      await b.evaluate("document.querySelector('.qcv2-match input').click(); document.querySelector('.qcv2-preview section:nth-of-type(3) .qcv2-candidate textarea').value='【系统测试·勿联系】人工编辑的事实'; for(const n of [3,4,6,7]) document.querySelector('.qcv2-preview section:nth-of-type('+n+') .qcv2-candidate input').click(); document.querySelector('.qcv2-preview section:nth-of-type(7) select').value='MUTUAL'");
+      await b.click('button', '生成服务端预览');
+      await b.wait("document.querySelector('.qcv2-preview')?.innerText.includes('服务端预览')");
+      assert.equal(await b.evaluate("window.__crmTest.calls.some(c=>c.action==='quickCaptureV2' && c.stage==='execute')"), false);
+      await b.click('button', '确认以上内容并写入');
       await b.wait("document.querySelector('.qcv2-success')?.textContent.includes('已保存互动')");
-      const payload = await b.evaluate("window.__crmTest.calls.find(c=>c.action==='commitQuickCaptureV2')?.payload");
+      const payload = await b.evaluate("window.__crmTest.calls.find(c=>c.action==='quickCaptureV2' && c.stage==='plan')?.payload");
       assert.equal(payload.personId, '980001');
-      assert.deepEqual(payload.facts, ['[CRM_TEST_ONLY]人工编辑的事实']);
-      assert.deepEqual(payload.signals, ['[CRM_TEST_ONLY]观察线索']);
-      assert.equal('opportunityCandidates' in payload, false);
+      assert.deepEqual(payload.draft.facts, ['【系统测试·勿联系】人工编辑的事实']);
+      assert.deepEqual(payload.draft.signals, ['【系统测试·勿联系】观察线索']);
+      assert.equal(payload.draft.actions.length, 1);
+      assert.equal(payload.draft.commitments[0].type, 'MUTUAL');
+      assert.equal('opportunityCandidates' in payload.draft, false);
       assert.equal(await b.evaluate("window.__crmTest.calls.some(c=>c.action==='create' && ['opportunities','followups'].includes(c.name))"), false);
     });
   } finally { await b.close(); }
