@@ -1,6 +1,6 @@
 # WP05 Person 360 身份与客户资料操作补齐
 
-状态：WP05 实现与业务验收通过；发布标记以提交、推送、标签和三端核对成功为准。用户已专项确认本 WP 范围。
+状态：WP05 完成。业务发布提交 `0b5d74d1aa807ca3337d380af34137b521d059a7`，标签 `release-20261003-182900`；发布后本地、GitHub、云端全量核对通过。用户已专项确认本 WP 范围。
 
 ## 基线与范围
 
@@ -44,7 +44,7 @@ customers.wx_account/education/mbti 已存在，但不在旧客户基本信息�
 - WP05 专项 8 项通过：只读实时来源、空联系方式不回退、客户不可用、独立人物、样本联系禁用、非法身份、来源/角色、旧编辑入口、异常重试和手机尺寸场景。360/390/768px 为隔离浏览器模拟，不是真机。
 - 本轮权限目录检查 646 项通过。
 - 首次完整门槛在 guard-tests 阶段停止：新 critical 项 `wp05-profile` 已加入运行器，但门槛自测夹具遗漏。用户要求继续验收后，仅补齐该夹具，保留 WP05 必检项。复跑 12/12 门槛自测通过；WP01 报告 `PASS_WITH_LIMITATIONS`，646 项权限、50 项匿名拒绝、WP02 17、WP03 18、WP04 8、WP05 8、旧功能 94 项通过，旧回归 0 失败、5 项标注跳过。
-- `person_360` 一项函数与 `admin.html`、`person-360.js`、`person-profile.js`、`person-360.css` 四个静态文件已单独部署。静态 21 个实际可达引用文件 SHA-256 与云端相同；28 个函数、160 个源码/配置文件与云端一致，云端只读证据 `C:\Users\victor\AppData\Local\Temp\crm-cloud-audit-d752e004b2004e9a9288d8f0a4b43a80`。GitHub/标签由发布后的完整 sync-check 核对。
+- `person_360` 一项函数与 `admin.html`、`person-360.js`、`person-profile.js`、`person-360.css` 四个静态文件已单独部署。静态 21 个实际可达引用文件 SHA-256 与云端相同；28 个函数、160 个源码/配置文件与云端一致。发布后全量三端只读证据：`C:\Users\victor\AppData\Local\Temp\crm-cloud-audit-c291bf8c72bf4882a9e1357236aefe07`。线上入口 `https://crm-d1gkae8ddc930d151-1434199662.tcloudbaseapp.com/crm/admin.html`。
 - `prtest` 已在隔离真实窗口登录。先跑 14 项只读 dry-run，再按原客户表单“确定”保存：public.customers #788（已登记虚构样本）的 occupation 从 NULL 改为 `【系统测试·勿联系】虚构资料验收职业`，初始/衍生/AI 审计新行均为 0。Person #783 返回后立即显示新职业，其他客户资料字段不变，台账计数仍 10/2/3。测试样本复制按钮禁用，未外发。报告 `tests/security/.results/wp05-live.json`。
 - 真实相邻只读回归 66 项通过：登录、53 个 authenticated 直接读拒绝、无效种子拒绝、测试场景/Person/旧客户/活动/漏斗及 390px 模拟页面。报告 `tests/security/.results/wp03-readonly-live.json`。这不等于实体手机测试。
 
@@ -52,6 +52,6 @@ customers.wx_account/education/mbti 已存在，但不在旧客户基本信息�
 
 新增 `cloudfunctions/person_360/customer-profile-service.js`、`crm/js/modules/person-profile.js`、`tests/wp05/profile.test.cjs`、`browser.test.cjs`、`live.cjs`、`README.md` 和本报告。改动涉及旧页面桥接、Person 360 模块/样式、函数分发、测试夹具、测试运行器和 package 脚本。
 
-未验证项：实体手机操作、服务角色独立运行时探针，以及非本 WP 的真实外发。登录和虚构客户旧表单写入已由上述真实验收覆盖。Git 提交/推送/标签及最终三端核对以发布脚本输出为准，不由本报告预先宣称通过。
+未验证项：实体手机操作、服务角色独立运行时探针，以及非本 WP 的真实外发。登录和虚构客户旧表单写入已由上述真实验收覆盖。
 
 代码回滚基于 WP04 标签 `release-20261003-134000`，只恢复本轮 `person_360` 与四个静态文件并创建恢复提交，不强推、不删除原有对象。数据库无结构变更；真实测试职业原值 NULL 已由受保护的 `wp05-live.json` dryRun.before 留存，必要时经原客户表单清空恢复，不直接批量写库。
