@@ -173,6 +173,17 @@ module.exports = async function smoke(root, test) {
       await b.wait(called('person_360', 'executeOpportunity'));
       assert.equal(await b.evaluate("window.__crmTest.calls.some(c=>c.action==='updateOpportunity')"), false);
     });
+    await check('person360.opportunity-preview-error', 'CloudBase 拒绝非 Error 对象时显示可定位错误而非 undefined', async () => {
+      await b.evaluate('window.__crmTest.rejectPreview=true');
+      try {
+        await b.click('.person360-opportunity button', '编辑');
+        await b.click('.person360-opportunity-form button', '生成服务端预览');
+        await b.wait(text('预览失败：SDK_NETWORK_TEST'));
+        assert.equal(await b.evaluate("document.querySelector('.person360-opportunity-form-host').innerText.includes('undefined')"), false);
+      } finally {
+        await b.evaluate('window.__crmTest.rejectPreview=false');
+      }
+    });
     await check('person360.search', '家庭成员只能搜索并选择已有 Person', async () => {
       await b.evaluate("document.querySelector('.person360-row input').value='[CRM_TEST_ONLY]家人乙'");
       await b.click('.person360-row button', '查找');

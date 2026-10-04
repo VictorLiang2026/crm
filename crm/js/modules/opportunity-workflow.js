@@ -9,7 +9,12 @@ const button=(label,fn,cls='')=>{const e=make('button',`btn ${cls}`,label);e.typ
   e.addEventListener('click',fn);return e;};
 const field=(label,control)=>{const e=make('label','person360-opportunity-field');
   e.append(make('span','',label),control);return e;};
-const requestError=result=>result?.error || '请求失败';
+const requestError=value=>{
+  if(typeof value==='string'&&value.trim())return value;
+  for(const detail of [value?.message,value?.error,value?.errMsg,value?.code])
+    if(typeof detail==='string'&&detail.trim())return detail;
+  return '请求未完成，请检查登录状态与网络后重试';
+};
 
 export function mountOpportunityWorkflow({root,personId,personName='',callFn,
   isCurrent=()=>true,onChanged=()=>{}}) {
@@ -55,7 +60,7 @@ export function mountOpportunityWorkflow({root,personId,personName='',callFn,
         card.append(controls);list.append(card);
       }
     } catch(error) {
-      if(mine===serial&&isCurrent())notice.textContent=`机会加载失败：${error.message}`;
+      if(mine===serial&&isCurrent())notice.textContent=`机会加载失败：${requestError(error)}`;
     }
   }
   async function preview(operation,opportunity,draft) {
@@ -82,11 +87,11 @@ export function mountOpportunityWorkflow({root,personId,personName='',callFn,
           const saved=await call('executeOpportunity',{previewId:result.previewId});
           message.textContent=`已保存机会 #${saved.opportunityId}${saved.outcomeId?`；结果 #${saved.outcomeId}`:''}${saved.replayed?'（幂等重放）':''}`;
           await load();onChanged(saved);
-        } catch(error) {message.textContent=`执行失败：${error.message}。请重新预览。`;confirm.disabled=false;}
+        } catch(error) {message.textContent=`执行失败：${requestError(error)}。请重新预览。`;confirm.disabled=false;}
       },'btn-primary');
       panel.append(confirm,button('取消',()=>editor.replaceChildren()),message);
       editor.replaceChildren(panel);panel.scrollIntoView({block:'nearest'});
-    } catch(error) {editor.replaceChildren(make('p','person360-error',`预览失败：${error.message}`));}
+    } catch(error) {editor.replaceChildren(make('p','person360-error',`预览失败：${requestError(error)}`));}
   }
   function showEditor(operation,row=null) {
     const form=make('form','person360-opportunity-form');
@@ -129,7 +134,7 @@ export function mountOpportunityWorkflow({root,personId,personName='',callFn,
             option.value=item.id;action.append(option);
           }
           action.disabled=false;
-        }).catch(error=>{message.textContent=`行动读取失败：${error.message}`;});
+        }).catch(error=>{message.textContent=`行动读取失败：${requestError(error)}`;});
       }
     }
     const message=make('p','person360-error');
@@ -179,7 +184,7 @@ export function mountOpportunityWorkflow({root,personId,personName='',callFn,
       }
       panel.append(button('关闭',()=>editor.replaceChildren()));
       editor.replaceChildren(panel);
-    }catch(error){editor.replaceChildren(make('p','person360-error',`关联加载失败：${error.message}`));}
+    }catch(error){editor.replaceChildren(make('p','person360-error',`关联加载失败：${requestError(error)}`));}
   }
   void load();
   return {refresh:load};

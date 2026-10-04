@@ -307,6 +307,8 @@ function installFixtures() {
     }; },
     async callFunction({ name, data }) {
       const key = name + ':' + data.action;
+      if (key === 'person_360:previewOpportunity' && window.__crmTest.rejectPreview)
+        throw {code:'SDK_NETWORK_TEST'};
       if (!Object.hasOwn(replies, key)) return fail('UNEXPECTED_OR_WRITE_ACTION: ' + key);
       calls.push({ name, action: data.action, view: data.view, guidance: data.guidance,
         operation: data.operation, stage: data.stage, id: data.id,
