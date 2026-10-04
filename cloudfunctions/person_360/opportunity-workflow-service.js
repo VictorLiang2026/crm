@@ -106,17 +106,26 @@ class OpportunityWorkflowService {
       customer_id:'is.null',deleted_at:'is.null',limit:1,
     });
     if (!rows.length) throw new Error('Person-only Opportunity unavailable');
-    const [actions,outcomes]=await Promise.all([
+    const [direct,links,outcomes]=await Promise.all([
       this.request('actions','GET',{
         select:'id,person_id,opportunity_id,title,status,due_at,source',
         person_id:`eq.${person}`,opportunity_id:`eq.${opp}`,
         order:'updated_at.desc,id.desc',limit:50,
+      }),
+      this.request('crm_opportunity_action_links','GET',{
+        select:'action_id',person_id:`eq.${person}`,opportunity_id:`eq.${opp}`,limit:50,
       }),
       this.request('outcomes','GET',{
         select:'id,opportunity_id,action_id,outcome_type,result,occurred_at',
         opportunity_id:`eq.${opp}`,order:'occurred_at.desc,id.desc',limit:20,
       }),
     ]);
+    const linkedIds=links.map(row=>id(row.action_id));
+    const extra=linkedIds.length?await this.request('actions','GET',{
+      select:'id,person_id,opportunity_id,title,status,due_at,source',
+      person_id:`eq.${person}`,id:`in.(${linkedIds.join(',')})`,limit:50,
+    }):[];
+    const actions=[...new Map([...direct,...extra].map(row=>[String(row.id),row])).values()];
     return {opportunityId:opp,actions,outcomes,testData:await this.disclosure([
       ...refsForRows('opportunities',rows),...refsForRows('actions',actions),
       ...refsForRows('outcomes',outcomes)])};
@@ -124,9 +133,15 @@ class OpportunityWorkflowService {
   async availableActions(personId,actorUid) {
     const person=id(personId);
     if(actorUid)await this.assertTrackedPerson(person,actorUid);
+    const links=await this.request('crm_opportunity_action_links','GET',{
+      select:'action_id',person_id:`eq.${person}`,limit:100,
+    });
+    const linkedIds=links.map(row=>id(row.action_id));
     const rows=await this.request('actions','GET',{
       select:'id,person_id,title,status,due_at',person_id:`eq.${person}`,
-      opportunity_id:'is.null',order:'updated_at.desc,id.desc',limit:30,
+      opportunity_id:'is.null',
+      ...(linkedIds.length?{id:`not.in.(${linkedIds.join(',')})`}:{}),
+      order:'updated_at.desc,id.desc',limit:30,
     });
     return {rows,testData:await this.disclosure(refsForRows('actions',rows))};
   }

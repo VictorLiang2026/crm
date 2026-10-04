@@ -79,7 +79,15 @@ class Browser {
       await delay(100);
     }
     if (!fs.existsSync(portFile)) throw new Error('Browser debugger startup timed out');
-    const port = fs.readFileSync(portFile, 'utf8').split(/\r?\n/)[0];
+    let port;
+    for (let i = 0; i < 100 && !port; i++) {
+      try { port = fs.readFileSync(portFile, 'utf8').split(/\r?\n/)[0]; }
+      catch (error) {
+        if (!['EBUSY','EACCES'].includes(error.code)) throw error;
+        await delay(100);
+      }
+    }
+    if (!port) throw new Error('Browser debugger port was not readable');
     let target;
     for (let i = 0; i < 200 && !target; i++) {
       try {

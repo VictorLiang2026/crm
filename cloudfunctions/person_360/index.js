@@ -30,7 +30,8 @@ const RECRUIT_READ_TABLES = new Set([
   'recruit_milestones',
 ]);
 const OPPORTUNITY_READ_TABLES = new Set([
-  'opportunity_candidates','outcomes','crm_test_batches','crm_test_records',
+  'opportunity_candidates','outcomes','crm_opportunity_action_links',
+  'crm_test_batches','crm_test_records',
 ]);
 const TABLES = new Set([
   'persons', 'households', 'household_members', 'interactions', 'commitments',
@@ -690,7 +691,7 @@ exports.main = async event => {
     }
   } catch (error) {
     return { error: error.message === 'UNAUTHORIZED' ? 'UNAUTHORIZED' :
-      /^(Invalid |Person |Person-only recruit|Activity |Attendance |Post-event |Participant |Speaker |This customer|Both people|Human confirmation|Selected Person|Household |Important facts|Could not|Same-name|Deleted identity|Customer |Preview |Identity candidates|Idempotency key|Test account|Test parent|Work item|Action |Commitment )/.test(error.message)
+      /^(Invalid |Person |Person-only recruit|Activity |Attendance |Post-event |Participant |Speaker |This customer|Both people|Human confirmation|Selected Person|Household |Important facts|Could not|Same-name|Deleted identity|Customer |Preview |Identity candidates|Idempotency key|Test account|Test parent|Work item|Action |Commitment |Opportunity )/.test(error.message)
         ? error.message : 'Person 360 request failed' };
   }
 };

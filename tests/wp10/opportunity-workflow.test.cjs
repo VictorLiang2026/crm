@@ -53,6 +53,27 @@ test('linked Action and Outcome read is scoped to Person-only Opportunity',async
   assert.equal(calls.find(x=>x.table==='opportunities').filters.person_id,'eq.783');
   assert.equal(calls.some(x=>x.method!=='GET'),false);
 });
+test('confirmed association reads through guarded link without changing Action identity',async()=>{
+  const calls=[];
+  const service=new OpportunityWorkflowService({
+    async request(table,method,filters){calls.push({table,method,filters});
+      if(table==='opportunities')return [{id:10,person_id:783,customer_id:null,status:'发现'}];
+      if(table==='crm_opportunity_action_links')return [{action_id:8}];
+      if(table==='actions')return filters.id?.startsWith('in.')?[{id:8,person_id:783,opportunity_id:null,
+        title:'【系统测试·勿联系】核对体验行动',status:'open'}]:[];
+      return [];
+    },async rpc(){throw new Error('read-only fixture');},
+    disclosure:async()=>({status:'verified',containsTestData:true,recordCount:1,sources:[]}),
+  });
+  const linked=await service.linked(783,10,'uid');
+  assert.equal(linked.actions[0].id,8);
+  assert.equal(linked.actions[0].opportunity_id,null);
+  const available=await service.availableActions(783,'uid');
+  assert.equal(available.rows.length,0);
+  assert.equal(calls.find(x=>x.table==='actions'&&x.filters.id?.startsWith('not.in.'))?.filters.id,
+    'not.in.(8)');
+  assert.equal(calls.some(x=>x.method!=='GET'),false);
+});
 test('test account pending candidates and linked records stay within tracked Person',async()=>{
   const calls=[];
   const service=new OpportunityWorkflowService({
@@ -86,4 +107,33 @@ test('migration keeps legacy table/view contract and protects atomic Outcome',()
   assert.ok(!sql.includes('ALTER TABLE public.opportunities'));
   assert.ok(!sql.includes('DROP VIEW'));
   assert.ok(rollback.includes("WHERE status='executed'"));
+});
+test('Action association migration preserves existing immutable guard and has guarded rollback',()=>{
+  const base=path.join(__dirname,'../../cloudbase/migrations/20261004201000_opportunity_action_links');
+  const sql=fs.readFileSync(base+'.sql','utf8');
+  const rollback=fs.readFileSync(base+'.rollback.sql','utf8');
+  assert.match(sql,/CREATE TABLE public\.crm_opportunity_action_links/);
+  assert.match(sql,/FORCE ROW LEVEL SECURITY/);
+  assert.match(sql,/GRANT SELECT, INSERT ON public\.crm_opportunity_action_links TO service_role/);
+  assert.match(sql,/INSERT INTO public\.crm_opportunity_action_links/);
+  assert.match(sql,/v_action\.opportunity_id IS DISTINCT FROM v_id AND NOT EXISTS/);
+  assert.doesNotMatch(sql,/UPDATE public\.actions SET opportunity_id/);
+  assert.doesNotMatch(sql,/CREATE OR REPLACE FUNCTION public\.actions_guard/);
+  assert.match(rollback,/IF EXISTS \(SELECT 1 FROM public\.crm_opportunity_action_links\)/);
+});
+test('authenticated legacy Person opportunity write actions cannot bypass preview',async()=>{
+  const Module=require('node:module');
+  const target=require.resolve('../../cloudfunctions/person_360');
+  const original=Module._load;
+  delete require.cache[target];
+  Module._load=function(name,parent,isMain){
+    if(name==='@cloudbase/node-sdk')return {init:()=>({auth:()=>({getUserInfo:()=>({uid:'prtest-uid'})})})};
+    return original.call(this,name,parent,isMain);
+  };
+  let main;
+  try{({main}=require(target));}finally{Module._load=original;delete require.cache[target];}
+  for(const action of ['createOpportunity','updateOpportunity','closeOpportunity','removeOpportunity']){
+    const result=await main({action,personId:783,id:10,data:{confirmed:true}});
+    assert.equal(result.error,'PREVIEW_REQUIRED');
+  }
 });

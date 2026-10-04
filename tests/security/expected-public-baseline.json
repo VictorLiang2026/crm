@@ -2689,6 +2689,36 @@
     },
     {
       "kind": "relation",
+      "name": "crm_opportunity_action_links",
+      "detail": {
+        "rls": true,
+        "type": "r",
+        "policies": [
+          {
+            "name": "crm_opportunity_action_links_service_only",
+            "roles": [
+              "service_role"
+            ],
+            "command": "*",
+            "check_hash": "b326b5062b2f0e69046810717534cb09",
+            "permissive": true,
+            "using_hash": "b326b5062b2f0e69046810717534cb09"
+          }
+        ],
+        "force_rls": true,
+        "privileges": {
+          "anon": [],
+          "service_role": [
+            "INSERT",
+            "SELECT"
+          ],
+          "authenticated": []
+        },
+        "security_invoker": false
+      }
+    },
+    {
+      "kind": "relation",
       "name": "crm_opportunity_commands",
       "detail": {
         "rls": true,
