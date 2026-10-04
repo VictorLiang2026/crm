@@ -1,6 +1,6 @@
 # WP07.1｜Person 主档、人物目录与角色转换
 
-起点：`38172b69f436557982d3382d5de8d0f0ccc35882` / `release-20261004-082600`。本包不实施 WP08；`public` 以外对象不参与。迁移：`cloudbase/migrations/20261004011800_person_directory_roles.sql`；回滚：`cloudbase/rollbacks/20261004011800_person_directory_roles.sql`。
+起点：`38172b69f436557982d3382d5de8d0f0ccc35882` / `release-20261004-082600`。本包不实施 WP08；`public` 以外对象不参与。主迁移：`cloudbase/migrations/20261004011800_person_directory_roles.sql`；安全补充迁移：`cloudbase/migrations/20261004031500_test_identity_command_guard.sql`；各自的同名回滚文件位于 `cloudbase/rollbacks/`。
 
 ## 字段归属和兼容
 
@@ -22,7 +22,12 @@
 - 真实测试账号只读复验：人物目录服务端第 1/2 页、编号升降序、50 条限制、无效排序拒绝、测试标记搜索、同名候选不自动选择、七列表头与 390px 横向滚动共 13 项 PASS。测试标记搜索曾被校验拒绝，已放行必要的 `【】` 字符并重发函数后复验通过。
 - 首次 Git 阶段发布在 CloudBase 源码下载时因 `D:` 空间耗尽（`ENOSPC`）中止，尚未提交。仅清理核实位于 `D:\Temp` 的旧 `crm-cloud-audit-*` 临时下载副本后恢复空间。`tools/sync-check.ps1` 增加可选 `CRM_SYNC_AUDIT_ROOT`，本轮改用 `C:` 的本机临时目录保存新证据，再运行原发布流程；不改变核对项目或放宽门槛。
 - 已发布 `person_360` 云函数及 `/crm/admin.html`、`/crm/js/modules/phase14-hubs.js`、`/crm/css/phase14-navigation.css`。本包的阶段提交/标签与最终验收结果以发布报告为准。
+- 阶段提交 `cc111e70fd604ea384f7aabb8b72ffd686fdf66e`、标签 `release-20261004-104500` 已推送；本地、GitHub、云端的 22 个可访问静态产物和 28 个 CRM 函数、163 个文件通过一致性核对。
+- 真实测试账号曾用未带完整标记的“张三（测试）”建立预览，执行返回 `Test account must use fictional marked Person`；只有一条未执行命令记录，没有 Person/客户/候选人业务行。随后人工选择带标记的“【系统测试·勿联系】虚构独立增员甲”，命令 `5b54466e-f301-4594-85de-ff8f6ce823bc` 建立 Person #784；当时无任何角色、客户或增员记录，测试台账记录为 `persons:784`，初始业务行仍为 10。
+- 同一测试 Person 先经命令 `dee428b4-cf4d-4e0a-997a-11f2f61612dc` 独立转增员，结果 `recruitId=19, customerId=null`；再经 `e54ac48c-14eb-4101-84ae-cc4fd1b68b06` 转客户，结果 `customerId=791`。现在 #784 有 `recruit` 与 `customer` 两个角色，候选人 #19 精确关联 Person #784，客户 #791 与两条衍生记录均有测试台账。
+- 安全补充迁移任务 `task-9dc2b586` 已成功：测试账号的身份命令必须使用完整标记；选择现有 Person 时还须有同批次测试台账 ID。触发器在预览插入和执行状态更新前检查，原有未执行、无标记预览也不能绕过。anon/authenticated 无函数执行权。真实账号只读复验增加“无标记新建”和“无标记现有 Person 转增员”两条拒绝路径，15/15 PASS，未产生预览或业务行。
+- 安全补充后，完整回归一次因 Today 晨间简报按钮等待超时而得 93 PASS/1 FAIL；失败快照已出现按钮。单独重跑发布门槛得 94 PASS/0 FAIL/5 预设 SKIP，匿名网关 54/54，门槛 `PASS_WITH_LIMITATIONS`。首次网关探针受本地网络沙箱阻断，获网络权限后通过；隔离浏览器也在沙箱外重开后完成只读复验。
 
 ## 回滚与未验证
 
-代码回滚以起点标签生成新的恢复提交并仅重发以上产物，不强推。数据库回滚文件有防护：存在 Person-only 候选人或有效身份预览时停止，须先评估并保留衍生数据，再执行。不要静默删除或改写客户数据。真实登录、Person-only 写入与恢复、不同角色转换、手机真机及部分旧 AI 增员动作仍需逐项验收；不把自动夹具当作这些路径的成功证据。
+代码回滚以起点标签生成新的恢复提交并仅重发以上产物，不强推。安全补充迁移可单独移除其触发器及函数；主数据库回滚文件有防护：现在已有 Person-only 增员历史和有效身份预览，执行前必须评估并保留衍生数据。不要静默删除或改写客户数据。独立客户转换、旧快速记录新人/嘉宾真实写入、软删除与恢复、手机真机及部分旧 AI 增员动作仍需逐项验收；不把自动夹具当作这些路径的成功证据。

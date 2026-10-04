@@ -44,6 +44,17 @@ async function main() {
     check('ordinary_test_search', !test?.error && test.rows.some(row => String(row.display_name).includes('虚构体验甲')));
     const resolved = await rpc('resolveIdentity', { name: '【系统测试·勿联系】虚构体验甲' });
     check('identity_requires_human', !resolved?.error && resolved.selectedPersonId == null && resolved.candidates.length >= 1);
+    const unmarkedKey = require('node:crypto').randomUUID();
+    const unmarked = await rpc('previewIdentity', { data: { kind: 'person',
+      idempotencyKey: unmarkedKey, displayName: '张三（测试）' } });
+    check('test_account_unmarked_new_person_rejected', /fictional marked Person/.test(String(unmarked?.error || '')));
+    const existing = asc.rows.find(row => !String(row.display_name).includes('【系统测试·勿联系】'));
+    if (existing) {
+      const unmarkedExisting = await rpc('previewIdentity', { data: { kind: 'recruit',
+        idempotencyKey: require('node:crypto').randomUUID(), personId: existing.id } });
+      check('test_account_unmarked_existing_person_rejected',
+        /fictional marked Person/.test(String(unmarkedExisting?.error || '')));
+    }
     await c.evaluate("location.hash='#/people'");
     let ready = false;
     for (let i = 0; i < 80; i++) {
