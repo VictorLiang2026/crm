@@ -36,4 +36,8 @@
 
 ## 回滚与未验证
 
-代码回滚以起点标签生成新的恢复提交并仅重发受影响产物，不强推。安全补充迁移可单独移除其触发器及函数；主数据库回滚文件有防护：现在已有 Person-only 候选人和有效身份预览，执行前必须评估并保留衍生数据。不要静默删除或改写客户数据。Person-only 候选人的页面删除/恢复、手机真机及部分旧 AI 增员动作仍需逐项验收；Legacy AI 解析未单独证明会产生 AI Gateway task/run/result 审计，WP07 V2 的审计与灰度回归保持通过，不把隔离夹具当作这些路径的成功证据。
+普通页面删除 Person-only 候选人首次失败：旧 `recruit_candidates.remove` 经匿名数据库角色执行时，`public.crm_delete_batch` 锁定 `public.persons` 被表权限拒绝，页面没有删除，数据未变化。修复仅为 Person-only 路由新增服务角色专用 `public.crm_person_only_recruit_delete_v1` 守卫与 `person_360` 入口；旧客户关联候选人仍走原接口。新迁移 `cloudbase/migrations/20261004053000_person_only_recruit_delete_guard.sql` 与同名回滚已配对，任务 `task-68c474c0` 成功。守卫在单事务中锁定并重查 Person/候选人和测试台账，拒绝客户关联 ID；anon/authenticated 无执行权限。新接口与 `/crm/admin.html` 已单独部署，云端 22 个静态产物、28 个 CRM 函数、163 个源码/配置文件一致。
+
+真实 `prtest` 登录后，人物目录跨页/排序/50 条/无敏感列/390px 横向滚动/身份拒绝 15/15 PASS。用户仅在虚构候选人 #20 上点击删除：页面回收站显示“跟进 1”，候选人 #20 和跟进 #3 的 `deleted_at` 均有值且 `delete_batch_id` 同为 `be8fbbbe-e0dd-43d4-a83c-58fba5aadbd5`；Person #786 未删除，候选人 `customer_id` 仍为 `NULL`。用户从同一页面点击恢复后，候选人和跟进的 `deleted_at`、`delete_batch_id` 都回到 `NULL`，旧招募列表再次显示 #20；其他真实客户未改动。初始样本仍为 10 行，测试台账现有 47 条衍生记录。完整自动回归 94 PASS、0 FAIL、5 预设 SKIP，安全目录 710 项及匿名网关 54/54 通过。
+
+代码回滚以起点标签生成新的恢复提交并仅重发受影响产物，不强推。安全补充迁移可单独移除其触发器及函数；新守卫回滚文件可在撤回页面和函数调用后执行，但不得自动回滚业务行；主数据库回滚文件有防护：现在已有 Person-only 候选人和有效身份预览，执行前必须评估并保留衍生数据。不要静默删除或改写客户数据。手机真机及部分旧 AI 增员动作仍需逐项验收；Legacy AI 解析未单独证明会产生 AI Gateway task/run/result 审计，WP07 V2 的审计与灰度回归保持通过，不把隔离夹具当作这些路径的成功证据。

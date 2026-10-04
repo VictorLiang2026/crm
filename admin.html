@@ -4460,6 +4460,7 @@ async function showRecruitTrash(){
       } while(legacyRows.length < legacyTotal);
       var personOnly = await callFn('person_360', {action:'listPersonOnlyRecruitTrash'});
       if(personOnly.error) throw new Error(personOnly.error);
+      Object.assign(legacyCounts, personOnly.counts || {});
       var kw = (rcTrashState.keyword||'').toLowerCase();
       var rows = legacyRows.concat((personOnly.rows||[]).filter(function(row){
         return !kw || [row.customer_name,row.occupation].some(function(v){ return String(v||'').toLowerCase().includes(kw); });
@@ -4475,14 +4476,21 @@ async function showRecruitTrash(){
       rows.forEach(function(row){ row._id=row.candidate_id; });
       return {rows:rows,total:total,counts:legacyCounts};
     },
-    restoreFn: function(ids){ return callFn('recruit_candidates', {action:'restore', ids:ids}); },
+    restoreFn: function(ids){
+      var personOnlyIds = ids.filter(function(id){ return rcTrashState.checked[id] && rcTrashState.checked[id].customer_id == null; });
+      if(personOnlyIds.length && personOnlyIds.length !== ids.length) return Promise.resolve({error:'请将独立增员与客户关联增员分开恢复'});
+      return personOnlyIds.length
+        ? callFn('person_360', {action:'restorePersonOnlyRecruit', ids:personOnlyIds})
+        : callFn('recruit_candidates', {action:'restore', ids:ids});
+    },
     afterRestore: function(){ invalidateRcMap(); },
     restoreOne: function(id, row){
       var msg = row.legacy_delete
         ? '这是历史删除记录，无法可靠判断跟进记录归属。确认只恢复该候选人，跟进记录继续保留在回收站？'
         : '确认恢复该候选人？仅恢复与本次删除同批次的增员跟进记录。';
       if(!confirm(msg)) return;
-      callFn('recruit_candidates', {action:'restore', ids:[id]}).then(function(r){
+      callFn(row.customer_id == null ? 'person_360' : 'recruit_candidates',
+        row.customer_id == null ? {action:'restorePersonOnlyRecruit', ids:[id]} : {action:'restore', ids:[id]}).then(function(r){
         if(r.error){ toast('恢复失败：'+r.error, 'error'); return; }
         if(r.skipped && r.skipped.length){ toast('未恢复：'+r.skipped[0].reason, 'error'); return; }
         invalidateRcMap();
@@ -7593,7 +7601,8 @@ async function showCandidateDetail(id, tab){
       el('button', {class:'btn btn-danger', style:'margin-left:auto', onclick:async function(){
         if(!confirm('确认删除该候选人？' + (c.customer_id == null ? '人物主档' : '客户记录') + '保留，其增员跟进记录将一并移入回收站，可随时恢复。')) return;
         try {
-          var dr = await callFn('recruit_candidates', {action:'remove', id:id});
+          var dr = await callFn(c.customer_id == null ? 'person_360' : 'recruit_candidates',
+            {action:c.customer_id == null ? 'removePersonOnlyRecruit' : 'remove', id:id});
           if(dr.error){ toast(dr.error, 'error'); return; }
           invalidateRcMap(); // 删除后客户列表自动回退为「转增员」
           toast('已移入回收站');

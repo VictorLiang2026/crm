@@ -1966,6 +1966,16 @@
     },
     {
       "kind": "routine",
+      "name": "crm_person_only_recruit_delete_v1(p_actor_uid text, p_action text, p_ids bigint[])",
+      "detail": {
+        "anon_execute": false,
+        "service_execute": true,
+        "security_definer": false,
+        "authenticated_execute": false
+      }
+    },
+    {
+      "kind": "routine",
       "name": "crm_recruit_goals_save_v1(p_goal_month text, p_goals jsonb, p_operator text)",
       "detail": {
         "anon_execute": true,

@@ -102,7 +102,8 @@ async function pgRequest(table, method, filters = {}, body) {
 
 async function pgRpc(name, body) {
   if (!new Set(['quick_capture_v2_commit', 'person_directory_page_v1',
-    'person_identity_preview_v1', 'person_identity_execute_v1']).has(name)) throw new Error('Invalid RPC');
+    'person_identity_preview_v1', 'person_identity_execute_v1',
+    'crm_person_only_recruit_delete_v1']).has(name)) throw new Error('Invalid RPC');
   const env = process.env.TCB_ENV;
   const key = process.env.CRM_PERSON360_DB_API_KEY;
   if (!/^crm-[a-z0-9]+$/.test(env || '') || !key) throw new Error('Person 360 is not configured');
@@ -125,7 +126,7 @@ async function pgRpc(name, body) {
     if (!response.ok) {
       const problem = await response.json().catch(() => null);
       const message = typeof problem?.message === 'string' ? problem.message : '';
-      if (/^(Invalid |Selected Person|Same-name|Deleted identity|Customer |Preview |Identity candidates|Active Person|Test account|Test parent|Idempotency key|Unauthorized|Speaker profile)/.test(message)) {
+      if (/^(Invalid |Selected Person|Same-name|Deleted identity|Customer |Preview |Identity candidates|Active Person|Person-only recruit|Test account|Test parent|Idempotency key|Unauthorized|Speaker profile)/.test(message)) {
         throw new Error(message);
       }
       throw new Error(`Database request failed (${response.status})`);
@@ -317,7 +318,43 @@ function createService({ request = pgRequest, rpc = pgRpc } = {}) {
     const rows = await request('v_recruit_candidates_person_only_trash', 'GET', {
       select: '*', order: 'candidate_deleted_at.desc,candidate_id.desc', limit: 1000,
     });
-    return { rows, total: rows.length, personOnly: true };
+    const counts = {};
+    if (rows.length) {
+      const ids = rows.map(row => idOf(row.candidate_id));
+      const roots = await request('recruit_candidates', 'GET', {
+        select: 'id,delete_batch_id', id: `in.(${ids.join(',')})`, limit: 1000,
+      });
+      const batches = new Map(roots.map(row => [String(row.id), row.delete_batch_id || null]));
+      for (const row of rows) {
+        const id = String(row.candidate_id);
+        counts[id] = { followups: 0 };
+        row.legacy_delete = !batches.get(id);
+      }
+      const followups = await request('recruit_followups', 'GET', {
+        select: 'candidate_id,delete_batch_id', candidate_id: `in.(${ids.join(',')})`,
+        deleted_at: 'not.is.null', limit: 1000,
+      });
+      for (const followup of followups) {
+        const id = String(followup.candidate_id);
+        if (batches.get(id) && followup.delete_batch_id === batches.get(id)) {
+          counts[id].followups++;
+        }
+      }
+    }
+    return { rows, total: rows.length, counts, personOnly: true };
+  }
+
+  async function changePersonOnlyRecruit(action, ids, uid) {
+    if (typeof uid !== 'string' || !uid.trim()) throw new Error('Unauthorized Person-only recruit action');
+    if (!['remove', 'restore'].includes(action) || !Array.isArray(ids) ||
+        ids.length < 1 || ids.length > 100 || (action === 'remove' && ids.length !== 1)) {
+      throw new Error('Invalid Person-only recruit action');
+    }
+    const cleanIds = ids.map(idOf);
+    if (new Set(cleanIds).size !== cleanIds.length) throw new Error('Invalid Person-only recruit IDs');
+    return rpc('crm_person_only_recruit_delete_v1', {
+      p_actor_uid: uid, p_action: action, p_ids: cleanIds.map(Number),
+    });
   }
 
   async function listOpportunities(personId) {
@@ -559,6 +596,7 @@ function createService({ request = pgRequest, rpc = pgRpc } = {}) {
   return { get, lookupCustomer, search, saveFacts, addMember, removeMember,
     listPeople, listOpportunityDirectory, resolveIdentity, previewIdentity, executeIdentity,
     listPersonOnlyRecruits, getPersonOnlyRecruit, listPersonOnlyRecruitTrash,
+    changePersonOnlyRecruit,
     listOpportunities, listRecruitContext, createOpportunity, updateOpportunity, closeOpportunity, removeOpportunity,
     getInsuranceContext,
     resolveQuickCaptureName, commitQuickCaptureV2 };
@@ -579,6 +617,8 @@ exports.main = async event => {
       case 'listPersonOnlyRecruits': return await service.listPersonOnlyRecruits();
       case 'getPersonOnlyRecruit': return await service.getPersonOnlyRecruit(event.id);
       case 'listPersonOnlyRecruitTrash': return await service.listPersonOnlyRecruitTrash();
+      case 'removePersonOnlyRecruit': return await service.changePersonOnlyRecruit('remove', [event.id], uid);
+      case 'restorePersonOnlyRecruit': return await service.changePersonOnlyRecruit('restore', event.ids, uid);
       case 'resolveIdentity': return await service.resolveIdentity(event.name);
       case 'previewIdentity': return await service.previewIdentity(event.data, uid);
       case 'executeIdentity': return await service.executeIdentity(event.data, uid);
@@ -621,7 +661,7 @@ exports.main = async event => {
     }
   } catch (error) {
     return { error: error.message === 'UNAUTHORIZED' ? 'UNAUTHORIZED' :
-      /^(Invalid |Person |Activity |Attendance |Post-event |Participant |Speaker |This customer|Both people|Human confirmation|Selected Person|Household |Important facts|Could not|Same-name|Deleted identity|Customer |Preview |Identity candidates|Idempotency key|Test account|Test parent)/.test(error.message)
+      /^(Invalid |Person |Person-only recruit|Activity |Attendance |Post-event |Participant |Speaker |This customer|Both people|Human confirmation|Selected Person|Household |Important facts|Could not|Same-name|Deleted identity|Customer |Preview |Identity candidates|Idempotency key|Test account|Test parent)/.test(error.message)
         ? error.message : 'Person 360 request failed' };
   }
 };

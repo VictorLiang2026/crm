@@ -80,3 +80,40 @@ test('execute accepts only a receipt bound to the authenticated actor', async ()
   assert.deepEqual(f.calls.find(c => c.operation).body,
     { p_actor_uid: 'test-uid', p_preview_id: previewId });
 });
+
+test('Person-only recycle uses a bounded server-only RPC and rejects forged input', async () => {
+  const calls = [];
+  const service = createService({ request: async () => { throw Error('Unexpected read'); },
+    rpc: async (operation, body) => { calls.push({ operation, body }); return { ok: true, restored: 1 }; } });
+  await assert.rejects(service.changePersonOnlyRecruit('remove', [20], ''), /Unauthorized/);
+  await assert.rejects(service.changePersonOnlyRecruit('remove', [0], 'test-uid'), /Invalid Person ID/);
+  await assert.rejects(service.changePersonOnlyRecruit('restore', [20, 20], 'test-uid'), /Invalid Person-only recruit IDs/);
+  await assert.rejects(service.changePersonOnlyRecruit('remove', [20, 21], 'test-uid'), /Invalid Person-only recruit action/);
+  assert.equal(calls.length, 0);
+  await service.changePersonOnlyRecruit('remove', [20], 'test-uid');
+  assert.deepEqual(calls[0], { operation: 'crm_person_only_recruit_delete_v1',
+    body: { p_actor_uid: 'test-uid', p_action: 'remove', p_ids: [20] } });
+});
+
+test('Person-only trash counts only followups in its current delete batch', async () => {
+  const batch = '53b62c8e-b28f-426d-94da-25100c83378b';
+  const request = async (table, method) => {
+    assert.equal(method, 'GET');
+    if (table === 'v_recruit_candidates_person_only_trash') return [
+      { candidate_id: 20, customer_id: null }, { candidate_id: 21, customer_id: null },
+    ];
+    if (table === 'recruit_candidates') return [
+      { id: 20, delete_batch_id: batch }, { id: 21, delete_batch_id: null },
+    ];
+    if (table === 'recruit_followups') return [
+      { candidate_id: 20, delete_batch_id: batch },
+      { candidate_id: 20, delete_batch_id: '27b5232d-c4e4-4d8b-b8a5-7bc6524a2582' },
+      { candidate_id: 21, delete_batch_id: null },
+    ];
+    throw Error('Unexpected read');
+  };
+  const result = await createService({ request, rpc: async () => {} }).listPersonOnlyRecruitTrash();
+  assert.deepEqual(result.counts, { '20': { followups: 1 }, '21': { followups: 0 } });
+  assert.equal(result.rows[0].legacy_delete, false);
+  assert.equal(result.rows[1].legacy_delete, true);
+});
