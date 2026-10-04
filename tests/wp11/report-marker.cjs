@@ -6,7 +6,7 @@ const Module = require('node:module');
 const marker = '【系统测试·勿联系】';
 
 test('legacy report generation keeps a fictional marked customer and operator throughout the saved draft', async () => {
-  let prompt = '', inserted, modelCalls = 0;
+  let prompt = '', inserted, updated, modelCalls = 0;
   const rows = { products: [], followups: [], gifts: [], policy_review_reports: [], photos: [] };
   function query(table) {
     let inserting = false;
@@ -14,11 +14,12 @@ test('legacy report generation keeps a fictional marked customer and operator th
       select() { return api; }, eq() { return api; }, is() { return api; },
       order() { return api; }, limit() { return api; },
       insert(value) { inserted = value; inserting = true; return api; },
+      update(value) { updated = value; return api; },
       async maybeSingle() { return { data: table === 'customers' ?
         { Id: 788, customer_name: `${marker}虚构体验甲`, phone: null,
           additional_info: `${marker}纯虚构资料` } :
         (inserted ? { id: 41, ...inserted } : null) }; },
-      then(resolve, reject) { return Promise.resolve({ data: inserting ? [{ id: 41 }] : rows[table] }).then(resolve, reject); },
+      then(resolve, reject) { return Promise.resolve({ data: inserting || updated ? [{ id: 41 }] : rows[table] }).then(resolve, reject); },
     };
     return api;
   }
@@ -59,4 +60,18 @@ test('legacy report generation keeps a fictional marked customer and operator th
   assert.equal(replay.id, 41);
   assert.equal(replay.replayed, true);
   assert.equal(modelCalls, 1);
+  const edit = await main({ action: 'update', id: 41, data: {
+    edited_summary: '人工复核摘要', edited_gaps: '待核实事项',
+    edited_recommendations: [{ detail: '虚构建议' }],
+  } });
+  assert.equal(edit.ok, true);
+  for (const field of ['edited_summary', 'edited_gaps', 'edited_recommendations']) {
+    assert.ok(updated[field]?.includes(marker), field);
+    assert.equal(typeof updated[field], 'string');
+  }
+  const cachedPageEdit = await main({ action: 'update', id: 41,
+    data: { edited_gaps_found: '旧页面发来的待核实事项' } });
+  assert.equal(cachedPageEdit.ok, true);
+  assert.equal(updated.edited_gaps, marker + '旧页面发来的待核实事项');
+  assert.equal(Object.hasOwn(updated, 'edited_gaps_found'), false);
 });

@@ -2983,9 +2983,10 @@ function renderPolicyReview(cid, rows, reports){
 function buildPolicyReviewCard(cid, rpt){
   var card = el('div', {class:'prr-card'});
   var editing = false;
+  function editedKey(field){ return field === 'gaps_found' ? 'edited_gaps' : 'edited_' + field; }
 
   function disp(field){
-    var e = rpt['edited_' + field];
+    var e = rpt[editedKey(field)];
     if(e != null && e !== '') return e;
     var v = rpt[field];
     return (v != null && v !== '') ? v : '';
@@ -3050,7 +3051,7 @@ function buildPolicyReviewCard(cid, rpt){
     try {
       var payload = {};
       PRR_BLOCKS.forEach(function(b){
-        var k = 'edited_' + b.key;
+        var k = editedKey(b.key);
         payload[k] = textareas[b.key].value;
       });
       var res = await callFn('policy_review_reports', { action:'update', id:rpt.id, data:payload });

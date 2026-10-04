@@ -73,7 +73,19 @@ async function get(event) {
 async function update(event) {
   const id = parseInt(event.id, 10);
   if (!id) return { error: 'id required' };
-  const payload = normFields(Object.assign({}, event.data || {}), EDIT_FIELDS);
+  const incoming = Object.assign({}, event.data || {});
+  // Old cached pages sent this display-field name; accept it until those pages expire.
+  if (!Object.hasOwn(incoming, 'edited_gaps') && Object.hasOwn(incoming, 'edited_gaps_found')) {
+    incoming.edited_gaps = incoming.edited_gaps_found;
+  }
+  const payload = normFields(incoming, EDIT_FIELDS);
+  const report = assertOk(await rdb.from('policy_review_reports').select('customer_name')
+    .eq('id', id).maybeSingle());
+  if (String(report.data?.customer_name || '').includes(TEST_MARKER)) {
+    for (const field of EDIT_FIELDS) {
+      if (Object.hasOwn(payload, field)) payload[field] = markTestText(payload[field]);
+    }
+  }
   payload.updated_at = nowIso();
   if (!Object.keys(payload).length) return { error: 'no valid fields' };
   assertOk(await rdb.from('policy_review_reports').update(payload).eq('id', id).select('id'));

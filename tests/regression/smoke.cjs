@@ -238,6 +238,19 @@ module.exports = async function smoke(root, test) {
       await b.wait(called('ocr_records', 'list'));
       await b.wait(text('暂无 AI 解析记录'));
     });
+    await check('customer.policy-review-edit', '旧报告人工缺口显示并写入 edited_gaps 字段', async () => {
+      await open('#/customer/910001', '[CRM_TEST_ONLY]客户甲', 'mode=policy_report');
+      await b.click('.tab', '保单检视');
+      await b.wait(text('[CRM_TEST_ONLY]人工核实待证据'));
+      assert.equal(await b.evaluate("document.querySelector('.prr-card .gaps .prr-body').innerText.includes('AI未经核实')"), false);
+      await b.click('.prr-card .actions button', '编辑');
+      await b.evaluate("document.querySelector('.prr-card textarea[name=prr_gaps_found]').value='[CRM_TEST_ONLY]复核后仍待核实'");
+      await b.click('.prr-editrow button', '保存修改');
+      await b.wait(called('policy_review_reports', 'update'));
+      assert.equal(await b.evaluate("window.__crmTest.calls.find(c=>c.name==='policy_review_reports' && c.action==='update').payload.edited_gaps"), '[CRM_TEST_ONLY]复核后仍待核实');
+      assert.equal(await b.evaluate("Object.hasOwn(window.__crmTest.calls.find(c=>c.name==='policy_review_reports' && c.action==='update').payload,'edited_gaps_found')"), false);
+      await open('#/customer/910001', '[CRM_TEST_ONLY]预约沟通');
+    });
     await check('followups.tab', '跟进标签显示跟进记录', async () => {
       await b.click('.tab', '跟进记录');
       await b.wait(text('[CRM_TEST_ONLY]跟进内容'));

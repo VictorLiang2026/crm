@@ -105,8 +105,13 @@ function installFixtures() {
       return { rows: matched.slice((page - 1) * pageSize, page * pageSize),
         total: matched.length, page, pageSize };
     },
-    'customers:get': () => ({ customer, followups: mode === 'empty' ? [] : [followup], products: [], gifts: [], photos: [], recommendations: [], reports: [] }),
+    'customers:get': () => ({ customer, followups: mode === 'empty' ? [] : [followup], products: [], gifts: [], photos: [], recommendations: [],
+      reports: mode === 'policy_report' ? [{ id: 940003, customer_id: customer.Id,
+        report_date: '2026-10-04', report_type: marker + '虚构保单检视',
+        summary: marker + '原始摘要', gaps_found: marker + 'AI未经核实的缺口',
+        edited_gaps: marker + '人工核实待证据' }] : [] }),
     'ocr_records:list': () => ({ rows: [] }),
+    'policy_review_reports:update': () => ({ ok: true }),
     'person_360:lookupCustomer': () => ({ personId: 980001 }),
     'person_360:listPeople': data => ({ rows: mode === 'empty' ? [] : [
       { id: 980001, display_name: marker + '客户甲', legacy_customer_id: customer.Id,
@@ -331,6 +336,7 @@ function installFixtures() {
           'person_360:updateOpportunity', 'person_360:createSpeakerProfile',
           'person_360:previewOpportunity',
           'person_360:previewIdentity','person_360:executeIdentity','activity_speakers:update',
+          'policy_review_reports:update',
           'person_360:linkSpeakerPerson'].includes(key) ? (key==='assistant:quickCaptureV2'?data:data.data) : null });
       if (!loggedIn) return fail('CALL_BEFORE_LOGIN: ' + key);
       if (mode === 'error' && (!params.get('fail') || params.get('fail') === key)) return { result: { error: 'TEST_API_FAILURE' } };
