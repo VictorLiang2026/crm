@@ -45,9 +45,10 @@
   - 交给 Codex：沿用现有 V2 解析与 Feature Flag，补身份选择、逐项候选编辑、服务端预览和确认后的 Interaction/Context/Action/Commitment 写入；先只面向测试账号灰度，预填测试内容经确认后走普通业务路径并记录衍生 ID。旧 Quick Capture 保持可用。
   - 验收：不确认不写库；AI Fact Candidate 默认未确认；重复确认不重复；同名冲突需人工处理；旧快速录入回归通过。
   - 2026-10-04：真实 `prtest` 人工选 Person/候选并确认，生成互动 #6/#7、默认未确认的事实 #3/#4、承诺 #1、行动 #7；未确认的过期预览无业务写入，两个已执行命令重放返回原 ID。初始样本 10，衍生/AI 审计逐 ID 入账；WP07 6 项、旧 V2 5 项、真实只读 67 项及 Person 时间线 14 项通过。仅文档收尾发布后本完成标记生效；证据、未验证真机与回滚见 [WP07 报告](../../docs/work-packages/wp07-quick-capture-v2.md)。
-- [ ] **WP08｜统一 Action 与 Commitment 的日常操作**　依赖：WP06、WP07。关联：R04、R08。
+- [x] **WP08｜统一 Action 与 Commitment 的日常操作**　依赖：WP06、WP07。关联：R04、R08。
   - 交给 Codex：在 Person 360 和 Today 补 Action/Commitment 的查看、创建、编辑、完成与来源跳转；新写入走对应 Service 和人工确认。保留 `v_action_center` 旧来源并防重。
   - 验收：同一任务在 Person/Today 只有一个有效状态；到期/逾期、完成时间、撤销/失败路径一致；测试行动进入真实 Today 且有醒目标记。
+  - 2026-10-04：prtest 对已登记的虚构 Person #783 人工确认 Action/Commitment 的创建、编辑、完成、撤销和重开；Person 与 Today 状态、到期时间一致，过期/伪造/跨人物预览拒绝，重放返回原 ID。初始样本仍为 10 行，旧 `v_action_center` 保持 166 行。最终发布和三端核对后本完成标记生效；证据、未验证真机及回滚见 [WP08 报告](../../docs/work-packages/wp08-work-items.md)。
 - [ ] **WP09｜Today 成为统一工作台**　依赖：WP08。关联：R04、R07、R10、R13。
   - 交给 Codex：让 Morning Brief、Top Actions、Commitments、Upcoming、Risk、Opportunities、Need Confirmation 从数据库统一事实与受限候选取数；补点击进入具体 Person/Action 的路径，校验排序解释与截止日期。旧 Today 5 和旧 daily_review 仍可访问。
   - 验收：预填测试日程可一键打开；无 AI 时仍有事实与到期提醒；旧候选不重复显示；普通 Today 纳入测试记录并提示数量/来源。

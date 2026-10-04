@@ -10,6 +10,7 @@
 <link rel="stylesheet" href="/crm/css/person-360.css">
 <link rel="stylesheet" href="/crm/css/activity-review-v2.css">
 <link rel="stylesheet" href="/crm/css/morning-brief.css">
+<link rel="stylesheet" href="/crm/css/work-items.css">
 <style>
   :root{
     --pri:#2563eb;--pri-hover:#1d4ed8;--pri-light:#dbeafe;
@@ -1485,6 +1486,13 @@ async function showTodayCoach(){
   var card = el('div', {class:'card'});
   card.appendChild(el('div', {class:'loading'}, '加载中…'));
   view.appendChild(card);
+  var workCard = el('section', {class:'card', id:'today-work-items'});
+  view.appendChild(workCard);
+  import('/crm/js/modules/work-items.js').then(function(module){
+    if(location.hash === '#/today') module.mountTodayWorkItems({root:workCard,callFn:callFn});
+  }).catch(function(error){
+    workCard.textContent = '行动与承诺加载失败：' + error.message;
+  });
   var morningCard = el('div', {class:'card', id:'today-morning-brief'});
   view.appendChild(morningCard);
   import('/crm/js/modules/morning-brief.js').then(function(module){
@@ -1495,6 +1503,13 @@ async function showTodayCoach(){
   var commitmentCard = el('div', {class:'card', id:'today-commitments'});
   view.appendChild(commitmentCard);
   renderDueCommitments(commitmentCard);
+  if(window.todayWorkRefresh) window.removeEventListener('crm:work-item-changed',window.todayWorkRefresh);
+  window.todayWorkRefresh = function(){
+    if(location.hash !== '#/today') return;
+    renderDueCommitments(commitmentCard);
+    renderTodayCoach(false);
+  };
+  window.addEventListener('crm:work-item-changed',window.todayWorkRefresh);
 
   try {
     var coachBox = el('div', {class:'coach-box'});

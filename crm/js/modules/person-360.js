@@ -1,6 +1,7 @@
 import { renderTestDataNotice } from './test-data-notice.js';
 import { renderPersonProfile } from './person-profile.js';
 import { renderPersonInsights } from './person-insights.js';
+import { mountPersonWorkItems } from './work-items.js';
 // Isolated Person 360 view. All data requests use the existing authenticated callFn bridge.
 import { renderOpportunityCandidates } from './opportunity-candidates.js';
 const ROLE_LABELS = { spouse: '配偶', child: '子女', parent: '父母', sibling: '兄弟姐妹', other: '其他' };
@@ -58,6 +59,8 @@ export async function renderPerson360({ root, personId, callFn, openLegacyTab })
     isCurrent: () => location.hash === hash });
   renderPersonInsights({ root: wrap, personId, customerId: model.person.legacy_customer_id,
     callFn, openLegacyTab, isCurrent: () => location.hash === hash });
+  const workItems = node('section', 'card person360-card person360-work-items');
+  wrap.append(workItems);
 
   const decay = node('section', 'card person360-card person360-decay');
   decay.append(node('h3', '', '关系节奏提醒'));
@@ -375,4 +378,6 @@ export async function renderPerson360({ root, personId, callFn, openLegacyTab })
   }, 'btn-primary'));
   wrap.append(facts);
   root.replaceChildren(wrap);
+  mountPersonWorkItems({root:workItems,personId,personName:model.person.display_name,
+    callFn,isCurrent:() => location.hash === hash});
 }

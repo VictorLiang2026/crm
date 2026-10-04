@@ -6,6 +6,7 @@ const { parsePersonName, PersonService } = require('./person-service');
 const { InteractionService } = require('./interaction-service');
 const { ActivityInteractionService } = require('./activity-interaction-service');
 const { CommitmentService } = require('./commitment-service');
+const { WorkItemService } = require('./work-item-service');
 const { InsuranceContextService } = require('./insurance-context-service');
 const { ParticipantService } = require('./participant-service');
 const { SpeakerProfileService } = require('./speaker-profile-service');
@@ -103,7 +104,8 @@ async function pgRequest(table, method, filters = {}, body) {
 async function pgRpc(name, body) {
   if (!new Set(['quick_capture_v2_commit', 'person_directory_page_v1',
     'person_identity_preview_v1', 'person_identity_execute_v1',
-    'crm_person_only_recruit_delete_v1']).has(name)) throw new Error('Invalid RPC');
+    'crm_person_only_recruit_delete_v1', 'crm_work_item_preview_v1',
+    'crm_work_item_execute_v1']).has(name)) throw new Error('Invalid RPC');
   const env = process.env.TCB_ENV;
   const key = process.env.CRM_PERSON360_DB_API_KEY;
   if (!/^crm-[a-z0-9]+$/.test(env || '') || !key) throw new Error('Person 360 is not configured');
@@ -126,7 +128,7 @@ async function pgRpc(name, body) {
     if (!response.ok) {
       const problem = await response.json().catch(() => null);
       const message = typeof problem?.message === 'string' ? problem.message : '';
-      if (/^(Invalid |Selected Person|Same-name|Deleted identity|Customer |Preview |Identity candidates|Active Person|Person-only recruit|Test account|Test parent|Idempotency key|Unauthorized|Speaker profile)/.test(message)) {
+      if (/^(Invalid |Selected Person|Same-name|Deleted identity|Customer |Preview |Identity candidates|Active Person|Person-only recruit|Test account|Test parent|Idempotency key|Unauthorized|Speaker profile|Work item|Action |Commitment )/.test(message)) {
         throw new Error(message);
       }
       throw new Error(`Database request failed (${response.status})`);
@@ -645,6 +647,14 @@ exports.main = async event => {
       case 'getContextGroups': return await new PersonInsightsService({ request: pgRequest })
         .context(event.personId);
       case 'listDueCommitments': return await new CommitmentService({ request: pgRequest }).listDue();
+      case 'listPersonWorkItems': return await new WorkItemService({request:pgRequest,rpc:pgRpc})
+        .listForPerson(event.personId);
+      case 'listTodayWorkItems': return await new WorkItemService({request:pgRequest,rpc:pgRpc})
+        .listForToday();
+      case 'previewWorkItem': return await new WorkItemService({request:pgRequest,rpc:pgRpc})
+        .preview(event.data,uid);
+      case 'executeWorkItem': return await new WorkItemService({request:pgRequest,rpc:pgRpc})
+        .execute(event.previewId,uid);
       case 'createInteraction': return await new InteractionService({ request: pgRequest })
         .createManual(event.personId, event.data, uid);
       case 'recordActivityInteraction': return await new ActivityInteractionService({ request: pgRequest })
@@ -661,7 +671,7 @@ exports.main = async event => {
     }
   } catch (error) {
     return { error: error.message === 'UNAUTHORIZED' ? 'UNAUTHORIZED' :
-      /^(Invalid |Person |Person-only recruit|Activity |Attendance |Post-event |Participant |Speaker |This customer|Both people|Human confirmation|Selected Person|Household |Important facts|Could not|Same-name|Deleted identity|Customer |Preview |Identity candidates|Idempotency key|Test account|Test parent)/.test(error.message)
+      /^(Invalid |Person |Person-only recruit|Activity |Attendance |Post-event |Participant |Speaker |This customer|Both people|Human confirmation|Selected Person|Household |Important facts|Could not|Same-name|Deleted identity|Customer |Preview |Identity candidates|Idempotency key|Test account|Test parent|Work item|Action |Commitment )/.test(error.message)
         ? error.message : 'Person 360 request failed' };
   }
 };
