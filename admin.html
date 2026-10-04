@@ -7591,7 +7591,7 @@ async function showCandidateDetail(id, tab){
       el('button', {class:'btn btn-ai', onclick:function(){ openQuickCapture({rcId:id, cid:c.customer_id, name:c.customer_name}); }}, '✍️ 快速记录'),
       el('button', {class:'btn', onclick:function(){ genRecruitScore(id); }}, 'AI 高潜评分'),
       el('button', {class:'btn btn-danger', style:'margin-left:auto', onclick:async function(){
-        if(!confirm('确认删除该候选人？客户记录保留，其增员跟进记录将一并移入回收站，可随时恢复。')) return;
+        if(!confirm('确认删除该候选人？' + (c.customer_id == null ? '人物主档' : '客户记录') + '保留，其增员跟进记录将一并移入回收站，可随时恢复。')) return;
         try {
           var dr = await callFn('recruit_candidates', {action:'remove', id:id});
           if(dr.error){ toast(dr.error, 'error'); return; }

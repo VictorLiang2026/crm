@@ -2615,6 +2615,16 @@
         "security_definer": false,
         "authenticated_execute": false
       }
+    },
+    {
+      "kind": "routine",
+      "name": "crm_test_identity_command_guard_v1()",
+      "detail": {
+        "anon_execute": false,
+        "service_execute": true,
+        "security_definer": false,
+        "authenticated_execute": false
+      }
     }
   ]
 }
