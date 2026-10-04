@@ -321,20 +321,21 @@ module.exports = async function smoke(root, test) {
     await check('speaker.person-first-create', '嘉宾专业档案先选择 Person 再保存', async () => {
       await open('#/speakers', '[CRM_TEST_ONLY]客户甲');
       await b.click('#view button', '+ 从 Person 新增嘉宾');
-      assert.equal(await b.evaluate("window.__crmTest.calls.some(c=>c.action==='createSpeakerProfile')"), false);
+      assert.equal(await b.evaluate("window.__crmTest.calls.some(c=>c.action==='executeIdentity')"), false);
       await b.evaluate("(() => { const input=document.querySelector('.modal-overlay input[type=text]'); input.value='[CRM_TEST_ONLY]客户甲'; input.dispatchEvent(new Event('input',{bubbles:true})); })()");
       await b.wait("document.querySelectorAll('.modal-overlay button').length > 2");
       await b.click('.modal-overlay button', '[CRM_TEST_ONLY]客户甲');
       await b.click('.modal-overlay button', '确认选择 Person');
       await b.wait("document.querySelector('.modal-overlay [name=expertise]') !== null");
       await b.evaluate("document.querySelector('.modal-overlay [name=expertise]').value='[CRM_TEST_ONLY]保险讲座'");
+      await b.evaluate('window.confirm=()=>true');
       await b.click('.modal-overlay .modal-footer button', '确定');
-      await b.wait(called('person_360', 'createSpeakerProfile'));
-      const payload = await b.evaluate("window.__crmTest.calls.find(c=>c.action==='createSpeakerProfile').payload");
+      await b.wait(called('person_360', 'executeIdentity'));
+      const payload = await b.evaluate("window.__crmTest.calls.find(c=>c.action==='previewIdentity').payload");
       assert.equal(payload.personId, '980001');
-      assert.equal(payload.selectedDisplayName, '[CRM_TEST_ONLY]客户甲');
-      assert.equal(payload.profile.expertise, '[CRM_TEST_ONLY]保险讲座');
-      assert.equal(payload.confirmed, true);
+      assert.equal(payload.displayName, '[CRM_TEST_ONLY]客户甲');
+      assert.equal(payload.kind, 'speaker');
+      assert.equal(await b.evaluate("window.__crmTest.calls.some(c=>c.name==='activity_speakers'&&c.action==='update'&&c.payload.expertise==='[CRM_TEST_ONLY]保险讲座')"),true);
     });
     await check('speaker.person-link', '旧嘉宾必须人工选择 Person 才能关联', async () => {
       await open('#/speakers', '[CRM_TEST_ONLY]客户甲');

@@ -25,17 +25,23 @@ async function getCustomerProfile(personId, { request, disclose = testData.discl
     ...testData.refsForRows('person_roles', roles),
   ]);
   // A missing/deleted linked customer must not expose a stale Person contact snapshot.
-  const fields = customer || (!linked ? {
+  const personFields = {
     customer_name: person.display_name, phone: person.phone, wx_account: person.wechat,
     gender: person.gender, birthday: person.birthday, occupation: person.occupation,
     organization: person.organization, education: person.education, source: person.source,
     additional_info: person.notes, updated_at: person.updated_at,
-  } : {});
-  const marked = [person.display_name, fields.customer_name, fields.source, fields.additional_info]
+  };
+  const fields = customer ? { ...customer, customer_name: personFields.customer_name,
+    phone: personFields.phone, wx_account: personFields.wx_account,
+    gender: personFields.gender, birthday: personFields.birthday,
+    occupation: personFields.occupation, organization: personFields.organization,
+    education: personFields.education } : (!linked ? personFields : {});
+  const marked = [person.display_name, fields.customer_name, fields.source, fields.additional_info,
+    customer?.customer_name, customer?.source, customer?.additional_info]
     .some(value => typeof value === 'string' && (value.includes(testData.MARKER) || value.startsWith('crm_test_')));
   return { personId: id, customerId: customer ? String(customer.Id) : null,
     status: customer ? 'linked' : linked ? 'customer_unavailable' : 'person_only',
-    source: customer ? 'public.customers' : linked ? null : 'public.persons',
+    source: linked && !customer ? null : 'public.persons',
     fields, roles, testData: summary,
     contactAllowed: !!(!linked || customer) && summary?.status === 'verified' && summary.containsTestData === false && !marked,
   };

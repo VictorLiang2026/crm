@@ -22,11 +22,16 @@ const INSURANCE_READ_TABLES = new Set([
   'products', 'policy_review_reports', 'ocr_records', 'photos', 'actions',
 ]);
 const RELATIONSHIP_READ_TABLES = new Set(['context_items', 'person_roles']);
+const RECRUIT_READ_TABLES = new Set([
+  'v_recruit_candidates_person_only', 'v_recruit_candidates_person_only_trash',
+  'recruit_milestones',
+]);
 const TABLES = new Set([
   'persons', 'households', 'household_members', 'interactions', 'commitments',
   'opportunities',
   ...INSURANCE_READ_TABLES,
   ...RELATIONSHIP_READ_TABLES,
+  ...RECRUIT_READ_TABLES,
   ...LEGACY_INTERACTION_TABLES,
 ]);
 const ROLES = new Set(['spouse', 'child', 'parent', 'sibling', 'other']);
@@ -64,6 +69,7 @@ async function pgRequest(table, method, filters = {}, body) {
   }
   if (INSURANCE_READ_TABLES.has(table) && method !== 'GET') throw new Error('Invalid source operation');
   if (RELATIONSHIP_READ_TABLES.has(table) && method !== 'GET') throw new Error('Invalid source operation');
+  if (RECRUIT_READ_TABLES.has(table) && method !== 'GET') throw new Error('Invalid source operation');
   if (table === 'commitments' && method !== 'GET') throw new Error('Invalid source operation');
   const env = process.env.TCB_ENV;
   const key = process.env.CRM_PERSON360_DB_API_KEY;
@@ -95,7 +101,8 @@ async function pgRequest(table, method, filters = {}, body) {
 }
 
 async function pgRpc(name, body) {
-  if (name !== 'quick_capture_v2_commit') throw new Error('Invalid RPC');
+  if (!new Set(['quick_capture_v2_commit', 'person_directory_page_v1',
+    'person_identity_preview_v1', 'person_identity_execute_v1']).has(name)) throw new Error('Invalid RPC');
   const env = process.env.TCB_ENV;
   const key = process.env.CRM_PERSON360_DB_API_KEY;
   if (!/^crm-[a-z0-9]+$/.test(env || '') || !key) throw new Error('Person 360 is not configured');
@@ -115,7 +122,14 @@ async function pgRpc(name, body) {
       body: JSON.stringify(body),
       signal: controller.signal,
     });
-    if (!response.ok) throw new Error(`Database request failed (${response.status})`);
+    if (!response.ok) {
+      const problem = await response.json().catch(() => null);
+      const message = typeof problem?.message === 'string' ? problem.message : '';
+      if (/^(Invalid |Selected Person|Same-name|Deleted identity|Customer |Preview |Identity candidates|Active Person|Test account|Test parent|Idempotency key|Unauthorized|Speaker profile)/.test(message)) {
+        throw new Error(message);
+      }
+      throw new Error(`Database request failed (${response.status})`);
+    }
     const result = await response.json();
     if (!result || typeof result !== 'object' || Array.isArray(result)) throw new Error('Unexpected database response');
     return result;
@@ -163,19 +177,95 @@ function createService({ request = pgRequest, rpc = pgRpc } = {}) {
   }
 
   async function listPeople(event = {}) {
-    const { page, pageSize, offset } = directoryPage(event);
+    const { page, pageSize } = directoryPage(event);
     const keyword = String(event.keyword || '').trim();
-    if (keyword.length > 40 || (keyword && !/^[\p{L}\p{N} （）()·.-]+$/u.test(keyword))) {
+    if (keyword.length > 40 || (keyword && !/^[\p{L}\p{N} （）()【】·.-]+$/u.test(keyword))) {
       throw new Error('Invalid directory keyword');
     }
-    const filters = {
-      select: 'id,display_name,occupation,organization,legacy_customer_id',
-      deleted_at: 'is.null', order: 'display_name.asc,id.asc',
-      limit: pageSize + 1, offset,
+    const sortField = String(event.sortField || 'id');
+    const sortDir = String(event.sortDir || 'desc');
+    if (!['id', 'display_name', 'updated_at'].includes(sortField) || !['asc', 'desc'].includes(sortDir)) {
+      throw new Error('Invalid directory sort');
+    }
+    return rpc('person_directory_page_v1', {
+      p_page: page, p_page_size: pageSize, p_keyword: keyword,
+      p_sort_field: sortField, p_sort_dir: sortDir,
+    });
+  }
+
+  async function resolveIdentity(name) {
+    const resolved = await new PersonService({ request }).resolveName(name);
+    const deleted = await request('persons', 'GET', {
+      select: 'id', display_name: `eq.${resolved.displayName}`,
+      deleted_at: 'not.is.null', limit: 1,
+    });
+    return { ...resolved, deletedIdentity: deleted.length > 0 };
+  }
+
+  async function previewIdentity(data, uid) {
+    if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('Invalid identity command');
+    const kind = String(data.kind || '');
+    if (!['person', 'customer', 'recruit', 'speaker', 'capture'].includes(kind)) throw new Error('Invalid identity command');
+    const key = String(data.idempotencyKey || '');
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(key)) {
+      throw new Error('Invalid idempotency key');
+    }
+    const selected = data.personId == null ? null : idOf(data.personId);
+    let name = String(data.displayName || '');
+    if (selected && !name) {
+      const person = await findPerson(selected);
+      if (!person) throw new Error('Selected Person not found');
+      name = person.display_name;
+    }
+    const resolution = await resolveIdentity(name);
+    if (selected) {
+      const person = await findPerson(selected);
+      if (!person || person.display_name !== resolution.displayName) {
+        throw new Error('Selected Person changed; resolve identity again');
+      }
+      if (kind === 'person' && !resolution.candidates.some(c => c.id === selected)) {
+        throw new Error('Selected Person is outside the reviewed candidates');
+      }
+    } else {
+      if (kind === 'customer' || kind === 'recruit') throw new Error('Selected Person is required');
+      if (resolution.hasMore || resolution.deletedIdentity ||
+          !['available', 'confirm_new_qualified'].includes(resolution.status)) {
+        throw new Error('Identity candidates need manual review');
+      }
+    }
+    const payload = {
+      display_name: resolution.displayName, name_key: resolution.nameKey,
+      ...(selected ? { person_id: selected } : {}),
+      occupation: String(data.occupation || '').trim().slice(0, 120),
+      organization: String(data.organization || '').trim().slice(0, 120),
+      education: String(data.education || '').trim().slice(0, 120),
+      source: kind === 'capture' ? '快速记录' : '人工新增',
     };
-    if (keyword) filters.display_name = `ilike.*${keyword}*`;
-    const rows = await request('persons', 'GET', filters);
-    return { rows: rows.slice(0, pageSize), page, pageSize, hasMore: rows.length > pageSize };
+    if (kind === 'capture') {
+      const note = String(data.note || '').trim();
+      if (!note || note.length > 10000) throw new Error('Invalid quick capture note');
+      payload.note = note;
+      payload.summary = String(data.summary || note).trim().slice(0, 2000);
+      payload.interaction_at = new Date().toISOString();
+      payload.customer = data.customer === true;
+      payload.speaker = data.speaker === true;
+      if (data.speakerId != null) payload.speaker_id = idOf(data.speakerId);
+      if (data.nextDate != null && data.nextDate !== '') {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(String(data.nextDate))) throw new Error('Invalid next contact date');
+        payload.next_contact_date = String(data.nextDate);
+      }
+    }
+    return rpc('person_identity_preview_v1', {
+      p_actor_uid: uid, p_idempotency_key: key, p_kind: kind, p_payload: payload,
+    });
+  }
+
+  async function executeIdentity(data, uid) {
+    const previewId = String(data?.previewId || '');
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(previewId)) {
+      throw new Error('Invalid preview ID');
+    }
+    return rpc('person_identity_execute_v1', { p_actor_uid: uid, p_preview_id: previewId });
   }
 
   async function listOpportunityDirectory(event = {}) {
@@ -203,6 +293,31 @@ function createService({ request = pgRequest, rpc = pgRpc } = {}) {
     return { rows: pageRows.map(row => ({ ...row,
       person: byPerson.get(String(row.person_id)) || byCustomer.get(String(row.customer_id)) || null,
     })), page, pageSize, hasMore: rows.length > pageSize };
+  }
+
+  async function listPersonOnlyRecruits() {
+    const rows = await request('v_recruit_candidates_person_only', 'GET', {
+      select: '*', order: 'updated_at.desc,candidate_id.desc', limit: 1000,
+    });
+    return { rows, total: rows.length, personOnly: true };
+  }
+
+  async function getPersonOnlyRecruit(id) {
+    const candidate = one(await request('v_recruit_candidates_person_only', 'GET', {
+      select: '*', candidate_id: `eq.${idOf(id)}`, limit: 1,
+    }));
+    if (!candidate) return { error: 'not found' };
+    const milestones = await request('recruit_milestones', 'GET', {
+      select: '*', candidate_id: `eq.${idOf(id)}`, order: 'happened_at.desc,id.desc', limit: 100,
+    });
+    return { candidate, milestones };
+  }
+
+  async function listPersonOnlyRecruitTrash() {
+    const rows = await request('v_recruit_candidates_person_only_trash', 'GET', {
+      select: '*', order: 'candidate_deleted_at.desc,candidate_id.desc', limit: 1000,
+    });
+    return { rows, total: rows.length, personOnly: true };
   }
 
   async function listOpportunities(personId) {
@@ -442,7 +557,8 @@ function createService({ request = pgRequest, rpc = pgRpc } = {}) {
   }
 
   return { get, lookupCustomer, search, saveFacts, addMember, removeMember,
-    listPeople, listOpportunityDirectory,
+    listPeople, listOpportunityDirectory, resolveIdentity, previewIdentity, executeIdentity,
+    listPersonOnlyRecruits, getPersonOnlyRecruit, listPersonOnlyRecruitTrash,
     listOpportunities, listRecruitContext, createOpportunity, updateOpportunity, closeOpportunity, removeOpportunity,
     getInsuranceContext,
     resolveQuickCaptureName, commitQuickCaptureV2 };
@@ -452,13 +568,20 @@ exports.main = async event => {
   try {
     const identity = app.auth().getUserInfo();
     const uid = identity && identity.uid;
-    if (typeof uid !== 'string' || !uid.trim()) return { error: 'UNAUTHORIZED' };
+    if (typeof uid !== 'string' || !uid.trim() ||
+        identity.isAnonymous === true || identity.is_anonymous === true) return { error: 'UNAUTHORIZED' };
     const service = createService();
     switch (event?.action) {
       case 'get': return await service.get(event.personId);
       case 'getCustomerProfile': return await getCustomerProfile(event.personId, { request: pgRequest });
       case 'lookupCustomer': return await service.lookupCustomer(event.customerId);
       case 'listPeople': return await service.listPeople(event);
+      case 'listPersonOnlyRecruits': return await service.listPersonOnlyRecruits();
+      case 'getPersonOnlyRecruit': return await service.getPersonOnlyRecruit(event.id);
+      case 'listPersonOnlyRecruitTrash': return await service.listPersonOnlyRecruitTrash();
+      case 'resolveIdentity': return await service.resolveIdentity(event.name);
+      case 'previewIdentity': return await service.previewIdentity(event.data, uid);
+      case 'executeIdentity': return await service.executeIdentity(event.data, uid);
       case 'listOpportunityDirectory': return await service.listOpportunityDirectory(event);
       case 'listOpportunities': return await service.listOpportunities(event.personId);
       case 'listRecruitContext': return await service.listRecruitContext(event.personId);
@@ -498,7 +621,7 @@ exports.main = async event => {
     }
   } catch (error) {
     return { error: error.message === 'UNAUTHORIZED' ? 'UNAUTHORIZED' :
-      /^(Invalid |Person |Activity |Attendance |Post-event |Participant |Speaker |This customer|Both people|Human confirmation|Selected Person|Household |Important facts|Could not)/.test(error.message)
+      /^(Invalid |Person |Activity |Attendance |Post-event |Participant |Speaker |This customer|Both people|Human confirmation|Selected Person|Household |Important facts|Could not|Same-name|Deleted identity|Customer |Preview |Identity candidates|Idempotency key|Test account|Test parent)/.test(error.message)
         ? error.message : 'Person 360 request failed' };
   }
 };

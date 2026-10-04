@@ -13,9 +13,9 @@ function fixture({linked=true, missing=false, summary={status:'verified',contain
   };
   return {calls,customer,load:()=>getCustomerProfile(71,{request,disclose:async()=>summary})};
 }
-test('linked fields always read latest customer; blank contacts never fall back to Person',async()=>{
- const f=fixture();const first=await f.load();assert.equal(first.fields.occupation,'虚构新职业');assert.equal(first.fields.phone,'');
- f.customer.occupation='【系统测试·勿联系】虚构更新职业';assert.equal((await f.load()).fields.occupation,f.customer.occupation);
+test('linked fields read Person master and keep customer-only business fields',async()=>{
+ const f=fixture();const first=await f.load();assert.equal(first.fields.occupation,'旧职业');assert.equal(first.fields.phone,'虚构旧联系方式');
+ f.customer.occupation='【系统测试·勿联系】虚构更新职业';assert.equal((await f.load()).fields.occupation,'旧职业');
  assert.ok(f.calls.every(c=>c.method==='GET'));assert.ok(f.calls.filter(c=>c.table==='customers').every(c=>c.filters.Id==='eq.81'&&c.filters.deleted_at==='is.null'));
 });
 test('deleted/missing linked customer exposes no stale contact or editor target',async()=>{
@@ -33,6 +33,6 @@ test('invalid identity and absent person reject without writes',async()=>{
  await assert.rejects(getCustomerProfile('71,72',{request}),/Invalid/);
  await assert.rejects(getCustomerProfile(71,{request:async()=>[]}),/Person not found/);
 });
-test('role evidence and source remain explicit, no role mutation',async()=>{
- const r=await fixture().load();assert.equal(r.roles[0].origin,'manual');assert.equal(r.source,'public.customers');assert.equal(r.personId,'71');
+test('role evidence and Person source remain explicit, no role mutation',async()=>{
+ const r=await fixture().load();assert.equal(r.roles[0].origin,'manual');assert.equal(r.source,'public.persons');assert.equal(r.personId,'71');
 });

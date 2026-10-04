@@ -48,35 +48,81 @@ function pager(host, current, hasMore, load) {
 }
 
 export function renderPeople({ root, callFn }) {
-  const wrap = page(root, '人', '以 Person 360 查看关系、互动与机会；传统客户列表仍在“更多”。');
+  const wrap = page(root, '人', 'Person 保存人物身份与通用资料；客户和增员是可独立拥有的角色。');
   const search = node('form', 'phase14-search');
   const input = node('input');
   input.type = 'search'; input.maxLength = 40; input.placeholder = '搜索姓名或括号限定';
   input.setAttribute('aria-label', '搜索人物');
   const submit = node('button', 'btn btn-primary', '搜索');
   submit.type = 'submit';
-  search.append(input, submit);
+  const add = button('＋ 新增人', () => openPersonCommand({ callFn, onDone: id => {
+    location.hash = `#/person/${id}`;
+  } }));
+  add.className = 'btn btn-primary';
+  search.append(input, submit, add);
   const list = node('div', 'phase14-list');
   wrap.append(search, list);
-  let keyword = '', requestId = 0;
+  let keyword = '', requestId = 0, sortField = 'id', sortDir = 'desc';
+  const headings = [
+    ['编号', 'id'], ['姓名', 'display_name'], ['角色'], ['职业／机构'],
+    ['最近更新', 'updated_at'], ['转客户'], ['转增员'],
+  ];
   async function load(number) {
     const mine = ++requestId;
     list.replaceChildren(node('p', 'loading', '正在加载人物…'));
     try {
       const result = checkResult(await callFn('person_360', {
-        action: 'listPeople', page: number, pageSize: 20, keyword,
+        action: 'listPeople', page: number, pageSize: 50, keyword, sortField, sortDir,
       }));
       if (mine !== requestId || location.hash !== PERSON_HASH) return;
       list.replaceChildren();
-      if (!result.rows.length) list.append(node('p', 'empty', '没有找到人物。可调整姓名再搜索。'));
-      for (const person of result.rows) {
-        const row = node('div', 'phase14-row');
-        row.append(link(person.display_name || `人物 #${person.id}`, `#/person/${person.id}`, 'phase14-row-title'));
-        const detail = [person.occupation, person.organization].filter(Boolean).join(' · ');
-        if (detail) row.append(node('span', 'phase14-muted', detail));
-        list.append(row);
+      const scroll = node('div', 'phase14-table-scroll');
+      const table = node('table', 'phase14-people-table');
+      const head = node('thead');
+      const headRow = node('tr');
+      for (const [label, field] of headings) {
+        const th = node('th');
+        if (field) {
+          const active = sortField === field;
+          const control = button(`${label}${active ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}`, () => {
+            sortDir = sortField === field && sortDir === 'desc' ? 'asc' : 'desc';
+            sortField = field;
+            void load(1);
+          });
+          control.className = 'phase14-sort';
+          control.setAttribute('aria-label', `${label}排序，当前${active ? (sortDir === 'asc' ? '升序' : '降序') : '未排序'}`);
+          th.append(control);
+          if (active) th.setAttribute('aria-sort', sortDir === 'asc' ? 'ascending' : 'descending');
+        } else th.textContent = label;
+        headRow.append(th);
       }
-      pager(list, result.page, result.hasMore, load);
+      head.append(headRow); table.append(head);
+      const body = node('tbody');
+      for (const person of result.rows) {
+        const row = node('tr');
+        const cell = (content) => { const td = node('td'); td.append(content); row.append(td); };
+        cell(node('span', '', person.id));
+        cell(link(person.display_name || `人物 #${person.id}`, `#/person/${person.id}`, 'phase14-row-title'));
+        const roles = Array.isArray(person.roles) ? person.roles : [];
+        cell(node('span', '', roles.map(role => ({ customer: '客户', recruit: '增员', speaker: '嘉宾', participant: '参与者' })[role] || role).join(' · ') || '尚无角色'));
+        cell(node('span', '', [person.occupation, person.organization].filter(Boolean).join('／') || '—'));
+        cell(node('span', '', person.updated_at ? new Date(person.updated_at).toLocaleDateString('zh-CN') : '—'));
+        const customerId = person.customer_id;
+        const customerAction = customerId ? link('查看客户', `#/customer/${customerId}`) :
+          button('转客户', () => openPersonCommand({ callFn, kind: 'customer', person, onDone: () => load(result.page) }));
+        cell(customerAction);
+        const recruitAction = person.recruit_id ? link('查看增员', `#/recruit/${person.recruit_id}`) :
+          button('转增员', () => openPersonCommand({ callFn, kind: 'recruit', person, onDone: () => load(result.page) }));
+        cell(recruitAction);
+        body.append(row);
+      }
+      table.append(body); scroll.append(table); list.append(scroll);
+      if (!result.rows.length) list.append(node('p', 'empty', '没有找到人物。可调整姓名再搜索，或人工新增。'));
+      const controls = node('div', 'phase14-pager');
+      const prev = button('上一页', () => load(result.page - 1)); prev.disabled = result.page <= 1;
+      const next = button('下一页', () => load(result.page + 1)); next.disabled = result.page >= result.totalPages;
+      controls.append(prev, node('span', '', `第 ${result.page}／${result.totalPages} 页 · 共 ${result.total} 人`), next);
+      list.append(controls);
     } catch (error) {
       if (mine === requestId && location.hash === PERSON_HASH)
         list.replaceChildren(node('p', 'phase14-error', `人物列表加载失败：${error.message}`));
@@ -84,6 +130,114 @@ export function renderPeople({ root, callFn }) {
   }
   search.addEventListener('submit', event => { event.preventDefault(); keyword = input.value.trim(); void load(1); });
   void load(1);
+}
+
+export function openPersonCommand({ callFn, kind = 'person', person = null, prefill = {}, onDone }) {
+  const overlay = node('div', 'phase14-command-overlay');
+  const dialog = node('section', 'phase14-command');
+  dialog.setAttribute('role', 'dialog'); dialog.setAttribute('aria-modal', 'true');
+  const actionTitle = ({ person: '＋ 人工新增人', customer: '人工确认 · 转客户',
+    recruit: '人工确认 · 转增员', speaker: '人工确认 · 建嘉宾', capture: '快速记录 · 核对人物' })[kind];
+  dialog.setAttribute('aria-label', actionTitle);
+  const title = node('h3', '', actionTitle);
+  const content = node('div');
+  const status = node('p', 'phase14-muted', '先核对身份，再查看服务端预览。');
+  const close = button('关闭', () => overlay.remove());
+  dialog.append(title, content, status, close); overlay.append(dialog); document.body.append(overlay);
+  let previewId = null;
+  function fail(error) { status.className = 'phase14-error'; status.textContent = error.message || String(error); }
+  function showPreview(result) {
+    previewId = result.previewId;
+    const p = result.preview;
+    content.replaceChildren(node('p', '', `人物：${p.displayName}（${p.newPerson ? '新建主档' : `#${p.personId}`}）`),
+      node('p', '', `本次将${p.willCreateCustomer ? '创建／关联客户；' : ''}${p.willCreateRecruit ? '创建／关联增员；' : ''}${p.willCreateSpeaker ? '创建嘉宾；' : ''}${p.willCreateInteraction ? '保存互动；' : ''}${kind === 'person' ? '仅建立人物身份。' : ''}`),
+      node('p', 'phase14-muted', `预览有效至 ${new Date(result.expiresAt).toLocaleString('zh-CN')}。`));
+    if (kind === 'capture') content.append(node('p', '', `交流原文：${String(prefill.note || '').slice(0, 300)}`));
+    const confirm = button('确认以上内容并执行', async () => {
+      confirm.disabled = true; status.textContent = '正在执行…';
+      try {
+        const saved = await callFn('person_360', { action: 'executeIdentity', data: { previewId } });
+        if (saved?.error) throw new Error(saved.error);
+        overlay.remove(); onDone?.(saved.personId, saved);
+      } catch (error) { fail(error); confirm.disabled = false; }
+    });
+    confirm.className = 'btn btn-primary'; content.append(confirm);
+    status.className = 'phase14-muted'; status.textContent = '请核对后人工确认；关闭不会写入。';
+  }
+  async function preview(data) {
+    status.className = 'phase14-muted'; status.textContent = '正在生成服务端预览…';
+    try {
+      const result = await callFn('person_360', { action: 'previewIdentity',
+        data: { kind, idempotencyKey: crypto.randomUUID(), ...data } });
+      if (result?.error) throw new Error(result.error);
+      showPreview(result);
+    } catch (error) { fail(error); }
+  }
+  if (person) {
+    content.append(node('p', '', `${person.display_name} · Person #${person.id}`),
+      node('p', 'phase14-muted', kind === 'customer' ?
+        '客户角色会建立旧客户详情所需的兼容档案。' :
+        kind === 'recruit' ? '增员角色可独立于客户；不会自动创建客户。' :
+          '嘉宾角色不要求客户档案。'));
+    content.append(button('生成服务端预览', () => preview({ personId: person.id, displayName: person.display_name })));
+  } else {
+    const fields = [['姓名（可加括号限定）', 'displayName'], ['职业', 'occupation'],
+      ['机构', 'organization'], ['教育', 'education']];
+    const inputs = {};
+    for (const [label, key] of fields) {
+      const wrapper = node('label', 'phase14-field', label);
+      const input = node('input'); input.type = 'text'; input.maxLength = key === 'displayName' ? 160 : 120;
+      input.setAttribute('aria-label', label); input.value = String(prefill[key] || '');
+      wrapper.append(input); content.append(wrapper); inputs[key] = input;
+    }
+    const customerChoice = node('label', 'phase14-choice');
+    const customerCheckbox = node('input'); customerCheckbox.type = 'checkbox';
+    if (kind === 'capture') {
+      customerChoice.append(customerCheckbox, node('span', '', '同时转客户（可选；不勾选不会进入客户列表）'));
+      content.append(customerChoice);
+    }
+    const candidates = node('div', 'phase14-candidates'); content.append(candidates);
+    content.append(button('查找并核对 Person', async () => {
+      candidates.replaceChildren(); status.textContent = '正在查找身份…';
+      try {
+        const found = await callFn('person_360', { action: 'resolveIdentity', name: inputs.displayName.value.trim() });
+        if (found?.error) throw new Error(found.error);
+        const options = [];
+        for (const candidate of found.candidates) {
+          options.push({ value: candidate.id, label: `选择已有 #${candidate.id} · ${candidate.displayName}${candidate.organization ? ` · ${candidate.organization}` : ''}` });
+        }
+        if (!found.hasMore && !found.deletedIdentity &&
+            (found.status === 'available' || found.status === 'confirm_new_qualified' || found.canCreateAfterConfirmation)) {
+          options.push({ value: 'new', label: '确认新建 Person（默认不创建客户）' });
+        }
+        const radioGroup = `identity-${crypto.randomUUID()}`;
+        for (const option of options) {
+          const label = node('label', 'phase14-choice');
+          const radio = node('input'); radio.type = 'radio'; radio.name = radioGroup;
+          radio.value = option.value; label.append(radio, node('span', '', option.label)); candidates.append(label);
+        }
+        if (found.hasMore || found.deletedIdentity) {
+          candidates.append(node('p', 'phase14-error', found.deletedIdentity ?
+            '发现已删除的同名身份，请先人工处理回收站身份。' : '同名候选超过显示上限，请加括号限定后重试。'));
+        }
+        if (!options.length) throw new Error('没有可安全选择的身份，请加括号限定后重试');
+        const next = button('生成服务端预览', () => {
+          const checked = candidates.querySelector('input:checked');
+          if (!checked) { fail(new Error('请人工选择已有 Person 或明确确认新建')); return; }
+          void preview({ ...Object.fromEntries(Object.entries(inputs).map(([k, v]) => [k, v.value.trim()])),
+            ...(checked.value === 'new' ? {} : { personId: checked.value }),
+            ...(kind === 'capture' ? { note: prefill.note, summary: prefill.summary,
+              customer: customerCheckbox.checked, speaker: prefill.speaker === true,
+              ...(prefill.speakerId ? { speakerId: prefill.speakerId } : {}),
+              ...(prefill.nextDate ? { nextDate: prefill.nextDate } : {}) } : {}) });
+        });
+        candidates.append(next); status.className = 'phase14-muted';
+        status.textContent = '候选不会自动选中。请逐项核对后选择。';
+      } catch (error) { fail(error); }
+    }));
+    inputs.displayName.focus();
+  }
+  overlay.addEventListener('keydown', event => { if (event.key === 'Escape') overlay.remove(); });
 }
 
 export function renderOpportunities({ root, callFn }) {

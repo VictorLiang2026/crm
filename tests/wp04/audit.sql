@@ -5,9 +5,9 @@ WITH links AS (
  FROM public.customers c LEFT JOIN public.persons p ON p.legacy_customer_id=c."Id" WHERE c.deleted_at IS NULL
  UNION ALL
  SELECT 'recruits',r.id::text,
-  CASE WHEN c."Id" IS NULL OR c.deleted_at IS NOT NULL THEN 'INVALID_CUSTOMER'
-   WHEN p.id IS NULL OR p.deleted_at IS NOT NULL THEN 'INVALID_PERSON'
-   WHEN p.legacy_customer_id IS DISTINCT FROM r.customer_id THEN 'IDENTITY_CONFLICT' END
+  CASE WHEN p.id IS NULL OR p.deleted_at IS NOT NULL THEN 'INVALID_PERSON'
+   WHEN r.customer_id IS NOT NULL AND (c."Id" IS NULL OR c.deleted_at IS NOT NULL) THEN 'INVALID_CUSTOMER'
+   WHEN r.customer_id IS NOT NULL AND p.legacy_customer_id IS DISTINCT FROM r.customer_id THEN 'IDENTITY_CONFLICT' END
  FROM public.recruit_candidates r LEFT JOIN public.persons p ON p.id=r.person_id
  LEFT JOIN public.customers c ON c."Id"=r.customer_id WHERE r.deleted_at IS NULL
  UNION ALL

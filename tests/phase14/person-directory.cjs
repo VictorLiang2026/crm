@@ -11,23 +11,24 @@ Module._load = function(name, parent, main) {
 const { createService, main } = require('../../cloudfunctions/person_360/index.js');
 Module._load = originalLoad;
 
-test('people directory is paged, field-limited, and read-only', async () => {
+test('people directory delegates bounded sorting and pagination to public RPC', async () => {
   const calls = [];
-  const service = createService({ request: async (table, method, filters) => {
-    calls.push({ table, method, filters });
-    return [{ id: 1, display_name: '甲' }, { id: 2, display_name: '乙' }, { id: 3, display_name: '丙' }];
+  const service = createService({ rpc: async (name, params) => {
+    calls.push({ name, params });
+    return { rows: [{ id: 2, display_name: '【系统测试·勿联系】虚构乙' }],
+      page: 2, pageSize: 2, total: 3, totalPages: 2 };
   } });
-  const result = await service.listPeople({ page: 2, pageSize: 2, keyword: '张玮' });
-  assert.deepEqual(result.rows.map(person => person.id), [1, 2]);
-  assert.equal(result.hasMore, true);
-  assert.deepEqual(calls.map(call => [call.table, call.method]), [['persons', 'GET']]);
-  assert.equal(calls[0].filters.offset, 2);
-  assert.equal(calls[0].filters.limit, 3);
-  assert.equal(calls[0].filters.display_name, 'ilike.*张玮*');
-  assert.equal(calls[0].filters.select, 'id,display_name,occupation,organization,legacy_customer_id');
+  const result = await service.listPeople({ page: 2, pageSize: 2, keyword: '虚构', sortField: 'id', sortDir: 'asc' });
+  assert.equal(result.total, 3);
+  assert.deepEqual(calls, [{ name: 'person_directory_page_v1', params: {
+    p_page: 2, p_page_size: 2, p_keyword: '虚构', p_sort_field: 'id', p_sort_dir: 'asc',
+  } }]);
+  await service.listPeople({ keyword: '【系统测试·勿联系】虚构乙' });
+  assert.equal(calls[1].params.p_keyword, '【系统测试·勿联系】虚构乙');
   await assert.rejects(service.listPeople({ keyword: '*' }), /Invalid directory keyword/);
   await assert.rejects(service.listPeople({ pageSize: 1000 }), /Invalid directory page/);
-  assert.equal(calls.length, 1);
+  await assert.rejects(service.listPeople({ sortField: 'phone' }), /Invalid directory sort/);
+  assert.equal(calls.length, 2);
 });
 
 test('opportunity directory maps explicit Person links before legacy customer links', async () => {

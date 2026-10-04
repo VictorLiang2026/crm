@@ -41,7 +41,9 @@ try {
   $dirs = @(Get-ChildItem (Join-Path $repo 'cloudfunctions') -Directory | Where-Object Name -ne '_shared')
   $names = @($config.functions | ForEach-Object { $_.name })
   if (@(Compare-Object @($dirs.Name | Sort-Object) @($names | Sort-Object)).Count) { throw 'Function manifest does not match local directories.' }
-  $audit = Join-Path $env:TEMP ('crm-cloud-audit-' + [guid]::NewGuid().ToString('N'))
+  $auditRoot = if ($env:CRM_SYNC_AUDIT_ROOT) { $env:CRM_SYNC_AUDIT_ROOT } else { $env:TEMP }
+  $auditRoot = (Resolve-Path -LiteralPath $auditRoot).Path
+  $audit = Join-Path $auditRoot ('crm-cloud-audit-' + [guid]::NewGuid().ToString('N'))
   New-Item -ItemType Directory -Path $audit | Out-Null
   $checked = 0
   foreach ($dir in $dirs) {

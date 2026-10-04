@@ -108,8 +108,16 @@ function installFixtures() {
     'person_360:lookupCustomer': () => ({ personId: 980001 }),
     'person_360:listPeople': data => ({ rows: mode === 'empty' ? [] : [
       { id: 980001, display_name: marker + '客户甲', legacy_customer_id: customer.Id,
-        occupation: '顾问', organization: marker + '机构' },
-    ], page: Number(data.page) || 1, pageSize: Number(data.pageSize) || 20, hasMore: false }),
+        customer_id: customer.Id, roles:['customer'], occupation: '顾问', organization: marker + '机构' },
+    ], page: Number(data.page) || 1, pageSize: Number(data.pageSize) || 50,
+      total:mode==='empty'?0:1,totalPages:1,hasMore:false }),
+    'person_360:listPersonOnlyRecruits': () => ({rows:[],total:0,personOnly:true}),
+    'person_360:listPersonOnlyRecruitTrash': () => ({rows:[],total:0,personOnly:true}),
+    'person_360:previewIdentity': data => ({previewId:'a45da2ae-b2ed-42c0-992e-e68e53085acc',
+      preview:{kind:data.data.kind,personId:data.data.personId,displayName:data.data.displayName,
+        newPerson:false,willCreateSpeaker:true,willCreateCustomer:false},
+      expiresAt:'2026-10-04T12:00:00+08:00',status:'preview'}),
+    'person_360:executeIdentity': () => ({personId:980001,speakerId:990011}),
     'person_360:listOpportunityDirectory': data => ({ rows: mode === 'empty' ? [] : [
       { id: 961001, person_id: 980001, customer_id: null, opportunity_type: 'recruit',
         status: '发现', next_action: marker + '联系候选人',
@@ -192,6 +200,7 @@ function installFixtures() {
     'person_360:addCanonicalParticipant': () => ({ id: 970002, linked: true, canonicalPersonId: '980001' }),
     'person_360:recordActivityInteraction': () => ({ interaction: { id: 990002 }, personId: '980001' }),
     'person_360:createSpeakerProfile': () => ({ id: 990011, personId: '980001', customerId: 910001 }),
+    'activity_speakers:update': () => ({ok:true}),
     'person_360:linkSpeakerPerson': () => ({ ok: true, personId: '980001' }),
     'person_360:commitQuickCaptureV2': () => ({ interactionId: 990001, contextItemCount: 2 }),
     'ai_parse:quick_capture': data => data.version === 2 ? ({ today: '2026-09-27', preview: {
@@ -277,6 +286,7 @@ function installFixtures() {
         candidateId:data.candidateId, personId: data.personId, version: data.version,
         payload: ['assistant:quickCaptureV2', 'person_360:commitQuickCaptureV2', 'person_360:addCanonicalParticipant', 'person_360:recordActivityInteraction', 'person_360:createOpportunity',
           'person_360:updateOpportunity', 'person_360:createSpeakerProfile',
+          'person_360:previewIdentity','person_360:executeIdentity','activity_speakers:update',
           'person_360:linkSpeakerPerson'].includes(key) ? (key==='assistant:quickCaptureV2'?data:data.data) : null });
       if (!loggedIn) return fail('CALL_BEFORE_LOGIN: ' + key);
       if (mode === 'error' && (!params.get('fail') || params.get('fail') === key)) return { result: { error: 'TEST_API_FAILURE' } };

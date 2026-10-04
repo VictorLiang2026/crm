@@ -735,6 +735,10 @@ function showReLoginOverlay(onOk){
 async function callFn(name, data){
   await ensureSession(); // 超过 5 分钟无操作时，先要求重新登录再继续原操作
   var res = await app.callFunction({ name: name, data: data });
+  if(name === 'recruit_candidates' && data && data.action === 'get' && res.result && res.result.error === 'not found'){
+    var personOnly = await app.callFunction({name:'person_360', data:{action:'getPersonOnlyRecruit', id:data.id}});
+    return personOnly.result;
+  }
   return res.result;
 }
 
@@ -4257,7 +4261,15 @@ async function showRecruit(){
     ]));
 
     var listRes = await callFn('recruit_candidates', {action:'list', keyword:rcState.keyword, stage:rcState.stage, page:rcState.page, pageSize:1000});
-    var rows = listRes.rows || [];
+    if(listRes.error) throw new Error(listRes.error);
+    var personOnlyRes = await callFn('person_360', {action:'listPersonOnlyRecruits'});
+    if(personOnlyRes.error) throw new Error(personOnlyRes.error);
+    var rows = (listRes.rows || []).concat((personOnlyRes.rows || []).filter(function(row){
+      var kw = (rcState.keyword || '').toLowerCase();
+      return (!rcState.stage || row.stage === rcState.stage) &&
+        (!kw || [row.customer_name,row.occupation,row.source].some(function(v){ return String(v||'').toLowerCase().includes(kw); }));
+    }));
+    rows.sort(function(a,b){ return String(b.updated_at||'').localeCompare(String(a.updated_at||'')) || b.candidate_id-a.candidate_id; });
     rcRenderTable(listCard, rows);
   } catch(e){
     funnelCard.innerHTML = '';
@@ -4436,11 +4448,32 @@ async function showRecruitTrash(){
     backHash: '#/recruit', backLabel: '增员工作台',
     emptyText: '回收站为空（删除候选人后，其增员跟进记录一并移入此处，可随时恢复）',
     reload: showRecruitTrash,
-    fetch: function(){
-      return callFn('recruit_candidates', {action:'trashList', page:rcTrashState.page, pageSize:rcTrashState.pageSize, keyword:rcTrashState.keyword, sortDir:rcTrashState.sortDir}).then(function(r){
-        (r.rows||[]).forEach(function(row){ row._id = row.candidate_id; });
-        return r;
+    fetch: async function(){
+      var legacyRows = [], legacyCounts = {}, legacyTotal = 0, legacyPage = 1;
+      do {
+        var legacy = await callFn('recruit_candidates', {action:'trashList', page:legacyPage, pageSize:100, keyword:rcTrashState.keyword, sortDir:rcTrashState.sortDir});
+        if(legacy.error) throw new Error(legacy.error);
+        legacyRows.push.apply(legacyRows, legacy.rows || []);
+        Object.assign(legacyCounts, legacy.counts || {});
+        legacyTotal = legacy.total || 0;
+        legacyPage++;
+      } while(legacyRows.length < legacyTotal);
+      var personOnly = await callFn('person_360', {action:'listPersonOnlyRecruitTrash'});
+      if(personOnly.error) throw new Error(personOnly.error);
+      var kw = (rcTrashState.keyword||'').toLowerCase();
+      var rows = legacyRows.concat((personOnly.rows||[]).filter(function(row){
+        return !kw || [row.customer_name,row.occupation].some(function(v){ return String(v||'').toLowerCase().includes(kw); });
+      }));
+      rows.sort(function(a,b){
+        var order = String(a.candidate_deleted_at||'').localeCompare(String(b.candidate_deleted_at||''));
+        return (rcTrashState.sortDir==='asc' ? order : -order) || b.candidate_id-a.candidate_id;
       });
+      var total = legacyTotal+(personOnly.rows||[]).filter(function(row){
+        return !kw || [row.customer_name,row.occupation].some(function(v){ return String(v||'').toLowerCase().includes(kw); });
+      }).length;
+      rows = rows.slice((rcTrashState.page-1)*rcTrashState.pageSize,rcTrashState.page*rcTrashState.pageSize);
+      rows.forEach(function(row){ row._id=row.candidate_id; });
+      return {rows:rows,total:total,counts:legacyCounts};
     },
     restoreFn: function(ids){ return callFn('recruit_candidates', {action:'restore', ids:ids}); },
     afterRestore: function(){ invalidateRcMap(); },
@@ -5905,7 +5938,10 @@ async function showSpeakers(){
     el('button', {class:'btn btn-primary', onclick:function(){
       openSpeakerPersonPicker('选择嘉宾对应的 Person', function(person){ openSpeakerForm(null, person); });
     }}, '+ 从 Person 新增嘉宾'),
-    el('button', {class:'btn', onclick:function(){ openSpeakerForm(null); }}, '+ 原方式新增嘉宾'),
+    el('button', {class:'btn', onclick:async function(){
+      var peopleModule = await import('/crm/js/modules/phase14-hubs.js');
+      peopleModule.openPersonCommand({callFn:callFn, kind:'speaker', onDone:function(){ showSpeakers(); }});
+    }}, '+ 新增嘉宾并核对 Person'),
     el('button', {class:'btn', onclick:function(){ location.hash='#/activities'; }}, '返回活动列表'),
   ]);
   view.appendChild(toolbar);
@@ -6047,6 +6083,7 @@ function openSpeakerPersonPicker(title, onPick){
 
 // 嘉宾档案：Person 入口先人工选身份；原新增/编辑入口保留客户主档兼容流程。
 function openSpeakerForm(s, selectedPerson){
+  if(!s && !selectedPerson){ toast('请先核对并选择 Person', 'err'); return; }
   var FIELDS = [
     {name:'name', label:'姓名', type:'text', req:true},
     {name:'phone', label:'电话', type:'text'},
@@ -6075,48 +6112,27 @@ function openSpeakerForm(s, selectedPerson){
     FIELDS.push({name:'customer_id', label:'关联客户ID' + (s.customer_id ? '' : '（当前为空，保存时自动补建/确认）'), type:'text'});
     FIELDS.push({name:'recruit_candidate_id', label:'关联增员ID（可选）', type:'text'});
   }
-  modal(s ? '编辑嘉宾：' + s.name : (selectedPerson ? '新增嘉宾档案：' + selectedPerson.displayName : '新增嘉宾（自动建立/关联客户档案）'), FIELDS, s || {}, async function(data){
+  modal(s ? '编辑嘉宾：' + s.name : '新增嘉宾档案：' + selectedPerson.displayName, FIELDS, s || {}, async function(data){
     ['cooperation_count','customer_id','recruit_candidate_id'].forEach(function(k){
       if(data[k] === '' || data[k] == null) delete data[k];
     });
     if(selectedPerson){
-      var created = await callFn('person_360', {action:'createSpeakerProfile', data:{
-        personId:selectedPerson.id, selectedDisplayName:selectedPerson.displayName,
-        confirmed:true, profile:data,
+      var preview = await callFn('person_360', {action:'previewIdentity', data:{
+        kind:'speaker', idempotencyKey:crypto.randomUUID(),
+        personId:selectedPerson.id, displayName:selectedPerson.displayName,
       }});
+      if(preview.error) throw new Error(preview.error);
+      if(!confirm('服务端预览：将为 Person #'+selectedPerson.id+'「'+selectedPerson.displayName+'」建立嘉宾角色，不创建客户。请核对后确认。')) return;
+      var created = await callFn('person_360', {action:'executeIdentity', data:{previewId:preview.previewId}});
       if(created.error) throw new Error(created.error);
+      var profile = await callFn('activity_speakers', {action:'update', id:created.speakerId, data:data});
+      if(profile.error) throw new Error(profile.error);
       toast('已创建嘉宾档案并关联 Person', 'ok'); showSpeakers();
       return;
     }
-    var followupToWrite = null;
-    if(!s){
-      // 新建：先确保客户主档（同名确认 / 加括号区分）
-      var pc = await ensurePersonCustomer((data.name || '').trim(), '嘉宾：' + (data.source || '资源池建档'));
-      data.customer_id = pc.cid;
-      data.name = pc.finalName;
-      // 填了最近联系信息：同步写一条客户跟进（沟通记录统一在客户时间线维系）
-      if(data.last_contact_date || data.last_contact_note){
-        followupToWrite = {
-          customer_id: pc.cid, customer_name: pc.finalName,
-          followup_date: data.last_contact_date || null,
-          followup_notes: '【嘉宾建档】' + (data.last_contact_note || ('建立嘉宾关系' + (data.organization ? '（' + data.organization + '）' : ''))),
-        };
-      }
-    }else if(s.customer_id == null && data.customer_id == null){
-      // 编辑无主嘉宾：引导补建/确认客户并回填
-      var pc2 = await ensurePersonCustomer((data.name || s.name || '').trim(), '嘉宾（补关联）');
-      data.customer_id = pc2.cid;
-      if(pc2.finalName && pc2.finalName !== (data.name || s.name)) data.name = pc2.finalName;
-    }
-    var r = s
-      ? await callFn('activity_speakers', {action:'update', id:s.id, data:data})
-      : await callFn('activity_speakers', {action:'create', data:data});
+    var r = await callFn('activity_speakers', {action:'update', id:s.id, data:data});
     if(r.error) throw new Error(r.error);
-    if(followupToWrite){
-      var fr2 = await callFn('followups', {action:'create', data:followupToWrite});
-      if(fr2 && fr2.error) throw new Error('嘉宾已保存，但跟进记录写入失败：' + fr2.error);
-    }
-    toast(s ? '已保存' : '已创建嘉宾并关联客户档案', 'ok');
+    toast('已保存', 'ok');
     showSpeakers();
   }, {wide:true});
 }
@@ -7677,11 +7693,15 @@ function renderCandidateInfo(c){
   renderCandidateAttachments(attachWrap, c);
   box.appendChild(attachWrap);
 
-  // 跳转客户详情链接
-  box.appendChild(el('div', {style:'margin-top:12px'}, el('a', {
+  // Person-only 增员不生成客户档案；旧候选人仍保留原客户详情入口。
+  if(c.customer_id) box.appendChild(el('div', {style:'margin-top:12px'}, el('a', {
     class:'btn btn-sm btn-ghost',
     onclick:function(){ location.hash='#/customer/'+c.customer_id; }
   }, '查看客户详情 →')));
+  else if(c.person_id) box.appendChild(el('div', {style:'margin-top:12px'}, el('a', {
+    class:'btn btn-sm btn-ghost',
+    onclick:function(){ location.hash='#/person/'+c.person_id; }
+  }, '查看人物主档 →')));
   return box;
 }
 
@@ -8534,7 +8554,7 @@ function renderQuickCapture(container, r, text, preset){
   personLine.appendChild(el('div', {style:'font-weight:700;margin-bottom:6px;'}, [qcTag('人物','#059669'), '这次交流的对象']));
   var personSel = el('select', {style:'width:100%;padding:6px;border:1px solid #d1d5db;border-radius:6px;box-sizing:border-box;'});
   var newNameWrap = el('div', {style:'margin-top:6px;display:none;'}, []);
-  var newNameInput = el('input', {type:'text', placeholder:'新客户姓名（保存时自动创建客户）', style:'width:100%;padding:6px;border:1px solid #d1d5db;border-radius:6px;box-sizing:border-box;'});
+  var newNameInput = el('input', {type:'text', placeholder:'新人物姓名（先核对 Person）', style:'width:100%;padding:6px;border:1px solid #d1d5db;border-radius:6px;box-sizing:border-box;'});
   newNameWrap.appendChild(newNameInput);
   function addOpt(v, label, selected){ var o = el('option', {value:v}, label); if(selected) o.selected = true; personSel.appendChild(o); }
   if(preset && preset.cid){
@@ -8557,7 +8577,7 @@ function renderQuickCapture(container, r, text, preset){
     (match.candidates || []).forEach(function(c){
       addOpt(c.type + '|' + c.id + '|' + (c.cid != null ? c.cid : '') + '|' + c.name, qcLabel(c.type) + c.name + (c.stage ? ('（' + c.stage + '）') : ''));
     });
-    addOpt('__new__', '＋ 新建客户…');
+    addOpt('__new__', '＋ 新建人…');
     addOpt('__new_speaker__', '＋ 新建嘉宾…');
     personSel.addEventListener('change', function(){
       newNameWrap.style.display = (personSel.value === '__new__' || personSel.value === '__new_speaker__') ? 'block' : 'none';
@@ -8565,7 +8585,7 @@ function renderQuickCapture(container, r, text, preset){
         newNameInput.placeholder = '新嘉宾姓名（保存时创建到嘉宾资源池）';
         if(!newNameInput.value && p.person_name) newNameInput.value = p.person_name;
       }
-      else if(personSel.value === '__new__') newNameInput.placeholder = '新客户姓名（保存时自动创建客户）';
+      else if(personSel.value === '__new__') newNameInput.placeholder = '新人物姓名（默认不创建客户）';
     });
     // AI 判定为嘉宾但未命中嘉宾池（如该人已有客户档案）：预选"新建嘉宾"并预填姓名，客户/增员选项保留可改选
     if(p.person_type_hint === 'speaker' && !(match.status === 'matched' && match.person_type === 'speaker')){
@@ -8653,7 +8673,7 @@ function renderQuickCapture(container, r, text, preset){
       personName = newNameInput.value.trim();
       if(!personName){ toast('请填写姓名，或选择已有对象', 'err'); return; }
     }else if(!target){
-      toast('请选择关联对象（或新建客户/嘉宾）', 'err'); return;
+      toast('请选择关联对象（或新建人/嘉宾）', 'err'); return;
     }else{
       var parts = target.split('|');
       personType = parts[0]; personId = parts[1]; cid = parts[2] || null; personName = parts.slice(3).join('|');
@@ -8664,34 +8684,50 @@ function renderQuickCapture(container, r, text, preset){
       var summary = (p.facts || []).join('；');
       var nextDate = dateInput.value || null;
       if(isNewCustomer){
-        var cr = await callFn('customers', {action:'create', data:{customer_name:personName, source:'快速记录'}});
-        if(cr && cr.error) throw new Error(cr.error);
-        cid = cr.id; personType = 'customer';
+        var identityModule = await import('/crm/js/modules/phase14-hubs.js');
+        identityModule.openPersonCommand({callFn:callFn, kind:'capture',
+          prefill:{displayName:personName, note:text, summary:summary || text, speaker:false},
+          onDone:function(personId){
+            var oldOverlay = saveBtn.closest ? saveBtn.closest('.modal-overlay') : null;
+            if(oldOverlay) oldOverlay.remove();
+            toast('已关联 Person 并保存互动；含测试数据时请勿联系', 'ok');
+            location.hash='#/person/'+personId;
+          }});
+        saveBtn.disabled = false; saveBtn.textContent = '✓ 确认并保存';
+        return;
       }
-      if(isNewSpeaker || personType === 'speaker'){
-        // 嘉宾路径（v1.8.10.6：customers 为唯一 person 主表）
-        // 1) 确保客户主档：新嘉宾走同名确认（关联/加括号新建）；已有嘉宾但缺关联（存量无主）同样补建并回填
-        if(isNewSpeaker){
-          var pc = await ensurePersonCustomer(personName, '嘉宾（快速记录）');
-          cid = pc.cid; personName = pc.finalName;
-          var spData0 = { last_contact_date: fdate, last_contact_note: '【快速记录】' + text, customer_id: cid };
-          if(nextDate) spData0.next_contact_date = nextDate;
-          if(p.activity) spData0.notes = '活动：' + p.activity;
-          var spr0 = await callFn('activity_speakers', {action:'create', data:Object.assign({name:personName, source:'快速记录'}, spData0)});
-          if(spr0 && spr0.error) throw new Error(spr0.error);
-        }else{
-          var spUpd = { last_contact_date: fdate, last_contact_note: '【快速记录】' + text };
-          if(nextDate) spUpd.next_contact_date = nextDate;
-          if(cid == null){
-            // 存量无主嘉宾：先建/确认客户再回填关联
-            var pc2 = await ensurePersonCustomer(personName, '嘉宾（快速记录）');
-            cid = pc2.cid; personName = pc2.finalName;
-            spUpd.customer_id = cid;
-          }
-          var spr1 = await callFn('activity_speakers', {action:'update', id:parseInt(personId, 10), data:spUpd});
-          if(spr1 && spr1.error) throw new Error(spr1.error);
+      if(isNewSpeaker){
+        var speakerModule = await import('/crm/js/modules/phase14-hubs.js');
+        speakerModule.openPersonCommand({callFn:callFn, kind:'capture',
+          prefill:{displayName:personName, note:text, summary:summary || text, speaker:true},
+          onDone:function(personId){
+            var oldOverlay = saveBtn.closest ? saveBtn.closest('.modal-overlay') : null;
+            if(oldOverlay) oldOverlay.remove();
+            toast('已核对 Person、建立嘉宾角色并保存互动', 'ok');
+            location.hash='#/person/'+personId;
+          }});
+        saveBtn.disabled = false; saveBtn.textContent = '✓ 确认并保存';
+        return;
+      }
+      if(personType === 'speaker'){
+        if(cid == null){
+          var existingSpeakerModule = await import('/crm/js/modules/phase14-hubs.js');
+          existingSpeakerModule.openPersonCommand({callFn:callFn, kind:'capture',
+            prefill:{displayName:personName, note:text, summary:summary || text,
+              speaker:true, speakerId:personId, nextDate:nextDate},
+            onDone:function(personIdDone){
+              var oldOverlay = saveBtn.closest ? saveBtn.closest('.modal-overlay') : null;
+              if(oldOverlay) oldOverlay.remove();
+              toast('已关联 Person 并保存嘉宾交流', 'ok');
+              location.hash='#/person/'+personIdDone;
+            }});
+          saveBtn.disabled = false; saveBtn.textContent = '✓ 确认并保存';
+          return;
         }
-        // 2) 沟通记录统一写 followups（客户详情时间线可见，全生命周期一处维系）
+        var spUpd = { last_contact_date: fdate, last_contact_note: '【快速记录】' + text };
+        if(nextDate) spUpd.next_contact_date = nextDate;
+        var spr1 = await callFn('activity_speakers', {action:'update', id:parseInt(personId, 10), data:spUpd});
+        if(spr1 && spr1.error) throw new Error(spr1.error);
         var sfr = await callFn('followups', {action:'create', data:{
           customer_id: parseInt(cid, 10), customer_name: personName || undefined, followup_date: fdate, followup_notes: '【嘉宾交流·快速记录】' + text,
           interaction_summary: summary || null, next_action: p.next_action || null, next_action_date: nextDate,
@@ -8714,7 +8750,7 @@ function renderQuickCapture(container, r, text, preset){
         }});
         if(fr && fr.error) throw new Error(fr.error);
       }
-      toast(isNewSpeaker || personType === 'speaker' ? '已保存：嘉宾档案已关联客户，跟进已记入客户时间线' : '已保存为跟进记录', 'ok');
+      toast(personType === 'speaker' ? '已保存：嘉宾跟进已记入客户时间线' : '已保存为跟进记录', 'ok');
       var ov = saveBtn.closest ? saveBtn.closest('.modal-overlay') : null;
       if(ov) ov.remove();
       // 从详情页进入：保存后刷新对应详情，让新跟进/下一步立即显示

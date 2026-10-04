@@ -38,9 +38,9 @@ async function main(){
   console.log(JSON.stringify({dryRun:report.dryRun}));
   await c.evaluate("location.hash='#/people'");await wait("!!document.querySelector('.phase14-search input')");
   await c.evaluate(`(()=>{const input=document.querySelector('.phase14-search input');input.value='虚构体验甲';document.querySelector('.phase14-search').requestSubmit()})()`);
-  await wait(`!!document.querySelector('.phase14-row a[href=${JSON.stringify('#/person/'+ids.personId)}]')`);
+  await wait(`!!document.querySelector('.phase14-people-table a[href=${JSON.stringify('#/person/'+ids.personId)}]')`);
   check('people_search_sample',true);
-  await c.evaluate(`document.querySelector('.phase14-row a[href=${JSON.stringify('#/person/'+ids.personId)}]').click()`);
+  await c.evaluate(`document.querySelector('.phase14-people-table a[href=${JSON.stringify('#/person/'+ids.personId)}]').click()`);
   await wait("document.querySelector('.person360-profile')?.innerText.includes('编辑基本信息')");
   check('profile_no_duplicate_editor',await c.evaluate("document.querySelectorAll('.person360-profile input,.person360-profile textarea,.person360-profile select').length===0"));
   check('contact_disabled',await c.evaluate("[...document.querySelectorAll('.person360-profile button')].filter(x=>x.textContent.startsWith('复制')).every(x=>x.disabled)"));
