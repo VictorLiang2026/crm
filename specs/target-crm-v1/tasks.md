@@ -55,9 +55,10 @@
 
 ## C. 领域闭环与可靠证据
 
-- [ ] **WP10｜机会从候选到成交/关闭**　依赖：WP07、WP08。关联：R05、R08。
+- [x] **WP10｜机会从候选到成交/关闭**　依赖：WP07、WP08。关联：R05、R08。
   - 交给 Codex：补 Person 360 与新机会主入口的候选审核、正式机会编辑/阶段/关闭、关联 Action/Outcome；旧 customer 机会及漏斗仍正常。业务更新走服务端预览与确认。
   - 验收：测试候选有来源，确认后仅一条正式机会；拒绝候选不写机会；Person 专属与旧 customer 机会权限隔离。
+  - 2026-10-04：prtest 已确认虚构候选拒绝/晋升、机会编辑/阶段/关闭及 Action #8 → Outcome #1；旧客户机会 #9 不变。发布与未验证项见 `docs/work-packages/wp10-opportunity-workflow.md`。
 - [ ] **WP11｜保险上下文可用性**　依赖：WP05、WP10。关联：R02、R06、R07。
   - 交给 Codex：把 Existing Coverage、Review、Known Needs、Potential Gaps、Open Opportunities、Next Actions 做成可跳转且可解释的 Person 360 摘要；必要的完整编辑留在旧保单检视。优先复用已标记样本，通过正常确认流程产生虚构产品/报告/证据与缺证据情况，不隐蔽增加初始种子。
   - 验收：摘要来源、日期和“未知”边界清楚；无资料不虚构保障缺口；旧保单检视与 OCR/照片流程通过回归。
