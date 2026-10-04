@@ -106,6 +106,7 @@ function installFixtures() {
         total: matched.length, page, pageSize };
     },
     'customers:get': () => ({ customer, followups: mode === 'empty' ? [] : [followup], products: [], gifts: [], photos: [], recommendations: [], reports: [] }),
+    'ocr_records:list': () => ({ rows: [] }),
     'person_360:lookupCustomer': () => ({ personId: 980001 }),
     'person_360:listPeople': data => ({ rows: mode === 'empty' ? [] : [
       { id: 980001, display_name: marker + '客户甲', legacy_customer_id: customer.Id,
@@ -209,8 +210,15 @@ function installFixtures() {
       nextAction: marker + '继续交流', nextActionDate: '2026-10-01',
       recentFollowups: [{ id: 950001, date: '2026-09-20', channel: '微信', summary: marker + '增员沟通' }],
     }]),
-    'person_360:getInsuranceContext': () => ({
-      existingCoverage: [{ label: '医疗(CI)', amount: 100000, premium: 3000 }],
+    'person_360:getInsuranceContext': () => sessionStorage.getItem('crm_test_empty_insurance') === '1' ? ({
+      existingCoverage: [], review: {latest:null,ocr:[],evidence:[]},
+      knownNeeds: [], potentialGaps: [], openOpportunities: [], nextActions: [],
+      evidenceStatus:'unknown',legacyCustomerId:null,
+      testData:{status:'verified',containsTestData:false,recordCount:0,sources:[]},
+    }) : ({
+      existingCoverage: [{ label: '医疗(CI)', amount: 100000, premium: 3000,
+        observedAt: '2026-09-20', source: {type:'products',id:940001},
+        provenance: '手工录入的保障明细，保单真实性待核实' }],
       review: { latest: { date: '2026-09-20', summary: marker + '人工检视', provenance: '人工编辑' },
         ocr: [{ summary: marker + '保单摘要', provenance: 'OCR 摘要，待人工核实' }],
         evidence: [{ fileName: marker + '保险附件.pdf' }] },
@@ -218,6 +226,9 @@ function installFixtures() {
       potentialGaps: [{ content: marker + '待核实缺口', provenance: '报告生成内容，待人工核实' }],
       openOpportunities: [{ id: 960001, type: '家庭保障', status: '沟通' }],
       nextActions: [{ title: marker + '核对保障', dueAt: '2026-09-30' }],
+      evidenceStatus: 'recorded',
+      testData: { status:'verified', containsTestData:true, recordCount:1,
+        sources:[{batchKey:'crm_test_main_v1',table:'products',count:1}] },
       legacyCustomerId: customer.Id,
     }),
     'person_360:createOpportunity': () => ({ id: 961002 }),

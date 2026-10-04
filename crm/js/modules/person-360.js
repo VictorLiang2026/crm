@@ -148,6 +148,40 @@ export async function renderPerson360({ root, personId, callFn, openLegacyTab })
   try {
     const context = await request('getInsuranceContext', { personId });
     if (location.hash !== hash) return;
+    renderTestDataNotice(insuranceBody, context.testData);
+    insuranceBody.append(node('p', 'person360-muted',
+      context.evidenceStatus === 'recorded' ?
+        '以下仅汇总已录入资料；金额、报告与附件不等于已核实的真实保障。' :
+        '保障资料未知：未见可核对的保单明细或附件，不能推断没有保障，也不能推断存在保障缺口。'));
+    function sourceLine(row) {
+      const line = node('div', 'person360-insurance-source');
+      const source = row.source;
+      const date = row.observedAt || row.date || row.createdAt || row.dueAt;
+      line.append(node('span', '',
+        `来源：${source?.type && source.id != null ? `public.${source.type}#${source.id}` : '待核验'} · 日期：${date ? String(date).slice(0, 10) : '未知'}`));
+      if (row.provenance) line.append(node('span', '', ` · ${row.provenance}`));
+      if (!source?.type || source.id == null) return line;
+      const legacyTab = { products: 'products', policy_review_reports: 'products',
+        ocr_records: 'ocr', photos: 'photos' }[source.type];
+      const target = source.type === 'opportunities' ? `opportunity-${source.id}` :
+        source.type === 'actions' ? `work-action-${source.id}` : null;
+      const selector = source.type === 'interactions' ? '.person360-timeline' :
+        source.type === 'context_items' ? '.person360-context-grid' : null;
+      if ((legacyTab && context.legacyCustomerId) || target || selector) {
+        line.append(button('打开来源', () => {
+          if (legacyTab) return openLegacyTab(context.legacyCustomerId, legacyTab);
+          const found = target ? document.getElementById(target) : document.querySelector(selector);
+          (found || document.querySelector(target?.startsWith('opportunity') ?
+            '.person360-opportunities' : '.person360-work-items'))?.scrollIntoView({ block: 'center' });
+        }, 'btn-sm'));
+      }
+      return line;
+    }
+    function item(text, row) {
+      const box = node('div', 'person360-insurance-item');
+      box.append(node('p', '', text), sourceLine(row));
+      return box;
+    }
     function section(title, rows, empty, render) {
       const block = node('div', 'person360-insurance-block');
       block.append(node('h4', '', title));
@@ -156,29 +190,32 @@ export async function renderPerson360({ root, personId, callFn, openLegacyTab })
       insuranceBody.append(block);
     }
     section('Existing Coverage · 已录入保障', context.existingCoverage || [],
-      '尚无已录入保单明细；不能据此判断没有保障。', row =>
-        node('p', '', `${row.label}：保额 ${row.amount ?? '—'}，年缴 ${row.premium ?? '—'}`));
+      '未知：尚无已录入保单明细；不能据此判断没有保障。', row =>
+        item(`${row.label}：保额 ${row.amount ?? '未知'}，年缴保费 ${row.premium ?? '未知'}`, row));
     const reviewRows = [];
     if (context.review?.latest) reviewRows.push({ label: '最近检视',
       text: `${context.review.latest.date || ''} ${context.review.latest.summary || '暂无摘要'}`,
+      date: context.review.latest.date, source: context.review.latest.source,
       provenance: context.review.latest.provenance });
     for (const row of context.review?.ocr || []) reviewRows.push({ label: 'OCR',
-      text: row.summary, provenance: row.provenance });
+      text: row.summary, createdAt: row.createdAt, source: row.source, provenance: row.provenance });
     for (const row of context.review?.evidence || []) reviewRows.push({ label: '资料',
-      text: `${row.fileName || '未命名文件'}${row.note ? ` · ${row.note}` : ''}`, provenance: '附件元数据' });
-    section('Review · 检视与依据', reviewRows, '暂无相关检视报告、OCR 摘要或资料。', row =>
-      node('p', '', `${row.label}：${row.text}（${row.provenance}）`));
+      text: `${row.fileName || '未命名文件'}${row.note ? ` · ${row.note}` : ''}`,
+      createdAt: row.createdAt, source: row.source, provenance: row.provenance });
+    section('Review · 检视与依据', reviewRows,
+      '未知：暂无相关检视报告、OCR 摘要或附件；未进行保单核验。', row =>
+        item(`${row.label}：${row.text}`, row));
     section('Known Needs · 已记录需求', context.knownNeeds || [],
-      '暂无人工编辑的检视需求。', row => node('p', '', `${row.content}（${row.provenance}）`));
+      '未知：暂无明确提及保险需求的沟通或已确认事实。', row => item(row.content, row));
     section('Potential Gaps · 待核实缺口', context.potentialGaps || [],
-      '暂无报告提出的待核实缺口；不能据此判断保障充分。', row =>
-        node('p', '', `${row.content}（${row.provenance}）`));
+      '未知：无人工复核且有资料依据的缺口记录；不能据此判断保障充分。', row =>
+        item(row.content, row));
     section('Open Opportunities · 进行中的保险机会', context.openOpportunities || [],
-      '暂无进行中的保险机会。', row =>
-        node('p', '', `${row.type} · ${row.status || '未分阶段'}${row.progress ? ` · ${row.progress}` : ''}`));
+      '暂无进行中的保险机会；已关闭机会不计入。', row =>
+        item(`${row.type} · ${row.status || '未分阶段'}${row.progress ? ` · ${row.progress}` : ''}`, row));
     section('Next Actions · 下一步行动', context.nextActions || [],
-      '暂无已记录的保险相关行动。', row =>
-        node('p', '', `${row.title}${row.dueAt ? ` · ${String(row.dueAt).slice(0, 10)}` : ''}`));
+      '暂无已记录的保险相关行动；机会文字建议不等于已创建行动。', row =>
+        item(`${row.title}${row.dueAt ? ` · 截止 ${String(row.dueAt).slice(0, 10)}` : ' · 截止未知'}`, row));
     if (context.legacyCustomerId) {
       const link = node('a', '', '打开原保单检视页面');
       link.href = `#/customer/${context.legacyCustomerId}`;

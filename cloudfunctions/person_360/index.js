@@ -148,7 +148,7 @@ async function pgRpc(name, body) {
   } finally { clearTimeout(timeout); }
 }
 
-function createService({ request = pgRequest, rpc = pgRpc } = {}) {
+function createService({ request = pgRequest, rpc = pgRpc, disclosure = disclose } = {}) {
   const findPerson = async id => one(await request('persons', 'GET', {
     select: 'id,display_name,legacy_customer_id,occupation,organization',
     id: `eq.${idOf(id)}`, deleted_at: 'is.null', limit: 1,
@@ -423,7 +423,18 @@ function createService({ request = pgRequest, rpc = pgRpc } = {}) {
   async function getInsuranceContext(personId) {
     const person = await findPerson(personId);
     if (!person) throw new Error('Person not found');
-    return new InsuranceContextService({ request }).build(person);
+    const context = await new InsuranceContextService({ request }).build(person);
+    const refs = [{ table: 'persons', id: String(person.id) }];
+    if (context.legacyCustomerId) refs.push({ table: 'customers', id: String(context.legacyCustomerId) });
+    const add = source => {
+      if (source?.type && source.id != null) refs.push({ table: source.type, id: String(source.id) });
+    };
+    for (const row of context.existingCoverage) add(row.source);
+    add(context.review.latest?.source);
+    for (const row of context.review.ocr.concat(context.review.evidence,
+      context.knownNeeds, context.potentialGaps, context.openOpportunities,
+      context.nextActions)) add(row.source);
+    return { ...context, testData: await disclosure(refs) };
   }
 
   function opportunityData(data, currentType, creating) {

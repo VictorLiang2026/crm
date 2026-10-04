@@ -150,8 +150,25 @@ module.exports = async function smoke(root, test) {
         assert.equal(await b.evaluate(text(label)), true);
       }
       assert.equal(await b.evaluate(text('[CRM_TEST_ONLY]核对保障')), true);
+      assert.equal(await b.evaluate(text('public.products#940001')), true);
+      assert.equal(await b.evaluate(text('含测试数据')), true);
       assert.equal(await b.evaluate("document.querySelector('.person360-insurance a').getAttribute('href')"), '#/customer/910001');
       assert.equal(await b.evaluate("window.__crmTest.calls.some(c=>c.name==='person_360' && c.action==='getInsuranceContext')"), true);
+      await b.click('.person360-insurance-source button', '打开来源');
+      assert.equal(await b.evaluate('window.location.hash'), '#/customer/910001');
+      await b.wait(text('保单检视'));
+      await open('#/person/980001', '[CRM_TEST_ONLY]联系候选人');
+    });
+    await check('person360.insurance-unknown', '无保障资料时显示未知且不编造缺口', async () => {
+      await b.evaluate("sessionStorage.setItem('crm_test_empty_insurance','1')");
+      await open('#/people', '人物');
+      await open('#/person/980001', '[CRM_TEST_ONLY]联系候选人');
+      await b.wait(text('保障资料未知'));
+      assert.equal(await b.evaluate(text('不能推断没有保障')), true);
+      assert.equal(await b.evaluate("document.querySelectorAll('.person360-insurance-item').length"), 0);
+      await b.evaluate("sessionStorage.removeItem('crm_test_empty_insurance')");
+      await open('#/people', '人物');
+      await open('#/person/980001', '[CRM_TEST_ONLY]联系候选人');
     });
     await check('person360.opportunity-create', 'Person 机会未确认时只生成服务端预览', async () => {
       await b.click('.person360-opportunities button', '新增 Person 机会');
@@ -208,6 +225,18 @@ module.exports = async function smoke(root, test) {
       await b.click('.tab', '保单检视');
       await b.wait(text('生成保单检视报告'));
       assert.equal(await b.evaluate("document.querySelectorAll('.prod-table').length"), 1);
+    });
+    await check('customer.photos', '旧照片附件页签保留直接上传入口且进入时不写入', async () => {
+      await b.click('.tab', '照片/附件');
+      await b.click('#view button', '+ 添加照片/资料');
+      await b.wait("document.getElementById('modal-root').innerText.includes('直接上传照片/附件')");
+      assert.equal(await b.evaluate("window.__crmTest.calls.some(c=>c.name==='photos' && c.action==='create')"), false);
+      await b.click('.modal-footer button', '取消');
+    });
+    await check('customer.ocr', '旧 OCR 页签可读并保持空结果状态', async () => {
+      await b.click('.tab', 'AI 解析记录');
+      await b.wait(called('ocr_records', 'list'));
+      await b.wait(text('暂无 AI 解析记录'));
     });
     await check('followups.tab', '跟进标签显示跟进记录', async () => {
       await b.click('.tab', '跟进记录');

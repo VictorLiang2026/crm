@@ -41,6 +41,7 @@ export function mountOpportunityWorkflow({root,personId,personName='',callFn,
       if(!rows.length)list.append(make('p','person360-muted','暂无经营机会。'));
       for(const row of rows) {
         const card=make('div','person360-opportunity');
+        card.id=`opportunity-${row.id}`;
         card.append(make('strong','',`${TYPES[row.opportunity_type]||row.opportunity_type} · ${row.status}`),
           make('span','person360-muted',` #${row.id} · ${row.customer_id==null?'Person 专属':'旧客户机会'}`));
         if(row.last_progress)card.append(make('p','',`进展：${row.last_progress}`));

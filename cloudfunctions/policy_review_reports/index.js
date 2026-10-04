@@ -29,6 +29,12 @@ const CREATE_FIELDS = [
 ];
 
 const OPERATOR_DEFAULT = { name: 'Victor', gender: '男', birthday: '1976-10' };
+const TEST_MARKER = '【系统测试·勿联系】';
+const markTestText = value => {
+  if (value == null || value === '') return value;
+  const text = typeof value === 'string' ? value : JSON.stringify(value);
+  return text.trim() ? (text.includes(TEST_MARKER) ? text : TEST_MARKER + text) : text;
+};
 
 exports.main = async (event, context) => {
   try {
@@ -111,6 +117,20 @@ async function generate(event) {
   const c = assertOk(await rdb.from('customers').select().eq('Id', customerId).is('deleted_at', null).maybeSingle());
   if (!c.data) return { error: 'customer not found' };
   const customer = c.data;
+  const testCustomer = String(customer.customer_name || '').includes(TEST_MARKER);
+  const today = new Date().toISOString().slice(0, 10);
+  const testReportType = TEST_MARKER + '虚构保单检视';
+  const existingTestReport = async () => {
+    const found = assertOk(await rdb.from('policy_review_reports').select()
+      .eq('customer_id', customerId).eq('report_date', today)
+      .eq('report_type', testReportType).is('deleted_at', null)
+      .order('id', { ascending: false }).limit(1).maybeSingle());
+    return found.data || null;
+  };
+  if (testCustomer) {
+    const prior = await existingTestReport();
+    if (prior) return { id: prior.id, report: prior, raw: prior.raw, replayed: true };
+  }
 
   // 拉上下文：保单、跟进、礼品、历史检视报告、照片
   const [prod, fol, gif, hist, photos] = await Promise.all([
@@ -153,7 +173,9 @@ async function generate(event) {
   });
 
   // 操作员信息
-  const opIn = (event && event.operator) || {};
+  const opIn = testCustomer ?
+    { name: '虚构系统顾问', gender: '未知', birthday: '2000-01' } :
+    ((event && event.operator) || {});
   const operator = {
     name: opIn.name || OPERATOR_DEFAULT.name,
     gender: opIn.gender || OPERATOR_DEFAULT.gender,
@@ -161,7 +183,7 @@ async function generate(event) {
   };
 
   const ctx = {
-    today: new Date().toISOString().slice(0, 10),
+    today: today,
     operator: operator,
     customer: {
       name: customer.customer_name, gender: customer.gender, birthday: customer.birthday,
@@ -199,7 +221,6 @@ async function generate(event) {
   const { text: raw } = await generateText(messages, { timeout: 120000 });
   const parsed = extractJson(raw) || {};
 
-  const today = new Date().toISOString().slice(0, 10);
   const payload = normFields({
     customer_id: customerId,
     customer_name: customer.customer_name,
@@ -216,6 +237,13 @@ async function generate(event) {
   if (!payload.summary && !payload.gaps_found && !payload.recommendations) {
     // 即使解析失败，也保存原始输出，便于排查
     payload.summary = '（模型输出非标准JSON，请人工查看 raw 后补录）';
+  }
+  if (testCustomer) {
+    payload.report_type = testReportType;
+    for (const field of ['summary', 'gaps_found', 'recommendations',
+      'asset_allocation', 'next_action', 'raw']) payload[field] = markTestText(payload[field]);
+    const prior = await existingTestReport();
+    if (prior) return { id: prior.id, report: prior, raw: prior.raw, replayed: true };
   }
   const r = assertOk(await rdb.from('policy_review_reports').insert(payload).select('id'));
   const id = r.data[0].id;

@@ -32,9 +32,13 @@
 .person360-recruit-heading{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
 .person360-recruit-followup{padding:7px 0;border-top:1px solid #f1f5f9}
 .person360-insurance-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px}
+.person360-insurance-grid>[data-crm-test-notice],.person360-insurance-grid>.person360-muted{grid-column:1/-1}
 .person360-insurance-block{padding:12px;border:1px solid #e5e7eb;border-radius:8px;min-width:0}
 .person360-insurance-block h4{margin:0 0 8px;font-size:14px}
 .person360-insurance-block p{margin:6px 0;overflow-wrap:anywhere;white-space:pre-wrap}
+.person360-insurance-item+.person360-insurance-item{border-top:1px solid #f1f5f9;padding-top:8px;margin-top:8px}
+.person360-insurance-source{font-size:12px;color:#64748b;overflow-wrap:anywhere}
+.person360-insurance-source .btn{margin-left:8px;min-height:34px}
 .person360-insurance>a{display:inline-block;margin-top:12px}
 .person360-profile{min-width:0;overflow-wrap:anywhere}
 .person360-profile-fields{margin:12px 0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 24px}
