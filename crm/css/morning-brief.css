@@ -9,10 +9,13 @@
 #today-morning-brief .mb-section h5{font-size:12px;margin:12px 0 5px;color:var(--text-secondary)}
 #today-morning-brief .mb-headline{font-weight:600;margin:0}
 #today-morning-brief .mb-guidance{margin:5px 0 0;color:var(--text-secondary)}
+#today-morning-brief .mb-ranking{margin:7px 0 0;color:var(--text-secondary);font-size:12px}
 #today-morning-brief .mb-list{list-style:none;padding:0;margin:0}
 #today-morning-brief .mb-row{padding:6px 0;border-top:1px solid var(--border-light);overflow-wrap:anywhere}
 #today-morning-brief .mb-row:first-child{border-top:0}
 #today-morning-brief .mb-link{color:var(--pri);text-decoration:none}
 #today-morning-brief .mb-link:hover{text-decoration:underline}
+#today-morning-brief .mb-link:focus-visible{outline:2px solid var(--pri);outline-offset:2px}
+#today-morning-brief .mb-source{display:block;color:var(--text-secondary);font-size:11px;margin-top:3px;overflow-wrap:anywhere}
 #today-morning-brief .mb-empty,#today-morning-brief .mb-limit{color:var(--text-secondary);font-size:12px;margin:0}
 #today-morning-brief .mb-limit{padding:4px 0 0}

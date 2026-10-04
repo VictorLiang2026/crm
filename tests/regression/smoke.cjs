@@ -245,17 +245,30 @@ module.exports = async function smoke(root, test) {
       await b.wait(called('person_360', 'get'));
       assert.equal(await b.evaluate('location.hash'), '#/person/980001');
     });
-    await check('today.morning_brief', '晨间简报按需生成七段且旧 Today 5 仍显示', async () => {
+    await check('today.morning_brief', '晨间事实自动显示七段，AI 建议按需请求且旧 Today 5 仍显示', async () => {
       await open('#/today', '[CRM_TEST_ONLY]今日行动');
-      await b.wait(text('生成晨间简报'));
-      assert.equal(await b.evaluate("window.__crmTest.calls.some(c=>c.name==='today_coach' && c.action==='daily_review')"), false);
-      await b.click('#today-morning-brief button', '生成晨间简报');
+      await b.wait(text('刷新事实'));
       await b.wait(text('[CRM_TEST_ONLY]晨间摘要'));
       for (const label of ['Morning Brief', 'Top Actions', 'Commitments', 'Upcoming',
         'Risk', 'Opportunities', 'Need Confirmation']) await b.wait(text(label));
       await b.wait(text('[CRM_TEST_ONLY]待审核依据'));
       await b.wait(text('[CRM_TEST_ONLY]今日行动'));
-      assert.equal(await b.evaluate("window.__crmTest.calls.filter(c=>c.name==='today_coach' && c.action==='daily_review').length"), 1);
+      assert.equal(await b.evaluate("window.__crmTest.calls.filter(c=>c.name==='today_coach' && c.action==='daily_review' && c.view==='morning' && c.guidance==='rules').length"), 1);
+      await b.click('#today-morning-brief button', '获取 AI 工作建议');
+      await b.wait("window.__crmTest.calls.some(c=>c.name==='today_coach' && c.action==='daily_review' && c.view==='morning' && c.guidance==='ai')");
+      assert.equal(await b.evaluate("window.__crmTest.calls.filter(c=>c.name==='today_coach' && c.action==='daily_review' && c.view==='morning' && c.guidance==='ai').length"), 1);
+      await b.click('#today-morning-brief .mb-section .mb-link', '[CRM_TEST_ONLY]今日行动');
+      await b.wait(called('person_360','listPersonWorkItems'));
+      assert.equal(await b.evaluate('location.hash'), '#/person/980001');
+      assert.equal(await b.evaluate("Boolean(document.getElementById('work-action-990301'))"), true);
+    });
+    await check('today.test_agenda', '虚构场景一键进入普通 Today 并自动读取晨间事实', async () => {
+      await open('#/test-scenario', '一键打开测试日程', 'v2=1');
+      await b.click('#view a', '一键打开测试日程');
+      await b.wait(text('已打开普通 Today，测试记录以来源提示为准'));
+      await b.wait(text('Morning Brief'));
+      assert.equal(await b.evaluate('location.hash'), '#/today');
+      assert.equal(await b.evaluate("window.__crmTest.calls.some(c=>c.name==='today_coach' && c.action==='daily_review' && c.view==='morning' && c.guidance==='rules')"), true);
     });
     await check('today.legacy_review', '旧版今日复盘入口与返回字段继续可用', async () => {
       await open('#/today', '[CRM_TEST_ONLY]今日行动');

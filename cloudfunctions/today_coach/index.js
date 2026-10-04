@@ -118,6 +118,8 @@ async function loadAll() {
   ]);
   if (vac && vac.error) throw new Error('v_action_center 读取失败：' + vac.error);
   return {
+    readErrors: [cust, fol, rc, rf, rm, ai, opp, act, atask, apart, aspk]
+      .map((result, i) => result?.error ? i : null).filter(i => i !== null),
     customers: (cust.data || []),
     followups: (fol.data || []),
     candidates: (rc.data || []),
@@ -1228,17 +1230,23 @@ exports.main = async (event, context) => {
     // An explicit view keeps the original daily_review contract and Today 5 cache untouched.
     if (action === 'daily_review' && event && event.view) {
       if (event.view !== 'morning') return { error: 'view must be morning' };
-      const today = todayStr();
+      const now = new Date().toISOString();
+      const today = dayKeyOf(now);
       const [data, openActions, morningFacts] = await Promise.all([
         loadAll(),
         readOpenActions({ env: process.env.TCB_ENV, key: process.env.CRM_TODAY_DB_API_KEY }),
-        readMorningFacts({ env: process.env.TCB_ENV, key: process.env.CRM_TODAY_DB_API_KEY, today }),
+        readMorningFacts({ env: process.env.TCB_ENV, key: process.env.CRM_TODAY_DB_API_KEY, today, now }),
       ]);
+      if (data.readErrors.length) throw new Error('Morning Brief fact source unavailable');
+      if (data.actions.length >= 1000) throw new Error('Morning Brief legacy candidate limit reached');
       const ranked = buildActionCandidates(data, indexFreshNba(data, today), today, openActions);
-      const sections = buildMorningSections({ data, actions: ranked, facts: morningFacts, today });
+      ranked.sort((a, b) => b.score - a.score ||
+        String(a.action_date || '').localeCompare(String(b.action_date || '')) ||
+        String(a.action_id || '').localeCompare(String(b.action_id || '')));
+      const sections = buildMorningSections({ data, actions: ranked, facts: morningFacts, today, now });
       const disclosure = await testSummary(data, openActions, sections);
       sections.testData = disclosure;
-      await enhanceGuidance(sections, generateText, extractJson);
+      if (event.guidance !== 'rules') await enhanceGuidance(sections, generateText, extractJson);
       return { view: 'morning', today, generated_at: nowIso(), sections, testData: disclosure };
     }
 

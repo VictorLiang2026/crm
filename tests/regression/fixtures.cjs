@@ -27,7 +27,8 @@ function installFixtures() {
   const rows = value => ({ rows: mode === 'empty' ? [] : value, total: mode === 'empty' ? 0 : value.length, page: 1, pageSize: 50 });
   const replies = {
     'assistant:testSamples': () => ({ok:true,ready:params.get('v2')==='1',
-      targets:{personId:'980001'},marker:'【系统测试·勿联系】'}),
+      targets:{personId:'980001',customerId:'910001',activityId:'940001'},
+      initialCount:10,derivedCount:2,auditCount:1,marker:'【系统测试·勿联系】'}),
     'assistant:quickCaptureV2': data => {
       if(data.stage==='parse') return {ok:true,stage:'parse',today:'2026-10-03',
         aiTaskId:990101,aiRunId:990102,aiResultId:990103,preview:{
@@ -245,7 +246,8 @@ function installFixtures() {
       sections: {
         morningBrief: { headline: marker + '晨间摘要', guidance: '先核对事实。', guidanceSource: 'rule' },
         topActions: [{ title: marker + '今日行动', personName: customer.customer_name,
-          whyNow: '今天到期', target: '#/customer/910001' }],
+          whyNow: '今天到期', target: '#/person/980001', focus: 'action:990301',
+          source: 'public.actions#990301', score: 85, dueDate:'2026-10-01T01:00:00Z' }],
         commitments: { overdue: [{ personName: customer.customer_name,
           content: marker + '已逾期承诺', dueAt: '2026-09-20', target: '#/person/980001' }], dueSoon: [] },
         upcoming: [{ title: marker + '近期活动', date: '2026-10-02', kind: 'activity', target: '#/activity/940001' }],
@@ -293,7 +295,8 @@ function installFixtures() {
     async callFunction({ name, data }) {
       const key = name + ':' + data.action;
       if (!Object.hasOwn(replies, key)) return fail('UNEXPECTED_OR_WRITE_ACTION: ' + key);
-      calls.push({ name, action: data.action, operation: data.operation, stage: data.stage, id: data.id,
+      calls.push({ name, action: data.action, view: data.view, guidance: data.guidance,
+        operation: data.operation, stage: data.stage, id: data.id,
         customer_id: data.customer_id, candidate_id: data.candidate_id,
         page: data.page, pageSize: data.pageSize, keyword: data.keyword, exactName: data.exactName,
         sortField: data.sortField, sortDir: data.sortDir,

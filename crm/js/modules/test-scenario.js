@@ -23,8 +23,10 @@ export function renderTestScenario({root,callFn}) {
   if(!state.ready)return;
   const {personId,customerId,activityId}=state.targets||{};
   if(![personId,customerId,activityId].every(id=>/^[1-9][0-9]*$/.test(String(id))))throw Error('SEED_DATABASE_ERROR');
+  const agenda=link('一键打开测试日程','#/today');
+  agenda.addEventListener('click',()=>{try{sessionStorage.setItem('crm_open_test_agenda','1');}catch{}});
   destinations.append(link('打开虚构人物',`#/person/${personId}`),link('打开客户',`#/customer/${customerId}`),
-   link('Today','#/today'),link('经营漏斗','#/funnels'),link('AI 搜索','#/ai/search'),
+   agenda,link('经营漏斗','#/funnels'),link('AI 搜索','#/ai/search'),
    link('预填下一步行动','#/test-scenario/action'));
   destinations.append(el('p','含测试数据。AI 搜索可点击“最近三个月参加过活动但没有继续跟进的人”，再搜索；无需输入业务文字。','phase14-row-note'));
  }

@@ -27,12 +27,14 @@ const facts = {
 };
 
 test('all seven sections use bounded database facts and keep candidates separate from formal opportunities', () => {
-  const result = buildMorningSections({ data, actions, facts, today });
+  const result = buildMorningSections({ data, actions, facts, today, now:'2026-09-30T16:00:00Z' });
   assert.deepEqual(Object.keys(result).slice(0, 7), ['morningBrief', 'topActions', 'commitments',
     'upcoming', 'risk', 'opportunities', 'needConfirmation']);
   assert.equal(result.topActions[0].source, 'public.actions#5');
   assert.equal(result.commitments.overdue[0].source, 'public.commitments#50');
-  assert.equal(result.upcoming.length, 1);
+  assert.equal(result.commitments.overdue[0].focus, 'commitment:50');
+  assert.equal(result.topActions[0].focus, 'action:5');
+  assert.equal(result.upcoming.length, 2); // today's Action and the future activity
   assert.equal(result.opportunities[0].source, 'public.opportunities#60');
   assert.equal(result.needConfirmation[0].source, 'public.opportunity_candidates#70');
   assert.equal(result.opportunities.length, 1);
@@ -63,11 +65,14 @@ test('read adapter stays on public, uses service key only, and separates overdue
     const value = table === 'commitments' && parsed.searchParams.has('and') ? facts.dueSoon : rows[table];
     return { ok: true, json: async () => value };
   };
-  const result = await readMorningFacts({ env: 'crm-test123', key: 'fixture-only', today, fetchImpl });
+  const result = await readMorningFacts({ env: 'crm-test123', key: 'fixture-only', today,
+    now:'2026-09-30T16:00:00Z', fetchImpl });
   assert.equal(result.overdue.length, 1);
   assert.equal(result.dueSoon.length, 1);
   assert.equal(result.persons.length, 1);
   assert.equal(seen.length, 5);
+  assert.equal(seen[0].parsed.searchParams.get('due_at'), 'lt.2026-09-30T16:00:00Z');
+  assert.match(seen[1].parsed.searchParams.get('and'), /due_at\.gte\.2026-09-30T16:00:00Z/);
   for (const { parsed, options } of seen) {
     assert.match(parsed.pathname, /^\/v1\/rdb\/rest\/(commitments|opportunities|opportunity_candidates|persons)$/);
     assert.equal(options.method, 'GET');
@@ -76,6 +81,16 @@ test('read adapter stays on public, uses service key only, and separates overdue
     assert.ok(Number(parsed.searchParams.get('limit')) <= 100);
     assert.doesNotMatch(parsed.pathname, /\/pr_/);
   }
+});
+
+test('duplicate source IDs appear once and a past Beijing deadline is overdue', () => {
+  const due = { ...actions[0], due_at:'2026-10-01T01:00:00Z' };
+  const result = buildMorningSections({ data, actions:[due,due,actions[1]], facts, today,
+    now:'2026-10-01T03:00:00Z' });
+  assert.equal(result.topActions.filter(a => a.source === 'public.actions#5').length, 1);
+  assert.equal(result.topActions[0].whyNow, '已超过记录的截止时间');
+  assert.equal(result.upcoming.filter(a => a.source === 'public.actions#5').length, 1);
+  assert.ok(result.risk.some(a => a.source === 'public.actions#5'));
 });
 
 test('missing service key fails before a database request', async () => {

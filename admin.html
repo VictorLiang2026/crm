@@ -1508,6 +1508,7 @@ async function showTodayCoach(){
     if(location.hash !== '#/today') return;
     renderDueCommitments(commitmentCard);
     renderTodayCoach(false);
+    morningCard.dispatchEvent(new Event('crm:morning-refresh'));
   };
   window.addEventListener('crm:work-item-changed',window.todayWorkRefresh);
 

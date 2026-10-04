@@ -9,13 +9,27 @@ const node = (tag, className, value) => {
 };
 const safeTarget = value => /^#\/(?:person|customer|recruit|activity)\/[1-9][0-9]*$/.test(String(value || ''))
   ? value : null;
-const dateLabel = value => value ? String(value).slice(0, 10) : '未排期';
+const dateLabel = value => {
+  if (!value) return '未排期';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(String(value))) return String(value) + '（北京时间）';
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) ? date.toLocaleString('zh-CN', {
+    timeZone:'Asia/Shanghai',hour12:false,year:'numeric',month:'2-digit',day:'2-digit',
+    hour:'2-digit',minute:'2-digit' }) + '（北京时间）' : '时间待核对';
+};
 
 function link(item, label) {
   const target = safeTarget(item.target);
   if (!target) return node('span', '', label);
   const anchor = node('a', 'mb-link', label);
   anchor.href = target;
+  if (item.focus && /^#\/person\/[1-9][0-9]*$/.test(target) &&
+      /^(?:action|commitment):[1-9][0-9]*$/.test(item.focus)) {
+    anchor.addEventListener('click', () => {
+      try { sessionStorage.setItem('crm_work_item_focus', JSON.stringify({
+        personId: target.slice('#/person/'.length), focus: item.focus })); } catch {}
+    });
+  }
   return anchor;
 }
 function list(rows, describe, emptyText) {
@@ -24,6 +38,7 @@ function list(rows, describe, emptyText) {
   rows.forEach(item => {
     const li = node('li', 'mb-row');
     li.append(link(item, describe(item)));
+    if (item.source) li.append(node('small', 'mb-source', `来源：${item.source}`));
     ul.append(li);
   });
   return ul;
@@ -43,17 +58,18 @@ function render(result, root) {
   brief.append(node('p', 'mb-headline', value.morningBrief?.headline || '请核对当前 CRM 记录。'),
     node('p', 'mb-guidance', `${value.morningBrief?.guidanceSource === 'ai' ? 'AI 工作建议' : '工作建议'}：${
       value.morningBrief?.guidance || '先核对已记录事实，再决定今天的行动。'}`));
+  brief.append(node('p', 'mb-ranking', value.morningBrief?.ranking || '排序依据当前已记录事实。'));
   output.append(section('Morning Brief · 晨间摘要', brief));
   output.append(section('Top Actions · 优先行动', list(value.topActions,
-    item => `${item.personName ? item.personName + ' · ' : ''}${item.title || '查看行动'} · ${item.whyNow || dateLabel(item.dueDate)}`,
+    item => `${item.personName ? item.personName + ' · ' : ''}${item.title || '查看行动'} · ${item.whyNow || '待核对'} · 截止 ${dateLabel(item.dueDate)} · 规则分 ${Number.isFinite(item.score) ? item.score : '未计算'}`,
     '当前记录中暂未列出优先行动。')));
   const commitments = node('div', 'mb-group');
   commitments.append(node('h5', '', '已逾期'), list(value.commitments?.overdue,
-    item => `${item.personName || '人物'} · ${item.content} · ${dateLabel(item.dueAt)}`,
+    item => `${item.personName || '人物'} · ${item.content} · 截止 ${dateLabel(item.dueAt)}`,
     '当前记录中没有逾期承诺。'));
   if (value.commitments?.hasMoreOverdue) commitments.append(node('p', 'mb-limit', '仅显示最早的 50 项逾期承诺。'));
   commitments.append(node('h5', '', '未来 3 天到期'), list(value.commitments?.dueSoon,
-    item => `${item.personName || '人物'} · ${item.content} · ${dateLabel(item.dueAt)}`,
+    item => `${item.personName || '人物'} · ${item.content} · 截止 ${dateLabel(item.dueAt)}`,
     '当前记录中没有未来 3 天到期的承诺。'));
   if (value.commitments?.hasMoreDueSoon) commitments.append(node('p', 'mb-limit', '仅显示最早的 50 项到期承诺。'));
   output.append(section('Commitments · 承诺', commitments));
@@ -82,22 +98,33 @@ export function mountMorningBrief({ root, callFn }) {
   root.replaceChildren();
   const heading = node('div', 'mb-heading');
   heading.append(node('h3', '', '晨间简报'));
-  const button = node('button', 'btn btn-primary', '生成晨间简报');
+  const button = node('button', 'btn', '刷新事实');
   button.type = 'button';
-  heading.append(button);
-  const note = node('p', 'mb-note', '按需生成；事实来自当前 CRM 记录，建议需由你核实。不会修改业务资料。');
+  const aiButton = node('button', 'btn btn-primary', '获取 AI 工作建议');
+  aiButton.type = 'button';
+  heading.append(button, aiButton);
+  const note = node('p', 'mb-note', '进入页面自动读取当前事实；AI 建议仅供人工核对。不会修改业务资料。');
   const status = node('p', 'mb-status');
   root.append(heading, note, status);
-  button.addEventListener('click', async () => {
-    button.disabled = true;
+  const testAgenda = (() => { try {
+    const value = sessionStorage.getItem('crm_open_test_agenda') === '1';
+    sessionStorage.removeItem('crm_open_test_agenda'); return value;
+  } catch { return false; } })();
+  async function refresh(guidance = 'rules') {
+    button.disabled = true; aiButton.disabled = true;
     status.textContent = '正在整理今日记录…';
     try {
-      const result = await api.call('today_coach', { action: 'daily_review', view: 'morning' });
+      const result = await api.call('today_coach', { action: 'daily_review', view: 'morning', guidance });
       if (result?.error) throw new Error(result.error);
       render(result, root);
-      status.textContent = `生成于 ${String(result.generated_at || '').replace('T', ' ').slice(0, 16)}`;
+      status.textContent = `${testAgenda ? '已打开普通 Today，测试记录以来源提示为准 · ' : ''}更新于 ${dateLabel(result.generated_at)}`;
+      if (testAgenda) root.scrollIntoView({block:'start'});
     } catch (error) {
       status.textContent = `晨间简报生成失败：${error.message}`;
-    } finally { button.disabled = false; }
-  });
+    } finally { button.disabled = false; aiButton.disabled = false; }
+  }
+  button.addEventListener('click', () => void refresh('rules'));
+  aiButton.addEventListener('click', () => void refresh('ai'));
+  root.addEventListener('crm:morning-refresh', () => void refresh('rules'));
+  void refresh('rules');
 }

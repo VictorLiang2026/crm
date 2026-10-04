@@ -25,6 +25,10 @@ function dayKey(value) {
   return Number.isNaN(date.getTime()) ? '' : new Date(date.getTime() + 8 * 3600000).toISOString().slice(0, 10);
 }
 function short(value, max = 100) { return String(value || '').trim().slice(0, max); }
+function dueTime(value) {
+  const raw = String(value || '');
+  return Date.parse(/^\d{4}-\d{2}-\d{2}$/.test(raw) ? `${raw}T00:00:00+08:00` : raw) || 0;
+}
 function targetFor(action) {
   const type = action.person_type;
   if (type === 'activity') return '#/activity/' + action.person_id;
@@ -34,9 +38,12 @@ function targetFor(action) {
   return '#/today';
 }
 
-async function readMorningFacts({ env, key, today, fetchImpl = fetch }) {
+async function readMorningFacts({ env, key, today, now = new Date().toISOString(), fetchImpl = fetch }) {
   if (!/^crm-[a-z0-9]+$/.test(env || '') || !key || !/^\d{4}-\d{2}-\d{2}$/.test(today || '')) {
     throw new Error('Morning Brief access is not configured');
+  }
+  if (!Number.isFinite(Date.parse(now)) || dayKey(now) !== today) {
+    throw new Error('Morning Brief clock is invalid');
   }
   async function read(table, filters, limit) {
     if (!TABLES.has(table) || limit < 1 || limit > 100) throw new Error('Invalid Morning Brief read');
@@ -57,11 +64,10 @@ async function readMorningFacts({ env, key, today, fetchImpl = fetch }) {
       return rows;
     } finally { clearTimeout(timer); }
   }
-  const start = `${today}T00:00:00+08:00`;
   const end = `${addDays(today, 4)}T00:00:00+08:00`;
   const [overdue, dueSoon, opportunities, candidates] = await Promise.all([
-    read('commitments', { status: 'eq.open', due_at: `lt.${start}`, order: 'due_at.asc,id.asc' }, 51),
-    read('commitments', { status: 'eq.open', and: `(due_at.gte.${start},due_at.lt.${end})`, order: 'due_at.asc,id.asc' }, 51),
+    read('commitments', { status: 'eq.open', due_at: `lt.${now}`, order: 'due_at.asc,id.asc' }, 51),
+    read('commitments', { status: 'eq.open', and: `(due_at.gte.${now},due_at.lt.${end})`, order: 'due_at.asc,id.asc' }, 51),
     read('opportunities', { deleted_at: 'is.null', status: 'not.in.(成交,关闭)', order: 'updated_at.desc,id.desc' }, 51),
     read('opportunity_candidates', { status: 'in.(draft,previewed,confirmed)', order: 'created_at.desc,id.desc' }, 21),
   ]);
@@ -79,7 +85,7 @@ async function readMorningFacts({ env, key, today, fetchImpl = fetch }) {
   };
 }
 
-function buildMorningSections({ data, actions, facts, today }) {
+function buildMorningSections({ data, actions, facts, today, now = new Date().toISOString() }) {
   const persons = new Map((facts.persons || []).filter(p => !p.deleted_at).map(p => [Number(p.id), p]));
   const customers = new Map((data.customers || []).map(c => [Number(c.Id), c]));
   const nameOf = row => persons.get(Number(row.person_id))?.display_name ||
@@ -88,14 +94,24 @@ function buildMorningSections({ data, actions, facts, today }) {
     Boolean(row.customer_id && customers.has(Number(row.customer_id)));
   const commitment = row => ({ id: row.id, personId: row.person_id, personName: nameOf(row),
     type: row.commitment_type, content: short(row.content, 180), dueAt: row.due_at,
-    target: '#/person/' + row.person_id, source: `public.commitments#${row.id}` });
+    target: '#/person/' + row.person_id, focus: `commitment:${row.id}`,
+    source: `public.commitments#${row.id}` });
   const overdue = (facts.overdue || []).filter(visible).map(commitment);
   const dueSoon = (facts.dueSoon || []).filter(visible).map(commitment);
-  const topActions = (actions || []).slice(0, 5).map(a => ({
+  const seenActions = new Set();
+  const uniqueActions = (actions || []).filter(a => {
+    const id = String(a.action_id || '');
+    if (!id || seenActions.has(id)) return false;
+    seenActions.add(id);
+    return true;
+  });
+  const topActions = uniqueActions.slice(0, 5).map(a => ({
     id: a.action_id, title: short(a.title || a.next_action, 120), personName: short(a.person_name, 80),
-    dueDate: a.action_date || null, status: a.status, score: a.score,
-    whyNow: a.status === 'overdue' ? '已超过记录的截止日期' :
+    dueDate: a.due_at || a.action_date || null, status: a.status, score: a.score,
+    whyNow: a.due_at && Date.parse(a.due_at) < Date.parse(now) ? '已超过记录的截止时间' :
+      a.status === 'overdue' ? '已超过记录的截止日期' :
       a.status === 'today' ? '今天到期' : a.action_date ? '已记录截止日期' : '尚未记录截止日期',
+    focus: a.canonical ? `action:${String(a.action_id).replace(/^action-/, '')}` : null,
     target: targetFor(a), source: a.canonical ? `public.actions#${String(a.action_id).replace(/^action-/, '')}` :
       `public.v_action_center#${a.action_id}`,
   }));
@@ -104,20 +120,24 @@ function buildMorningSections({ data, actions, facts, today }) {
       const day = dayKey(a.activity_date);
       return day >= today && day <= addDays(today, 7) &&
         !['cancelled', 'canceled', '已取消', 'ended', 'completed', '已结束'].includes(a.status);
-    }).map(a => ({ title: short(a.name, 120), date: dayKey(a.activity_date),
+    }).map(a => ({ title: short(a.name, 120), date: a.activity_date,
       kind: 'activity', target: '#/activity/' + a.id, source: `public.activities#${a.id}` })),
-    ...(actions || []).filter(a => a.action_date && a.action_date > today &&
+    ...uniqueActions.filter(a => a.action_date && a.action_date >= today &&
       a.action_date <= addDays(today, 7)).slice(0, 20).map(a => ({
-      title: short(a.title || a.next_action, 120), date: a.action_date,
-      kind: 'action', target: targetFor(a), source: a.canonical ?
+      title: short(a.title || a.next_action, 120), date: a.due_at || a.action_date,
+      kind: 'action', target: targetFor(a),
+      focus: a.canonical ? `action:${String(a.action_id).replace(/^action-/, '')}` : null,
+      source: a.canonical ?
         `public.actions#${String(a.action_id).replace(/^action-/, '')}` : `public.v_action_center#${a.action_id}` })),
-  ].sort((a, b) => a.date.localeCompare(b.date)).slice(0, 10);
+  ].sort((a, b) => dueTime(a.date) - dueTime(b.date) || a.source.localeCompare(b.source)).slice(0, 10);
   const risk = [
     ...overdue.slice(0, 5).map(c => ({ title: `逾期承诺：${c.personName || '未命名人物'} · ${c.content}`,
-      target: c.target, source: c.source })),
-    ...(actions || []).filter(a => a.status === 'overdue').slice(0, 5).map(a => ({
+      target: c.target, focus: c.focus, source: c.source })),
+    ...uniqueActions.filter(a => a.status === 'overdue' ||
+      (a.due_at && Date.parse(a.due_at) < Date.parse(now))).slice(0, 5).map(a => ({
       title: `逾期行动：${short(a.person_name, 60)} · ${short(a.title || a.next_action, 100)}`,
-      target: targetFor(a), source: a.canonical ?
+      target: targetFor(a), focus: a.canonical ? `action:${String(a.action_id).replace(/^action-/, '')}` : null,
+      source: a.canonical ?
         `public.actions#${String(a.action_id).replace(/^action-/, '')}` : `public.v_action_center#${a.action_id}` })),
   ].slice(0, 10);
   const opportunities = (facts.opportunities || []).filter(visible).slice(0, 10).map(o => ({
@@ -141,7 +161,8 @@ function buildMorningSections({ data, actions, facts, today }) {
     topActions.some(a => ['overdue', 'today'].includes(a.status)) ? 'due_action' :
       needConfirmation.length ? 'opportunity_review' : upcoming.length ? 'prepare_activity' : 'regular';
   return {
-    morningBrief: { headline, counts, guidance: GUIDANCE[focus], guidanceSource: 'rule' },
+    morningBrief: { headline, counts, guidance: GUIDANCE[focus], guidanceSource: 'rule',
+      ranking: '优先行动按六维规则分排序：紧迫、影响、置信、投入、关系与机会；同分按截止日期。各分区只表示已读取的 CRM 记录。' },
     topActions, commitments: { overdue, dueSoon,
       hasMoreOverdue: Boolean(facts.hasMore?.overdue), hasMoreDueSoon: Boolean(facts.hasMore?.dueSoon) },
     upcoming, risk, opportunities, needConfirmation,
