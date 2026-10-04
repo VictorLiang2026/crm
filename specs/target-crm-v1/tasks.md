@@ -41,9 +41,10 @@
   - 2026-10-03：获专项确认后增加只读分页时间线和 Fact/Signal/Inference 三栏；旧来源删改可刷新，报名不算到场，测试来源显式标注。WP06 5 项、旧回归 94 项、权限目录 646 项、匿名 50 项、真实测试账号只读 14 项通过；样本仍为 10/2/3。发布标签 `release-20261003-215500`，完成标记仅随提交/推送和正式三端核对通过生效。详见 [WP06 报告](../../docs/work-packages/wp06-person-insights.md)。
   - 交给 Codex：用 InteractionService 与 Legacy Adapter 分页呈现 followup、招募跟进、实际活动参与和人工互动；分栏展示 Fact/Signal/Inference、来源、确认状态和最近更新时间。只读映射旧历史，不强制 backfill。
   - 验收：同一来源不重复；编辑/删除旧跟进后时间线同步；“报名”不伪装成到场；测试记录显示统一标记。
-- [ ] **WP07｜Quick Capture V2 完整确认写入**　依赖：WP04、WP06。关联：R01、R03、R08。
+- [x] **WP07｜Quick Capture V2 完整确认写入**　依赖：WP04、WP06。关联：R01、R03、R08。
   - 交给 Codex：沿用现有 V2 解析与 Feature Flag，补身份选择、逐项候选编辑、服务端预览和确认后的 Interaction/Context/Action/Commitment 写入；先只面向测试账号灰度，预填测试内容经确认后走普通业务路径并记录衍生 ID。旧 Quick Capture 保持可用。
   - 验收：不确认不写库；AI Fact Candidate 默认未确认；重复确认不重复；同名冲突需人工处理；旧快速录入回归通过。
+  - 2026-10-04：真实 `prtest` 人工选 Person/候选并确认，生成互动 #6/#7、默认未确认的事实 #3/#4、承诺 #1、行动 #7；未确认的过期预览无业务写入，两个已执行命令重放返回原 ID。初始样本 10，衍生/AI 审计逐 ID 入账；WP07 6 项、旧 V2 5 项、真实只读 67 项及 Person 时间线 14 项通过。仅文档收尾发布后本完成标记生效；证据、未验证真机与回滚见 [WP07 报告](../../docs/work-packages/wp07-quick-capture-v2.md)。
 - [ ] **WP08｜统一 Action 与 Commitment 的日常操作**　依赖：WP06、WP07。关联：R04、R08。
   - 交给 Codex：在 Person 360 和 Today 补 Action/Commitment 的查看、创建、编辑、完成与来源跳转；新写入走对应 Service 和人工确认。保留 `v_action_center` 旧来源并防重。
   - 验收：同一任务在 Person/Today 只有一个有效状态；到期/逾期、完成时间、撤销/失败路径一致；测试行动进入真实 Today 且有醒目标记。
