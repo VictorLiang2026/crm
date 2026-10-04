@@ -2,7 +2,8 @@
 'use strict';
 
 const READ_TABLES = new Set(['activities', 'activity_participants', 'activity_tasks',
-  'persons', 'interactions', 'actions', 'opportunities', 'relationships']);
+  'activity_speakers', 'recruit_candidates', 'persons', 'interactions', 'actions',
+  'opportunities', 'relationships']);
 const AUDIT_TABLES = new Set(['ai_tasks', 'ai_runs', 'ai_results']);
 
 function filterValue(value) {

@@ -103,3 +103,28 @@ test('rejects invalid scope, unbounded options, missing or failed root reads', a
   await assert.rejects(broken.buildContext({ recipe: 'person_basic', subjectType: 'customer', subjectId: 7 }),
     /boom/);
 });
+
+test('activity review resolves only exact legacy identity links and never treats signup as interaction', async () => {
+  const rows = {
+    activities: [{ id: 41, name: '【系统测试·勿联系】活动', status: 'ended', deleted_at: null }],
+    activity_participants: [
+      { id: 1, activity_id: 41, person_type: 'speaker', person_id: 8,
+        status: 'attended', canonical_person_id: null, deleted_at: null },
+      { id: 2, activity_id: 41, person_type: 'customer', person_id: 9,
+        status: 'registered', canonical_person_id: null, deleted_at: null },
+      { id: 3, activity_id: 41, person_type: 'manual', person_id: null,
+        status: 'attended', canonical_person_id: null, deleted_at: null },
+    ],
+    activity_speakers: [{ id: 8, person_id: 71, deleted_at: null }],
+    persons: [{ id: 71, display_name: '【系统测试·勿联系】嘉宾', deleted_at: null }],
+  };
+  const { engine } = fixture(rows);
+  const { context } = await engine.buildContext({ recipe: 'activity_review',
+    subjectType: 'activity', subjectId: 41 });
+  assert.deepEqual(context.persons.map(row => row.data.id), [71]);
+  assert.equal(context.participants[0].data.resolved_person_id, 71);
+  assert.equal(context.participants[0].data.identity_source, 'exact_legacy_foreign_key');
+  assert.equal(context.participants[1].data.resolved_person_id, undefined);
+  assert.equal(context.participants[2].data.resolved_person_id, undefined);
+  assert.deepEqual(context.activity_interactions, []);
+});

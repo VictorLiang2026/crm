@@ -6,19 +6,20 @@ const LIMITS = Object.freeze({ interactions: 5, interactionsMax: 10, opportuniti
   products: 5, reports: 3, participants: 20, tasks: 20, actions: 20, goals: 5,
   activityInteractions: 20, activityPersons: 20, activityRelationships: 20 });
 const FIELDS = Object.freeze({
-  persons: ['id', 'display_name', 'occupation', 'organization'],
+  persons: ['id', 'display_name', 'occupation', 'organization', 'legacy_customer_id'],
   customers: ['Id', 'customer_name', 'occupation', 'customer_stage', 'sales_priority', 'next_action', 'next_action_date'],
   followups: ['Id', 'customer_id', 'followup_date', 'interaction_summary', 'followup_notes', 'next_action', 'next_action_date', 'next_followup_date'],
   opportunities: ['id', 'customer_id', 'person_id', 'opportunity_type', 'status', 'last_progress', 'next_action', 'next_action_date'],
   products: ['id', 'customer_id', 'items', 'created_at'],
   policy_review_reports: ['id', 'customer_id', 'report_date', 'report_type', 'edited_summary', 'summary', 'next_action'],
   activities: ['id', 'name', 'activity_date', 'activity_type', 'status', 'review_summary', 'review_notes', 'review_score'],
-  activity_participants: ['id', 'activity_id', 'canonical_person_id', 'person_type', 'status', 'participant_role', 'followup_status'],
+  activity_participants: ['id', 'activity_id', 'canonical_person_id', 'person_type', 'person_id', 'status', 'participant_role', 'followup_status'],
+  activity_speakers: ['id', 'person_id'],
   activity_tasks: ['id', 'activity_id', 'task_title', 'status', 'priority', 'due_date', 'completed_at'],
   interactions: ['id', 'person_id', 'activity_id', 'interaction_type', 'interaction_at', 'channel', 'summary', 'importance', 'source_type', 'source_id'],
   actions: ['id', 'person_id', 'activity_id', 'opportunity_id', 'interaction_id', 'action_type', 'title', 'due_at', 'priority', 'status', 'source'],
   relationships: ['id', 'from_person_id', 'to_person_id', 'relationship_type', 'relationship_stage', 'strength', 'trust_level', 'trend', 'last_meaningful_interaction_at'],
-  recruit_candidates: ['id', 'customer_id', 'stage', 'motivation', 'concerns', 'potential_score', 'next_action', 'next_action_date'],
+  recruit_candidates: ['id', 'person_id', 'customer_id', 'stage', 'motivation', 'concerns', 'potential_score', 'next_action', 'next_action_date'],
   recruit_followups: ['id', 'candidate_id', 'followup_date', 'interaction_summary', 'followup_notes', 'next_action', 'next_action_date'],
 });
 const IDS = Object.freeze({ customers: 'Id', followups: 'Id' });
@@ -164,8 +165,37 @@ function createContextEngine({ rdb, now = () => new Date() } = {}) {
           read('activity_participants', { activity_id: subject, deleted_at: null }, { order: 'created_at', limit: LIMITS.participants }),
           read('activity_tasks', { activity_id: subject }, { order: 'created_at', limit: LIMITS.tasks }),
         ]);
-        const personIds = [...new Set(participants.map(row => row.data.canonical_person_id)
-          .filter(value => Number.isSafeInteger(Number(value)) && Number(value) > 0))]
+        // Older rows retain their original foreign keys. Resolve only exact, active
+        // customer/recruit/speaker links; a name alone is never identity evidence.
+        const exactIds = (type) => [...new Set(participants.filter(row =>
+          row.data.canonical_person_id == null && row.data.person_type === type)
+          .map(row => Number(row.data.person_id)).filter(value =>
+            Number.isSafeInteger(value) && value > 0))].slice(0, LIMITS.activityPersons);
+        const [speakers, recruits, customers] = await Promise.all([
+          exactIds('speaker').length ? read('activity_speakers', {
+            id: exactIds('speaker'), deleted_at: null }, { limit: LIMITS.activityPersons }) : [],
+          exactIds('recruit').length ? read('recruit_candidates', {
+            id: exactIds('recruit'), deleted_at: null }, { limit: LIMITS.activityPersons }) : [],
+          exactIds('customer').length ? read('persons', {
+            legacy_customer_id: exactIds('customer'), deleted_at: null },
+          { limit: LIMITS.activityPersons }) : [],
+        ]);
+        const resolved = new Map([
+          ...speakers.map(row => [`speaker:${row.data.id}`, row.data.person_id]),
+          ...recruits.map(row => [`recruit:${row.data.id}`, row.data.person_id]),
+          ...customers.map(row => [`customer:${row.data.legacy_customer_id}`, row.data.id]),
+        ]);
+        for (const row of participants) {
+          const personId = row.data.canonical_person_id ||
+            resolved.get(`${row.data.person_type}:${row.data.person_id}`);
+          if (Number.isSafeInteger(Number(personId)) && Number(personId) > 0) {
+            row.data.resolved_person_id = Number(personId);
+            row.data.identity_source = row.data.canonical_person_id ?
+              'canonical_person_id' : 'exact_legacy_foreign_key';
+          }
+        }
+        const personIds = [...new Set(participants.map(row => row.data.resolved_person_id)
+          .filter(value => Number.isSafeInteger(value) && value > 0))]
           .slice(0, LIMITS.activityPersons);
         if (!personIds.length) {
           context = { activity, participants, tasks, persons: [], activity_interactions: [],

@@ -18,6 +18,7 @@ function installFixtures() {
   const calls = [], violations = [], errors = [];
   let actionCommandStage = null;
   let qcV2Stage = null;
+  let activityReviewPreview = null;
   let loggedIn = params.get('login') !== 'required';
   window.__crmTest = { calls, violations, errors, loginAttempts: 0 };
   addEventListener('error', e => errors.push(e.message));
@@ -86,11 +87,38 @@ function installFixtures() {
     'ai_activity:postReviewV2': () => ({ activity_id: activity.id, activity_name: activity.name,
       task_id: 800001, result_id: 800002, requires_confirmation: true,
       business_data_written: false, discarded_unsupported_items: 0,
+      testData: {status:'verified',containsTestData:true,recordCount:1,
+        sources:[{batchKey:'crm_test_main_v1',table:'activities',count:1}]},
       review: { summary: marker + '关系复盘摘要',
         whoMattered: [{ text: marker + '客户甲值得关注', sourceRefs: ['public.persons#980001'] }],
         whatChanged: [], relationshipsImproved: [], signalsAppeared: [], opportunitiesAppeared: [],
         followUpPeople: [], actionCandidates: [{ personId: '980001', personName: marker + '客户甲',
-          title: marker + '核实需求', reason: marker + '活动后联系', sourceRefs: ['public.interactions#990001'] }] } }),
+          sourceIndex:0,title: '【系统测试·勿联系】' + marker + '核实需求',
+          reason: '【系统测试·勿联系】' + marker + '活动后联系',
+          sourceRefs: ['public.interactions#990001'] }],
+        opportunityCandidates:[{personId:'980001',personName:marker+'客户甲',sourceIndex:0,
+          opportunityType:'activity',reason:'【系统测试·勿联系】虚构合作线索',
+          nextAction:'【系统测试·勿联系】核对合作意向',
+          sourceRefs:['public.interactions#990001']}] } }),
+    'person_360:previewActivityReview': data => {
+      if (data.data.activityId !== 940001 || !['action','opportunity','reject_action',
+        'reject_opportunity','outcome'].includes(data.data.operation)) return fail('INVALID_ACTIVITY_REVIEW_PREVIEW');
+      activityReviewPreview = data.data.operation;
+      return {previewId:data.data.idempotencyKey,operation:data.data.operation,
+        personId:data.data.operation==='outcome'?null:980001,after:data.data.draft,
+        sourceRefs:data.data.operation==='outcome'?[]:['public.interactions#990001'],
+        businessDataWritten:false,expiresAt:'2026-10-05T01:00:00+08:00'};
+    },
+    'person_360:executeActivityReview': data => {
+      if (!activityReviewPreview || !data.previewId) return fail('ACTIVITY_REVIEW_WITHOUT_PREVIEW');
+      const kind=activityReviewPreview.replace('reject_','');
+      const rejected=activityReviewPreview.startsWith('reject_');
+      activityReviewPreview=null;
+      return {kind,status:rejected?'rejected':'accepted',personId:kind==='outcome'?null:980001,
+        actionId:kind==='action'&&!rejected?990101:null,
+        candidateId:kind==='opportunity'&&!rejected?990102:null,
+        outcomeId:kind==='outcome'?990103:null,businessDataWritten:!rejected};
+    },
     'customers:list': data => {
       const all = mode === 'pagination'
         ? Array.from({ length: 55 }, (_, i) => ({ ...customer, Id: 910001 + i, customer_name: marker + '客户' + String(i).padStart(2, '0') }))
@@ -335,7 +363,8 @@ function installFixtures() {
         payload: ['assistant:quickCaptureV2', 'person_360:commitQuickCaptureV2', 'person_360:addCanonicalParticipant', 'person_360:recordActivityInteraction', 'person_360:createOpportunity',
           'person_360:updateOpportunity', 'person_360:createSpeakerProfile',
           'person_360:previewOpportunity',
-          'person_360:previewIdentity','person_360:executeIdentity','activity_speakers:update',
+          'person_360:previewIdentity','person_360:executeIdentity',
+          'person_360:previewActivityReview','activity_speakers:update',
           'policy_review_reports:update',
           'person_360:linkSpeakerPerson'].includes(key) ? (key==='assistant:quickCaptureV2'?data:data.data) : null });
       if (!loggedIn) return fail('CALL_BEFORE_LOGIN: ' + key);

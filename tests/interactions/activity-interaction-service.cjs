@@ -71,6 +71,13 @@ test('legacy participant identity is resolved by ID, never by name', async () =>
   }
 });
 
+test('Person-only recruit participant needs no customer compatibility row', async () => {
+  const { service, tables } = fixture({ type: 'recruit', canonical: false });
+  tables.recruit_candidates[0] = { id: 201, person_id: 11, customer_id: null };
+  tables.persons[0].legacy_customer_id = null;
+  assert.equal((await service.record(base, 'test-uid')).personId, '11');
+});
+
 test('speaker cooperation and post-event followup enforce their business gates', async () => {
   const ordinary = fixture();
   await assert.rejects(ordinary.service.record({ ...base, eventType: 'speaker_cooperation',

@@ -103,7 +103,7 @@ const SKILLS = [
     confirmationLevel: 'confirm_before_write', timeoutClass: 'long',
   },
   {
-    name: 'activity_review', version: '2.0.0', capability: 'analysis',
+    name: 'activity_review', version: '2.1.0', capability: 'analysis',
     contextRecipe: recipe(['activity', 'participants', 'tasks', 'persons', 'activity_interactions',
       'recent_interactions', 'current_actions', 'open_opportunities', 'relationships'], [],
     { participants: 20, tasks: 20, persons: 20, activity_interactions: 20,
@@ -118,10 +118,17 @@ const SKILLS = [
         { type: 'integer', minimum: 1 }, { type: 'string', pattern: '^[1-9][0-9]*$' },
       ] }, title: text(200), reason: text(600), sourceRefs: { ...refs, minItems: 1 } },
       ['personId', 'title', 'reason', 'sourceRefs']);
+      const opportunityCandidate = object({ personId: { anyOf: [
+        { type: 'integer', minimum: 1 }, { type: 'string', pattern: '^[1-9][0-9]*$' },
+      ] }, opportunityType: { type: 'string', enum: [
+        'insurance','recruit','referral','activity','speaker','partnership','service','relationship',
+      ] }, reason: text(600), nextAction: text(500), sourceRefs: { ...refs, minItems: 1 } },
+      ['personId', 'opportunityType', 'reason', 'nextAction', 'sourceRefs']);
       return object({ summary: text(2000), whoMattered: claims, whatChanged: claims,
         relationshipsImproved: claims, signalsAppeared: claims,
         opportunitiesAppeared: claims, followUpPeople: claims,
-        actionCandidates: { type: 'array', maxItems: 12, items: candidate } },
+        actionCandidates: { type: 'array', maxItems: 12, items: candidate },
+        opportunityCandidates: { type: 'array', maxItems: 1, items: opportunityCandidate } },
       ['summary', 'whoMattered', 'whatChanged', 'relationshipsImproved',
         'signalsAppeared', 'opportunitiesAppeared', 'followUpPeople', 'actionCandidates']);
     })(),

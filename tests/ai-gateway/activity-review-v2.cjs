@@ -10,7 +10,7 @@ const context = {
   activity: source('activities', 11, { id: 11, name: '测试活动', status: 'ended' }),
   participants: [source('activity_participants', 12, { id: 12, canonical_person_id: 7 })],
   tasks: [], persons: [source('persons', 7, { id: 7, display_name: '测试人物' })],
-  activity_interactions: [source('interactions', 13, { id: 13, person_id: 7 })],
+  activity_interactions: [source('interactions', 13, { id: 13, person_id: 7, importance: 4 })],
   recent_interactions: [], current_actions: [], open_opportunities: [], relationships: [],
 };
 const result = { summary: '仅供核实', whoMattered: [claim('值得联系', ['public.persons#7'])],
@@ -19,6 +19,9 @@ const result = { summary: '仅供核实', whoMattered: [claim('值得联系', ['
   actionCandidates: [
     { personId: 7, title: '人工核实需求', reason: '活动沟通', sourceRefs: ['public.interactions#13'] },
     { personId: 8, title: '不应显示', reason: '身份未确认', sourceRefs: ['public.persons#7'] },
+  ], opportunityCandidates: [
+    { personId: 7, opportunityType: 'relationship', reason: '需人工核实',
+      nextAction: '复核事实', sourceRefs: ['public.interactions#13'] },
   ] };
 
 test('new activity review requires a real login before context or AI access', async () => {
@@ -51,6 +54,9 @@ test('review uses Gateway, checks the activity state and emits only sourced Pers
   assert.equal(calls[1][1].context.activity.source.schema, 'public');
   assert.equal(response.review.actionCandidates.length, 1);
   assert.equal(response.review.actionCandidates[0].personName, '测试人物');
+  assert.equal(response.review.opportunityCandidates.length, 1);
+  assert.equal(response.review.opportunityCandidates[0].personId, '7');
+  assert.equal(response.review.opportunityCandidates[0].sourceIndex, 0);
   assert.equal(response.review.followUpPeople.length, 0);
   assert.equal(response.review.whatChanged.length, 0);
   assert.equal(response.discarded_unsupported_items, 3);
@@ -66,11 +72,12 @@ test('server-only adapter restricts schema, tables and business writes', async (
   };
   const rdb = createPublicRdb({ env: 'crm-test123', key: 'test-secret', fetchImpl });
   await rdb.from('persons').select('id,display_name').in('id', [7, 8]).limit(20);
+  await rdb.from('recruit_candidates').select('id,person_id').eq('id', 7).limit(1);
+  await rdb.from('activity_speakers').select('id,person_id').eq('id', 8).limit(1);
   await rdb.from('ai_tasks').insert({ task_type: 'test' }).select('id');
-  assert.equal(calls.length, 2);
+  assert.equal(calls.length, 4);
   assert.ok(calls.every(call => call.profile === 'public' && !call.url.includes('test-secret')));
-  assert.equal(calls[0].method, 'GET');
-  assert.equal(calls[1].method, 'POST');
+  assert.deepEqual(calls.map(call => call.method), ['GET','GET','GET','POST']);
   await assert.rejects(async () => rdb.from('persons').update({ display_name: 'bad' }).eq('id', 7).select('id'),
     /read-only/);
   await assert.rejects(async () => rdb.from('forbidden').select('id'), /Invalid review table/);

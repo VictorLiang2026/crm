@@ -30,6 +30,12 @@ function sourceRefs(context) {
 function reviewForDisplay(result, context) {
   const refs = sourceRefs(context);
   const persons = new Map(context.persons.map(row => [String(row.data.id), row.data.display_name]));
+  const positive = new Map(context.activity_interactions.filter(row =>
+    Number(row.data.importance) >= 3).map(row =>
+    [`public.interactions#${row.data.id}`, String(row.data.person_id)]));
+  const attendance = new Map(context.participants.filter(row => row.data.status === 'attended' &&
+    row.data.resolved_person_id).map(row =>
+    [`public.activity_participants#${row.data.id}`, String(row.data.resolved_person_id)]));
   let discarded = 0;
   const knownRefs = item => Array.isArray(item?.sourceRefs) && item.sourceRefs.length > 0 &&
     item.sourceRefs.every(ref => refs.has(ref));
@@ -41,8 +47,17 @@ function reviewForDisplay(result, context) {
       return valid;
     });
   }
-  review.actionCandidates = result.actionCandidates.filter(item => {
-    const valid = persons.has(String(item.personId)) && knownRefs(item) && item.sourceRefs.length > 0;
+  review.actionCandidates = result.actionCandidates.map((item, sourceIndex) => ({...item,sourceIndex})).filter(item => {
+    const valid = persons.has(String(item.personId)) && knownRefs(item) &&
+      item.sourceRefs.some(ref => positive.get(ref) === String(item.personId) ||
+        attendance.get(ref) === String(item.personId));
+    if (!valid) discarded++;
+    return valid;
+  }).map(item => ({ ...item, personId: String(item.personId), personName: persons.get(String(item.personId)) }));
+  review.opportunityCandidates = (result.opportunityCandidates || [])
+    .map((item, sourceIndex) => ({...item,sourceIndex})).filter(item => {
+    const valid = persons.has(String(item.personId)) && knownRefs(item) &&
+      item.sourceRefs.some(ref => positive.get(ref) === String(item.personId));
     if (!valid) discarded++;
     return valid;
   }).map(item => ({ ...item, personId: String(item.personId), personName: persons.get(String(item.personId)) }));
@@ -68,7 +83,7 @@ async function run(event, { app, rdb, gateway, engine } = {}) {
   const task = await aiGateway.runAITask({
     taskType: 'activity_review', skill: 'activity_review', capability: 'analysis',
     subjectType: 'activity', subjectId: activityId,
-    input: { activityId: String(activityId), focus: '只依据给定来源回答六项问题。关系改善与新机会属于待核实研判；没有前后证据时明确说证据不足。引用 source 的 public.表#ID，不猜测身份或截止日期。Action Candidate 只关联已确认的 Person，需人工审核，不写业务事实。' },
+    input: { activityId: String(activityId), focus: '只依据给定来源回答六项问题。关系改善与新机会属于待核实研判；没有前后证据时明确说证据不足。引用 source 的 public.表#ID，不猜测身份或截止日期。Action 与 Opportunity Candidate 只关联已确认的 Person，报名或到场本身不能推出机会，需人工审核，不写业务事实。' },
     context: built.context, contextSnapshot: built.context_snapshot,
   });
   const display = reviewForDisplay(task.result, built.context);

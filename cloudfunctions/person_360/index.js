@@ -5,6 +5,7 @@ const cloudbase = require('@cloudbase/node-sdk');
 const { parsePersonName, PersonService } = require('./person-service');
 const { InteractionService } = require('./interaction-service');
 const { ActivityInteractionService } = require('./activity-interaction-service');
+const { ActivityReviewWorkflowService } = require('./activity-review-workflow-service');
 const { CommitmentService } = require('./commitment-service');
 const { WorkItemService } = require('./work-item-service');
 const { OpportunityWorkflowService } = require('./opportunity-workflow-service');
@@ -114,7 +115,8 @@ async function pgRpc(name, body) {
     'person_identity_preview_v1', 'person_identity_execute_v1',
     'crm_person_only_recruit_delete_v1', 'crm_work_item_preview_v1',
     'crm_work_item_execute_v1', 'crm_opportunity_preview_v1',
-    'crm_opportunity_execute_v1']).has(name)) throw new Error('Invalid RPC');
+    'crm_opportunity_execute_v1','crm_activity_review_preview_v1',
+    'crm_activity_review_execute_v1']).has(name)) throw new Error('Invalid RPC');
   const env = process.env.TCB_ENV;
   const key = process.env.CRM_PERSON360_DB_API_KEY;
   if (!/^crm-[a-z0-9]+$/.test(env || '') || !key) throw new Error('Person 360 is not configured');
@@ -137,7 +139,7 @@ async function pgRpc(name, body) {
     if (!response.ok) {
       const problem = await response.json().catch(() => null);
       const message = typeof problem?.message === 'string' ? problem.message : '';
-      if (/^(Invalid |Selected Person|Same-name|Deleted identity|Customer |Preview |Identity candidates|Active Person|Person-only recruit|Test account|Test parent|Idempotency key|Unauthorized|Speaker profile|Work item|Action |Commitment |Opportunity |Person changed)/.test(message)) {
+      if (/^(Invalid |Selected Person|Same-name|Deleted identity|Customer |Preview |Identity candidates|Active Person|Person-only recruit|Test account|Test parent|Idempotency key|Unauthorized|Speaker profile|Work item|Action |Commitment |Opportunity |Person changed|Activity |Outcome )/.test(message)) {
         throw new Error(message);
       }
       throw new Error(`Database request failed (${response.status})`);
@@ -690,6 +692,12 @@ exports.main = async event => {
         .createManual(event.personId, event.data, uid);
       case 'recordActivityInteraction': return await new ActivityInteractionService({ request: pgRequest })
         .record(event.data, uid);
+      case 'previewActivityReview': return await new ActivityReviewWorkflowService({request:pgRequest,rpc:pgRpc})
+        .preview(event.data,uid);
+      case 'executeActivityReview': return await new ActivityReviewWorkflowService({request:pgRequest,rpc:pgRpc})
+        .execute(event.previewId,uid);
+      case 'listActivityOutcomes': return await new ActivityReviewWorkflowService({request:pgRequest,rpc:pgRpc})
+        .outcomes(event.activityId);
       case 'resolveQuickCaptureName': return await service.resolveQuickCaptureName(event.name);
       case 'addCanonicalParticipant': return await new ParticipantService({ request: pgRequest })
         .add(event.data, uid);

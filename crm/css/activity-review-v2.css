@@ -10,3 +10,11 @@
 .activity-review-v2-muted{color:#64748b}
 .activity-review-v2-candidate{padding:8px 10px;margin:8px 0;background:#fff;border-left:3px solid #6366f1}
 .activity-review-v2-candidate p{margin:4px 0}
+.activity-review-v2-editor{margin-top:12px;padding:12px;border:1px solid #cbd5e1;background:#f8fafc}
+.activity-review-v2-field{display:block;max-width:720px;margin:8px 0;color:#334155;font-size:13px}
+.activity-review-v2-field span{display:block;margin-bottom:4px;font-weight:600}
+.activity-review-v2-field input,.activity-review-v2-field textarea{box-sizing:border-box;width:100%;min-height:36px;padding:7px 9px;border:1px solid #94a3b8;border-radius:5px;background:#fff;color:#0f172a;font:inherit}
+.activity-review-v2-field textarea{min-height:72px;resize:vertical}
+.activity-review-v2-controls{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.activity-review-v2-preview{max-width:720px;margin-top:10px;padding:10px;border-left:3px solid #0f766e;background:#ecfdf5;overflow-wrap:anywhere}
+.activity-review-v2-preview p{margin:5px 0}

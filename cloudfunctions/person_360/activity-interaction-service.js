@@ -34,9 +34,10 @@ class ActivityInteractionService {
       if (participant.person_type === 'customer') customerId = idOf(participant.person_id);
       if (participant.person_type === 'recruit') {
         const candidate = one(await this.request('recruit_candidates', 'GET', {
-          select: 'id,customer_id', id: `eq.${idOf(participant.person_id)}`,
+          select: 'id,person_id,customer_id', id: `eq.${idOf(participant.person_id)}`,
           deleted_at: 'is.null', limit: 1,
         }));
+        personId = candidate?.person_id;
         customerId = candidate?.customer_id;
       }
       if (participant.person_type === 'speaker') {
