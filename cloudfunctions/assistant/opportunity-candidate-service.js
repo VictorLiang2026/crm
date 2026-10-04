@@ -10,6 +10,7 @@ const ID=/^[1-9][0-9]*$/;
 const HASH=/^[0-9a-f]{32}$/;
 const TYPES=new Set(['insurance','recruit','referral','activity','speaker',
   'partnership','service','relationship']);
+const TEST_MARKER='【系统测试·勿联系】';
 function invalid() { const error=new Error('Invalid candidate request');error.code='INVALID_INPUT';throw error; }
 function draftOf(value) {
   if (!value || typeof value!=='object' || Array.isArray(value) ||
@@ -21,6 +22,23 @@ function draftOf(value) {
   return { opportunity_type:value.opportunity_type,reason:value.reason.trim(),
     next_action:value.next_action.trim() };
 }
+async function requireTrackedTestPerson(database,uid,personId) {
+  const batches=await database.read('crm_test_batches',{
+    select:'batch_key',created_by_uid:`eq.${uid}`,limit:10,
+  });
+  if (!batches.length) return false;
+  const keys=batches.map(row=>row.batch_key).filter(key=>/^crm_test_[a-z0-9_]+$/.test(key));
+  if (!keys.length) invalid();
+  const records=await database.read('crm_test_records',{
+    select:'record_id',batch_key:`in.(${keys.join(',')})`,record_table:'eq.persons',
+    record_id:`eq.${personId}`,limit:1,
+  });
+  if (!records.length) {
+    const error=new Error('Test account requires tracked fictional Person');
+    error.code='TEST_PERSON_REQUIRED';throw error;
+  }
+  return true;
+}
 
 async function runOpportunityCandidate(event, uid, {data,gateway,app,auditRdb}={}) {
   if (typeof uid!=='string' || !uid.trim() || !event ||
@@ -31,16 +49,20 @@ async function runOpportunityCandidate(event, uid, {data,gateway,app,auditRdb}={
     key:process.env.CRM_ASSISTANT_DB_API_KEY});
   if (operation==='list') {
     const personId=idOf(event.personId);
+    await requireTrackedTestPerson(database,uid,personId);
     return {ok:true,status:'listed',rows:await database.list(personId),
       execution:{modelCalled:false,businessDataWritten:false}};
   }
   if (operation==='context') {
-    const context=await buildCandidateContext(database,idOf(event.personId));
+    const personId=idOf(event.personId);
+    await requireTrackedTestPerson(database,uid,personId);
+    const context=await buildCandidateContext(database,personId);
     return {ok:true,status:'context',evidence:context.evidence,
       execution:{modelCalled:false,businessDataWritten:false}};
   }
   if (operation==='generate') {
     const personId=idOf(event.personId);
+    const trackedTest=await requireTrackedTestPerson(database,uid,personId);
     const context=await buildCandidateContext(database,personId);
     if (!context.evidence.some(item=>item.primary)) {
       return {ok:true,status:'insufficient_evidence',notice:'现有资料缺少可支持机会判断的具体证据；不会创建候选。',
@@ -60,17 +82,23 @@ async function runOpportunityCandidate(event, uid, {data,gateway,app,auditRdb}={
       taskId:task.taskId,resultId:task.resultId,
       notice:'模型未给出可核对的正面来源，未保存机会候选。',
       execution:{modelCalled:true,businessDataWritten:false}};
+    const markedDraft=trackedTest?{...checked.draft,
+      reason:checked.draft.reason.includes(TEST_MARKER)?checked.draft.reason:
+        TEST_MARKER+checked.draft.reason.slice(0,1000-TEST_MARKER.length),
+      next_action:checked.draft.next_action.includes(TEST_MARKER)?checked.draft.next_action:
+        TEST_MARKER+checked.draft.next_action.slice(0,500-TEST_MARKER.length)}:checked.draft;
     const saved=await database.run('create',uid,{personId,aiResultId:task.resultId,
-      draft:checked.draft,evidence:checked.evidence});
+      draft:markedDraft,evidence:checked.evidence});
     return {...saved,taskId:task.taskId,resultId:task.resultId,
       confidence:checked.confidence,
       execution:{modelCalled:true,businessDataWritten:false}};
   }
   const candidateId=idOf(event.candidateId);
   const args={candidateId};
+  const candidate=await database.get(candidateId);
+  if (!candidate) invalid();
+  const trackedTest=await requireTrackedTestPerson(database,uid,candidate.person_id);
   if (operation==='preview' || operation==='execute') {
-    const candidate=await database.get(candidateId);
-    if (!candidate) invalid();
     const context=await buildCandidateContext(database,candidate.person_id);
     const byRef=new Map(context.evidence.map(item=>[item.ref,item]));
     if (!Array.isArray(candidate.evidence) || !candidate.evidence.length ||
@@ -79,7 +107,11 @@ async function runOpportunityCandidate(event, uid, {data,gateway,app,auditRdb}={
       const error=new Error('Candidate evidence changed');error.code='PREVIEW_STALE';throw error;
     }
   }
-  if (operation==='edit') args.draft=draftOf(event.draft);
+  if (operation==='edit') {
+    args.draft=draftOf(event.draft);
+    if (trackedTest && (!args.draft.reason.includes(TEST_MARKER) ||
+        !args.draft.next_action.includes(TEST_MARKER))) invalid();
+  }
   if (operation==='confirm') {
     if (typeof event.previewHash!=='string' || !HASH.test(event.previewHash)) invalid();
     args.previewHash=event.previewHash;

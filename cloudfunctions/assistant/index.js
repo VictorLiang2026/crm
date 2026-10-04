@@ -38,6 +38,7 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
         const code = ['INVALID_INPUT','INVALID_CONFIG','INVALID_RESULT','RATE_LIMIT','TIMEOUT',
           'UPSTREAM_UNAVAILABLE','PERSISTENCE_ERROR','AI_REQUEST_FAILED','INVALID_CANDIDATE',
           'DUPLICATE_OPPORTUNITY','PREVIEW_STALE','CONFIRMATION_REQUIRED',
+          'TEST_PERSON_REQUIRED',
           'CANDIDATE_DATABASE_ERROR'].includes(error?.code) ? error.code : 'CANDIDATE_FAILED';
         return { ok:false,error:{code,message:'机会候选操作未完成'} };
       }

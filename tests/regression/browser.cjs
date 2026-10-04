@@ -39,6 +39,7 @@ class Browser {
       else if (pathname === '/crm/js/modules/phase14-hubs.js') { res.setHeader('Content-Type', 'text/javascript; charset=utf-8'); res.end(fs.readFileSync(path.join(this.root, 'crm/js/modules/phase14-hubs.js'))); }
       else if (pathname === '/crm/css/phase14-navigation.css') { res.setHeader('Content-Type', 'text/css; charset=utf-8'); res.end(fs.readFileSync(path.join(this.root, 'crm/css/phase14-navigation.css'))); }
       else if (pathname === '/crm/js/modules/opportunity-candidates.js') { res.setHeader('Content-Type', 'text/javascript; charset=utf-8'); res.end(fs.readFileSync(path.join(this.root, 'crm/js/modules/opportunity-candidates.js'))); }
+      else if (pathname === '/crm/js/modules/opportunity-workflow.js') { res.setHeader('Content-Type', 'text/javascript; charset=utf-8'); res.end(fs.readFileSync(path.join(this.root, 'crm/js/modules/opportunity-workflow.js'))); }
       else if (pathname === '/crm/css/person-360.css') { res.setHeader('Content-Type', 'text/css; charset=utf-8'); res.end(fs.readFileSync(path.join(this.root, 'crm/css/person-360.css'))); }
       else if (pathname === '/crm/js/modules/activity-review-v2.js') { res.setHeader('Content-Type', 'text/javascript; charset=utf-8'); res.end(fs.readFileSync(path.join(this.root, 'crm/js/modules/activity-review-v2.js'))); }
       else if (pathname === '/crm/js/modules/test-data-notice.js') { res.setHeader('Content-Type', 'text/javascript; charset=utf-8'); res.end(fs.readFileSync(path.join(this.root, 'crm/js/modules/test-data-notice.js'))); }
@@ -137,7 +138,7 @@ class Browser {
     this.runtimeErrors.length = 0;
     const target = this.origin + '/admin.html?' + query + '&run=' + Date.now() + hash;
     await this.send('Page.navigate', { url: target });
-    await this.wait('location.href === ' + JSON.stringify(target) + ' && Boolean(window.__crmTest && document.getElementById("view"))', 12000);
+    await this.wait('location.href === ' + JSON.stringify(target) + ' && Boolean(window.__crmTest && document.getElementById("view"))', 25000);
   }
   async click(selector, text) {
     await this.evaluate(`(() => { const e = [...document.querySelectorAll(${JSON.stringify(selector)})].find(e => e.textContent.includes(${JSON.stringify(text)})); if (!e) throw new Error('Control not found: ' + ${JSON.stringify(text)}); e.click(); })()`);

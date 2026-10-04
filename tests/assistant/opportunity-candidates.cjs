@@ -49,6 +49,34 @@ test('AI can only cite current Person evidence; it cannot directly write Opportu
   await buildCandidateContext(data,7)).status,'insufficient_evidence');
 });
 
+test('test account cannot generate a candidate for an untracked Person',async()=>{
+  const data=fixture({crm_test_batches:[{batch_key:'crm_test_main_v1'}],crm_test_records:[]});
+  await assert.rejects(()=>runOpportunityCandidate({action:'opportunityCandidate',
+    operation:'generate',personId:7},'test-uid',{data,
+    gateway:{runAITask(){throw Error('model must not run');}}}),
+  error=>error.code==='TEST_PERSON_REQUIRED');
+  assert.equal(data.calls.some(x=>x.operation==='create'),false);
+});
+
+test('tracked test candidate keeps visible marker and rejects an unmarked edit',async()=>{
+  const data=fixture({persons:[{id:7,display_name:'【系统测试·勿联系】虚构人物'}],
+    interactions:[{id:9,summary:'【系统测试·勿联系】虚构交流',importance:4}],
+    crm_test_batches:[{batch_key:'crm_test_main_v1'}],
+    crm_test_records:[{record_id:'7'}]});
+  const gateway={async runAITask(){return {taskId:1,resultId:2,result:{status:'candidate',
+    opportunityType:'insurance',reason:'虚构沟通依据',nextAction:'核对虚构资料',
+    confidence:0.7,sourceRefs:['public.interactions#9']}};}};
+  await runOpportunityCandidate({action:'opportunityCandidate',operation:'generate',personId:7},
+    'test-uid',{data,gateway,auditRdb:{},app:{}});
+  const saved=data.calls.find(x=>x.operation==='create').args.draft;
+  assert.match(saved.reason,/【系统测试·勿联系】/);
+  assert.match(saved.next_action,/【系统测试·勿联系】/);
+  data.get=async()=>({person_id:7});
+  await assert.rejects(()=>runOpportunityCandidate({action:'opportunityCandidate',
+    operation:'edit',candidateId:12,draft:{opportunity_type:'insurance',
+      reason:'去掉标记',next_action:'普通文字'}},'test-uid',{data}),/Invalid candidate/);
+});
+
 test('anonymous user and malformed edit/confirm are rejected before DB call',async()=>{
   const anonymous=createMain(()=>({uid:'anon',isAnonymous:true}),undefined,undefined,
     ()=>{throw Error('must not run');});

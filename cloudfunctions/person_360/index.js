@@ -7,6 +7,8 @@ const { InteractionService } = require('./interaction-service');
 const { ActivityInteractionService } = require('./activity-interaction-service');
 const { CommitmentService } = require('./commitment-service');
 const { WorkItemService } = require('./work-item-service');
+const { OpportunityWorkflowService } = require('./opportunity-workflow-service');
+const { disclose, refsForRows } = require('./test-data');
 const { InsuranceContextService } = require('./insurance-context-service');
 const { ParticipantService } = require('./participant-service');
 const { SpeakerProfileService } = require('./speaker-profile-service');
@@ -27,12 +29,16 @@ const RECRUIT_READ_TABLES = new Set([
   'v_recruit_candidates_person_only', 'v_recruit_candidates_person_only_trash',
   'recruit_milestones',
 ]);
+const OPPORTUNITY_READ_TABLES = new Set([
+  'opportunity_candidates','outcomes','crm_test_batches','crm_test_records',
+]);
 const TABLES = new Set([
   'persons', 'households', 'household_members', 'interactions', 'commitments',
   'opportunities',
   ...INSURANCE_READ_TABLES,
   ...RELATIONSHIP_READ_TABLES,
   ...RECRUIT_READ_TABLES,
+  ...OPPORTUNITY_READ_TABLES,
   ...LEGACY_INTERACTION_TABLES,
 ]);
 const ROLES = new Set(['spouse', 'child', 'parent', 'sibling', 'other']);
@@ -71,6 +77,7 @@ async function pgRequest(table, method, filters = {}, body) {
   if (INSURANCE_READ_TABLES.has(table) && method !== 'GET') throw new Error('Invalid source operation');
   if (RELATIONSHIP_READ_TABLES.has(table) && method !== 'GET') throw new Error('Invalid source operation');
   if (RECRUIT_READ_TABLES.has(table) && method !== 'GET') throw new Error('Invalid source operation');
+  if (OPPORTUNITY_READ_TABLES.has(table) && method !== 'GET') throw new Error('Invalid source operation');
   if (table === 'commitments' && method !== 'GET') throw new Error('Invalid source operation');
   const env = process.env.TCB_ENV;
   const key = process.env.CRM_PERSON360_DB_API_KEY;
@@ -105,7 +112,8 @@ async function pgRpc(name, body) {
   if (!new Set(['quick_capture_v2_commit', 'person_directory_page_v1',
     'person_identity_preview_v1', 'person_identity_execute_v1',
     'crm_person_only_recruit_delete_v1', 'crm_work_item_preview_v1',
-    'crm_work_item_execute_v1']).has(name)) throw new Error('Invalid RPC');
+    'crm_work_item_execute_v1', 'crm_opportunity_preview_v1',
+    'crm_opportunity_execute_v1']).has(name)) throw new Error('Invalid RPC');
   const env = process.env.TCB_ENV;
   const key = process.env.CRM_PERSON360_DB_API_KEY;
   if (!/^crm-[a-z0-9]+$/.test(env || '') || !key) throw new Error('Person 360 is not configured');
@@ -128,7 +136,7 @@ async function pgRpc(name, body) {
     if (!response.ok) {
       const problem = await response.json().catch(() => null);
       const message = typeof problem?.message === 'string' ? problem.message : '';
-      if (/^(Invalid |Selected Person|Same-name|Deleted identity|Customer |Preview |Identity candidates|Active Person|Person-only recruit|Test account|Test parent|Idempotency key|Unauthorized|Speaker profile|Work item|Action |Commitment )/.test(message)) {
+      if (/^(Invalid |Selected Person|Same-name|Deleted identity|Customer |Preview |Identity candidates|Active Person|Person-only recruit|Test account|Test parent|Idempotency key|Unauthorized|Speaker profile|Work item|Action |Commitment |Opportunity |Person changed)/.test(message)) {
         throw new Error(message);
       }
       throw new Error(`Database request failed (${response.status})`);
@@ -372,8 +380,9 @@ function createService({ request = pgRequest, rpc = pgRpc } = {}) {
     });
     const byId = new Map();
     for (const row of own.concat(legacy)) byId.set(String(row.id), row);
-    return { rows: [...byId.values()].sort((a, b) =>
-      String(b.updated_at || '').localeCompare(String(a.updated_at || ''))) };
+    const rows = [...byId.values()].sort((a, b) =>
+      String(b.updated_at || '').localeCompare(String(a.updated_at || '')));
+    return { rows, testData: await disclose(refsForRows('opportunities', rows)) };
   }
 
   async function listRecruitContext(personId) {
@@ -625,15 +634,25 @@ exports.main = async event => {
       case 'previewIdentity': return await service.previewIdentity(event.data, uid);
       case 'executeIdentity': return await service.executeIdentity(event.data, uid);
       case 'listOpportunityDirectory': return await service.listOpportunityDirectory(event);
+      case 'listPendingOpportunityCandidates': return await new OpportunityWorkflowService({request:pgRequest,rpc:pgRpc}).listPending(uid);
       case 'listOpportunities': return await service.listOpportunities(event.personId);
+      case 'getOpportunityLinks': return await new OpportunityWorkflowService({request:pgRequest,rpc:pgRpc})
+        .linked(event.personId,event.id,uid);
+      case 'listUnlinkedOpportunityActions': return await new OpportunityWorkflowService({request:pgRequest,rpc:pgRpc})
+        .availableActions(event.personId,uid);
+      case 'previewOpportunity': return await new OpportunityWorkflowService({request:pgRequest,rpc:pgRpc})
+        .preview(event.data,uid);
+      case 'executeOpportunity': return await new OpportunityWorkflowService({request:pgRequest,rpc:pgRpc})
+        .execute(event.previewId,uid);
       case 'listRecruitContext': return await service.listRecruitContext(event.personId);
       case 'getInsuranceContext': return await service.getInsuranceContext(event.personId);
       case 'getRelationshipDecay': return await new RelationshipDecayService({ request: pgRequest })
         .evaluateForPerson(event.personId);
-      case 'createOpportunity': return await service.createOpportunity(event.personId, event.data);
-      case 'updateOpportunity': return await service.updateOpportunity(event.personId, event.id, event.data);
-      case 'closeOpportunity': return await service.closeOpportunity(event.personId, event.id);
-      case 'removeOpportunity': return await service.removeOpportunity(event.personId, event.id);
+      case 'createOpportunity':
+      case 'updateOpportunity':
+      case 'closeOpportunity':
+      case 'removeOpportunity':
+        return {error:'PREVIEW_REQUIRED',message:'请通过服务端预览并人工确认机会变更'};
       case 'search': return await service.search(event.name);
       case 'saveFacts': return await service.saveFacts(event.personId, event.facts);
       case 'addMember': return await service.addMember(

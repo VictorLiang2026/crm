@@ -27,6 +27,7 @@ test('profile errors retry; no-link and stale-navigation fixtures never expose a
  const b=new Browser(path.resolve(__dirname,'../..'));
  try{
   await b.start();await b.open('#/more');
+  await b.wait("document.querySelector('#view')?.innerText.includes('更多')");
   await b.evaluate(`(async()=>{
     const {renderPersonProfile}=await import('/crm/js/modules/person-profile.js');
     window.mountProfile=(mode)=>renderPersonProfile({root:document.getElementById('view'),personId:71,

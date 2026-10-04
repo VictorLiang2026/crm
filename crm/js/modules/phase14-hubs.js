@@ -1,4 +1,7 @@
 // Phase 14 navigation surfaces. Existing business routes and write flows remain in admin.html.
+import { mountOpportunityWorkflow } from './opportunity-workflow.js';
+import { renderOpportunityCandidates } from './opportunity-candidates.js';
+import { renderTestDataNotice } from './test-data-notice.js';
 const PERSON_HASH = '#/people';
 const OPPORTUNITY_HASH = '#/opportunities';
 const LEGACY_TABS = {
@@ -241,9 +244,37 @@ export function openPersonCommand({ callFn, kind = 'person', person = null, pref
 }
 
 export function renderOpportunities({ root, callFn }) {
-  const wrap = page(root, '机会', '查看现有机会，进入对应 Person 360 后再核实和处理。');
+  const wrap = page(root, '机会', '机会候选先核对来源；Person 专属机会经服务端预览和人工确认处理。旧客户机会仍在原详情操作。');
+  wrap.append(link('选择人物新增机会', '#/people', 'btn btn-primary'));
+  const pending = node('div', 'phase14-list');
+  const review = node('div', 'phase14-list');
+  wrap.append(node('h3', '', '待审核候选'), pending, review, node('h3', '', '正式机会'));
   const list = node('div', 'phase14-list');
-  wrap.append(list);
+  const manager = node('div', 'phase14-list');
+  wrap.append(list, manager);
+  async function loadPending() {
+    pending.replaceChildren(node('p','loading','正在读取候选…'));
+    try {
+      const result=await callFn('person_360',{action:'listPendingOpportunityCandidates'});
+      if(result?.error||!Array.isArray(result?.rows))throw new Error(result?.error||'候选列表格式异常');
+      if(location.hash!==OPPORTUNITY_HASH)return;
+      pending.replaceChildren();renderTestDataNotice(pending,result.testData);
+      if(!result.rows.length)pending.append(node('p','phase14-muted','暂无待审核机会候选。'));
+      for(const candidate of result.rows){
+        const card=node('div','phase14-row');
+        card.append(node('strong','',`${candidate.personName} · 候选 #${candidate.id}`),
+          node('p','',candidate.draft?.reason||'待核对依据'),
+          node('p','phase14-muted',`来源：${(candidate.evidence||[]).join('、')}`),
+          button('审核候选',()=>{
+            review.replaceChildren();renderOpportunityCandidates({root:review,personId:candidate.person_id,
+              callFn,onCreated:()=>{void loadPending();void load(1);}});
+            review.scrollIntoView({block:'nearest'});
+          }));
+        pending.append(card);
+      }
+      if(result.hasMore)pending.append(node('p','phase14-muted','仅显示最近 20 条待审核候选。'));
+    }catch(error){pending.replaceChildren(node('p','phase14-error',`候选加载失败：${error.message}`));}
+  }
   let requestId = 0;
   async function load(number) {
     const mine = ++requestId;
@@ -265,6 +296,12 @@ export function renderOpportunities({ root, callFn }) {
         row.append(node('span', 'phase14-muted', person?.display_name ||
           (opportunity.customer_id ? `旧客户 #${opportunity.customer_id}` : '关联人物待核对')));
         if (opportunity.next_action) row.append(node('p', 'phase14-row-note', opportunity.next_action));
+        if(opportunity.customer_id==null&&person?.id)row.append(button('管理机会',()=>{
+          manager.replaceChildren();mountOpportunityWorkflow({root:manager,personId:person.id,
+            personName:person.display_name,callFn,
+            isCurrent:()=>location.hash===OPPORTUNITY_HASH,onChanged:()=>void load(number)});
+          manager.scrollIntoView({block:'nearest'});
+        }));
         list.append(row);
       }
       pager(list, result.page, result.hasMore, load);
@@ -273,6 +310,7 @@ export function renderOpportunities({ root, callFn }) {
         list.replaceChildren(node('p', 'phase14-error', `机会列表加载失败：${error.message}`));
     }
   }
+  void loadPending();
   void load(1);
 }
 

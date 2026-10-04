@@ -190,6 +190,19 @@ function installFixtures() {
       { id: 960001, person_id: 980001, customer_id: customer.Id, opportunity_type: '家庭保障',
         status: '沟通', next_action: marker + '核对保障', updated_at: '2026-09-27' },
     ]),
+    'person_360:listPendingOpportunityCandidates': () => ({rows:[],hasMore:false,
+      testData:{status:'verified',containsTestData:false,recordCount:0,sources:[]}}),
+    'person_360:getOpportunityLinks': () => ({opportunityId:961001,actions:[],outcomes:[],
+      testData:{status:'verified',containsTestData:false,recordCount:0,sources:[]}}),
+    'person_360:listUnlinkedOpportunityActions': () => ({rows:[{id:990301,
+      title:'【系统测试·勿联系】整理反馈',status:'open'}]}),
+    'person_360:previewOpportunity': data => ({previewId:'a4825230-1d16-408f-9823-c49e99152d79',
+      preview:{operation:data.data.operation,personId:data.data.personId,
+        personName:marker+'客户甲',opportunityId:data.data.opportunityId,
+        before:data.data.operation==='create'?null:{status:'发现'},after:data.data.draft,
+        source:'public.opportunities#961001'},expiresAt:'2026-10-04T23:00:00Z',status:'preview'}),
+    'person_360:executeOpportunity': () => ({opportunityId:961001,outcomeId:null,
+      operation:'edit',replayed:false}),
     'person_360:listRecruitContext': () => rows(mode === 'empty' ? [] : [{
       id: candidate.candidate_id, stage: '面谈', motivation: marker + '了解事业',
       concerns: marker + '担心时间', potentialScore: 4, careerPlan: marker + '职业转型',
@@ -303,6 +316,7 @@ function installFixtures() {
         candidateId:data.candidateId, personId: data.personId, version: data.version,
         payload: ['assistant:quickCaptureV2', 'person_360:commitQuickCaptureV2', 'person_360:addCanonicalParticipant', 'person_360:recordActivityInteraction', 'person_360:createOpportunity',
           'person_360:updateOpportunity', 'person_360:createSpeakerProfile',
+          'person_360:previewOpportunity',
           'person_360:previewIdentity','person_360:executeIdentity','activity_speakers:update',
           'person_360:linkSpeakerPerson'].includes(key) ? (key==='assistant:quickCaptureV2'?data:data.data) : null });
       if (!loggedIn) return fail('CALL_BEFORE_LOGIN: ' + key);

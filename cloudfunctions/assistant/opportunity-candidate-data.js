@@ -4,7 +4,7 @@
 const TABLES = new Set(['persons','interactions','context_items','followups',
   'activity_participants','activities','products','policy_review_reports',
   'ocr_records','photos','recruit_candidates','recruit_followups',
-  'opportunities','opportunity_candidates']);
+  'opportunities','opportunity_candidates','crm_test_batches','crm_test_records']);
 const ID = /^[1-9][0-9]*$/;
 
 function createOpportunityCandidateData({ env, key, fetchImpl = fetch } = {}) {
