@@ -110,18 +110,23 @@ export function mountMorningBrief({ root, callFn }) {
     const value = sessionStorage.getItem('crm_open_test_agenda') === '1';
     sessionStorage.removeItem('crm_open_test_agenda'); return value;
   } catch { return false; } })();
+  let refreshSerial = 0;
   async function refresh(guidance = 'rules') {
+    const current = ++refreshSerial;
     button.disabled = true; aiButton.disabled = true;
     status.textContent = '正在整理今日记录…';
     try {
       const result = await api.call('today_coach', { action: 'daily_review', view: 'morning', guidance });
+      if (current !== refreshSerial) return;
       if (result?.error) throw new Error(result.error);
       render(result, root);
       status.textContent = `${testAgenda ? '已打开普通 Today，测试记录以来源提示为准 · ' : ''}更新于 ${dateLabel(result.generated_at)}`;
       if (testAgenda) root.scrollIntoView({block:'start'});
     } catch (error) {
-      status.textContent = `晨间简报生成失败：${error.message}`;
-    } finally { button.disabled = false; aiButton.disabled = false; }
+      if (current === refreshSerial) status.textContent = `晨间简报生成失败：${error.message}`;
+    } finally {
+      if (current === refreshSerial) { button.disabled = false; aiButton.disabled = false; }
+    }
   }
   button.addEventListener('click', () => void refresh('rules'));
   aiButton.addEventListener('click', () => void refresh('ai'));

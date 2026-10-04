@@ -6,6 +6,7 @@
 
 - 起点：`master` `825703293315ce83c80ee8c69c9dbfaa0cb80ab3`，回滚标签 `release-20261004-155918`。修改前 `tools/sync-check.ps1` 证实本地、GitHub、云端页面及 28 个 CRM 函数源码一致。
 - 页面：`#/today` 的 Morning Brief 进入即从当前数据库事实生成七段，按钮可刷新事实或按需取得 AI 工作建议。`#/test-scenario` 增加“一键打开测试日程”，仍打开普通 Today 查询，没有隐藏测试数据或新增种子。Person 360、Today 5、旧复盘、旧客户/招募/活动/回收站路由保持原入口。
+- 并发：行动或承诺状态改变会触发晨间事实刷新；前端只接受最新一次请求的响应，避免先发出的旧读取晚到后覆盖当前状态。
 - 接口：沿用 `callFn('today_coach', {action:'daily_review', view:'morning'})`。新增可选 `guidance:'rules'` 参数跳过模型，仅按规则返回事实；原不带 `view` 的 `daily_review` 与 `generate` 契约不变。WP08 行动状态改变后刷新晨间事实。
 - 字段：只读取 `public.actions` 的 ID、Person ID、标题、截止时间、状态、来源与六维排序值；`public.commitments` 的 ID、Person ID、内容、截止时间与状态；现有 `public.v_action_center`、活动、正式机会和待审核机会候选作为只读来源。页面不展示电话或其他联系信息。
 - 数据：本包不写业务表、不增加初始样本，也不添加数据库结构。无 migration/rollback；旧的 10 条初始虚构样本保持不变。含测试数据提示沿用受保护台账的服务端摘要，显示数量与来源，不从普通查询排除样本。
