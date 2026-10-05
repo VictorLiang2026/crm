@@ -4931,6 +4931,7 @@ async function showActivities(){
         item.appendChild(el('div', {style:'display:flex;justify-content:space-between;align-items:center'}, [
           el('div', {}, [
             el('strong', {}, a.name),
+            el('span', {style:'margin-left:8px;font-size:12px;color:var(--muted)'}, '活动 #' + String(a.id)),
             a.activity_type ? el('span', {style:'margin-left:8px;font-size:12px;color:var(--muted)'}, a.activity_type) : null,
           ]),
           el('div', {style:'display:flex;gap:12px;align-items:center'}, [
@@ -5012,6 +5013,7 @@ async function showActivityDetail(id){
     var si = actStatusInfo(act.status);
     card.appendChild(el('div', {style:'display:flex;align-items:center;gap:10px;margin-bottom:6px'}, [
       el('h2', {style:'margin:0'}, act.name),
+      el('span', {style:'font-size:12px;color:var(--muted)'}, '活动 #' + String(act.id)),
       el('span', {style:'font-size:12px;color:#fff;background:'+si.color+';padding:2px 8px;border-radius:8px'}, si.label),
     ]));
     var meta = [];
@@ -5160,6 +5162,7 @@ async function showActivityDetail(id){
           el('div', {}, [
             el('span', {style:'font-size:11px;color:#fff;background:'+(p.person_type==='customer'?'#2563eb':(p.person_type==='speaker'?'#7c3aed':'#d97706'))+';padding:1px 6px;border-radius:8px;margin-right:6px'}, p.person_type === 'customer' ? '客户' : (p.person_type === 'speaker' ? '嘉宾' : '增员')),
             el('strong', {}, esc(p.person_name || '（未命名）')),
+            el('span', {style:'margin-left:6px;font-size:12px;color:var(--muted)'}, '参与者 #' + String(p.id)),
             p.participant_role ? el('span', {style:'font-size:11px;color:var(--muted);border:1px solid #ddd;padding:0 4px;border-radius:4px;margin-left:4px'}, ri.label) : null,
             el('span', {style:'margin-left:8px;color:#fff;background:'+stColor+';padding:1px 6px;border-radius:8px;font-size:11px'}, stLabel),
             p.followup_status ? el('span', {style:'font-size:11px;color:#fff;background:'+fi.color+';padding:1px 6px;border-radius:8px;margin-left:4px'}, fi.label) : null,

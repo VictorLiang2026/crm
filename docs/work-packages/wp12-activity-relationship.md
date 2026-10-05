@@ -19,6 +19,10 @@
 
 本地 `npm run test:ai-gateway`、`npm run test:ai-skills`、`npm run test:interactions`、`npm run test:modular` 通过；`npm test` 初轮 100 通过、0 失败、5 个既定跳过。新增浏览器验收覆盖“未预览不执行”“逐项接受/拒绝”“机会候选和 Outcome 独立确认”，以及相邻旧客户、招募、活动、Today、回收站与 WP07 V2，`npm run test:browser` 为 66 通过、0 失败、6 个既定跳过。隔离浏览器发现拒绝候选误报已保存，现已修正并复验通过。
 
-生产测试账号、真实 AI 模型输出及衍生 ID 的最终验收、发布提交与标签待本轮后续记录补齐。未确认前不能把本地通过等同线上业务成功。
+首个阶段版已以提交 `597649805c79996316245546f8784d42d739b6a3`、标签 `release-20261005-010922` 发布；本地、GitHub 和云端源码核对一致。生产测试账号、真实 AI 模型输出及衍生 ID 的最终验收仍待完成，未确认前不能把本地通过等同线上业务成功。
+
+2026-10-05 验收补充：用户反馈活动列表和参与者卡片缺少编号，并专项确认只读显示调整。`admin.html` 现显示活动列表/详情的 `public.activities.id`，以及活动详情每张参与者卡片的 `public.activity_participants.id`；现有 `activities.list/get` 已返回 ID，未改接口、数据或权限。隔离完整回归 102 通过、0 失败、5 项既定跳过，浏览器回归 66 通过、0 失败、6 项既定跳过；第一次受限 Edge 无页面目标、一次 Today 加载超时，均未改业务代码，在允许本机回环的环境重跑通过。WP01 权限目录 784 项、身份审计、匿名探针与发布门槛通过，登录摘要因页面哈希变化仍需重新采集。仅上传 `/crm/admin.html`，上传后页面 SHA-256 与本地一致；这只是编号可见性的阶段发布，WP12 活动互动、AI 候选、Outcome 的生产人工确认尚未完成，不标记整包完成。
+
+生产 prtest 已只读确认三个编号显示。随后人工确认虚构参与者 #18 的实质沟通，生成 `public.interactions#11`，精确关联活动 #11、Person #783，摘要含测试标记，`crm_test_records` 逐 ID 记为 derived；初始种子仍为 10 行。`ai_activity.postReviewV2` 产生审计 task/run/result #19，逐 ID 记账，引用 `public.interactions#11`；AI 未提出有充分证据的新机会，错误引用旧互动的行动候选被后端过滤。预览后活动 #11 的 Action、Opportunity Candidate、Outcome 仍均为 0，未凭 AI 内容写业务事实。实际 Outcome 人工预览/确认仍待验收。
 
 代码回退从基线标签创建恢复提交并仅重部署本包变更的活动模块、样式、`ai_activity`、`assistant`、`person_360`；不强推。若要移除新命令台账，先核对已接受的 Action、Opportunity Candidate、Outcome 及其测试登记 ID；回滚脚本发现已写业务行即拒绝删除，不能静默清除。人工互动唯一索引可用独立 rollback 移除，但须先评估此后重复写入风险。无需回滚既有基表或视图，因为本包未改其结构。
