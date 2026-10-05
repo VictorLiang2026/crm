@@ -63,9 +63,10 @@
   - 交给 Codex：把 Existing Coverage、Review、Known Needs、Potential Gaps、Open Opportunities、Next Actions 做成可跳转且可解释的 Person 360 摘要；必要的完整编辑留在旧保单检视。优先复用已标记样本，通过正常确认流程产生虚构产品/报告/证据与缺证据情况，不隐蔽增加初始种子。
   - 验收：摘要来源、日期和“未知”边界清楚；无资料不虚构保障缺口；旧保单检视与 OCR/照片流程通过回归。
   - 2026-10-04：prtest 已确认六块概览、报告 #3 人工摘要及待核实边界、产品 #2、照片 #25／附件 #26 的旧页与来源跳转、Person #786 无资料显示“未知”；旧 OCR 空态正常，真实识别未执行。初始样本仍为 10；两次阶段发布及最终标签 `release-20261004-234100`、测试与回滚见 `docs/work-packages/wp11-insurance-context.md`。
-- [ ] **WP12｜活动关系闭环**　依赖：WP06、WP08、WP10。关联：R05、R06、R10。
+- [x] **WP12｜活动关系闭环**　依赖：WP06、WP08、WP10。关联：R05、R06、R10。
   - 交给 Codex：让活动人员经 Person 映射，真实到场/重要邀约/交流/嘉宾合作经门槛进入 Interaction；活动复盘只生成可审查的 Action/Opportunity Candidate，并可记录 Outcome。保留现有 `ai_activity`。
   - 验收：普通报名不造高价值互动；一条来源不会重复；旧活动详情、参与者、嘉宾和复盘路径通过回归。
+  - 2026-10-05：prtest 在虚构活动 #11 人工确认互动 #11 与 Outcome #2；AI task/run/result #19 引用来源但无足够证据的新候选，未写 Action/机会。活动与参与者编号、Person 时间线中文标题/活动跳转、独立到场、旧嘉宾列表与旧六维复盘已复验；初始种子保持 10 行。自动回归 102 通过、权限目录 784 项与匿名探针通过。线上候选正向接受/拒绝未执行，见 [WP12 报告](../../docs/work-packages/wp12-activity-relationship.md)；完成标记以最终提交/推送、标签及三端核对通过为准。
 - [ ] **WP13｜招募互动与教练闭环**　依赖：WP06、WP08。关联：R02、R06、R07。
   - 交给 Codex：在 Person 360 的 Recruit panel 接通跟进、行动、结果和 `recruit_coach`，使招募建议基于真实阶段/互动/顾虑；旧 recruit_candidates 与 recruit_followups 继续可编辑。
   - 验收：新旧入口显示同一候选人阶段；旧跟进改动即时反映；测试候选人能走跟进到 Outcome，空记录不虚构建议。

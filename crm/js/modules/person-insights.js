@@ -1,6 +1,8 @@
 import { renderTestDataNotice } from './test-data-notice.js';
 
 const LABELS = { followup:'客户跟进', recruit_followup:'增员跟进', activity_participation:'实际到场', manual:'人工互动' };
+const ACTIVITY_LABELS = { invitation:'个别邀约（已有回应）', conversation:'实质沟通',
+  speaker_cooperation:'嘉宾合作进展', post_event_followup:'活动后跟进' };
 const CONTEXT = [['fact','Fact · 已记录事实'],['signal','Signal · 待核实信号'],['inference','Inference · 推断候选']];
 function el(tag, cls, value) {
   const n = document.createElement(tag);
@@ -32,7 +34,7 @@ export function renderPersonInsights({ root, personId, customerId, callFn, openL
       const list = el('ol', 'person360-timeline-list');
       for (const row of result.rows) {
         const item = el('li', 'person360-timeline-item');
-        item.append(el('strong', '', LABELS[row.type] || row.type || '互动'),
+        item.append(el('strong', '', (row.activityId && ACTIVITY_LABELS[row.type]) || LABELS[row.type] || row.type || '互动'),
           el('time', 'person360-muted', formatDate(row.at)), el('p', '', row.summary || '未填写摘要'),
           el('p', 'person360-muted', `来源：${row.source}`));
         let href = null, label = null;
