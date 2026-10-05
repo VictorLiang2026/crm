@@ -49,9 +49,10 @@
   - 交给 Codex：在 Person 360 和 Today 补 Action/Commitment 的查看、创建、编辑、完成与来源跳转；新写入走对应 Service 和人工确认。保留 `v_action_center` 旧来源并防重。
   - 验收：同一任务在 Person/Today 只有一个有效状态；到期/逾期、完成时间、撤销/失败路径一致；测试行动进入真实 Today 且有醒目标记。
   - 2026-10-04：prtest 对已登记的虚构 Person #783 人工确认 Action/Commitment 的创建、编辑、完成、撤销和重开；Person 与 Today 状态、到期时间一致，过期/伪造/跨人物预览拒绝，重放返回原 ID。初始样本仍为 10 行，旧 `v_action_center` 保持 166 行。最终发布和三端核对后本完成标记生效；证据、未验证真机及回滚见 [WP08 报告](../../docs/work-packages/wp08-work-items.md)。
-- [ ] **WP09｜Today 成为统一工作台**　依赖：WP08。关联：R04、R07、R10、R13。
+- [x] **WP09｜Today 成为统一工作台**　依赖：WP08。关联：R04、R07、R10、R13。
   - 交给 Codex：让 Morning Brief、Top Actions、Commitments、Upcoming、Risk、Opportunities、Need Confirmation 从数据库统一事实与受限候选取数；补点击进入具体 Person/Action 的路径，校验排序解释与截止日期。旧 Today 5 和旧 daily_review 仍可访问。
   - 验收：预填测试日程可一键打开；无 AI 时仍有事实与到期提醒；旧候选不重复显示；普通 Today 纳入测试记录并提示数量/来源。
+  - 2026-10-05 WP09-R：`prtest` 真实只读登录通过；生产晨间简报七块、测试数量与来源、Person 跳转、测试日程和旧复盘经人工核对；规则模式、北京时间截止、去重与账号维护等隔离回归通过。初始种子仍为 10 行。本包只修正两处验收脚本并更新文档，未改业务代码或云端数据；未验证项和证据见 [WP09 报告](../../docs/work-packages/wp09-today-workspace.md)。
 
 ## C. 领域闭环与可靠证据
 

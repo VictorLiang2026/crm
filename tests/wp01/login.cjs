@@ -76,7 +76,7 @@ const server = http.createServer((req, res) => {
   req.on('end', () => {
     try {
       const input = JSON.parse(body);
-      if (!Array.isArray(input.results) || input.results.length > 52) throw Error('Invalid result');
+      if (!Array.isArray(input.results) || input.results.length > relations.length + 3) throw Error('Invalid result');
       const results = input.results.map(r => {
         if (!allowed.has(r.id) || !['PASS','FAIL','UNVERIFIED'].includes(r.status)) throw Error('Invalid result');
         return { id: r.id, status: r.status }; // Strict whitelist; never retain arbitrary browser text.

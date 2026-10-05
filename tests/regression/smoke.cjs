@@ -85,7 +85,7 @@ module.exports = async function smoke(root, test) {
       await b.wait("location.hash==='#/account' && [...document.querySelectorAll('#view button')].some(button=>button.textContent==='强制加载最新版')");
       await b.evaluate("localStorage.setItem('todayCoachCache','fixture-cache'); window.confirm=()=>true");
       await b.click('#view button', '强制加载最新版');
-      await b.wait("performance.getEntriesByType('navigation')[0]?.name.includes('_fresh=') && document.getElementById('view').innerText.includes('账号与应用维护')", 15000);
+      await b.wait("performance.getEntriesByType('navigation')[0]?.name.includes('_fresh=') && document.getElementById('view')?.innerText?.includes('账号与应用维护') === true", 15000);
       assert.equal(await b.evaluate("localStorage.getItem('todayCoachCache')"), 'fixture-cache');
       assert.equal(await b.evaluate("document.getElementById('view').innerText.includes('CRM 登录')"), false);
     });
