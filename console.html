@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Victor's CRM Console</title>
+<link rel="stylesheet" href="/crm/css/console.css">
+<script src="https://static.cloudbase.net/cloudbase-js-sdk/3.10.1/cloudbase.full.js"></script>
+<script>
+// 与 admin.html 同一环境与操作者配置；本页为新控制台骨架（WP0），不改动 admin.html。
+window.APP_CONFIG = { envId: 'crm-d1gkae8ddc930d151', operator: { name: 'Victor', gender: '男', birthday: '1976-10' } };
+</script>
+</head>
+<body>
+<div id="app"></div>
+<div id="toast-root"></div>
+<script type="module" src="/crm/js/modules/console/app.js"></script>
+</body>
+</html>
