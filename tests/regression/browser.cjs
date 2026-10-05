@@ -37,6 +37,7 @@ class Browser {
       else if (pathname === '/crm/js/modules/person-insights.js') { res.setHeader('Content-Type', 'text/javascript; charset=utf-8'); res.end(fs.readFileSync(path.join(this.root, 'crm/js/modules/person-insights.js'))); }
       else if (pathname === '/crm/js/modules/person-profile.js') { res.setHeader('Content-Type', 'text/javascript; charset=utf-8'); res.end(fs.readFileSync(path.join(this.root, 'crm/js/modules/person-profile.js'))); }
       else if (pathname === '/crm/js/modules/phase14-hubs.js') { res.setHeader('Content-Type', 'text/javascript; charset=utf-8'); res.end(fs.readFileSync(path.join(this.root, 'crm/js/modules/phase14-hubs.js'))); }
+      else if (pathname === '/crm/js/modules/account-settings.js') { res.setHeader('Content-Type', 'text/javascript; charset=utf-8'); res.end(fs.readFileSync(path.join(this.root, 'crm/js/modules/account-settings.js'))); }
       else if (pathname === '/crm/css/phase14-navigation.css') { res.setHeader('Content-Type', 'text/css; charset=utf-8'); res.end(fs.readFileSync(path.join(this.root, 'crm/css/phase14-navigation.css'))); }
       else if (pathname === '/crm/js/modules/opportunity-candidates.js') { res.setHeader('Content-Type', 'text/javascript; charset=utf-8'); res.end(fs.readFileSync(path.join(this.root, 'crm/js/modules/opportunity-candidates.js'))); }
       else if (pathname === '/crm/js/modules/opportunity-workflow.js') { res.setHeader('Content-Type', 'text/javascript; charset=utf-8'); res.end(fs.readFileSync(path.join(this.root, 'crm/js/modules/opportunity-workflow.js'))); }

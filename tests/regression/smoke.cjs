@@ -23,11 +23,26 @@ module.exports = async function smoke(root, test) {
       await b.wait(text('TEST_LOGIN_DENIED'));
       assert.equal(await b.evaluate('window.__crmTest.calls.length'), 0);
     });
+    await check('login.error-result', 'SDK 返回 error 时不得误判登录成功', async () => {
+      await b.evaluate("document.querySelector('[name=username]').value='return-error'; document.querySelector('[name=password]').value='wrong'");
+      await b.click('button', '登录');
+      await b.wait(text('TEST_LOGIN_DENIED_OBJECT'));
+      assert.equal(await b.evaluate("document.getElementById('view').innerText.includes('CRM 登录')"), true);
+      assert.equal(await b.evaluate('window.__crmTest.calls.length'), 0);
+    });
     await check('login.success', '模拟登录成功后进入原目标路由', async () => {
       await b.evaluate("document.querySelector('[name=username]').value='[CRM_TEST_ONLY]'; document.querySelector('[name=password]').value='local-fixture-only'");
       await b.click('button', '登录');
       await b.wait(text('[CRM_TEST_ONLY]客户甲'));
       await b.wait(called('customers', 'list'));
+    });
+    await check('login.timeout', '原有五分钟无操作机制仍要求重新登录', async () => {
+      await b.evaluate("localStorage.setItem('crm_last_activity',String(Date.now()-6*60*1000))");
+      await open('#/customers', 'CRM 登录');
+      assert.equal(await b.evaluate("getComputedStyle(document.getElementById('mod-switch')).display"), 'none');
+      await b.evaluate("document.querySelector('[name=username]').value='[CRM_TEST_ONLY]'; document.querySelector('[name=password]').value='local-fixture-only'");
+      await b.click('button', '登录');
+      await b.wait(text('[CRM_TEST_ONLY]客户甲'));
     });
     await check('phase14.navigation', '七项主导航和全局快速记录始终可见', async () => {
       await open('#/today', '今日');
@@ -63,6 +78,51 @@ module.exports = async function smoke(root, test) {
       await b.click('#view button', '打开传统跟进');
       await b.wait(text('[CRM_TEST_ONLY]跟进内容'));
       assert.equal(await b.evaluate('location.hash'), '#/customer/910001');
+    });
+    await check('account.entry-refresh', '更多入口可强制重新加载且保留本地业务缓存', async () => {
+      await open('#/more', '账号与应用维护', 'authCase=1');
+      await b.click('#view a', '账号与应用维护');
+      await b.wait("location.hash==='#/account' && [...document.querySelectorAll('#view button')].some(button=>button.textContent==='强制加载最新版')");
+      await b.evaluate("localStorage.setItem('todayCoachCache','fixture-cache'); window.confirm=()=>true");
+      await b.click('#view button', '强制加载最新版');
+      await b.wait("performance.getEntriesByType('navigation')[0]?.name.includes('_fresh=') && document.getElementById('view').innerText.includes('账号与应用维护')", 15000);
+      assert.equal(await b.evaluate("localStorage.getItem('todayCoachCache')"), 'fixture-cache');
+      assert.equal(await b.evaluate("document.getElementById('view').innerText.includes('CRM 登录')"), false);
+    });
+    await check('account.logout', '退出失败可重试；成功后旧导航仍停留在登录页', async () => {
+      await b.evaluate("sessionStorage.setItem('crm_fixture_fail_signout','1')");
+      await b.click('#view button', '退出登录');
+      await b.wait(text('TEST_SIGNOUT_DENIED'));
+      assert.equal(await b.evaluate("document.getElementById('view').innerText.includes('修改密码')"), true);
+      await b.evaluate("sessionStorage.removeItem('crm_fixture_fail_signout')");
+      await b.click('#view button', '退出登录');
+      await b.wait(text('CRM 登录'), 15000);
+      assert.equal(await b.evaluate("sessionStorage.getItem('crm_fixture_signed_out')"), '1');
+      assert.equal(await b.evaluate("getComputedStyle(document.getElementById('mod-switch')).display"), 'none');
+      assert.equal(await b.evaluate("getComputedStyle(document.getElementById('qc-entry-btn')).display"), 'none');
+      await b.evaluate("location.hash='#/customers'");
+      await b.wait("location.hash==='#/customers'");
+      assert.equal(await b.evaluate("document.getElementById('view').innerText.includes('CRM 登录')"), true);
+      assert.equal(await b.evaluate('window.__crmTest.calls.length'), 0);
+    });
+    await check('account.password', '旧密码错误不更新；成功后退出并用新密码登录', async () => {
+      await b.evaluate("document.querySelector('[name=username]').value='[CRM_TEST_ONLY]'; document.querySelector('[name=password]').value='local-fixture-only'");
+      await b.click('button', '登录');
+      await b.wait(text('[CRM_TEST_ONLY]客户甲'));
+      assert.notEqual(await b.evaluate("getComputedStyle(document.getElementById('mod-switch')).display"), 'none');
+      await open('#/account', '修改密码', 'authCase=1');
+      await b.evaluate("document.querySelector('[name=account-old-password]').value='wrong'; document.querySelector('[name=account-new-password]').value='NewTestPass123!'; document.querySelector('[name=account-confirm-password]').value='NewTestPass123!'");
+      await b.click('#view button', '修改密码');
+      await b.wait(text('TEST_OLD_PASSWORD_DENIED'));
+      assert.equal(await b.evaluate('window.__crmTest.passwordChanges'), 1);
+      await b.evaluate("document.querySelector('[name=account-old-password]').value='local-fixture-only'");
+      await b.click('#view button', '修改密码');
+      await b.wait(text('CRM 登录'), 15000);
+      assert.equal(await b.evaluate("sessionStorage.getItem('crm_fixture_pw_changed')"), '1');
+      await b.evaluate("document.querySelector('[name=username]').value='[CRM_TEST_ONLY]'; document.querySelector('[name=password]').value='NewTestPass123!'");
+      await b.click('button', '登录');
+      await b.wait(text('今日'));
+      assert.equal(await b.evaluate("document.getElementById('view').innerText.includes('CRM 登录')"), false);
     });
     await check('ai.search.entry', 'AI CRM 搜索独立页面展示固定示例，进入页面不执行搜索', async () => {
       await open('#/ai/search', 'AI CRM 搜索');

@@ -595,7 +595,20 @@ var PRR_BLOCKS = [
 
 // ==================== SDK 初始化 ====================
 var authInst = null;
+var loginReady = false;
+function setLoginReady(ready){
+  loginReady = ready;
+  ['mod-switch','qc-entry-btn'].forEach(function(id){
+    var control = document.getElementById(id);
+    if(control) control.style.display = ready ? '' : 'none';
+  });
+}
+function checkAuthResult(result){
+  if(result && result.error) throw result.error;
+  return result;
+}
 async function initSdk(){
+  setLoginReady(false);
   if(!CONFIG.envId){
     document.getElementById('view').innerHTML = '<div class="card"><p>请在 admin.html 中设置 <code>window.APP_CONFIG.envId</code> 为你的 CloudBase 环境 ID，然后部署到静态托管。</p><p>本页面通过 <code>app.callFunction</code> 调用云函数（同域），不直连 PG，不直连 AI。</p></div>';
     return false;
@@ -613,13 +626,14 @@ async function initSdk(){
     }
   } catch(e0){ console.warn(e0); }
   // 已有登录态（本地持久化）则直接进入
-  try { if(authInst.hasLoginState && authInst.hasLoginState()) return true; } catch(e){ console.warn(e); }
+  try { if(authInst.hasLoginState && authInst.hasLoginState()){ setLoginReady(true); return true; } } catch(e){ console.warn(e); }
   await showLogin();
   return true;
 }
 
 function showLogin(){
   return new Promise(function(resolve){
+    setLoginReady(false);
     var view = document.getElementById('view');
     view.innerHTML = '';
     var card = el('div', {class:'card'});
@@ -636,7 +650,8 @@ function showLogin(){
       if(!u.value.trim() || !p.value){ msg.textContent = '请输入用户名和密码'; return; }
       btn.disabled = true; btn.textContent = '登录中…'; msg.textContent = '';
       try {
-        await authInst.signInWithPassword({ username: u.value.trim(), password: p.value });
+        checkAuthResult(await authInst.signInWithPassword({ username: u.value.trim(), password: p.value }));
+        setLoginReady(true);
         lastActivity = Date.now(); persistActivity(true);
         resolve();
       } catch(e){
@@ -714,7 +729,7 @@ function showReLoginOverlay(onOk){
     if(!u.value.trim() || !p.value){ msg.textContent = '请输入用户名和密码'; return; }
     btn.disabled = true; btn.textContent = '登录中…'; msg.textContent = '';
     try {
-      await authInst.signInWithPassword({ username: u.value.trim(), password: p.value });
+      checkAuthResult(await authInst.signInWithPassword({ username: u.value.trim(), password: p.value }));
       overlay.remove();
       toast('已重新登录');
       onOk();
@@ -730,6 +745,28 @@ function showReLoginOverlay(onOk){
   overlay.appendChild(m);
   document.getElementById('modal-root').appendChild(overlay);
   setTimeout(function(){ u.focus(); }, 50);
+}
+
+async function signOutCurrentAccount(){
+  checkAuthResult(await authInst.signOut());
+  setLoginReady(false);
+  try { localStorage.removeItem('crm_last_activity'); } catch(e){ console.warn(e); }
+  var url = new URL(location.href);
+  url.hash = '#/today';
+  url.searchParams.set('_fresh', String(Date.now()));
+  location.replace(url.href);
+}
+async function changeCurrentPassword(oldPassword, newPassword){
+  await ensureSession();
+  if(!authInst.resetPasswordForOld) throw new Error('当前认证组件不支持自行修改密码');
+  checkAuthResult(await authInst.resetPasswordForOld({old_password:oldPassword, new_password:newPassword}));
+  try { await signOutCurrentAccount(); }
+  catch(e){ throw new Error('密码已修改，但自动退出失败：' + (e.message || e)); }
+}
+function reloadLatestVersion(){
+  var url = new URL(location.href);
+  url.searchParams.set('_fresh', String(Date.now()));
+  location.replace(url.href);
 }
 
 // ==================== API 封装 ====================
@@ -972,6 +1009,7 @@ function ensurePersonCustomer(name, sourceLabel){
 
 // ==================== 路由 ====================
 function route(){
+  if(!loginReady) return;
   var hash = location.hash || '#/';
   updateModuleSwitch(hash);
   if(hash === '#/ai') return import('/crm/js/modules/phase14-hubs.js').then(function(module){
@@ -990,6 +1028,11 @@ function route(){
     if(location.hash !== hash) return;
     return module.renderMore({root:$('view')});
   }).catch(function(e){ $('view').textContent = '更多功能加载失败：' + e.message; });
+  if(hash === '#/account') return import('/crm/js/modules/account-settings.js').then(function(module){
+    if(location.hash !== hash || !loginReady) return;
+    return module.renderAccountSettings({root:$('view'), changePassword:changeCurrentPassword,
+      signOut:signOutCurrentAccount, reloadLatest:reloadLatestVersion});
+  }).catch(function(e){ $('view').textContent = '账号与应用维护加载失败：' + e.message; });
   var moreFeature = hash.match(/^#\/more\/(followups|policy-review|products|gifts|photos|ocr)$/);
   if(moreFeature) return import('/crm/js/modules/phase14-hubs.js').then(function(module){
     if(location.hash !== hash) return;

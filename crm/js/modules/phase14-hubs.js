@@ -333,6 +333,7 @@ export function renderMore({ root }) {
   const wrap = page(root, '更多', '旧功能继续保留原页面与地址。选择客户后可进入旧客户详情中的功能。');
   const grid = node('div', 'phase14-grid');
   for (const [title, hash, description] of [
+    ['账号与应用维护', '#/account', '修改密码、退出登录、强制加载最新版'],
     ['测试场景', '#/test-scenario', '受控生成 / 打开虚构测试场景'],
     ['传统客户列表', '#/customers', '原客户列表与详情'],
     ['传统跟进', '#/more/followups', '选择客户后进入旧跟进记录'],

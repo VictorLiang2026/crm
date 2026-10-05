@@ -19,8 +19,9 @@ function installFixtures() {
   let actionCommandStage = null;
   let qcV2Stage = null;
   let activityReviewPreview = null;
-  let loggedIn = params.get('login') !== 'required';
-  window.__crmTest = { calls, violations, errors, loginAttempts: 0 };
+  let loggedIn = params.get('login') !== 'required' &&
+    !(params.get('authCase') && sessionStorage.getItem('crm_fixture_signed_out') === '1');
+  window.__crmTest = { calls, violations, errors, loginAttempts: 0, signOutAttempts: 0, passwordChanges: 0 };
   addEventListener('error', e => errors.push(e.message));
   addEventListener('unhandledrejection', e => errors.push(String(e.reason)));
   addEventListener('securitypolicyviolation', e => violations.push('CSP: ' + e.blockedURI));
@@ -342,11 +343,30 @@ function installFixtures() {
   window.cloudbase = { init() { return {
     auth() { return {
       hasLoginState: () => loggedIn,
-      async signOut() { loggedIn = false; },
+      async signOut() {
+        window.__crmTest.signOutAttempts++;
+        if (sessionStorage.getItem('crm_fixture_fail_signout') === '1')
+          return { error: new Error('TEST_SIGNOUT_DENIED') };
+        loggedIn = false;
+        if (params.get('authCase')) sessionStorage.setItem('crm_fixture_signed_out', '1');
+        return { error: null };
+      },
       async signInWithPassword(credentials) {
         window.__crmTest.loginAttempts++;
-        if (credentials.username !== marker || credentials.password !== 'local-fixture-only') throw new Error('TEST_LOGIN_DENIED');
+        if (credentials.username === 'return-error') return { error: new Error('TEST_LOGIN_DENIED_OBJECT') };
+        const expectedPassword = sessionStorage.getItem('crm_fixture_pw_changed') === '1'
+          ? 'NewTestPass123!' : 'local-fixture-only';
+        if (credentials.username !== marker || credentials.password !== expectedPassword) throw new Error('TEST_LOGIN_DENIED');
         loggedIn = true;
+        sessionStorage.removeItem('crm_fixture_signed_out');
+        return { error: null };
+      },
+      async resetPasswordForOld({ old_password, new_password }) {
+        window.__crmTest.passwordChanges++;
+        if (old_password !== 'local-fixture-only') return { error: new Error('TEST_OLD_PASSWORD_DENIED') };
+        if (new_password !== 'NewTestPass123!') return { error: new Error('TEST_NEW_PASSWORD_DENIED') };
+        sessionStorage.setItem('crm_fixture_pw_changed', '1');
+        return { data: { session: {} }, error: null };
       }
     }; },
     async callFunction({ name, data }) {
