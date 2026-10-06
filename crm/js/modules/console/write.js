@@ -489,7 +489,7 @@ export function openQuickCapture(ctx, { personId, onDone } = {}) {
     });
     if (canCreate) {
       const newNameInput = h('input', {
-        class: 'sheet-input', value: resolution.displayName || p.person_name || '',
+        class: 'sheet-input', value: (resolution && resolution.displayName) || p.person_name || '',
         maxlength: '160', placeholder: '新 Person 完整姓名',
       });
       const newCard = h('div', { class: 'cand', style: 'display:flex;flex-direction:column;align-items:stretch;gap:6px;cursor:default' }, [
