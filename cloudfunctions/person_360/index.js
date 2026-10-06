@@ -35,6 +35,7 @@ const OPPORTUNITY_READ_TABLES = new Set([
   'opportunity_candidates','outcomes','crm_opportunity_action_links',
   'crm_test_batches','crm_test_records',
 ]);
+const AI_AUDIT_READ_TABLES = new Set(['ai_tasks', 'ai_results']);
 const TABLES = new Set([
   'persons', 'households', 'household_members', 'interactions', 'commitments',
   'opportunities',
@@ -42,6 +43,7 @@ const TABLES = new Set([
   ...RELATIONSHIP_READ_TABLES,
   ...RECRUIT_READ_TABLES,
   ...OPPORTUNITY_READ_TABLES,
+  ...AI_AUDIT_READ_TABLES,
   ...LEGACY_INTERACTION_TABLES,
 ]);
 const ROLES = new Set(['spouse', 'child', 'parent', 'sibling', 'other']);
@@ -149,6 +151,60 @@ async function pgRpc(name, body) {
     if (!result || typeof result !== 'object' || Array.isArray(result)) throw new Error('Unexpected database response');
     return result;
   } finally { clearTimeout(timeout); }
+}
+
+async function listActivityData(event) {
+  const activityId = String(event?.activityId || '').trim();
+  if (!/^[1-9][0-9]*$/.test(activityId)) throw new Error('Invalid activity identity');
+  const id = activityId;
+
+  // 互动记录
+  const interactions = await pgRequest('interactions', 'GET', {
+    activity_id: `eq.${id}`,
+    order: 'interaction_at.desc',
+  });
+  const personIds = [...new Set(interactions.map(r => r.person_id).filter(Boolean))];
+  const personMap = {};
+  if (personIds.length) {
+    const persons = await pgRequest('persons', 'GET', {
+      id: `in.(${personIds.join(',')})`,
+      select: 'id,display_name',
+    });
+    (persons || []).forEach(p => { personMap[p.id] = p.display_name; });
+  }
+  const INTERACTION_LABELS = {
+    invitation: '邀约', conversation: '实质沟通',
+    speaker_cooperation: '嘉宾合作', post_event_followup: '活动后跟进',
+  };
+  const rows = (interactions || []).map(r => ({
+    id: r.id, personId: r.person_id, personName: personMap[r.person_id] || `Person #${r.person_id}`,
+    type: INTERACTION_LABELS[r.interaction_type] || r.interaction_type,
+    channel: r.channel, summary: r.summary, importance: r.importance,
+    interactionAt: r.interaction_at, sourceType: r.source_type, sourceId: r.source_id,
+  }));
+
+  // 机会候选：最近一次 activity_review 的 ai_results
+  let opportunityCandidates = [];
+  const tasks = await pgRequest('ai_tasks', 'GET', {
+    subject_type: 'eq.activity', subject_id: `eq.${id}`,
+    task_type: 'eq.activity_review', status: 'eq.completed',
+    order: 'created_at.desc', limit: 1,
+  });
+  if (tasks && tasks.length) {
+    const results = await pgRequest('ai_results', 'GET', {
+      task_id: `eq.${tasks[0].id}`, limit: 1,
+    });
+    if (results && results.length) {
+      const cands = results[0].result_json?.opportunityCandidates || [];
+      opportunityCandidates = cands.map(c => ({
+        personId: c.personId, personName: personMap[c.personId] || `Person #${c.personId}`,
+        opportunityType: c.opportunityType, reason: c.reason,
+        nextAction: c.nextAction, sourceRefs: c.sourceRefs,
+      }));
+    }
+  }
+
+  return { activityId: id, interactions: rows, opportunityCandidates };
 }
 
 function createService({ request = pgRequest, rpc = pgRpc, disclosure = disclose } = {}) {
@@ -681,6 +737,7 @@ exports.main = async event => {
         .timeline(event.personId, { page: event.page, pageSize: event.pageSize });
       case 'getContextGroups': return await new PersonInsightsService({ request: pgRequest })
         .context(event.personId);
+      case 'listActivityData': return await listActivityData(event);
       case 'getMeetingPrepContext': return await new MeetingPrepContextBuilder({ request: pgRequest })
         .build(event.personId);
       case 'listDueCommitments': return await new CommitmentService({ request: pgRequest }).listDue();

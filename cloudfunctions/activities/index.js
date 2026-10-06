@@ -442,59 +442,15 @@ async function applyTopics(event) {
   return { ok: true, topic_ids: validIds, added: added };
 }
 
-// 活动复盘数据：互动记录 + 机会候选
+// 活动复盘数据：互动记录 + 机会候选（委托 person_360 查询，因 interactions 表权限在 person_360）
 async function getActivityData(event) {
   const id = parseInt(event.id, 10);
   if (!id) return { error: 'id required' };
-  // 活动存在
-  const a = assertOk(await rdb.from('activities').select('id, name, status, activity_date')
-    .eq('id', id).is('deleted_at', null).maybeSingle());
-  if (!a.data) return { error: 'activity not found' };
-  const activity = a.data;
-
-  // 互动记录（带 person_name）
-  const iRes = assertOk(await rdb.from('interactions').select()
-    .eq('activity_id', id).order('interaction_at', { ascending: false }));
-  const interactionRows = iRes.data || [];
-  // 批量查 persons 名字
-  const personIds = [...new Set(interactionRows.map(r => r.person_id).filter(Boolean))];
-  const personMap = {};
-  if (personIds.length) {
-    const pRes = assertOk(await rdb.from('persons').select('id, display_name')
-      .in('id', personIds).is('deleted_at', null));
-    (pRes.data || []).forEach(p => { personMap[p.id] = p.display_name; });
-  }
-  const INTERACTION_LABELS = {
-    invitation: '邀约', conversation: '实质沟通',
-    speaker_cooperation: '嘉宾合作', post_event_followup: '活动后跟进',
-  };
-  const interactions = interactionRows.map(r => ({
-    id: r.id, personId: r.person_id, personName: personMap[r.person_id] || `Person #${r.person_id}`,
-    type: INTERACTION_LABELS[r.interaction_type] || r.interaction_type,
-    channel: r.channel, summary: r.summary, importance: r.importance,
-    interactionAt: r.interaction_at, sourceType: r.source_type, sourceId: r.source_id,
-  }));
-
-  // 机会候选：从最近一次 activity_review 的 ai_results 提取
-  let opportunityCandidates = [];
-  const tRes = assertOk(await rdb.from('ai_tasks').select('id')
-    .eq('subject_type', 'activity').eq('subject_id', String(id))
-    .eq('task_type', 'activity_review').eq('status', 'completed')
-    .order('created_at', { ascending: false }).limit(1));
-  const taskRows = tRes.data || [];
-  if (taskRows.length) {
-    const rRes = assertOk(await rdb.from('ai_results').select('result_json')
-      .eq('task_id', taskRows[0].id).limit(1));
-    const resultRows = rRes.data || [];
-    if (resultRows.length) {
-      const cands = resultRows[0].result_json?.opportunityCandidates || [];
-      opportunityCandidates = cands.map(c => ({
-        personId: c.personId, personName: personMap[c.personId] || `Person #${c.personId}`,
-        opportunityType: c.opportunityType, reason: c.reason,
-        nextAction: c.nextAction, sourceRefs: c.sourceRefs,
-      }));
-    }
-  }
-
-  return { activity, interactions, opportunityCandidates };
+  const cloudbase = require('@cloudbase/node-sdk');
+  const app = cloudbase.init({ env: process.env.TCB_ENV });
+  const res = await app.callFunction({
+    name: 'person_360',
+    data: { action: 'listActivityData', activityId: String(id) },
+  });
+  return res.result;
 }
