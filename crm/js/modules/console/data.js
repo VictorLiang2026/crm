@@ -25,6 +25,7 @@ export const data = {
   aiSearch: (ctx, query) => call(ctx, 'assistant', { action: 'search', query }),
   summarizePerson: (ctx, personId) => call(ctx, 'assistant', { action: 'summarize', personId }),
   meetingPrep: (ctx, personId) => call(ctx, 'assistant', { action: 'meetingPrep', personId }),
+  conversationPlaybook: (ctx, personId, objection) => call(ctx, 'assistant', { action: 'conversationPlaybook', personId, objection }),
   activities: (ctx) => call(ctx, 'activities', { action: 'list' }),
 
   // ---------- 人物目录 ----------

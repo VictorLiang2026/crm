@@ -19,6 +19,7 @@ const ICONS = {
   refresh: '<path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4v4h-4"/>',
   check: '<path d="m5 12.5 4.5 4.5L19 7.5"/>',
   clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3.5 2"/>',
+  chat: '<path d="M4 5h16v11H8l-4 4z"/>',
 };
 
 export function ic(name, cls) {

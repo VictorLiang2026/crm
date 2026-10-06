@@ -91,6 +91,16 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
         return { ok: false, error: { code, message: detail || 'Meeting prep could not be generated' } };
       }
     }
+    if (event?.action === 'conversationPlaybook') {
+      try { return await require('./conversation-playbook-service').runConversationPlaybook(event); }
+      catch (error) {
+        const code = ['INVALID_INPUT', 'NOT_FOUND', 'INVALID_CONFIG', 'INVALID_RESULT',
+          'RATE_LIMIT', 'TIMEOUT', 'UPSTREAM_UNAVAILABLE', 'PERSISTENCE_ERROR',
+          'AI_REQUEST_FAILED'].includes(error?.code) ? error.code : 'PLAYBOOK_FAILED';
+        const detail = error?.message ? String(error.message) : '';
+        return { ok: false, error: { code, message: detail || 'Conversation playbook could not be generated' } };
+      }
+    }
     // CloudBase may add transport metadata to the event. Only route the declared request fields.
     try { return routeIntent({ intent: event?.intent, subject: event?.subject, input: event?.input }); }
     catch (error) {

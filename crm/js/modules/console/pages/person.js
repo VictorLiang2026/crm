@@ -418,6 +418,70 @@ export function renderPerson(ctx, id) {
     }, h('div', { class: 'card-body muted' }, '生成中…'));
   }
 
+  // AI 对话策略（WP3.3b）
+  const playbookPanel = h('div', { class: 'card summary-card', style: 'display:none;margin-bottom:12px' });
+  function openPlaybook() {
+    playbookPanel.style.display = '';
+    playbookPanel.replaceChildren(h('div', { class: 'card-body' }, [
+      h('p', { class: 'summary-label' }, '输入客户异议或场景，生成应对策略：'),
+      h('textarea', {
+        id: 'playbook-objection', rows: 3, placeholder: '例如：客户说「保险都是骗人的」「我再考虑考虑」「保费太贵了」…',
+        style: 'width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;box-sizing:border-box;resize:vertical;',
+      }),
+      h('div', { style: 'margin-top:8px' }, [
+        h('button', {
+          class: 'btn btn-primary btn-sm', type: 'button',
+          onclick: () => runPlaybook(document.getElementById('playbook-objection').value.trim()),
+        }, '生成策略'),
+      ]),
+    ]));
+  }
+  function runPlaybook(objection) {
+    if (!objection) { ctx.toast('请输入客户异议'); return; }
+    playbookPanel.replaceChildren(h('div', { class: 'card-body muted' }, '生成中…'));
+    (async () => {
+      let res;
+      try { res = await data.conversationPlaybook(ctx, id, objection); }
+      catch (e) {
+        playbookPanel.replaceChildren(h('div', { class: 'card-body' }, h('div', { class: 'empty' }, `生成失败：${e.message || 'PLAYBOOK_FAILED'}`)));
+        return;
+      }
+      if (!res.ok) {
+        const code = res.error?.code || 'PLAYBOOK_FAILED';
+        const msg = res.error?.message || '';
+        playbookPanel.replaceChildren(h('div', { class: 'card-body' }, h('div', { class: 'empty' }, `${code}${msg ? ': ' + msg : ''}`)));
+        return;
+      }
+      const blocks = [];
+      blocks.push(h('div', { class: 'summary-section' }, [
+        h('b', { class: 'summary-label' }, '客户异议'),
+        h('p', { class: 'summary-text' }, res.objection),
+      ]));
+      if (Array.isArray(res.possibleUnderlyingReasons) && res.possibleUnderlyingReasons.length) blocks.push(h('div', { class: 'summary-section' }, [
+        h('b', { class: 'summary-label' }, '可能的深层原因'),
+        h('ul', { class: 'summary-list' }, res.possibleUnderlyingReasons.map((s) => h('li', {}, s))),
+      ]));
+      if (Array.isArray(res.clarifyingQuestions) && res.clarifyingQuestions.length) blocks.push(h('div', { class: 'summary-section' }, [
+        h('b', { class: 'summary-label' }, '可追问的问题'),
+        h('ul', { class: 'summary-list' }, res.clarifyingQuestions.map((s) => h('li', {}, s))),
+      ]));
+      if (res.responseLogic) blocks.push(h('div', { class: 'summary-section' }, [
+        h('b', { class: 'summary-label' }, '回应思路'),
+        h('p', { class: 'summary-text' }, res.responseLogic),
+      ]));
+      if (res.nextObjective) blocks.push(h('div', { class: 'summary-section' }, [
+        h('b', { class: 'summary-label' }, '下一步目标'),
+        h('p', { class: 'summary-text' }, res.nextObjective),
+      ]));
+      if (Array.isArray(res.doNotSay) && res.doNotSay.length) blocks.push(h('div', { class: 'summary-section' }, [
+        h('b', { class: 'summary-label' }, '避免说的话'),
+        h('ul', { class: 'summary-list evidence' }, res.doNotSay.map((s) => h('li', {}, s))),
+      ]));
+      blocks.push(h('p', { class: 'foot-note' }, `对话策略基于 public 记录生成，仅供参考；task #${res.taskId}`));
+      playbookPanel.replaceChildren(h('div', { class: 'card-body' }, blocks));
+    })();
+  }
+
   ctx.main.replaceChildren(
     pageHead({
       kicker: 'PERSON 360', title: titleNode, tag: wpTag('WP3 AI'),
@@ -430,6 +494,9 @@ export function renderPerson(ctx, id) {
           class: 'btn btn-soft', type: 'button', onclick: openPrep,
         }, [ic('calendar'), '会前准备']),
         h('button', {
+          class: 'btn btn-soft', type: 'button', onclick: openPlaybook,
+        }, [ic('chat'), '对话策略']),
+        h('button', {
           class: 'btn btn-soft', type: 'button',
           onclick: () => openQuickCapture(wctx, { personId: String(id), onDone: wctx.onWriteDone }),
         }, [ic('mic'), '记录沟通']),
@@ -441,6 +508,7 @@ export function renderPerson(ctx, id) {
     }),
     summaryPanel,
     prepPanel,
+    playbookPanel,
     h('div', { class: 'tabs' }, btns),
     h('section', { class: 'card tabs-body' }, bodies),
   );
