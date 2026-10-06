@@ -46,6 +46,15 @@ const todayStr = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
+// 服务端要求 interaction.at 为带时区偏移的完整 ISO（YYYY-MM-DDTHH:mm:ss+08:00）。
+function dateToIso(dateStr) {
+  const d = dateStr ? new Date(`${dateStr}T09:00:00`) : new Date();
+  const p = (n) => String(n).padStart(2, '0');
+  const offMin = -d.getTimezoneOffset();
+  const sign = offMin >= 0 ? '+' : '-';
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
+    + `${sign}${p(Math.floor(Math.abs(offMin) / 60))}:${p(Math.abs(offMin) % 60)}`;
+}
 
 // ---------- Bottom Sheet 骨架 ----------
 export function openSheet({ title, sub, body }) {
@@ -458,23 +467,42 @@ export function openQuickCapture(ctx, { personId, onDone } = {}) {
     const resolution = fixed ? null
       : (p.person_name ? await p360(ctx, 'resolveQuickCaptureName', { name: p.person_name }) : null);
     const candidates = fixed ? [fixed] : ((resolution && resolution.candidates) || []);
-    const hint = fixed ? `已锁定为当前 Person（服务端将再次核对身份）`
-      : !p.person_name ? 'AI 未识别出人名，请从候选中选择或先到完整档案建档'
-      : resolution && resolution.status === 'available' ? '未找到同名 Person；请先在完整档案（Legacy admin）建立该人物后再记录'
-      : candidates.length ? '请点选明确的 Person（服务端已核对同名候选）' : '未找到候选；请先在完整档案建档后再记录';
+    // 服务端允许在无同名（available）或带限定无匹配（confirm_new_qualified）时人工确认新建 Person；
+    // AI 未识别人名时也允许手动填写姓名，保存前先做同名解析。
+    const canCreate = !fixed && (!resolution ||
+      (!resolution.hasMore && ['available', 'confirm_new_qualified'].includes(resolution.status)));
+    const hint = fixed ? '已锁定为当前 Person（服务端将再次核对身份）'
+      : !p.person_name ? 'AI 未识别出人名：可点「新建 Person」建档，或从 Person 页锁定对象后进入'
+      : canCreate ? '未找到同名 Person：可人工确认后新建（建档时服务端再次核对同名）'
+      : candidates.length ? '请点选明确的 Person（服务端已核对同名候选）' : '同名结果较多或需补充限定，请先在完整档案核对身份后再记录';
     const candBox = h('div', {});
     let picked = fixed || null;
-    if (candidates.length) {
-      candBox.appendChild(h('div', {}, candidates.map((c, i) => h('div', {
+    const markActive = (node) => {
+      candBox.querySelectorAll('.cand').forEach((n) => n.classList.remove('active'));
+      node.classList.add('active');
+    };
+    candidates.forEach((c) => {
+      candBox.appendChild(h('div', {
         class: 'cand' + (picked && String(picked.id) === String(c.id) ? ' active' : ''),
-        onclick: (e) => {
-          picked = c;
-          candBox.querySelectorAll('.cand').forEach((n) => n.classList.remove('active'));
-          e.currentTarget.classList.add('active');
-        },
-      }, `${c.displayName || c.display_name}（${c.occupation || '职业未填'} · ${c.organization || '机构未填'}）#${c.id}`
-        + (i === 0 && !fixed ? '' : '')))));
-    } else {
+        onclick: (e) => { picked = c; markActive(e.currentTarget); },
+      }, `${c.displayName || c.display_name}（${c.occupation || '职业未填'} · ${c.organization || '机构未填'}）#${c.id}`));
+    });
+    if (canCreate) {
+      const newNameInput = h('input', {
+        class: 'sheet-input', value: resolution.displayName || p.person_name || '',
+        maxlength: '160', placeholder: '新 Person 完整姓名',
+      });
+      const newCard = h('div', { class: 'cand', style: 'display:flex;flex-direction:column;align-items:stretch;gap:6px;cursor:default' }, [
+        h('div', { style: 'font-weight:700' }, '＋ 新建 Person（人工确认建档）'),
+        newNameInput,
+        h('div', { class: 'sheet-note' }, '测试账号只能使用【系统测试·勿联系】开头的姓名；确认后先建档、再写入本次互动。'),
+      ]);
+      const selectNew = () => { picked = { isNew: true }; markActive(newCard); };
+      newNameInput.addEventListener('focus', selectNew);
+      newNameInput.addEventListener('input', selectNew);
+      candBox.appendChild(newCard);
+    }
+    if (!candidates.length && !canCreate) {
       candBox.appendChild(h('div', { class: 'sheet-err' }, hint));
     }
     const typeSel = sel([['见面', '见面'], ['吃饭', '吃饭'], ['电话', '电话'], ['微信', '微信'],
@@ -509,25 +537,74 @@ export function openQuickCapture(ctx, { personId, onDone } = {}) {
           class: 'btn btn-primary', type: 'button',
           onclick: async (e) => {
             const b = e.currentTarget;
-            if (!picked) { sheet.showErr('请先点选明确的 Person 身份'); return; }
+            if (!picked) { sheet.showErr('请先点选明确的 Person 身份（已有候选或新建）'); return; }
             const facts = factsWrap.readValues().filter((x) => x.trim()).slice(0, 20);
             const signals = sigsWrap.readValues().filter((x) => x.trim()).slice(0, 12);
             if (facts.some((x) => x.length > 500) || signals.some((x) => x.length > 500)) {
               sheet.showErr('每条事实 / 信号不能超过 500 字'); return;
             }
+            const summary = (summaryTa.value || facts.join('；') || text).slice(0, 2000);
+            if (!summary.trim()) { sheet.showErr('请填写互动摘要或至少一条事实'); return; }
+            const commit = (personId, displayName) => p360(ctx, 'commitQuickCaptureV2', { data: {
+              confirmed: true,
+              personId: String(personId),
+              selectedDisplayName: displayName,
+              interaction: {
+                type: typeSel.value, at: dateToIso(dateInput.value || todayStr()), channel: '',
+                summary, rawNote: text,
+              },
+              facts, signals,
+            } });
             busy(b, true, '保存中…');
             try {
-              await p360(ctx, 'commitQuickCaptureV2', { data: {
-                confirmed: true,
-                personId: String(picked.id),
-                selectedDisplayName: picked.displayName || picked.display_name,
-                interaction: {
-                  type: typeSel.value, at: dateInput.value || todayStr(), channel: '',
-                  summary: (summaryTa.value || facts.join('；')).slice(0, 2000),
-                  rawNote: text,
-                },
-                facts, signals,
-              } });
+              if (picked.isNew) {
+                // 新建分支：姓名可能被改过（或 AI 未识别人名）→ 先重新解析同名；再走 Person 建档预览。
+                let res = resolution;
+                const newNameInputEl = candBox.querySelector('.cand input');
+                const newName = (newNameInputEl ? newNameInputEl.value : '').trim();
+                if (!newName) { busy(b, false, '确认并保存'); sheet.showErr('请填写新 Person 姓名'); return; }
+                if (!res || newName !== res.displayName) {
+                  res = await p360(ctx, 'resolveQuickCaptureName', { name: newName });
+                  if (res.hasMore || !['available', 'confirm_new_qualified'].includes(res.status)) {
+                    busy(b, false, '确认并保存');
+                    sheet.showErr('该姓名存在同名候选，请改用已有候选或补充括号限定后重试'); return;
+                  }
+                }
+                const pv = await p360(ctx, 'previewIdentity', { data: {
+                  kind: 'person', idempotencyKey: uuid(),
+                  displayName: res.displayName, nameKey: res.nameKey,
+                } });
+                busy(b, false, '确认并保存');
+                sheet.swap(h('div', {}, [
+                  previewBlock([
+                    kvRow('① 新建 Person', res.displayName),
+                    kvRow('② 交流记录', `${typeSel.value} · ${dateInput.value || todayStr()}`),
+                    kvRow('事实 / 信号', `${facts.length} 条 / ${signals.length} 条`),
+                    h('div', { class: 'sheet-note', style: 'margin-top:8px' },
+                      '一次确认产生两项写入：服务端先建档 Person，再落本次互动与事实/信号。'),
+                  ]),
+                  h('div', { class: 'sheet-actions' }, [
+                    h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => sheet.overlay.remove() }, '取消'),
+                    h('button', {
+                      class: 'btn btn-primary', type: 'button',
+                      onclick: async (ev) => {
+                        const bb = ev.currentTarget;
+                        busy(bb, true, '建档并保存中…');
+                        try {
+                          const created = await p360(ctx, 'executeIdentity', { data: { previewId: pv.previewId } });
+                          if (!created || !created.personId) throw new Error('建档未返回 Person');
+                          await commit(created.personId, res.displayName);
+                          sheet.overlay.remove();
+                          ctx.toast(`已新建 Person 并保存互动 #${created.personId}`, 'ok');
+                          if (onDone) onDone();
+                        } catch (err) { busy(bb, false, '确认建档并保存'); sheet.showErr(err.message); }
+                      },
+                    }, '确认建档并保存'),
+                  ]),
+                ]));
+                return;
+              }
+              await commit(picked.id, picked.displayName || picked.display_name);
               sheet.overlay.remove();
               ctx.toast('已记录并保存互动', 'ok');
               if (onDone) onDone();
