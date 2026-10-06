@@ -449,7 +449,8 @@ export function renderPerson(ctx, id) {
       if (!res.ok) {
         const code = res.error?.code || 'PLAYBOOK_FAILED';
         const msg = res.error?.message || '';
-        playbookPanel.replaceChildren(h('div', { class: 'card-body' }, h('div', { class: 'empty' }, `${code}${msg ? ': ' + msg : ''}`)));
+        const details = res.error?.details ? `\n${res.error.details}` : '';
+        playbookPanel.replaceChildren(h('div', { class: 'card-body' }, h('div', { class: 'empty' }, `${code}${msg ? ': ' + msg : ''}${details}`)));
         return;
       }
       const blocks = [];

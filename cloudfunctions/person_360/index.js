@@ -26,7 +26,7 @@ const LEGACY_INTERACTION_TABLES = new Set([
 const INSURANCE_READ_TABLES = new Set([
   'products', 'policy_review_reports', 'ocr_records', 'photos', 'actions',
 ]);
-const RELATIONSHIP_READ_TABLES = new Set(['context_items', 'person_roles']);
+const RELATIONSHIP_READ_TABLES = new Set(['context_items', 'person_roles', 'relationships']);
 const RECRUIT_READ_TABLES = new Set([
   'v_recruit_candidates_person_only', 'v_recruit_candidates_person_only_trash',
   'recruit_milestones',

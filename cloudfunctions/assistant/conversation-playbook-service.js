@@ -28,21 +28,19 @@ async function runConversationPlaybook(event) {
     data: { action: 'getMeetingPrepContext', personId },
   });
   const prep = p360 && p360.result;
-  if (!prep || typeof prep !== 'object') {
-    const e = new Error('Person context unavailable');
+  if (!prep || typeof prep !== 'object' || prep.error || !prep.person) {
+    const e = new Error(prep?.error ? `Person context error: ${prep.error}` : 'Person context unavailable');
     e.code = 'UPSTREAM_UNAVAILABLE';
     throw e;
   }
 
-  // Build conversation_playbook context from meeting prep context + extras.
+  // Build reliable_evidence from recent interactions and facts (person_360 returns arrays).
   const evidence = [];
-  const recent = prep.recent_interactions?.content || [];
-  recent.slice(0, 6).forEach((it) => {
-    evidence.push(`互动: ${it.summary || it.interaction_type || ''}`.slice(0, 200));
+  (Array.isArray(prep.recent_interactions) ? prep.recent_interactions : []).slice(0, 6).forEach((it) => {
+    evidence.push(`互动: ${it.summary || it.type || ''}`.slice(0, 200));
   });
-  const facts = prep.facts?.content || [];
-  facts.slice(0, 6).forEach((f) => {
-    evidence.push(`事实: ${f.content || f.fact || ''}`.slice(0, 200));
+  (Array.isArray(prep.facts) ? prep.facts : []).slice(0, 6).forEach((f) => {
+    evidence.push(`事实: ${f.content || ''}`.slice(0, 200));
   });
 
   const context = {
@@ -58,7 +56,7 @@ async function runConversationPlaybook(event) {
 
   const database = createSearchData({ env: process.env.TCB_ENV,
     key: process.env.CRM_ASSISTANT_DB_API_KEY });
-  const aiGateway = createAIGateway({ app, rdb: database.auditRdb, timeoutMs: 30000, maxAttempts: 1 });
+  const aiGateway = createAIGateway({ app, rdb: database.auditRdb, timeoutMs: 60000, maxAttempts: 1 });
   const task = await aiGateway.runAITask({
     taskType: 'conversation_playbook',
     skill: 'conversation_playbook',
