@@ -1,9 +1,8 @@
-// 人物目录（WP1）：服务端姓名搜索 + 分页（person_directory_page_v1），行内角色徽标。
-// 按本轮决策：chips 多维筛选暂缓（RPC 仅支持姓名 keyword）。
+// 人物目录：表格形式，表头与 admin.html 客户列表一致，可点击排序。
 import { h } from '../dom.js';
 import { ic } from '../icons.js';
 import { data } from '../data.js';
-import { wpTag, pageHead, emptyNote, loadInto, bdg, avatar, textOf } from '../ui.js';
+import { wpTag, pageHead, emptyNote, loadInto, bdg, textOf } from '../ui.js';
 
 const PAGE_SIZE = 20;
 const ROLE_BADGE = {
@@ -12,19 +11,40 @@ const ROLE_BADGE = {
   speaker: ['嘉宾', 'jade'],
 };
 
+const SORT_COLUMNS = [
+  { field: 'display_name', label: '姓名' },
+  { field: 'sales_priority', label: '优先级' },
+  { field: 'customer_stage', label: '客户经营阶段' },
+  { field: 'latest_followup_date', label: '本次跟进日期' },
+  { field: 'next_followup_date', label: '下次跟进日期' },
+  { field: 'id', label: '编号' },
+];
+
+function fmtDate(v) {
+  if (!v) return '-';
+  const s = String(v);
+  return s.length >= 10 ? s.slice(0, 10) : s;
+}
+
 export function renderPeople(ctx) {
-  const state = { page: 1, keyword: '' };
+  const state = { page: 1, keyword: '', sortField: 'id', sortDir: 'desc' };
   const listEl = h('div', {});
   const metaEl = h('span', { class: 'foot-note' }, '');
-  const input = h('input', { placeholder: '按姓名搜索（服务端分页，每页 20 人）' });
+  const input = h('input', { placeholder: '搜索姓名' });
   const prevBtn = h('button', { class: 'btn btn-ghost btn-sm', type: 'button' }, '上一页');
   const nextBtn = h('button', { class: 'btn btn-ghost btn-sm', type: 'button' }, '下一页');
   const pageInfo = h('span', { class: 'pager-info' }, '');
 
+  function arrow(field) {
+    if (state.sortField !== field) return '';
+    return state.sortDir === 'asc' ? ' ▲' : ' ▼';
+  }
+
   function runQuery() {
     loadInto(listEl, async () => {
       const res = await data.listPeople(ctx, {
-        page: state.page, pageSize: PAGE_SIZE, keyword: state.keyword, sortField: 'id', sortDir: 'desc',
+        page: state.page, pageSize: PAGE_SIZE, keyword: state.keyword,
+        sortField: state.sortField, sortDir: state.sortDir,
       });
       const rows = res.rows || [];
       metaEl.textContent = state.keyword ? `「${state.keyword}」共 ${res.total} 人` : `共 ${res.total} 人`;
@@ -34,22 +54,35 @@ export function renderPeople(ctx) {
       if (!rows.length) {
         return h('div', { class: 'card-body' }, [emptyNote('没有匹配的人物', state.keyword ? '换个姓名关键词试试。' : '尚无人物记录。')]);
       }
-      return h('div', { class: 'card-body' }, rows.map((p) => {
+      const thead = h('thead', {}, h('tr', {}, SORT_COLUMNS.map((col) => {
+        const th = h('th', { class: 'sortable-th', onclick: () => {
+          if (state.sortField === col.field) {
+            state.sortDir = state.sortDir === 'asc' ? 'desc' : 'asc';
+          } else {
+            state.sortField = col.field;
+            state.sortDir = 'asc';
+          }
+          state.page = 1;
+          runQuery();
+        } }, `${col.label}${arrow(col.field)}`);
+        return th;
+      })));
+      const tbody = h('tbody', {}, rows.map((p) => {
         const badges = (p.roles || []).map((role) => {
           const [label, tone] = ROLE_BADGE[role] || [role, 'gray'];
           return bdg(label, tone);
         });
         if (p.recruit_id) badges.push(bdg('在增员', 'gold'));
-        const subParts = [p.occupation, p.organization].map(textOf).filter(Boolean);
-        return h('a', { class: 'list-row data-row', href: `#/person/${p.id}` }, [
-          avatar(p.display_name, !!p.recruit_id),
-          h('div', { style: 'flex:1;min-width:0' }, [
-            h('div', { class: 'row-title' }, [p.display_name, h('span', { class: 'badge-stack' }, badges)]),
-            h('div', { class: 'row-sub' }, subParts.join(' · ') || (p.customer_id ? `Legacy 客户 #${p.customer_id}` : 'Person 身份')),
-          ]),
-          ic('chevron', 'mut'),
+        return h('tr', { onclick: () => { location.hash = `#/person/${p.id}`; } }, [
+          h('td', {}, h('a', {}, [p.display_name, h('span', { class: 'badge-stack' }, badges)])),
+          h('td', {}, p.sales_priority || '-'),
+          h('td', {}, p.customer_stage ? h('span', { class: 'badge stage' }, p.customer_stage) : '-'),
+          h('td', {}, fmtDate(p.latest_followup_date)),
+          h('td', {}, fmtDate(p.next_followup_date)),
+          h('td', {}, String(p.id)),
         ]);
       }));
+      return h('div', { class: 'table-scroll' }, h('table', { class: 'people-table' }, [thead, tbody]));
     });
   }
 
@@ -65,11 +98,7 @@ export function renderPeople(ctx) {
   ctx.main.replaceChildren(
     pageHead({
       kicker: 'PEOPLE', title: '人物目录', tag: wpTag('WP1 只读'),
-      sub: '客户、增员、嘉宾统一为 Person 身份；按精确 ID 关联，不按姓名自动合并。',
-      actions: [
-        h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => ctx.toast('身份候选审核在 WP2 接入（AI 仅提名，人工确认）') }, [ic('users'), '身份候选']),
-        h('button', { class: 'btn btn-primary', type: 'button', onclick: () => ctx.toast('新建人物在 WP2 接入') }, [ic('plus'), '新建人物']),
-      ],
+      sub: '客户、增员、嘉宾统一为 Person 身份；表头可点击排序。',
     }),
     h('div', { class: 'toolbar' }, [
       h('div', { class: 'searchbox' }, [
@@ -80,10 +109,7 @@ export function renderPeople(ctx) {
     h('section', { class: 'card' }, [
       listEl,
       h('div', { class: 'card-foot' }, [
-        h('span', { style: 'display:flex;align-items:center;gap:10px' }, [
-          metaEl,
-          h('span', { class: 'foot-note' }, '多维筛选（A 级 / 本周有互动）待服务端过滤能力后启用'),
-        ]),
+        metaEl,
         h('div', { class: 'pager', style: 'margin-left:auto' }, [prevBtn, pageInfo, nextBtn]),
       ]),
     ]),

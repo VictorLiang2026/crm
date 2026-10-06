@@ -199,7 +199,8 @@ function createService({ request = pgRequest, rpc = pgRpc, disclosure = disclose
     }
     const sortField = String(event.sortField || 'id');
     const sortDir = String(event.sortDir || 'desc');
-    if (!['id', 'display_name', 'updated_at'].includes(sortField) || !['asc', 'desc'].includes(sortDir)) {
+    if (!['id', 'display_name', 'updated_at', 'sales_priority', 'customer_stage',
+      'latest_followup_date', 'next_followup_date'].includes(sortField) || !['asc', 'desc'].includes(sortDir)) {
       throw new Error('Invalid directory sort');
     }
     return rpc('person_directory_page_v1', {
