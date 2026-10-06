@@ -1,13 +1,33 @@
-/** Person summary: read public facts, call person_summary skill via AI Gateway. */
+/** Person summary: read public facts via RDB REST, call person_summary skill via AI Gateway. */
 'use strict';
 
-const cloudbase = require('@cloudbase/node-sdk');
-const { app, rdb } = require('./db');
+const { app } = require('./db');
 const { createAIGateway } = require('./ai-gateway');
 const { createSearchData } = require('./search-data');
 
 function positiveId(value) {
   return /^[1-9][0-9]*$/.test(String(value || ''));
+}
+
+async function restGet(table, filters) {
+  const env = process.env.TCB_ENV;
+  const key = process.env.CRM_ASSISTANT_DB_API_KEY;
+  if (!/^crm-[a-z0-9]+$/.test(env || '') || !key) throw new Error('Database is not configured');
+  const url = new URL(`https://${env}.api.tcloudbasegateway.com/v1/rdb/rest/${table}`);
+  for (const [name, value] of Object.entries(filters || {})) url.searchParams.set(name, String(value));
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 10000);
+  try {
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${key}`, 'Accept-Profile': 'public',
+        'Content-Profile': 'public', Accept: 'application/json' },
+      signal: controller.signal,
+    });
+    if (!response.ok) throw new Error(`DB request failed (${response.status})`);
+    const payload = await response.text();
+    return payload ? JSON.parse(payload) : [];
+  } finally { clearTimeout(timer); }
 }
 
 async function runSummarize(event) {
@@ -17,29 +37,29 @@ async function runSummarize(event) {
     e.code = 'INVALID_INPUT';
     throw e;
   }
-  const id = Number(personId);
 
-  const personRes = await rdb.from('persons').select(
-    'id,display_name,occupation,organization,legacy_customer_id'
-  ).eq('id', id).is('deleted_at', null).limit(1);
-  if (personRes && personRes.error) throw personRes.error;
-  const person = personRes && personRes.data && personRes.data[0];
+  const persons = await restGet('persons', {
+    select: 'id,display_name,occupation,organization,legacy_customer_id',
+    id: `eq.${personId}`, deleted_at: 'is.null', limit: 1,
+  });
+  const person = Array.isArray(persons) && persons[0];
   if (!person) {
     const e = new Error('Person not found');
     e.code = 'NOT_FOUND';
     throw e;
   }
 
-  const interactionsRes = await rdb.from('interactions').select(
-    'id,interaction_type,interaction_at,channel,summary,importance'
-  ).eq('person_id', id).order('interaction_at', { ascending: false }).limit(20);
-  if (interactionsRes && interactionsRes.error) throw interactionsRes.error;
+  const interactions = await restGet('interactions', {
+    select: 'id,interaction_type,interaction_at,channel,summary,importance',
+    person_id: `eq.${personId}`, order: 'interaction_at.desc,id.desc', limit: 20,
+  });
 
-  const oppsRes = await rdb.from('opportunities').select(
-    'id,opportunity_type,status,next_action,discovered_at,updated_at'
-  ).eq('person_id', id).is('deleted_at', null).order('updated_at', { ascending: false }).limit(10);
-  if (oppsRes && oppsRes.error) throw oppsRes.error;
-  const openOpps = (oppsRes.data || []).filter((o) => o.status !== '成交' && o.status !== '关闭');
+  const opps = await restGet('opportunities', {
+    select: 'id,opportunity_type,status,next_action,discovered_at,updated_at',
+    person_id: `eq.${personId}`, deleted_at: 'is.null',
+    order: 'updated_at.desc,id.desc', limit: 10,
+  });
+  const openOpps = (Array.isArray(opps) ? opps : []).filter((o) => o.status !== '成交' && o.status !== '关闭');
 
   const context = {
     person: {
@@ -48,20 +68,13 @@ async function runSummarize(event) {
       occupation: person.occupation || null,
       organization: person.organization || null,
     },
-    recent_interactions: (interactionsRes.data || []).map((i) => ({
-      id: i.id,
-      type: i.interaction_type,
-      at: i.interaction_at,
-      channel: i.channel,
-      summary: i.summary,
-      importance: i.importance,
+    recent_interactions: (Array.isArray(interactions) ? interactions : []).map((i) => ({
+      id: i.id, type: i.interaction_type, at: i.interaction_at,
+      channel: i.channel, summary: i.summary, importance: i.importance,
     })),
     open_opportunities: openOpps.map((o) => ({
-      id: o.id,
-      type: o.opportunity_type,
-      status: o.status,
-      next_action: o.next_action,
-      discovered_at: o.discovered_at,
+      id: o.id, type: o.opportunity_type, status: o.status,
+      next_action: o.next_action, discovered_at: o.discovered_at,
     })),
   };
 
