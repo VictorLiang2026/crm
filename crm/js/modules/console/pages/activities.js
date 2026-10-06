@@ -148,11 +148,58 @@ function attendanceNode(ctx, id) {
 }
 
 const PLACEHOLDER = {
-  2: ['互动与名单', '活动后逐人互动记录与跟进建议在 WP2 接入。'],
-  3: ['机会候选', '活动互动产生的机会候选，经人工三键确认后建机会（WP2）。'],
   4: ['伴手礼', '当前没有活动级礼品数据源；如需要请在后续工作包提出并单独设计。'],
   5: ['照片', '照片目前仅按客户归档（无 activity_id 字段）；活动照片需先做数据设计。'],
 };
+
+function interactionNode(ctx, id) {
+  return data.activityData(ctx, id).then((res) => {
+    if (res.error) return h('div', { class: 'tab-stack' }, [emptyNote('加载失败', res.error)]);
+    const rows = res.interactions || [];
+    if (!rows.length) return h('div', { class: 'tab-stack' }, [emptyNote('暂无互动记录', '互动由 WP12 写入闭环产生，仅在活动后逐人确认时记录。')]);
+    return h('div', { class: 'tab-stack' }, [
+      sectionTitle(`互动记录（${rows.length}）`),
+      h('div', {}, rows.map((r) => h('div', { class: 'list-row' }, [
+        h('div', { style: 'flex:1;min-width:0' }, [
+          h('div', { class: 'row-title' }, [
+            bdg(r.type, 'ink'),
+            r.personName ? h('a', { href: `#/person/${r.personId}`, style: 'margin-left:8px;color:var(--ink);font-weight:600' }, r.personName)
+              : h('span', { style: 'margin-left:8px' }, r.personName),
+          ]),
+          r.summary ? h('div', { class: 'row-sub' }, r.summary) : null,
+          h('div', { class: 'row-sub' }, [
+            r.channel ? `渠道: ${r.channel}` : null,
+            r.interactionAt ? ` · ${fmtDate(r.interactionAt)}` : null,
+            r.importance ? ` · 重要性 ${r.importance}` : null,
+          ].filter(Boolean)),
+        ]),
+      ]))),
+    ]);
+  });
+}
+
+function candidateNode(ctx, id) {
+  return data.activityData(ctx, id).then((res) => {
+    if (res.error) return h('div', { class: 'tab-stack' }, [emptyNote('加载失败', res.error)]);
+    const rows = res.opportunityCandidates || [];
+    if (!rows.length) return h('div', { class: 'tab-stack' }, [emptyNote('暂无机会候选', '机会候选由 AI 复盘生成，需有实质沟通等互动证据支撑。')]);
+    return h('div', { class: 'tab-stack' }, [
+      sectionTitle(`机会候选（${rows.length}）`),
+      h('p', { class: 'muted' }, '以下候选由 AI 复盘生成，需经人工审核确认后才建正式机会。'),
+      h('div', {}, rows.map((o) => h('div', { class: 'list-row' }, [
+        h('div', { style: 'flex:1;min-width:0' }, [
+          h('div', { class: 'row-title' }, [
+            o.personName ? h('a', { href: `#/person/${o.personId}` }, o.personName) : `Person #${o.personId}`,
+            bdg(o.opportunityType, 'gold'),
+          ]),
+          o.reason ? h('div', { class: 'row-sub' }, o.reason) : null,
+          o.nextAction ? h('div', { class: 'row-sub' }, `下一步: ${o.nextAction}`) : null,
+          o.sourceRefs?.length ? h('div', { class: 'foot-note' }, `来源: ${o.sourceRefs.join(', ')}`) : null,
+        ]),
+      ]))),
+    ]);
+  });
+}
 
 function claimList(items) {
   if (!Array.isArray(items) || !items.length) return h('p', { class: 'muted' }, '无');
@@ -243,6 +290,8 @@ export function renderActivity(ctx, id) {
     if (i === 0) loadInto(bodies[i], async () => h('div', { class: 'card-body' }, [await flowNode(ctx, id)]));
     else if (i === 1) loadInto(bodies[i], async () => h('div', { class: 'card-body' }, [await attendanceNode(ctx, id)]));
     else if (i === 6) loadInto(bodies[i], async () => h('div', { class: 'card-body' }, [await reviewNode(ctx, id)]));
+    else if (i === 2) loadInto(bodies[i], async () => h('div', { class: 'card-body' }, [await interactionNode(ctx, id)]));
+    else if (i === 3) loadInto(bodies[i], async () => h('div', { class: 'card-body' }, [await candidateNode(ctx, id)]));
     else bodies[i].replaceChildren(h('div', { class: 'card-body' }, placeholder(i)));
   }
 

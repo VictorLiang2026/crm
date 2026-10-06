@@ -52,6 +52,8 @@ export const data = {
     call(ctx, 'activity_tasks', { action: 'list', activity_id: Number(activityId) }),
   activityPostReviewV2: (ctx, activityId) =>
     call(ctx, 'ai_activity', { action: 'postReviewV2', activity_id: Number(activityId) }),
+  activityData: (ctx, activityId) =>
+    call(ctx, 'activities', { action: 'getActivityData', id: Number(activityId) }),
 
   // ---------- 招募 ----------
   recruitList: (ctx, params) => call(ctx, 'recruit_candidates', { action: 'list', ...(params || {}) }),
