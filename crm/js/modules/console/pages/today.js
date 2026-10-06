@@ -48,7 +48,7 @@ function briefCard(sections) {
       mb.guidance ? h('div', { class: 'brief-guidance' }, [
         ic('sparkle'), h('span', {}, mb.guidance),
       ]) : null,
-      actions.length ? actions.map((a, i) =>
+      ...(actions.length ? actions.map((a, i) =>
         h('a', { class: 'brief-row data-row', href: a.target || '#/today' }, [
           h('span', { class: 'brief-num' }, String(i + 1)),
           h('div', { style: 'flex:1;min-width:0' }, [
@@ -59,7 +59,7 @@ function briefCard(sections) {
               a.source ? h('span', { class: 'src-tag', title: a.source }, a.source.split('#')[0]) : null,
             ].filter(Boolean)),
           ]),
-        ])) : h('div', { class: 'brief-empty' }, '当前没有优先行动'),
+        ])) : [h('div', { class: 'brief-empty' }, '当前没有优先行动')]),
     ]),
     counts && Object.values(counts).some(Boolean) ? h('div', { class: 'brief-foot' }, [
       counts.overdueCommitments ? bdg(`逾期承诺 ${counts.overdueCommitments}`, 'red') : null,
