@@ -26,6 +26,7 @@ export const data = {
   summarizePerson: (ctx, personId) => call(ctx, 'assistant', { action: 'summarize', personId }),
   meetingPrep: (ctx, personId) => call(ctx, 'assistant', { action: 'meetingPrep', personId }),
   conversationPlaybook: (ctx, personId, objection) => call(ctx, 'assistant', { action: 'conversationPlaybook', personId, objection }),
+  conversationPlaybookHistory: (ctx, personId) => call(ctx, 'assistant', { action: 'conversationPlaybookHistory', personId }),
   activities: (ctx) => call(ctx, 'activities', { action: 'list' }),
 
   // ---------- 人物目录 ----------

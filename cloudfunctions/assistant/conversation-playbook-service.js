@@ -61,6 +61,8 @@ async function runConversationPlaybook(event) {
     taskType: 'conversation_playbook',
     skill: 'conversation_playbook',
     capability: 'coaching',
+    subjectType: 'person',
+    subjectId: personId,
     input: { person_id: personId, objection },
     context,
     contextSnapshot: {

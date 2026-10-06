@@ -420,7 +420,42 @@ export function renderPerson(ctx, id) {
 
   // AI 对话策略（WP3.3b）
   const playbookPanel = h('div', { class: 'card summary-card', style: 'display:none;margin-bottom:12px' });
-  function openPlaybook() {
+  function renderPlaybookResult(res) {
+    const blocks = [];
+    blocks.push(h('div', { class: 'summary-section' }, [
+      h('b', { class: 'summary-label' }, '客户异议'),
+      h('p', { class: 'summary-text' }, res.objection),
+    ]));
+    if (Array.isArray(res.possibleUnderlyingReasons) && res.possibleUnderlyingReasons.length) blocks.push(h('div', { class: 'summary-section' }, [
+      h('b', { class: 'summary-label' }, '可能的深层原因'),
+      h('ul', { class: 'summary-list' }, res.possibleUnderlyingReasons.map((s) => h('li', {}, s))),
+    ]));
+    if (Array.isArray(res.clarifyingQuestions) && res.clarifyingQuestions.length) blocks.push(h('div', { class: 'summary-section' }, [
+      h('b', { class: 'summary-label' }, '可追问的问题'),
+      h('ul', { class: 'summary-list' }, res.clarifyingQuestions.map((s) => h('li', {}, s))),
+    ]));
+    if (res.responseLogic) blocks.push(h('div', { class: 'summary-section' }, [
+      h('b', { class: 'summary-label' }, '回应思路'),
+      h('p', { class: 'summary-text' }, res.responseLogic),
+    ]));
+    if (res.nextObjective) blocks.push(h('div', { class: 'summary-section' }, [
+      h('b', { class: 'summary-label' }, '下一步目标'),
+      h('p', { class: 'summary-text' }, res.nextObjective),
+    ]));
+    if (Array.isArray(res.doNotSay) && res.doNotSay.length) blocks.push(h('div', { class: 'summary-section' }, [
+      h('b', { class: 'summary-label' }, '避免说的话'),
+      h('ul', { class: 'summary-list evidence' }, res.doNotSay.map((s) => h('li', {}, s))),
+    ]));
+    if (res.createdAt) blocks.push(h('p', { class: 'foot-note' }, `生成于 ${res.createdAt}`));
+    else if (res.taskId) blocks.push(h('p', { class: 'foot-note' }, `对话策略基于 public 记录生成，仅供参考；task #${res.taskId}`));
+    blocks.push(h('div', { style: 'margin-top:10px' }, [
+      h('button', {
+        class: 'btn btn-soft btn-sm', type: 'button', onclick: showPlaybookInput,
+      }, '重新生成'),
+    ]));
+    playbookPanel.replaceChildren(h('div', { class: 'card-body' }, blocks));
+  }
+  function showPlaybookInput() {
     playbookPanel.style.display = '';
     playbookPanel.replaceChildren(h('div', { class: 'card-body' }, [
       h('p', { class: 'summary-label' }, '输入客户异议或场景，生成应对策略：'),
@@ -436,6 +471,13 @@ export function renderPerson(ctx, id) {
       ]),
     ]));
   }
+  function openPlaybook() {
+    if (playbookPanel.style.display === 'none' || !playbookPanel.children.length) {
+      showPlaybookInput();
+    } else {
+      playbookPanel.style.display = 'none';
+    }
+  }
   function runPlaybook(objection) {
     if (!objection) { ctx.toast('请输入客户异议'); return; }
     playbookPanel.replaceChildren(h('div', { class: 'card-body muted' }, '生成中…'));
@@ -449,39 +491,22 @@ export function renderPerson(ctx, id) {
       if (!res.ok) {
         const code = res.error?.code || 'PLAYBOOK_FAILED';
         const msg = res.error?.message || '';
-        const details = res.error?.details ? `\n${res.error.details}` : '';
-        playbookPanel.replaceChildren(h('div', { class: 'card-body' }, h('div', { class: 'empty' }, `${code}${msg ? ': ' + msg : ''}${details}`)));
+        playbookPanel.replaceChildren(h('div', { class: 'card-body' }, h('div', { class: 'empty' }, `${code}${msg ? ': ' + msg : ''}`)));
         return;
       }
-      const blocks = [];
-      blocks.push(h('div', { class: 'summary-section' }, [
-        h('b', { class: 'summary-label' }, '客户异议'),
-        h('p', { class: 'summary-text' }, res.objection),
-      ]));
-      if (Array.isArray(res.possibleUnderlyingReasons) && res.possibleUnderlyingReasons.length) blocks.push(h('div', { class: 'summary-section' }, [
-        h('b', { class: 'summary-label' }, '可能的深层原因'),
-        h('ul', { class: 'summary-list' }, res.possibleUnderlyingReasons.map((s) => h('li', {}, s))),
-      ]));
-      if (Array.isArray(res.clarifyingQuestions) && res.clarifyingQuestions.length) blocks.push(h('div', { class: 'summary-section' }, [
-        h('b', { class: 'summary-label' }, '可追问的问题'),
-        h('ul', { class: 'summary-list' }, res.clarifyingQuestions.map((s) => h('li', {}, s))),
-      ]));
-      if (res.responseLogic) blocks.push(h('div', { class: 'summary-section' }, [
-        h('b', { class: 'summary-label' }, '回应思路'),
-        h('p', { class: 'summary-text' }, res.responseLogic),
-      ]));
-      if (res.nextObjective) blocks.push(h('div', { class: 'summary-section' }, [
-        h('b', { class: 'summary-label' }, '下一步目标'),
-        h('p', { class: 'summary-text' }, res.nextObjective),
-      ]));
-      if (Array.isArray(res.doNotSay) && res.doNotSay.length) blocks.push(h('div', { class: 'summary-section' }, [
-        h('b', { class: 'summary-label' }, '避免说的话'),
-        h('ul', { class: 'summary-list evidence' }, res.doNotSay.map((s) => h('li', {}, s))),
-      ]));
-      blocks.push(h('p', { class: 'foot-note' }, `对话策略基于 public 记录生成，仅供参考；task #${res.taskId}`));
-      playbookPanel.replaceChildren(h('div', { class: 'card-body' }, blocks));
+      renderPlaybookResult(res);
     })();
   }
+  // 页面加载时自动拉取最近一次对话策略结果
+  (async () => {
+    try {
+      const hist = await data.conversationPlaybookHistory(ctx, id);
+      if (hist.ok && hist.hasResult) {
+        playbookPanel.style.display = '';
+        renderPlaybookResult(hist);
+      }
+    } catch (_) { /* ignore history load failure */ }
+  })();
 
   ctx.main.replaceChildren(
     pageHead({

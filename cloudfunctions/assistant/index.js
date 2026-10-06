@@ -98,8 +98,15 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
           'RATE_LIMIT', 'TIMEOUT', 'UPSTREAM_UNAVAILABLE', 'PERSISTENCE_ERROR',
           'AI_REQUEST_FAILED'].includes(error?.code) ? error.code : 'PLAYBOOK_FAILED';
         const detail = error?.message ? String(error.message) : '';
-        const details = error?.details ? JSON.stringify(error.details) : '';
-        return { ok: false, error: { code, message: detail || 'Conversation playbook could not be generated', details } };
+        return { ok: false, error: { code, message: detail || 'Conversation playbook could not be generated' } };
+      }
+    }
+    if (event?.action === 'conversationPlaybookHistory') {
+      try { return await require('./conversation-playbook-history-service').getConversationPlaybookHistory(event); }
+      catch (error) {
+        const code = ['INVALID_INPUT', 'PERSISTENCE_ERROR'].includes(error?.code) ? error.code : 'PLAYBOOK_HISTORY_FAILED';
+        const detail = error?.message ? String(error.message) : '';
+        return { ok: false, error: { code, message: detail || 'Could not load conversation playbook history' } };
       }
     }
     // CloudBase may add transport metadata to the event. Only route the declared request fields.
