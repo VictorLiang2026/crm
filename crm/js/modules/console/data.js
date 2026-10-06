@@ -4,7 +4,9 @@ async function call(ctx, name, params) {
   const res = await ctx.api.call(name, params || {});
   if (res == null || typeof res !== 'object') throw new Error('服务无响应');
   if (res.error) {
-    const msg = typeof res.error === 'string' ? res.error : '请求失败';
+    const e = res.error;
+    const msg = typeof e === 'string' ? e :
+      [e.code, e.message].filter(Boolean).join(': ') || '请求失败';
     throw new Error(msg);
   }
   return res;

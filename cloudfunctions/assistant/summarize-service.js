@@ -1,8 +1,10 @@
 /** Person summary: read public facts, call person_summary skill via AI Gateway. */
 'use strict';
 
+const cloudbase = require('@cloudbase/node-sdk');
 const { app, rdb } = require('./db');
 const { createAIGateway } = require('./ai-gateway');
+const { createSearchData } = require('./search-data');
 
 function positiveId(value) {
   return /^[1-9][0-9]*$/.test(String(value || ''));
@@ -63,13 +65,13 @@ async function runSummarize(event) {
     })),
   };
 
-  const aiGateway = createAIGateway({ app, rdb, timeoutMs: 30000, maxAttempts: 1 });
+  const database = createSearchData({ env: process.env.TCB_ENV,
+    key: process.env.CRM_ASSISTANT_DB_API_KEY });
+  const aiGateway = createAIGateway({ app, rdb: database.auditRdb, timeoutMs: 30000, maxAttempts: 1 });
   const task = await aiGateway.runAITask({
     taskType: 'person_summary',
     skill: 'person_summary',
     capability: 'summarization',
-    subjectType: 'person',
-    subjectId: id,
     input: { personId },
     context,
     contextSnapshot: {

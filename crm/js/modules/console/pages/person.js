@@ -337,8 +337,14 @@ export function renderPerson(ctx, id) {
   function openSummary() {
     summaryPanel.style.display = '';
     loadInto(summaryPanel, async () => {
-      const res = await data.summarizePerson(ctx, id);
-      if (!res.ok) throw new Error(res.error?.code || 'SUMMARY_FAILED');
+      let res;
+      try { res = await data.summarizePerson(ctx, id); }
+      catch (e) { throw new Error(e.message || 'SUMMARY_FAILED'); }
+      if (!res.ok) {
+        const code = res.error?.code || 'SUMMARY_FAILED';
+        const msg = res.error?.message || '';
+        throw new Error(`${code}${msg ? ': ' + msg : ''}`);
+      }
       const blocks = [];
       if (res.summary) blocks.push(h('div', { class: 'summary-section' }, [
         h('b', { class: 'summary-label' }, '摘要'),
