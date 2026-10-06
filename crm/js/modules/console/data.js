@@ -21,6 +21,7 @@ export const data = {
   cockpit: (ctx) => call(ctx, 'today_coach', { action: 'cockpit' }),
   morningBrief: (ctx) => call(ctx, 'today_coach', { action: 'daily_review', view: 'morning' }),
   aiSearch: (ctx, query) => call(ctx, 'assistant', { action: 'search', query }),
+  summarizePerson: (ctx, personId) => call(ctx, 'assistant', { action: 'summarize', personId }),
   activities: (ctx) => call(ctx, 'activities', { action: 'list' }),
 
   // ---------- 人物目录 ----------

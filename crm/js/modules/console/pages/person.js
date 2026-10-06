@@ -332,11 +332,47 @@ export function renderPerson(ctx, id) {
     onWriteDone: () => { loaded.delete(cur); select(cur); },
   });
 
+  // AI 人物摘要（WP3.2b）
+  const summaryPanel = h('div', { class: 'card summary-card', style: 'display:none;margin-bottom:12px' });
+  function openSummary() {
+    summaryPanel.style.display = '';
+    loadInto(summaryPanel, async () => {
+      const res = await data.summarizePerson(ctx, id);
+      if (!res.ok) throw new Error(res.error?.code || 'SUMMARY_FAILED');
+      const blocks = [];
+      if (res.summary) blocks.push(h('div', { class: 'summary-section' }, [
+        h('b', { class: 'summary-label' }, '摘要'),
+        h('p', { class: 'summary-text' }, res.summary),
+      ]));
+      if (Array.isArray(res.signals) && res.signals.length) blocks.push(h('div', { class: 'summary-section' }, [
+        h('b', { class: 'summary-label' }, '关键信号'),
+        h('ul', { class: 'summary-list' }, res.signals.map((s) => h('li', {}, s))),
+      ]));
+      if (Array.isArray(res.gaps) && res.gaps.length) blocks.push(h('div', { class: 'summary-section' }, [
+        h('b', { class: 'summary-label' }, '信息缺口'),
+        h('ul', { class: 'summary-list' }, res.gaps.map((s) => h('li', {}, s))),
+      ]));
+      if (Array.isArray(res.nextActions) && res.nextActions.length) blocks.push(h('div', { class: 'summary-section' }, [
+        h('b', { class: 'summary-label' }, '建议下一步'),
+        h('ul', { class: 'summary-list' }, res.nextActions.map((s) => h('li', {}, s))),
+      ]));
+      if (Array.isArray(res.evidence) && res.evidence.length) blocks.push(h('div', { class: 'summary-section' }, [
+        h('b', { class: 'summary-label' }, '证据来源'),
+        h('ul', { class: 'summary-list evidence' }, res.evidence.map((s) => h('li', {}, s))),
+      ]));
+      blocks.push(h('p', { class: 'foot-note' }, `AI 摘要基于 public 记录生成，仅供参考；task #${res.taskId}`));
+      return h('div', { class: 'card-body' }, blocks);
+    }, h('div', { class: 'card-body muted' }, '生成中…'));
+  }
+
   ctx.main.replaceChildren(
     pageHead({
-      kicker: 'PERSON 360', title: titleNode, tag: wpTag('WP2 写入'),
+      kicker: 'PERSON 360', title: titleNode, tag: wpTag('WP3 AI'),
       sub: '人物详情：汇总互动、事实、家庭、保险、机会与招募数据；机会与行动支持经服务端预览的写入操作。',
       actions: [
+        h('button', {
+          class: 'btn btn-soft', type: 'button', onclick: openSummary,
+        }, [ic('sparkle'), 'AI 摘要']),
         h('button', {
           class: 'btn btn-soft', type: 'button',
           onclick: () => openQuickCapture(wctx, { personId: String(id), onDone: wctx.onWriteDone }),
@@ -347,6 +383,7 @@ export function renderPerson(ctx, id) {
         }, [ic('file'), '完整客户档案']),
       ],
     }),
+    summaryPanel,
     h('div', { class: 'tabs' }, btns),
     h('section', { class: 'card tabs-body' }, bodies),
   );

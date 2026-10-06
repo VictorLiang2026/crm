@@ -71,6 +71,15 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
         return { ok: false, error: { code, message: 'CRM search could not be completed' } };
       }
     }
+    if (event?.action === 'summarize') {
+      try { return await require('./summarize-service').runSummarize(event); }
+      catch (error) {
+        const code = ['INVALID_INPUT', 'NOT_FOUND', 'INVALID_CONFIG', 'INVALID_RESULT',
+          'RATE_LIMIT', 'TIMEOUT', 'UPSTREAM_UNAVAILABLE', 'PERSISTENCE_ERROR',
+          'AI_REQUEST_FAILED'].includes(error?.code) ? error.code : 'SUMMARY_FAILED';
+        return { ok: false, error: { code, message: 'Person summary could not be generated' } };
+      }
+    }
     // CloudBase may add transport metadata to the event. Only route the declared request fields.
     try { return routeIntent({ intent: event?.intent, subject: event?.subject, input: event?.input }); }
     catch (error) {
