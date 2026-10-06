@@ -5,6 +5,7 @@ import { h, toast } from './dom.js';
 import { renderLogin, renderReloginOverlay } from './login.js';
 import { mountShell } from './shell.js';
 import { navHashFor, dispatch } from './router.js';
+import { openQuickCapture } from './write.js';
 
 const CONFIG = window.APP_CONFIG || {};
 const SESSION_TIMEOUT = 5 * 60 * 1000; // 与 admin.html 一致
@@ -122,7 +123,11 @@ function enterApp(appRoot) {
   shell = mountShell({
     appRoot,
     operator: CONFIG.operator || {},
-    onQuickCapture: () => toast('快速记录（Quick Capture）在 WP2 接入'),
+    // WP2 写入闭环：快速记录走生产链路（AI 只读解析 → 服务端身份解析 → 人工确认 → 提交）
+    onQuickCapture: () => openQuickCapture(
+      { api, callFn, toast, operator: CONFIG.operator || {} },
+      { onDone: () => route() },
+    ),
   });
   if (!hashBound) {
     hashBound = true;

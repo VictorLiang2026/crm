@@ -1,9 +1,11 @@
-// Person 360（WP1）：八页签全部只读，数据来自 person_360 云函数既有 action。
+// Person 360（WP2）：八页签；总览/时间线/事实/家庭/保险/活动只读，
+// 「机会与行动」页签接入写入闭环（完成行动/承诺、推进/关闭机会）。
 // 「活动」页签按 G5 证据口径：activities.listByPerson 仅支持 legacy 数字 ID，
 // 故 canonical 人物的活动参与记录取 getTimelinePage 已合并的 activity_participants 数据。
 import { h } from '../dom.js';
 import { ic } from '../icons.js';
 import { data } from '../data.js';
+import { openWorkItemDone, openOpportunityAdvance, openQuickCapture } from '../write.js';
 import {
   wpTag, pageHead, emptyNote, loadInto, bdg, kvGrid, sectionTitle,
   fmtDate, weekdayCN, dueLabel, toneByDue, textOf,
@@ -233,6 +235,7 @@ function opportunitiesNode(ctx, id) {
       const activeWorks = (works.rows || []).filter((r) =>
         (r.kind === 'action' && (r.status === 'open' || r.status === 'in_progress')) ||
         (r.kind === 'commitment' && r.status === 'open'));
+      const onDone = ctx.onWriteDone || null;
       return h('div', { class: 'tab-stack' }, [
         sectionTitle(`机会（${rows.length}）`),
         rowsBlock(rows, (r) => h('div', { class: 'list-row' }, [
@@ -241,6 +244,10 @@ function opportunitiesNode(ctx, id) {
             h('div', { class: 'row-sub' }, `下一步：${textOf(r.next_action) || '无'}${r.next_action_date ? ' · ' + dueLabel(r.next_action_date) : ''} · 发现 ${fmtDate(r.discovered_at)}`),
           ]),
           bdg(r.status || '发现', r.status === '成交' ? 'jade' : r.status === '关闭' ? 'gray' : 'gold'),
+          r.status !== '成交' && r.status !== '关闭' ? h('button', {
+            class: 'btn btn-ghost btn-sm', type: 'button',
+            onclick: () => openOpportunityAdvance(ctx, { opportunity: r, onDone }),
+          }, '推进 / 关闭') : null,
         ]), '暂无机会记录'),
         sectionTitle('行动与承诺'),
         rowsBlock(activeWorks, (r) => h('div', { class: 'list-row' }, [
@@ -249,6 +256,10 @@ function opportunitiesNode(ctx, id) {
             h('div', { class: 'row-sub' }, `${r.status} · ${dueLabel(String(r.due_at || '').slice(0, 10))}`),
           ]),
           bdg(r.kind === 'action' ? '行动' : '承诺', r.kind === 'action' ? 'ink' : 'gold'),
+          h('button', {
+            class: 'btn btn-ghost btn-sm', type: 'button',
+            onclick: () => openWorkItemDone(ctx, { row: r, onDone }),
+          }, [ic('check'), '完成']),
         ]), '暂无开放行动'),
       ]);
     });
@@ -299,28 +310,41 @@ export function renderPerson(ctx, id) {
   const titleNode = h('span', {}, `Person #${id}`);
   const bodies = TABS.map(() => h('div', {}));
   const loaded = new Set();
+  let cur = 0;
   const btns = TABS.map((name, i) => h('button', {
     class: 'tab' + (i === 0 ? ' active' : ''), type: 'button',
     onclick: () => select(i),
   }, name));
 
   function select(i) {
+    cur = i;
     btns.forEach((b, j) => b.classList.toggle('active', i === j));
     bodies.forEach((b, j) => { b.style.display = i === j ? '' : 'none'; });
     if (!loaded.has(i)) {
       loaded.add(i);
       const setName = i === 0 ? (n) => { titleNode.textContent = n; } : () => {};
-      loadInto(bodies[i], async () => h('div', { class: 'card-body' }, [await BUILDERS[i](ctx, id, setName)]));
+      loadInto(bodies[i], async () => h('div', { class: 'card-body' }, [await BUILDERS[i](wctx, id, setName)]));
     }
   }
 
+  // 写入闭环：写入成功后重载当前页签；写操作经 wctx 拿到 onWriteDone。
+  const wctx = Object.assign({}, ctx, {
+    onWriteDone: () => { loaded.delete(cur); select(cur); },
+  });
+
   ctx.main.replaceChildren(
     pageHead({
-      kicker: 'PERSON 360', title: titleNode, tag: wpTag('WP1 只读'),
-      sub: '人物详情：汇总互动、事实、家庭、保险、机会与招募数据；写入操作在 WP2。',
+      kicker: 'PERSON 360', title: titleNode, tag: wpTag('WP2 写入'),
+      sub: '人物详情：汇总互动、事实、家庭、保险、机会与招募数据；机会与行动支持经服务端预览的写入操作。',
       actions: [
-        h('button', { class: 'btn btn-soft', type: 'button', onclick: () => ctx.toast('记录沟通（Quick Capture）在 WP2 接入') }, [ic('mic'), '记录沟通']),
-        h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => ctx.toast('Legacy 完整档案入口将在 WP2 写入闭环时一并对齐') }, [ic('file'), '完整客户档案']),
+        h('button', {
+          class: 'btn btn-soft', type: 'button',
+          onclick: () => openQuickCapture(wctx, { personId: String(id), onDone: wctx.onWriteDone }),
+        }, [ic('mic'), '记录沟通']),
+        h('a', {
+          class: 'btn btn-ghost', href: `/crm/admin.html#/person/${id}`,
+          target: '_blank', rel: 'noopener',
+        }, [ic('file'), '完整客户档案']),
       ],
     }),
     h('div', { class: 'tabs' }, btns),

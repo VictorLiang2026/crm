@@ -1,8 +1,10 @@
-// 今日页（WP1）：统计、Today 5（纯事实规则排序）、今日节奏、双向承诺、机会速览。
-// 晨间简报（WP3 AI）、关系风险（G1 无批量接口）、候选确认操作（WP2）保留骨架。
+// 今日页（WP2）：统计、Today 5（纯事实规则排序）、今日节奏、双向承诺、机会速览。
+// WP2 写入闭环：行动/承诺「完成」、候选「审核」经 write.js 服务端 preview→人工确认→execute。
+// 晨间简报（WP3 AI）、关系风险（G1 无批量接口）保留骨架。
 import { h } from '../dom.js';
 import { ic } from '../icons.js';
 import { data } from '../data.js';
+import { openWorkItemDone, openCandidate } from '../write.js';
 import {
   wpTag, sk, pageHead, card, emptyNote, loadInto, bdg, avatar,
   dueLabel, dayDiffFromToday, textOf,
@@ -49,7 +51,7 @@ function rankActions(rows) {
     .slice(0, 5);
 }
 
-function actionRow(item) {
+function actionRow(ctx, item, onDone) {
   const name = item.person_name || '未命名';
   const labelMap = { M: ['必做', 'red'], R: ['应做', 'ink'], O: ['可做', 'gray'] };
   const [text, tone] = labelMap[item.level];
@@ -60,6 +62,10 @@ function actionRow(item) {
       h('div', { class: 'row-sub' }, `${name} · ${dueLabel(item._due)}`),
     ]),
     bdg(text, tone),
+    h('button', {
+      class: 'btn btn-ghost btn-sm', type: 'button',
+      onclick: () => openWorkItemDone(ctx, { row: item, onDone }),
+    }, [ic('check'), '完成']),
   ]);
 }
 
@@ -88,6 +94,9 @@ export function renderToday(ctx) {
   const rhythmEl = h('div', {});
   const commitEl = h('div', {});
   const oppEl = h('div', {});
+
+  // 写入成功后的刷新：整页重渲染（只读数据幂等，代价可接受）。
+  function reload() { renderToday(ctx); }
 
   loadInto(statsEl, async () => {
     const [work, due, pending, acts] =
@@ -122,9 +131,9 @@ export function renderToday(ctx) {
     const picks = rankActions(work.v.rows);
     return card({
       title: '优先行动 · Today 5', icon: 'chevron', tag: wpTag('事实版'),
-      body: picks.length ? picks.map(actionRow) : [emptyNote('今天没有待办行动', '开放行动都已完成，或还没有记录行动。')],
+      body: picks.length ? picks.map((r) => actionRow(ctx, r, reload)) : [emptyNote('今天没有待办行动', '开放行动都已完成，或还没有记录行动。')],
       foot: [
-        h('span', { class: 'foot-note' }, '按 必做 M（红）/ 应做 R（墨）/ 可做 O（灰）规则排序；AI 五选三在 WP3 接入'),
+        h('span', { class: 'foot-note' }, '按 必做 M（红）/ 应做 R（墨）/ 可做 O（灰）规则排序；完成后需在弹层确认'),
       ],
     });
   });
@@ -134,7 +143,7 @@ export function renderToday(ctx) {
     if (!pending.ok) throw pending.e;
     const rows = pending.v.rows || [];
     return card({
-      title: '需要你确认', icon: 'shield', tag: wpTag('WP2 操作'),
+      title: '需要你确认', icon: 'shield', tag: wpTag('写入'),
       body: rows.length
         ? rows.slice(0, 5).map((row) => h('div', { class: 'list-row' }, [
           avatar(row.personName, true),
@@ -143,9 +152,13 @@ export function renderToday(ctx) {
             h('div', { class: 'row-sub' }, describeCandidate(row)),
           ]),
           bdg('候选', 'gold'),
+          h('button', {
+            class: 'btn btn-soft btn-sm', type: 'button',
+            onclick: () => openCandidate(ctx, { row, onDone: reload }),
+          }, '审核'),
         ]))
-        : [emptyNote('暂无待确认候选', '机会候选由服务端在互动中生成，三键确认在 WP2 接入。')],
-      foot: [h('span', { class: 'foot-note' }, '拒绝 / 编辑 / 接受并建机会，三键等宽，全部由你确认')],
+        : [emptyNote('暂无待确认候选', '机会候选由服务端在互动中生成，审核后才建真实机会。')],
+      foot: [h('span', { class: 'foot-note' }, '拒绝 / 编辑 / 接受并建机会，全部先经服务端预览，由你确认')],
     });
   });
 
@@ -190,6 +203,14 @@ export function renderToday(ctx) {
             h('div', { class: 'row-sub' }, `${r.person_name || '未命名'} · ${dueLabel(String(r.due_at || '').slice(0, 10))}`),
           ]),
           bdg(label, tone),
+          h('button', {
+            class: 'btn btn-ghost btn-sm', type: 'button',
+            onclick: () => openWorkItemDone(ctx, {
+              row: { kind: 'commitment', id: r.id, person_id: r.person_id,
+                content: r.content, due_at: r.due_at },
+              onDone: reload,
+            }),
+          }, [ic('check'), '完成']),
         ]);
       }) : [emptyNote('近期没有到期承诺', '')],
     });
