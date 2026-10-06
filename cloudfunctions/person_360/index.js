@@ -16,6 +16,7 @@ const { SpeakerProfileService } = require('./speaker-profile-service');
 const { RelationshipDecayService } = require('./relationship-decay-service');
 const { getCustomerProfile } = require('./customer-profile-service');
 const { PersonInsightsService } = require('./person-insights-service');
+const { MeetingPrepContextBuilder } = require('./meeting-prep-context');
 
 const app = cloudbase.init({ env: process.env.TCB_ENV });
 const LEGACY_INTERACTION_TABLES = new Set([
@@ -679,6 +680,8 @@ exports.main = async event => {
         .timeline(event.personId, { page: event.page, pageSize: event.pageSize });
       case 'getContextGroups': return await new PersonInsightsService({ request: pgRequest })
         .context(event.personId);
+      case 'getMeetingPrepContext': return await new MeetingPrepContextBuilder({ request: pgRequest })
+        .build(event.personId);
       case 'listDueCommitments': return await new CommitmentService({ request: pgRequest }).listDue();
       case 'listPersonWorkItems': return await new WorkItemService({request:pgRequest,rpc:pgRpc})
         .listForPerson(event.personId);

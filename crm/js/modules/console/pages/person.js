@@ -371,6 +371,53 @@ export function renderPerson(ctx, id) {
     }, h('div', { class: 'card-body muted' }, '生成中…'));
   }
 
+  // AI 会前准备（WP3.3a）
+  const prepPanel = h('div', { class: 'card summary-card', style: 'display:none;margin-bottom:12px' });
+  function openPrep() {
+    prepPanel.style.display = '';
+    loadInto(prepPanel, async () => {
+      let res;
+      try { res = await data.meetingPrep(ctx, id); }
+      catch (e) { throw new Error(e.message || 'MEETING_PREP_FAILED'); }
+      if (!res.ok) {
+        const code = res.error?.code || 'MEETING_PREP_FAILED';
+        const msg = res.error?.message || '';
+        throw new Error(`${code}${msg ? ': ' + msg : ''}`);
+      }
+      const blocks = [];
+      if (res.brief30Seconds) blocks.push(h('div', { class: 'summary-section' }, [
+        h('b', { class: 'summary-label' }, '30 秒简报'),
+        h('p', { class: 'summary-text' }, res.brief30Seconds),
+      ]));
+      if (Array.isArray(res.recentChanges) && res.recentChanges.length) blocks.push(h('div', { class: 'summary-section' }, [
+        h('b', { class: 'summary-label' }, '近期变化'),
+        h('ul', { class: 'summary-list' }, res.recentChanges.map((s) => h('li', {}, s))),
+      ]));
+      if (res.suggestedObjective) blocks.push(h('div', { class: 'summary-section' }, [
+        h('b', { class: 'summary-label' }, '建议目标'),
+        h('p', { class: 'summary-text' }, res.suggestedObjective),
+      ]));
+      if (Array.isArray(res.openingAngles) && res.openingAngles.length) blocks.push(h('div', { class: 'summary-section' }, [
+        h('b', { class: 'summary-label' }, '开场角度'),
+        h('ul', { class: 'summary-list' }, res.openingAngles.map((s) => h('li', {}, s))),
+      ]));
+      if (Array.isArray(res.possibleObjections) && res.possibleObjections.length) blocks.push(h('div', { class: 'summary-section' }, [
+        h('b', { class: 'summary-label' }, '可能异议'),
+        h('ul', { class: 'summary-list' }, res.possibleObjections.map((s) => h('li', {}, s))),
+      ]));
+      if (Array.isArray(res.questionsToConfirm) && res.questionsToConfirm.length) blocks.push(h('div', { class: 'summary-section' }, [
+        h('b', { class: 'summary-label' }, '需确认的问题'),
+        h('ul', { class: 'summary-list' }, res.questionsToConfirm.map((s) => h('li', {}, s))),
+      ]));
+      if (Array.isArray(res.avoid) && res.avoid.length) blocks.push(h('div', { class: 'summary-section' }, [
+        h('b', { class: 'summary-label' }, '避免事项'),
+        h('ul', { class: 'summary-list evidence' }, res.avoid.map((s) => h('li', {}, s))),
+      ]));
+      blocks.push(h('p', { class: 'foot-note' }, `会前准备基于 public 记录生成，仅供参考；task #${res.taskId}`));
+      return h('div', { class: 'card-body' }, blocks);
+    }, h('div', { class: 'card-body muted' }, '生成中…'));
+  }
+
   ctx.main.replaceChildren(
     pageHead({
       kicker: 'PERSON 360', title: titleNode, tag: wpTag('WP3 AI'),
@@ -379,6 +426,9 @@ export function renderPerson(ctx, id) {
         h('button', {
           class: 'btn btn-soft', type: 'button', onclick: openSummary,
         }, [ic('sparkle'), 'AI 摘要']),
+        h('button', {
+          class: 'btn btn-soft', type: 'button', onclick: openPrep,
+        }, [ic('calendar'), '会前准备']),
         h('button', {
           class: 'btn btn-soft', type: 'button',
           onclick: () => openQuickCapture(wctx, { personId: String(id), onDone: wctx.onWriteDone }),
@@ -390,6 +440,7 @@ export function renderPerson(ctx, id) {
       ],
     }),
     summaryPanel,
+    prepPanel,
     h('div', { class: 'tabs' }, btns),
     h('section', { class: 'card tabs-body' }, bodies),
   );
