@@ -34,7 +34,7 @@ async function runSummarize(event) {
   if (interactionsRes && interactionsRes.error) throw interactionsRes.error;
 
   const oppsRes = await rdb.from('opportunities').select(
-    'id,opportunity_type,status,next_action,stage,updated_at'
+    'id,opportunity_type,status,next_action,discovered_at,updated_at'
   ).eq('person_id', id).is('deleted_at', null).order('updated_at', { ascending: false }).limit(10);
   if (oppsRes && oppsRes.error) throw oppsRes.error;
   const openOpps = (oppsRes.data || []).filter((o) => o.status !== '成交' && o.status !== '关闭');
@@ -59,7 +59,7 @@ async function runSummarize(event) {
       type: o.opportunity_type,
       status: o.status,
       next_action: o.next_action,
-      stage: o.stage,
+      discovered_at: o.discovered_at,
     })),
   };
 
