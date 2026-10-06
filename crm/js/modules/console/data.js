@@ -50,6 +50,8 @@ export const data = {
   activityDetail: (ctx, id) => call(ctx, 'activities', { action: 'get', id: Number(id) }),
   activityTasks: (ctx, activityId) =>
     call(ctx, 'activity_tasks', { action: 'list', activity_id: Number(activityId) }),
+  activityPostReviewV2: (ctx, activityId) =>
+    call(ctx, 'ai_activity', { action: 'postReviewV2', activity_id: Number(activityId) }),
 
   // ---------- 招募 ----------
   recruitList: (ctx, params) => call(ctx, 'recruit_candidates', { action: 'list', ...(params || {}) }),

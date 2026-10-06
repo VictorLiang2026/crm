@@ -152,8 +152,76 @@ const PLACEHOLDER = {
   3: ['机会候选', '活动互动产生的机会候选，经人工三键确认后建机会（WP2）。'],
   4: ['伴手礼', '当前没有活动级礼品数据源；如需要请在后续工作包提出并单独设计。'],
   5: ['照片', '照片目前仅按客户归档（无 activity_id 字段）；活动照片需先做数据设计。'],
-  6: ['复盘', 'AI 复盘候选逐人审核，在 WP3 接入（模型经 AI Gateway 配置）。'],
 };
+
+function claimList(items) {
+  if (!Array.isArray(items) || !items.length) return h('p', { class: 'muted' }, '无');
+  return h('ul', { class: 'summary-list' }, items.map((c) => h('li', {}, [
+    h('span', {}, c.text),
+    c.sourceRefs?.length ? h('span', { class: 'foot-note', style: 'display:block;margin-top:2px' },
+      `来源: ${c.sourceRefs.join(', ')}`) : null,
+  ])));
+}
+
+function reviewNode(ctx, id) {
+  return (async () => {
+    const blocks = [h('p', { class: 'muted' }, 'AI 复盘基于活动 public 记录生成，候选需人工审核后才产生业务影响。')];
+    let res;
+    try { res = await data.activityPostReviewV2(ctx, id); }
+    catch (e) {
+      return h('div', { class: 'tab-stack' }, [emptyNote('生成失败', e.message || 'ACTIVITY_REVIEW_FAILED')]);
+    }
+    if (res.error) {
+      const map = { ACTIVITY_NOT_ENDED: '活动尚未结束，无法复盘', NO_CANONICAL_PERSON: res.message || '暂无已确认 Person 关联' };
+      return h('div', { class: 'tab-stack' }, [emptyNote(map[res.error] || res.error, '')]);
+    }
+    const r = res.review || {};
+    blocks.push(sectionTitle('复盘摘要'));
+    blocks.push(h('p', { class: 'summary-text' }, r.summary || ''));
+    const sections = [
+      ['谁最重要', r.whoMattered],
+      ['发生了什么变化', r.whatChanged],
+      ['关系改善', r.relationshipsImproved],
+      ['出现的信号', r.signalsAppeared],
+      ['出现的机会', r.opportunitiesAppeared],
+      ['需要跟进的人', r.followUpPeople],
+    ];
+    sections.forEach(([title, items]) => {
+      blocks.push(sectionTitle(title));
+      blocks.push(claimList(items));
+    });
+    if (Array.isArray(r.actionCandidates) && r.actionCandidates.length) {
+      blocks.push(sectionTitle('行动候选（待人工确认）'));
+      blocks.push(h('div', {}, r.actionCandidates.map((a) => h('div', { class: 'list-row' }, [
+        h('div', { style: 'flex:1;min-width:0' }, [
+          h('div', { class: 'row-title' }, [
+            a.personName ? h('a', { href: `#/person/${a.personId}` }, a.personName) : `Person #${a.personId}`,
+          ]),
+          h('div', { class: 'row-sub' }, a.title),
+          a.reason ? h('div', { class: 'row-sub' }, a.reason) : null,
+        ]),
+      ]))));
+    }
+    if (Array.isArray(r.opportunityCandidates) && r.opportunityCandidates.length) {
+      blocks.push(sectionTitle('机会候选（待人工确认）'));
+      blocks.push(h('div', {}, r.opportunityCandidates.map((o) => h('div', { class: 'list-row' }, [
+        h('div', { style: 'flex:1;min-width:0' }, [
+          h('div', { class: 'row-title' }, [
+            o.personName ? h('a', { href: `#/person/${o.personId}` }, o.personName) : `Person #${o.personId}`,
+            bdg(o.opportunityType, 'gold'),
+          ]),
+          o.reason ? h('div', { class: 'row-sub' }, o.reason) : null,
+          o.nextAction ? h('div', { class: 'row-sub' }, `下一步: ${o.nextAction}`) : null,
+        ]),
+      ]))));
+    }
+    if (res.discarded_unsupported_items) {
+      blocks.push(h('p', { class: 'foot-note' }, `已过滤 ${res.discarded_unsupported_items} 条无有效来源引用的候选项。`));
+    }
+    blocks.push(h('p', { class: 'foot-note' }, `task #${res.task_id}；仅生成候选，不写入业务数据。`));
+    return h('div', { class: 'tab-stack' }, blocks);
+  })();
+}
 
 export function renderActivity(ctx, id) {
   const bodies = ACT_TABS.map(() => h('div', {}));
@@ -174,6 +242,7 @@ export function renderActivity(ctx, id) {
     loaded.add(i);
     if (i === 0) loadInto(bodies[i], async () => h('div', { class: 'card-body' }, [await flowNode(ctx, id)]));
     else if (i === 1) loadInto(bodies[i], async () => h('div', { class: 'card-body' }, [await attendanceNode(ctx, id)]));
+    else if (i === 6) loadInto(bodies[i], async () => h('div', { class: 'card-body' }, [await reviewNode(ctx, id)]));
     else bodies[i].replaceChildren(h('div', { class: 'card-body' }, placeholder(i)));
   }
 
