@@ -1,0 +1,189 @@
+// 活动工作台（WP1 只读）：活动列表（日期条筛选）+ 详情「流程」「签到与到场」两页签。
+// 互动名单/机会候选/复盘（WP2 写、WP3 AI）、伴手礼与照片（G4 无数据源）保留骨架。
+import { h } from '../dom.js';
+import { ic } from '../icons.js';
+import { data } from '../data.js';
+import {
+  wpTag, pageHead, emptyNote, loadInto, bdg, kvGrid, sectionTitle,
+  fmtDate, weekdayCN, dayDiffFromToday, textOf,
+} from '../ui.js';
+
+const ACT_TABS = ['流程', '签到与到场', '互动与名单', '机会候选', '伴手礼', '照片', '复盘'];
+const TASK_STATUS = {
+  pending: ['待处理', 'gray'], in_progress: ['进行中', 'gold'],
+  completed: ['已完成', 'jade'], skipped: ['已跳过', 'gray'],
+};
+const PART_STATUS = {
+  invited: ['已邀约', 'ink'], attended: ['已到场', 'jade'], absent: ['缺席', 'red'],
+};
+const PART_TYPE = { customer: '客户', recruit: '增员', speaker: '嘉宾' };
+
+// ---------- 列表 ----------
+export function renderActivities(ctx) {
+  const listEl = h('div', {});
+  let selectedDate = '';
+
+  const d = new Date();
+  const strip = [];
+  for (let i = 0; i < 7; i++) {
+    const day = new Date(d.getFullYear(), d.getMonth(), d.getDate() + i);
+    const key = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`;
+    const node = h('button', { class: 'day' + (i === 0 ? ' today' : ''), type: 'button' }, [
+      h('b', {}, String(day.getDate())),
+      h('span', {}, i === 0 ? '今天' : '周' + '日一二三四五六'[day.getDay()]),
+    ]);
+    node.onclick = () => {
+      selectedDate = (selectedDate === key) ? '' : key;
+      strip.forEach((x) => x.classList.remove('sel'));
+      if (selectedDate) node.classList.add('sel');
+      runList();
+    };
+    strip.push(node);
+  }
+
+  function runList() {
+    loadInto(listEl, async () => {
+      const res = await data.activities(ctx);
+      let rows = res.rows || [];
+      if (selectedDate) rows = rows.filter((r) => String(r.activity_date || '').slice(0, 10) === selectedDate);
+      if (!rows.length) {
+        return h('div', { class: 'card-body' }, [emptyNote(
+          selectedDate ? '当天没有活动' : '近期没有活动',
+          selectedDate ? '再选其他日期看看。' : '新建活动在 WP2 接入。')]);
+      }
+      return h('div', { class: 'card-body' }, rows.map((a) => {
+        const diff = dayDiffFromToday(a.activity_date);
+        const dateText = a.activity_date
+          ? `${fmtDate(a.activity_date)} ${weekdayCN(a.activity_date)}${diff != null && diff >= 0 ? '' : ''}`
+          : '日期待定';
+        return h('a', { class: 'list-row data-row', href: `#/activity/${a.id}` }, [
+          h('span', { class: 'pavatar sm gold' }, (a.name || '活').charAt(0)),
+          h('div', { style: 'flex:1;min-width:0' }, [
+            h('div', { class: 'row-title' }, a.name),
+            h('div', { class: 'row-sub' },
+              [dateText, a.activity_type, a.location].map(textOf).filter(Boolean).join(' · ')),
+          ]),
+          a.status ? bdg(a.status, diff != null && diff < 0 ? 'gray' : 'gold') : null,
+          ic('chevron', 'mut'),
+        ]);
+      }));
+    });
+  }
+
+  ctx.main.replaceChildren(
+    pageHead({
+      kicker: 'ACTIVITIES', title: '活动工作台', tag: wpTag('WP1 只读'),
+      sub: '先有人，才有数字：报名与实际到场分开记录，复盘逐人审核。',
+      actions: [
+        h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => ctx.toast('活动量日报在 WP1 后续批次接入') }, [ic('calendar'), '活动量日报']),
+        h('button', { class: 'btn btn-primary', type: 'button', onclick: () => ctx.toast('新建活动在 WP2 接入') }, [ic('plus'), '新建活动']),
+      ],
+    }),
+    h('div', { class: 'date-strip' }, strip),
+    h('div', { style: 'height:16px' }),
+    h('section', { class: 'card' }, [listEl]),
+  );
+  runList();
+}
+
+// ---------- 详情 ----------
+function flowNode(ctx, id) {
+  return Promise.all([data.activityDetail(ctx, id), data.activityTasks(ctx, id)]).then(([detail, tasksRes]) => {
+    if (!detail.activity) throw new Error('活动不存在');
+    const a = detail.activity;
+    const tasks = tasksRes.rows || [];
+    return h('div', { class: 'tab-stack' }, [
+      sectionTitle('活动信息'),
+      kvGrid([
+        ['名称', a.name], ['日期', a.activity_date ? `${fmtDate(a.activity_date)} ${weekdayCN(a.activity_date)}` : ''],
+        ['类型', a.activity_type], ['地点', a.location], ['状态', a.status], ['说明', a.description],
+      ]),
+      sectionTitle(`筹备任务（${tasks.length}）`),
+      tasks.length ? h('div', {}, tasks.map((t) => h('div', { class: 'list-row' }, [
+        h('div', { style: 'flex:1;min-width:0' }, [
+          h('div', { class: 'row-title' }, [
+            t.task_type ? bdg(t.task_type, 'ink') : null,
+            h('span', { style: 'margin-left:8px' }, t.task_title),
+          ]),
+          t.note ? h('div', { class: 'row-sub' }, t.note) : null,
+          t.due_date ? h('div', { class: 'row-sub' }, `截止 ${fmtDate(t.due_date)}`) : null,
+        ]),
+        bdg((TASK_STATUS[t.status] || [t.status, 'gray'])[0], (TASK_STATUS[t.status] || ['', 'gray'])[1]),
+      ]))) : emptyNote('暂无筹备任务', ''),
+    ]);
+  });
+}
+
+function attendanceNode(ctx, id) {
+  return data.activityDetail(ctx, id).then((detail) => {
+    const parts = detail.participants || [];
+    const groups = [
+      ['attended', '已到场', 'jade'], ['invited', '已邀约', 'ink'], ['absent', '缺席', 'red'],
+    ];
+    const blocks = [];
+    groups.forEach(([key, label]) => {
+      const rows = parts.filter((p) => (p.status || 'invited') === key);
+      if (!rows.length) return;
+      blocks.push(sectionTitle(label, bdg(String(rows.length), key === 'absent' ? 'red' : key === 'attended' ? 'jade' : 'ink')));
+      blocks.push(h('div', {}, rows.map((p) => {
+        const label = p.person_name || (p.person_id ? `${PART_TYPE[p.person_type] || ''} #${p.person_id}` : '暂存姓名');
+        const nameNode = p.canonical_person_id
+          ? h('a', { href: `#/person/${p.canonical_person_id}`, style: 'margin-left:8px;color:var(--ink);font-weight:600' }, label)
+          : h('span', { style: 'margin-left:8px' }, label);
+        return h('div', { class: 'list-row' }, [
+          h('div', { style: 'flex:1;min-width:0' }, [
+            h('div', { class: 'row-title' }, [
+              bdg(PART_TYPE[p.person_type] || p.person_type || '人员', p.person_type === 'recruit' ? 'gold' : 'ink'),
+              nameNode,
+            ]),
+            p.relationship_note ? h('div', { class: 'row-sub' }, p.relationship_note) : null,
+          ]),
+          p.canonical_person_id ? ic('chevron', 'mut') : null,
+        ]);
+      })));
+    });
+    return h('div', { class: 'tab-stack' },
+      blocks.length ? blocks : [emptyNote('暂无参与者', '报名与签到在 WP2 写入闭环中接入。')]);
+  });
+}
+
+const PLACEHOLDER = {
+  2: ['互动与名单', '活动后逐人互动记录与跟进建议在 WP2 接入。'],
+  3: ['机会候选', '活动互动产生的机会候选，经人工三键确认后建机会（WP2）。'],
+  4: ['伴手礼', '当前没有活动级礼品数据源；如需要请在后续工作包提出并单独设计。'],
+  5: ['照片', '照片目前仅按客户归档（无 activity_id 字段）；活动照片需先做数据设计。'],
+  6: ['复盘', 'AI 复盘候选逐人审核，在 WP3 接入（模型经 AI Gateway 配置）。'],
+};
+
+export function renderActivity(ctx, id) {
+  const bodies = ACT_TABS.map(() => h('div', {}));
+  const loaded = new Set();
+  const btns = ACT_TABS.map((name, i) => h('button', {
+    class: 'tab' + (i === 0 ? ' active' : ''), type: 'button',
+    onclick: () => select(i),
+  }, name));
+
+  function placeholder(i) {
+    const [title, note] = PLACEHOLDER[i];
+    return h('div', { class: 'tab-stack' }, [emptyNote(title, note)]);
+  }
+  function select(i) {
+    btns.forEach((b, j) => b.classList.toggle('active', i === j));
+    bodies.forEach((b, j) => { b.style.display = i === j ? '' : 'none'; });
+    if (loaded.has(i)) return;
+    loaded.add(i);
+    if (i === 0) loadInto(bodies[i], async () => h('div', { class: 'card-body' }, [await flowNode(ctx, id)]));
+    else if (i === 1) loadInto(bodies[i], async () => h('div', { class: 'card-body' }, [await attendanceNode(ctx, id)]));
+    else bodies[i].replaceChildren(h('div', { class: 'card-body' }, placeholder(i)));
+  }
+
+  ctx.main.replaceChildren(
+    pageHead({
+      kicker: 'ACTIVITY', title: `活动 #${id}`, tag: wpTag('WP1 只读'),
+      sub: '报名与到场分开记录；复盘候选逐人人工审核。',
+    }),
+    h('div', { class: 'tabs' }, btns),
+    h('section', { class: 'card tabs-body' }, bodies),
+  );
+  select(0);
+}

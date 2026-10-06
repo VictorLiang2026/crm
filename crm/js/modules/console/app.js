@@ -5,7 +5,6 @@ import { h, toast } from './dom.js';
 import { renderLogin, renderReloginOverlay } from './login.js';
 import { mountShell } from './shell.js';
 import { navHashFor, dispatch } from './router.js';
-import { bindToast } from './views.js';
 
 const CONFIG = window.APP_CONFIG || {};
 const SESSION_TIMEOUT = 5 * 60 * 1000; // 与 admin.html 一致
@@ -22,8 +21,6 @@ let lastActivity = Date.now();
 let sessionLocked = false;
 let sessionWaiters = [];
 let reloginShowing = false;
-
-bindToast(toast);
 
 // ---------- 会话活动持久化（与 admin.html 相同节流：15 秒最多写一次） ----------
 function persistActivity(force) {
