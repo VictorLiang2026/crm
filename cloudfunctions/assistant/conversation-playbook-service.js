@@ -46,17 +46,14 @@ async function runConversationPlaybook(event) {
   });
 
   const context = {
-    guidance: {
-      status: 'ok',
-      content: '保险销售对话原则：先理解客户真实顾虑，用事实和数据回应，不夸大承诺，不施压；尊重客户节奏，提供选择而非结论。',
-    },
+    guidance: '保险销售对话原则：先理解客户真实顾虑，用事实和数据回应，不夸大承诺，不施压；尊重客户节奏，提供选择而非结论。',
     person: prep.person,
     recent_interactions: prep.recent_interactions,
     facts: prep.facts,
     signals: prep.signals,
     open_opportunities: prep.open_opportunities,
-    relevant_playbooks: { status: 'unavailable', content: null, reason: 'No maintained playbook content' },
-    reliable_evidence: { status: evidence.length ? 'ok' : 'empty', content: evidence },
+    relevant_playbooks: [],
+    reliable_evidence: evidence,
   };
 
   const database = createSearchData({ env: process.env.TCB_ENV,
