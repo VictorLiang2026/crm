@@ -12,12 +12,12 @@ import {
 
 const settled = (p) => Promise.resolve(p).then((v) => ({ ok: true, v }), (e) => ({ ok: false, e }));
 
-function briefCard() {
+function briefLoadingCard() {
   const d = new Date();
   const week = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'][d.getDay()];
   return h('section', { class: 'brief' }, [
     h('div', { class: 'brief-head' }, [
-      ic('bell'), h('b', {}, '晨间简报'), wpTag('AI 生成 · WP3'),
+      ic('bell'), h('b', {}, '晨间简报'), wpTag('AI 生成'),
       h('span', { style: 'margin-left:auto;font-size:12px;opacity:.7' },
         `${d.getMonth() + 1} 月 ${d.getDate()} 日 · ${week}`),
     ]),
@@ -26,10 +26,46 @@ function briefCard() {
         h('span', { class: 'brief-num' }, String(i)),
         h('div', { style: 'flex:1;display:flex;flex-direction:column;gap:8px;padding-top:4px' }, [sk('86%', 't'), sk('58%')]),
       ]))),
-    h('div', { class: 'brief-foot' }, [
-      h('span', {}, '每条要点将带来源与依据，由你确认后才影响今日安排'),
-      h('span', { class: 'wp-tag' }, 'WP3 接入'),
+  ]);
+}
+
+function briefCard(sections) {
+  const d = new Date();
+  const week = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'][d.getDay()];
+  const mb = sections.morningBrief || {};
+  const actions = sections.topActions || [];
+  const counts = mb.counts || {};
+  const sourceTag = mb.guidanceSource === 'ai' ? 'AI 建议' : '规则建议';
+  const sourceTone = mb.guidanceSource === 'ai' ? 'ink' : 'gray';
+  return h('section', { class: 'brief' }, [
+    h('div', { class: 'brief-head' }, [
+      ic('bell'), h('b', {}, '晨间简报'), bdg(sourceTag, sourceTone),
+      h('span', { style: 'margin-left:auto;font-size:12px;opacity:.7' },
+        `${d.getMonth() + 1} 月 ${d.getDate()} 日 · ${week}`),
     ]),
+    h('div', { class: 'brief-body' }, [
+      mb.headline ? h('div', { class: 'brief-headline' }, mb.headline) : null,
+      mb.guidance ? h('div', { class: 'brief-guidance' }, [
+        ic('sparkle'), h('span', {}, mb.guidance),
+      ]) : null,
+      actions.length ? actions.map((a, i) =>
+        h('a', { class: 'brief-row data-row', href: a.target || '#/today' }, [
+          h('span', { class: 'brief-num' }, String(i + 1)),
+          h('div', { style: 'flex:1;min-width:0' }, [
+            h('div', { class: 'row-title' }, a.title || '未命名行动'),
+            h('div', { class: 'row-sub' }, [
+              a.personName ? `${a.personName} · ` : '',
+              a.whyNow || '',
+              a.source ? h('span', { class: 'src-tag', title: a.source }, a.source.split('#')[0]) : null,
+            ].filter(Boolean)),
+          ]),
+        ])) : h('div', { class: 'brief-empty' }, '当前没有优先行动'),
+    ]),
+    counts && Object.values(counts).some(Boolean) ? h('div', { class: 'brief-foot' }, [
+      counts.overdueCommitments ? bdg(`逾期承诺 ${counts.overdueCommitments}`, 'red') : null,
+      counts.needConfirmation ? bdg(`待确认 ${counts.needConfirmation}`, 'gold') : null,
+      counts.opportunities ? bdg(`开放机会 ${counts.opportunities}`, 'ink') : null,
+    ].filter(Boolean)) : null,
   ]);
 }
 
@@ -94,6 +130,7 @@ export function renderToday(ctx) {
   const rhythmEl = h('div', {});
   const commitEl = h('div', {});
   const oppEl = h('div', {});
+  const briefEl = h('div', {});
 
   // 写入成功后的刷新：整页重渲染（只读数据幂等，代价可接受）。
   function reload() { renderToday(ctx); }
@@ -238,14 +275,20 @@ export function renderToday(ctx) {
     });
   });
 
+  loadInto(briefEl, async () => {
+    const res = await settled(data.morningBrief(ctx));
+    if (!res.ok) throw res.e;
+    return briefCard(res.v.sections || {});
+  }, briefLoadingCard());
+
   ctx.main.replaceChildren(
     pageHead({
       kicker: 'TODAY', title: `早安，${ctx.operator.name || 'Victor'} · 今天先做什么`,
-      sub: '先定要事，再看数字。Today 5 为规则排序的开放行动；AI 简报在 WP3 接入。',
+      sub: '先定要事，再看数字。Today 5 为规则排序的开放行动；晨间简报经 AI Gateway 生成。',
     }),
     h('div', { class: 'today-grid' }, [
       h('div', {}, [
-        briefCard(),
+        briefEl,
         h('div', { style: 'height:16px' }),
         statsEl,
         h('div', { style: 'height:16px' }),

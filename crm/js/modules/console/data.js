@@ -19,6 +19,7 @@ export const data = {
   pendingOpportunities: (ctx) => p360(ctx, 'listPendingOpportunityCandidates'),
   opportunityDirectory: (ctx, params) => p360(ctx, 'listOpportunityDirectory', params || {}),
   cockpit: (ctx) => call(ctx, 'today_coach', { action: 'cockpit' }),
+  morningBrief: (ctx) => call(ctx, 'today_coach', { action: 'daily_review', view: 'morning' }),
   activities: (ctx) => call(ctx, 'activities', { action: 'list' }),
 
   // ---------- 人物目录 ----------
