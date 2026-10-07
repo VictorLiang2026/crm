@@ -13,7 +13,7 @@
 | 对象 | 变化类型 | 调用方/消费者 | 所属包 | 状态 | 证据 |
 | --- | --- | --- | --- | --- | --- |
 | `tools/tcb.ps1` | 修改：增加显式子命令守卫（拒绝无命令/首参为 flag 的裸调用） | sync-check.ps1（`fn code download`）、deploy-function.ps1（`fn code update`）、人工只读命令（`fn list`） | PMC-00 缺口处置 | 已部署（Git，本地工具；云端无关） | evidence/PMC-00.md 第九节 G2 |
-| `tools/sync-migration-backup.ps1` | 新增：迁移双备份非破坏性同步脚本（归档旧稿→镜像→哈希校验，含 -DryRun） | 发布迁移包前的人工执行；后续涉及数据库的 PMC 包 | PMC-00 缺口处置 | 已提交；**待用户沙箱外首次运行验证** | evidence/PMC-00.md 第九节 G1 |
+| `tools/sync-migration-backup.ps1` | 新增：迁移双备份非破坏性同步脚本（归档旧稿→镜像→哈希校验，含 -DryRun） | 发布迁移包前的外部备份同步；后续涉及数据库的 PMC 包 | PMC-00 缺口处置 | 已执行并独立复核：外部 82/82 哈希一致，25 旧稿归档 `_archive-20261007/` | evidence/PMC-00.md 第九节 G1 |
 | `tools/pg-readonly.cjs` | 新增：Trae/Codex 共用只读 PG 查询（SELECT/WITH 单语句，拒绝 DDL/DML/多语句） | PMC 各包只读证据采集（替代临时候选脚本） | PMC-00 缺口处置 | 已验证（persons=784 + 3 类拒绝路径） | evidence/PMC-00.md 第九节 G3 |
 | `tests/wp01/static.cjs` | 无变更（核实 console.html 入口早已存在） | sync-check / WP01 gate | PMC-00 缺口处置 | 已核实：50 资产含 48 console 链 | evidence/PMC-00.md 第九节 G4 |
 
