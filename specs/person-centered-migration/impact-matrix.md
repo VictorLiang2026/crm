@@ -339,7 +339,7 @@ persons.legacy_customer_id（自引用）
 
 | # | 未知项 | 影响 | 补查任务 | 优先级 |
 | --- | --- | --- | --- | --- |
-| U1 | 3 个 customers 无对应 Person 的具体原因 | 阻塞 Person 收敛完整性验证 | 查询这 3 个客户的 Id/姓名/创建时间，判断是否为已删除/测试数据 | 高 |
+| U1 | ~~3 个 customers 无对应 Person 的具体原因~~ **已补查（PMC-02，2026-10-07）**：#786/#789/#790 均活跃未删、近期经 legacy `customers.create` 建档（该路径不建 Person，1 条跟进/无子记录），无嘉宾/机会/招募关联 | 处置方案入 D2（data-model.md §8）：建议走身份命令流程补建 Person（人工确认）后回填 | 无需再查；待 D2 批准 | 高 → 已查明 |
 | U2 | `activity_participants.person_id` 无 FK 约束的原因 | 可能导致孤儿参与者记录 | 检查是否为历史遗留，是否需要补 FK | 中 |
 | U3 | `activity_speakers.customer_id` 无 FK 约束的原因 | 可能导致孤儿嘉宾记录 | 同上 | 中 |
 | U4 | `persons.legacy_customer_id` 自引用 FK 的语义 | 需确认是否允许 NULL | 检查约束定义是否允许 NULL | 低 |

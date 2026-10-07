@@ -44,7 +44,8 @@
 | --- | --- | --- |
 | PMC-00 | 已完成 | 接管检查 + 档案建立，无业务变更；见 [evidence/PMC-00.md](evidence/PMC-00.md) |
 | PMC-01 | 已完成（纯只读盘点） | 全量影响盘点：无业务设计变更；产出为 [impact-matrix.md](impact-matrix.md) PMC-01 节（47 表/12 视图/33 函数实测、字段重复与一致性统计、66 FK 分类、视图依赖、28 函数 × action 矩阵、5 专项调用链核查、未知项 U1–U8）；见 [evidence/PMC-01.md](evidence/PMC-01.md) |
-| PMC-02～PMC-20 | 未收到指令 | 不预写；收到指令后逐包登记完整指令与验收范围 |
+| PMC-02 | 已完成设计（待批准） | 目标数据模型与接口契约：新建 [data-model.md](data-model.md)——persons 为主实体不重命名、ID 精度契约（int8 字符串传输 R-ID1~5）、逐表字段归属字典与争议字段裁决（收入/需求/性格/标签/来源/备注）、三层资料与快照不可变、角色基数（person_roles UNIQUE(person_id,role)）与软删除兼容、customers.person_id 关联设计与 legacy_customer_id 退出条件、受影响 action 新旧契约（C1–C9 + 适配类型 T1/T2/T3）、阶段权威来源（0–4）与切换/部署/回滚次序；D1–D11 待用户批准；见 [evidence/PMC-02.md](evidence/PMC-02.md) |
+| PMC-03～PMC-20 | 未收到指令 | 不预写；收到指令后逐包登记完整指令与验收范围 |
 
 ## 三、迁移总体取向（已确认原则，非实施授权）
 
