@@ -74,7 +74,7 @@ export function clickableRow(children, href) {
 // ---------- 键值网格 ----------
 export function kvGrid(pairs) {
   const items = pairs.filter(([, v]) => v !== null && v !== undefined && v !== '');
-  if (!items.length) return emptyNote('暂无资料', '');
+  if (!items.length) return emptyNote(t('empty_no_info'), '');
   return h('dl', { class: 'kv' }, items.flatMap(([k, v]) => [
     h('dt', {}, k), h('dd', {}, String(v)),
   ]));
@@ -90,12 +90,12 @@ export function textOf(v) {
 }
 export function fmtDate(s) {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(s || ''));
-  return m ? `${Number(m[2])}月${Number(m[3])}日` : (s ? String(s).slice(0, 10) : '');
+  return m ? `${Number(m[2])}${t('month_suffix')}${Number(m[3])}${t('day_suffix')}` : (s ? String(s).slice(0, 10) : '');
 }
 export function weekdayCN(s) {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(s || ''));
   if (!m) return '';
-  return '周' + '日一二三四五六'[new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])).getDay()];
+  return t('weekday_prefix') + t('weekday_' + new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])).getDay());
 }
 function localDay(d) {
   // 以北京时间（UTC+8）计算日差，与服务端 horizon 口径一致。

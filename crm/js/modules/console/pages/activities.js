@@ -29,7 +29,7 @@ export function renderActivities(ctx) {
   for (let i = 0; i < 7; i++) {
     const day = new Date(d.getFullYear(), d.getMonth(), d.getDate() + i);
     const key = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`;
-    const weekdayText = i === 0 ? t('act_today') : (t('act_weekday_prefix') || '') + '日一二三四五六'[day.getDay()];
+    const weekdayText = i === 0 ? t('act_today') : (t('act_weekday_prefix') || '') + t('act_weekday_' + day.getDay());
     const node = h('button', { class: 'day' + (i === 0 ? ' today' : ''), type: 'button' }, [
       h('b', {}, String(day.getDate())),
       h('span', {}, weekdayText),
@@ -267,7 +267,7 @@ function reviewNode(ctx, id) {
     if (res.discarded_unsupported_items) {
       blocks.push(h('p', { class: 'foot-note' }, `${t('act_filtered_unsupported')} ${res.discarded_unsupported_items} ${t('act_items_unsupported')}`));
     }
-    blocks.push(h('p', { class: 'foot-note' }, `${t('act_task_id')}${res.task_id}；${t('act_review_only')}`));
+    blocks.push(h('p', { class: 'foot-note' }, `${t('act_task_id')}${res.task_id}${t('act_task_id_sep')}${t('act_review_only')}`));
     return h('div', { class: 'tab-stack' }, blocks);
   })();
 }

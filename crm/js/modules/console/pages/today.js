@@ -13,14 +13,21 @@ import {
 
 const settled = (p) => Promise.resolve(p).then((v) => ({ ok: true, v }), (e) => ({ ok: false, e }));
 
+const WEEKDAY_KEYS = ['weekday_0', 'weekday_1', 'weekday_2', 'weekday_3', 'weekday_4', 'weekday_5', 'weekday_6'];
+
+function fmtBriefDate(d) {
+  const locale = getLang() === 'en' ? 'en-US' : 'zh-CN';
+  const datePart = new Intl.DateTimeFormat(locale, { month: 'long', day: 'numeric' }).format(d);
+  return `${datePart} · ${t(WEEKDAY_KEYS[d.getDay()])}`;
+}
+
 function briefLoadingCard() {
   const d = new Date();
-  const week = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'][d.getDay()];
   return h('section', { class: 'brief' }, [
     h('div', { class: 'brief-head' }, [
       ic('bell'), h('b', {}, t('morning_brief')), wpTag(t('ai_generated')),
       h('span', { style: 'margin-left:auto;font-size:12px;opacity:.7' },
-        `${d.getMonth() + 1} 月 ${d.getDate()} 日 · ${week}`),
+        fmtBriefDate(d)),
     ]),
     h('div', { class: 'brief-body' }, [1, 2, 3].map((i) =>
       h('div', { class: 'brief-row' }, [
@@ -32,7 +39,6 @@ function briefLoadingCard() {
 
 function briefCard(sections) {
   const d = new Date();
-  const week = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'][d.getDay()];
   const mb = sections.morningBrief || {};
   const actions = sections.topActions || [];
   const counts = mb.counts || {};
@@ -42,7 +48,7 @@ function briefCard(sections) {
     h('div', { class: 'brief-head' }, [
       ic('bell'), h('b', {}, t('morning_brief')), bdg(sourceTag, sourceTone),
       h('span', { style: 'margin-left:auto;font-size:12px;opacity:.7' },
-        `${d.getMonth() + 1} 月 ${d.getDate()} 日 · ${week}`),
+        fmtBriefDate(d)),
     ]),
     h('div', { class: 'brief-body' }, [
       mb.headline ? h('div', { class: 'brief-headline' }, mb.headline) : null,
@@ -230,7 +236,7 @@ export function renderToday(ctx) {
     if (!due.ok) throw due.e;
     const rows = [...due.v.overdue.map((r) => ({ ...r, _grp: 'overdue' })),
       ...due.v.dueSoon.map((r) => ({ ...r, _grp: 'dueSoon' }))].slice(0, 4);
-    const typeMap = { THEY_PROMISED: ['对方承诺', 'gold'], I_PROMISED: ['我承诺', 'ink'], MUTUAL: ['双向', 'red'] };
+    const typeMap = { THEY_PROMISED: [t('commit_they_promised'), 'gold'], I_PROMISED: [t('commit_i_promised'), 'ink'], MUTUAL: [t('commit_mutual'), 'red'] };
     return card({
       title: t('mutual_commitments'), icon: 'shield', tag: wpTag(t('fact')),
       body: rows.length ? rows.map((r) => {

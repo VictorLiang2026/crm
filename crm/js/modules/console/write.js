@@ -38,11 +38,15 @@ function uuid() {
   });
 }
 const OPP_TYPES = ['insurance', 'recruit', 'referral', 'activity', 'speaker', 'partnership', 'service', 'relationship'];
-const OPP_TYPE_CN = {
-  insurance: '保障', recruit: '增员', referral: '转介绍', activity: '活动',
-  speaker: '嘉宾', partnership: '合作', service: '服务', relationship: '关系维护',
+const OPP_TYPE_I18N = {
+  insurance: 'opp_type_insurance', recruit: 'opp_type_recruit', referral: 'opp_type_referral', activity: 'opp_type_activity',
+  speaker: 'opp_type_speaker', partnership: 'opp_type_partnership', service: 'opp_type_service', relationship: 'opp_type_relationship',
 };
 const STAGE_OPTIONS = ['发现', '沟通', '方案', '潜在线索', '已介绍', '已联系', '已建立关系'];
+const STAGE_I18N = {
+  '发现': 'stage_discovered', '沟通': 'stage_contacted', '方案': 'stage_proposal',
+  '潜在线索': 'stage_potential', '已介绍': 'stage_introduced', '已联系': 'stage_connected', '已建立关系': 'stage_relationship',
+};
 const todayStr = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -66,7 +70,7 @@ export function openSheet({ title, sub, body }) {
       h('div', { class: 'sheet-head' }, [
         h('b', { class: 'sheet-title' }, title),
         h('button', {
-          class: 'btn btn-ghost btn-sm', type: 'button', 'aria-label': '关闭',
+          class: 'btn btn-ghost btn-sm', type: 'button', 'aria-label': t('close_aria'),
           onclick: () => overlay.remove(),
         }, [ic('x')]),
       ]),
@@ -108,7 +112,7 @@ function kvRow(k, v) {
 // ---------- 行动/承诺：完成 ----------
 export function openWorkItemDone(ctx, { row, onDone }) {
   const kind = row.kind === 'commitment' ? 'commitment' : 'action';
-  const titleText = kind === 'action' ? (row.title || '未命名行动') : (row.content || '未填写承诺');
+  const titleText = kind === 'action' ? (row.title || t('unnamed_action')) : (row.content || t('no_content'));
   const body = h('div', {}, [
     h('p', { class: 'sheet-note', style: 'margin:0 0 10px' },
       t('preview_note')),
@@ -161,13 +165,13 @@ export function openWorkItemDone(ctx, { row, onDone }) {
 export function openOpportunityAdvance(ctx, { opportunity, personName, onDone }) {
   const status = opportunity.status || '发现';
   const modeSel = sel([['stage', t('advance_stage')], ['close', t('close_won')]], 'stage');
-  const stageSel = sel(STAGE_OPTIONS.filter((s) => s !== status).map((s) => [s, s]), '沟通');
+  const stageSel = sel(STAGE_OPTIONS.filter((s) => s !== status).map((s) => [s, t(STAGE_I18N[s])]), '沟通');
   const closeSel = sel([['成交', t('won')], ['关闭', t('closed')]], '成交');
   const resultTa = h('textarea', { class: 'sheet-textarea', placeholder: t('outcome_required') });
   const form = h('div', {}, [
     fieldRow(t('operation'), modeSel),
     h('div', { id: 'opp-stage-wrap' }, [fieldRow(t('advance_to'), stageSel,
-      `${t('current_stage')}${status}；${t('no_auto_advance')}`)]),
+      `${t('current_stage')}${t(STAGE_I18N[status])}；${t('no_auto_advance')}`)]),
     h('div', { id: 'opp-close-wrap', style: 'display:none' }, [
       fieldRow(t('result'), closeSel),
       fieldRow(t('result_note'), resultTa, t('close_check_note')),
@@ -175,7 +179,7 @@ export function openOpportunityAdvance(ctx, { opportunity, personName, onDone })
   ]);
   const sheet = openSheet({
     title: t('advance_close_opp'),
-    sub: `${OPP_TYPE_CN[opportunity.opportunity_type] || opportunity.opportunity_type || t('opportunity')} · ${personName || ''}`,
+    sub: `${t(OPP_TYPE_I18N[opportunity.opportunity_type]) || opportunity.opportunity_type || t('opportunity')} · ${personName || ''}`,
     body: h('div', {}, [
       h('p', { class: 'sheet-note', style: 'margin:0 0 10px' }, t('preview_before_write')),
       form,
@@ -192,28 +196,28 @@ export function openOpportunityAdvance(ctx, { opportunity, personName, onDone })
   };
   async function doPreview(btn) {
     sheet.showErr('');
-    busy(btn, true, '预览中…');
+    busy(btn, true, t('previewing'));
     const draft = modeSel.value === 'stage' ? { status: stageSel.value }
       : { actionId: null, status: closeSel.value, result: resultTa.value.trim() };
     try {
-      if (modeSel.value === 'close' && !draft.result) throw new Error('请填写结果说明（Outcome）');
+      if (modeSel.value === 'close' && !draft.result) throw new Error(t('fill_outcome'));
       const res = await p360(ctx, 'previewOpportunity', { data: {
         idempotencyKey: uuid(), operation: modeSel.value,
         personId: String(opportunity.person_id || opportunity.person?.id || ''),
         opportunityId: String(opportunity.id), draft,
       } });
       renderConfirm(res, draft);
-    } catch (err) { busy(btn, false, '生成预览'); sheet.showErr(err.message); }
+    } catch (err) { busy(btn, false, t('generate_preview')); sheet.showErr(err.message); }
   }
   function renderConfirm(res, draft) {
     sheet.swap(h('div', {}, [
       previewBlock([
         kvRow(t('target'), (res.preview && res.preview.personName) || personName || ''),
-        kvRow(t('content'), `${OPP_TYPE_CN[opportunity.opportunity_type] || t('opportunity')}（${status}）`),
+        kvRow(t('content'), `${t(OPP_TYPE_I18N[opportunity.opportunity_type]) || t('opportunity')}（${t(STAGE_I18N[status])}）`),
         h('div', { class: 'kv-line' }, [
           h('span', { class: 'kv-k' }, t('change')),
-          bdg(status, 'gray'), h('span', {}, ' → '),
-          bdg(draft.status, draft.status === '成交' ? 'jade' : 'gold'),
+          bdg(t(STAGE_I18N[status]), 'gray'), h('span', {}, ' → '),
+          bdg(t(STAGE_I18N[draft.status]) || draft.status, draft.status === '成交' ? 'jade' : 'gold'),
         ]),
         draft.result ? kvRow(t('result_note'), draft.result.slice(0, 120)) : null,
         h('div', { class: 'sheet-note', style: 'margin-top:8px' }, t('preview_no_write')),
@@ -240,12 +244,12 @@ export function openOpportunityAdvance(ctx, { opportunity, personName, onDone })
 
 // ---------- 机会：新建 ----------
 export function openOpportunityCreate(ctx, { onDone }) {
-  const nameInput = h('input', { class: 'sheet-input', placeholder: '输入完整姓名，点「搜索 Person」' });
-  const searchBtn = h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => doSearch() }, '搜索 Person');
+  const nameInput = h('input', { class: 'sheet-input', placeholder: t('search_person') });
+  const searchBtn = h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => doSearch() }, t('search_person'));
   const candBox = h('div', {});
-  const typeSel = sel(OPP_TYPES.map((t) => [t, OPP_TYPE_CN[t]]), 'insurance');
-  const progressTa = h('textarea', { class: 'sheet-textarea', placeholder: '当前进展（≤4000 字）' });
-  const nextInput = h('input', { class: 'sheet-input', placeholder: '下一步动作（≤1000 字）' });
+  const typeSel = sel(OPP_TYPES.map((k) => [k, t(OPP_TYPE_I18N[k])]), 'insurance');
+  const progressTa = h('textarea', { class: 'sheet-textarea', placeholder: t('placeholder_progress') });
+  const nextInput = h('input', { class: 'sheet-input', placeholder: t('placeholder_next_action') });
   const dateInput = h('input', { class: 'sheet-input', type: 'date' });
   let picked = null;
   const sheet = openSheet({
@@ -303,39 +307,39 @@ export function openOpportunityCreate(ctx, { onDone }) {
       } });
       sheet.swap(h('div', {}, [
         previewBlock([
-          kvRow('Person', `${picked.display_name || picked.displayName} #${picked.id}`),
-          kvRow('类型', OPP_TYPE_CN[typeSel.value]),
-          kvRow('进展', progressTa.value.trim().slice(0, 120)),
-          kvRow('下一步', `${nextInput.value.trim()}${dateInput.value ? ' · ' + dateInput.value : ''}`),
-          h('div', { class: 'sheet-note', style: 'margin-top:8px' }, '新机会将进入「发现」阶段。'),
+          kvRow(t('target'), `${picked.display_name || picked.displayName} #${picked.id}`),
+          kvRow(t('type'), t(OPP_TYPE_I18N[typeSel.value])),
+          kvRow(t('progress'), progressTa.value.trim().slice(0, 120)),
+          kvRow(t('next_action_label'), `${nextInput.value.trim()}${dateInput.value ? ' · ' + dateInput.value : ''}`),
+          h('div', { class: 'sheet-note', style: 'margin-top:8px' }, t('new_opp_stage')),
         ]),
         h('div', { class: 'sheet-actions' }, [
-          h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => sheet.overlay.remove() }, '取消'),
+          h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => sheet.overlay.remove() }, t('cancel')),
           h('button', {
             class: 'btn btn-primary', type: 'button',
             onclick: async (e) => {
               const b = e.currentTarget;
-              busy(b, true, '写入中…');
+              busy(b, true, t('writing'));
               try {
                 await p360(ctx, 'executeOpportunity', { previewId: res.previewId });
                 sheet.overlay.remove();
-                ctx.toast('机会已创建', 'ok');
+                ctx.toast(t('opp_created'), 'ok');
                 if (onDone) onDone();
-              } catch (err) { busy(b, false, '确认创建'); sheet.showErr(err.message); }
+              } catch (err) { busy(b, false, t('confirm_create')); sheet.showErr(err.message); }
             },
-          }, '确认创建'),
+          }, t('confirm_create')),
         ]),
       ]));
-    } catch (err) { busy(btn, false, '生成预览'); sheet.showErr(err.message); }
+    } catch (err) { busy(btn, false, t('generate_preview')); sheet.showErr(err.message); }
   }
 }
 
 // ---------- 机会候选：三键（编辑 / 拒绝 / 接受并建机会） ----------
 export function openCandidate(ctx, { row, onDone }) {
-  const body = h('div', {}, [h('div', { class: 'sheet-note' }, '正在生成服务端预览…')]);
+  const body = h('div', {}, [h('div', { class: 'sheet-note' }, t('preview_generating'))]);
   const sheet = openSheet({
-    title: '审核机会候选',
-    sub: `${row.personName || ''} · 候选 #${row.id}`,
+    title: t('review_candidate'),
+    sub: `${row.personName || ''} · ${t('candidate_id_prefix')}${row.id}`,
     body,
   });
   document.body.appendChild(sheet.overlay);
@@ -351,24 +355,23 @@ export function openCandidate(ctx, { row, onDone }) {
 
   function renderEditor(preview, expiresAt) {
     const d = preview.after || {};
-    typeSel = sel(OPP_TYPES.map((t) => [t, OPP_TYPE_CN[t]]), d.opportunity_type || 'insurance');
+    typeSel = sel(OPP_TYPES.map((k) => [k, t(OPP_TYPE_I18N[k])]), d.opportunity_type || 'insurance');
     reasonTa = h('textarea', { class: 'sheet-textarea' }, d.reason || '');
     nextTa = h('textarea', { class: 'sheet-textarea' }, d.next_action || '');
     const evidence = preview.evidence || [];
     sheet.swap(h('div', {}, [
       previewBlock([
-        kvRow('Person', (preview.person && `${preview.person.displayName} #${preview.person.id}`) || row.personName || ''),
-        h('div', { class: 'sheet-note', style: 'margin-top:6px' },
-          'AI 候选仅供参考；接受后才创建真实机会（进入「发现」阶段）。'),
+        kvRow(t('target'), (preview.person && `${preview.person.displayName} #${preview.person.id}`) || row.personName || ''),
+        h('div', { class: 'sheet-note', style: 'margin-top:6px' }, t('ai_candidate_note')),
       ]),
-      fieldRow('机会类型', typeSel),
-      fieldRow('理由（进展依据）', reasonTa),
-      fieldRow('建议下一步', nextTa),
+      fieldRow(t('opp_type'), typeSel),
+      fieldRow(t('reason_basis'), reasonTa),
+      fieldRow(t('suggested_next'), nextTa),
       evidence.length ? h('div', { class: 'sheet-field' }, [
-        h('label', {}, '依据（原文引用）'),
+        h('label', {}, t('evidence_quote')),
         h('ul', { class: 'sheet-evidence' }, evidence.slice(0, 6).map((x) => h('li', {}, String(x)))),
       ]) : null,
-      expiresAt ? h('div', { class: 'sheet-note' }, `预览有效期至 ${fmtDate(String(expiresAt).slice(0, 10))}；修改草稿后需重新预览。`) : null,
+      expiresAt ? h('div', { class: 'sheet-note' }, `${t('preview_valid_until')} ${fmtDate(String(expiresAt).slice(0, 10))}；${t('draft_changed_preview')}`) : null,
       h('div', { class: 'sheet-actions' }, [
         h('button', {
           class: 'btn btn-ghost', type: 'button', style: 'color:var(--red)',
@@ -378,11 +381,11 @@ export function openCandidate(ctx, { row, onDone }) {
             try {
               await assistant(ctx, { action: 'opportunityCandidate', operation: 'reject', candidateId: row.id });
               sheet.overlay.remove();
-              ctx.toast('已拒绝该候选', 'ok');
+              ctx.toast(t('candidate_rejected'), 'ok');
               if (onDone) onDone();
-            } catch (err) { busy(b, false, '拒绝'); sheet.showErr(err.message); }
+            } catch (err) { busy(b, false, t('reject')); sheet.showErr(err.message); }
           },
-        }, '拒绝'),
+        }, t('reject')),
         h('button', {
           class: 'btn btn-ghost', type: 'button',
           onclick: async (e) => {
@@ -393,11 +396,11 @@ export function openCandidate(ctx, { row, onDone }) {
                 draft: { opportunity_type: typeSel.value, reason: reasonTa.value.trim(), next_action: nextTa.value.trim() } });
               const re = await assistant(ctx, { action: 'opportunityCandidate', operation: 'preview', candidateId: row.id });
               pv = re.preview || {}; hash = re.previewHash || null;
-              busy(b, false, '保存编辑');
-              ctx.toast('草稿已更新，请再次确认', 'ok');
-            } catch (err) { busy(b, false, '保存编辑'); sheet.showErr(err.message); }
+              busy(b, false, t('save_edit'));
+              ctx.toast(t('draft_updated'), 'ok');
+            } catch (err) { busy(b, false, t('save_edit')); sheet.showErr(err.message); }
           },
-        }, '保存编辑'),
+        }, t('save_edit')),
         h('button', {
           class: 'btn btn-primary', type: 'button',
           onclick: async (e) => {
@@ -413,18 +416,18 @@ export function openCandidate(ctx, { row, onDone }) {
                   draft: { opportunity_type: typeSel.value, reason: reasonTa.value.trim(), next_action: nextTa.value.trim() } });
                 const re = await assistant(ctx, { action: 'opportunityCandidate', operation: 'preview', candidateId: row.id });
                 pv = re.preview || {}; hash = re.previewHash || null;
-                busy(b, false, '接受并建机会');
-                sheet.showErr('草稿已修改，已重新预览；请核对后再次点击「接受并建机会」');
+                busy(b, false, t('accept_create'));
+                sheet.showErr(t('draft_modified'));
                 return;
               }
               await assistant(ctx, { action: 'opportunityCandidate', operation: 'confirm', candidateId: row.id, previewHash: hash });
               const done = await assistant(ctx, { action: 'opportunityCandidate', operation: 'execute', candidateId: row.id });
               sheet.overlay.remove();
-              ctx.toast(done && done.opportunityId ? `机会已创建 #${done.opportunityId}` : '机会已创建', 'ok');
+              ctx.toast(done && done.opportunityId ? `${t('opp_created')} #${done.opportunityId}` : t('opp_created'), 'ok');
               if (onDone) onDone();
-            } catch (err) { busy(b, false, '接受并建机会'); sheet.showErr(err.message); }
+            } catch (err) { busy(b, false, t('accept_create')); sheet.showErr(err.message); }
           },
-        }, '接受并建机会'),
+        }, t('accept_create')),
       ]),
     ]));
   }
@@ -434,26 +437,26 @@ export function openCandidate(ctx, { row, onDone }) {
 export function openQuickCapture(ctx, { personId, onDone } = {}) {
   const ta = h('textarea', {
     class: 'sheet-textarea', style: 'min-height:96px',
-    placeholder: '像说话一样记下这次交流，例如：今天和王总吃饭，他说孩子明年去美国读大学，对教育金感兴趣，让我十月后再联系。',
+    placeholder: t('quick_capture_placeholder'),
   });
-  const parseBtn = h('button', { class: 'btn btn-primary', type: 'button', onclick: (e) => doParse(e.currentTarget) }, 'AI 理解 →');
+  const parseBtn = h('button', { class: 'btn btn-primary', type: 'button', onclick: (e) => doParse(e.currentTarget) }, t('ai_parse'));
   const sheet = openSheet({
-    title: '快速记录',
-    sub: 'AI 只拆解和匹配人物；保存前由你逐项确认，AI 不会自动改阶段或建机会。',
+    title: t('quick_record'),
+    sub: t('ai_parse_note'),
     body: h('div', {}, [ta, h('div', { class: 'sheet-actions' }, [parseBtn])]),
   });
   document.body.appendChild(sheet.overlay);
   async function doParse(btn) {
     const text = ta.value.trim();
-    if (!text) { sheet.showErr('请先输入要记录的内容'); return; }
-    busy(btn, true, 'AI 理解中…（约十几秒）');
+    if (!text) { sheet.showErr(t('enter_content')); return; }
+    busy(btn, true, t('ai_parsing'));
     try {
       const r = await aiParse(ctx, { action: 'quick_capture', text });
-      busy(btn, false, 'AI 理解 →');
+      busy(btn, false, t('ai_parse'));
       await renderReview(r, text, btn);
     } catch (err) {
-      busy(btn, false, 'AI 理解 →');
-      sheet.showErr(`AI 解析失败：${err.message}`);
+      busy(btn, false, t('ai_parse'));
+      sheet.showErr(`${t('ai_parse_failed')}${err.message}`);
     }
   }
   async function renderReview(r, text, parseBtn) {
@@ -472,10 +475,10 @@ export function openQuickCapture(ctx, { personId, onDone } = {}) {
     // AI 未识别人名时也允许手动填写姓名，保存前先做同名解析。
     const canCreate = !fixed && (!resolution ||
       (!resolution.hasMore && ['available', 'confirm_new_qualified'].includes(resolution.status)));
-    const hint = fixed ? '已锁定为当前 Person（服务端将再次核对身份）'
-      : !p.person_name ? 'AI 未识别出人名：可点「新建 Person」建档，或从 Person 页锁定对象后进入'
-      : canCreate ? '未找到同名 Person：可人工确认后新建（建档时服务端再次核对同名）'
-      : candidates.length ? '请点选明确的 Person（服务端已核对同名候选）' : '同名结果较多或需补充限定，请先在完整档案核对身份后再记录';
+    const hint = fixed ? t('person_locked')
+      : !p.person_name ? t('ai_no_name')
+      : canCreate ? t('no_same_name')
+      : candidates.length ? t('select_confirmed') : t('many_names');
     const candBox = h('div', {});
     let picked = fixed || null;
     const markActive = (node) => {
@@ -486,17 +489,17 @@ export function openQuickCapture(ctx, { personId, onDone } = {}) {
       candBox.appendChild(h('div', {
         class: 'cand' + (picked && String(picked.id) === String(c.id) ? ' active' : ''),
         onclick: (e) => { picked = c; markActive(e.currentTarget); },
-      }, `${c.displayName || c.display_name}（${c.occupation || '职业未填'} · ${c.organization || '机构未填'}）#${c.id}`));
+      }, `${c.displayName || c.display_name}（${c.occupation || t('occupation_empty')} · ${c.organization || t('organization_empty')}）#${c.id}`));
     });
     if (canCreate) {
       const newNameInput = h('input', {
         class: 'sheet-input', value: (resolution && resolution.displayName) || p.person_name || '',
-        maxlength: '160', placeholder: '新 Person 完整姓名',
+        maxlength: '160', placeholder: t('new_person_name_ph'),
       });
       const newCard = h('div', { class: 'cand', style: 'display:flex;flex-direction:column;align-items:stretch;gap:6px;cursor:default' }, [
-        h('div', { style: 'font-weight:700' }, '＋ 新建 Person（人工确认建档）'),
+        h('div', { style: 'font-weight:700' }, t('new_person_manual')),
         newNameInput,
-        h('div', { class: 'sheet-note' }, '测试账号只能使用【系统测试·勿联系】开头的姓名；确认后先建档、再写入本次互动。'),
+        h('div', { class: 'sheet-note' }, t('test_account_note')),
       ]);
       const selectNew = () => { picked = { isNew: true }; markActive(newCard); };
       newNameInput.addEventListener('focus', selectNew);
@@ -506,8 +509,8 @@ export function openQuickCapture(ctx, { personId, onDone } = {}) {
     if (!candidates.length && !canCreate) {
       candBox.appendChild(h('div', { class: 'sheet-err' }, hint));
     }
-    const typeSel = sel([['见面', '见面'], ['吃饭', '吃饭'], ['电话', '电话'], ['微信', '微信'],
-      ['活动', '活动'], ['其他', '其他']].map(([v, l]) => [v, l]), p.interaction_type || '见面');
+    const INTERACTION_TYPES = ['见面', '吃饭', '电话', '微信', '活动', '其他'];
+    const typeSel = sel(INTERACTION_TYPES.map((v) => [v, t('interaction_type_' + (v === '见面' ? 'meet' : v === '吃饭' ? 'meal' : v === '电话' ? 'call' : v === '微信' ? 'wechat' : v === '活动' ? 'activity' : 'other'))]), p.interaction_type || '见面');
     const dateInput = h('input', { class: 'sheet-input', type: 'date', value: p.interaction_date || todayStr() });
     const factList = [];
     const pushFacts = (arr) => (arr || []).forEach((x) => { if (x && String(x).trim()) factList.push(String(x).trim()); });
@@ -515,37 +518,37 @@ export function openQuickCapture(ctx, { personId, onDone } = {}) {
     if (!factList.length) factList.push('');
     const sigList = [];
     const pushSig = (note) => { if (note && String(note).trim()) sigList.push(String(note).trim()); };
-    if (p.opportunity && p.opportunity.has) pushSig(`机会信号：${p.opportunity.type || ''} ${p.opportunity.note || ''}`);
-    if (p.recruit_signal && p.recruit_signal.has) pushSig(`增员信号：${p.recruit_signal.note || ''}`);
-    if (p.referral_signal && p.referral_signal.has) pushSig(`转介绍信号：${p.referral_signal.note || ''}`);
+    if (p.opportunity && p.opportunity.has) pushSig(`${t('opportunity')}：${p.opportunity.type || ''} ${p.opportunity.note || ''}`);
+    if (p.recruit_signal && p.recruit_signal.has) pushSig(`${t('recruit')}：${p.recruit_signal.note || ''}`);
+    if (p.referral_signal && p.referral_signal.has) pushSig(`${t('opp_type_referral')}：${p.referral_signal.note || ''}`);
     if (!sigList.length) sigList.push('');
-    const factsWrap = listEditor(factList, '事实（发生了什么 / 需求 / 兴趣）', '最多 20 条，每条 ≤500 字');
-    const sigsWrap = listEditor(sigList, '信号（AI 判断，仅供记录）', '最多 12 条；不会自动建机会或改阶段');
+    const factsWrap = listEditor(factList, t('facts_label'), t('max_20_items'));
+    const sigsWrap = listEditor(sigList, t('signals_label'), t('max_12_signals'));
     const summaryTa = h('textarea', { class: 'sheet-textarea' },
       (p.facts || []).join('；') || '');
     const sheetBody = h('div', {}, [
-      fieldRow('交流对象（Person 身份）', candBox, hint),
+      fieldRow(t('link_person'), candBox, hint),
       h('div', { style: 'display:flex;gap:10px' }, [
-        h('div', { class: 'sheet-field', style: 'flex:1' }, [h('label', {}, '方式'), typeSel]),
-        h('div', { class: 'sheet-field', style: 'width:170px' }, [h('label', {}, '日期'), dateInput]),
+        h('div', { class: 'sheet-field', style: 'flex:1' }, [h('label', {}, t('method')), typeSel]),
+        h('div', { class: 'sheet-field', style: 'width:170px' }, [h('label', {}, t('date')), dateInput]),
       ]),
       factsWrap,
       sigsWrap,
-      fieldRow('互动摘要', summaryTa, '保存到互动时间线；≤2000 字。原话已留存为 rawNote。'),
+      fieldRow(t('interaction_summary'), summaryTa, t('summary_note')),
       h('div', { class: 'sheet-actions' }, [
-        h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => sheet.overlay.remove() }, '取消'),
+        h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => sheet.overlay.remove() }, t('cancel')),
         h('button', {
           class: 'btn btn-primary', type: 'button',
           onclick: async (e) => {
             const b = e.currentTarget;
-            if (!picked) { sheet.showErr('请先点选明确的 Person 身份（已有候选或新建）'); return; }
+            if (!picked) { sheet.showErr(t('select_person_first')); return; }
             const facts = factsWrap.readValues().filter((x) => x.trim()).slice(0, 20);
             const signals = sigsWrap.readValues().filter((x) => x.trim()).slice(0, 12);
             if (facts.some((x) => x.length > 500) || signals.some((x) => x.length > 500)) {
-              sheet.showErr('每条事实 / 信号不能超过 500 字'); return;
+              sheet.showErr(t('max_500_chars')); return;
             }
             const summary = (summaryTa.value || facts.join('；') || text).slice(0, 2000);
-            if (!summary.trim()) { sheet.showErr('请填写互动摘要或至少一条事实'); return; }
+            if (!summary.trim()) { sheet.showErr(t('fill_summary_or_fact')); return; }
             const commit = (personId, displayName) => p360(ctx, 'commitQuickCaptureV2', { data: {
               confirmed: true,
               personId: String(personId),
@@ -556,66 +559,65 @@ export function openQuickCapture(ctx, { personId, onDone } = {}) {
               },
               facts, signals,
             } });
-            busy(b, true, '保存中…');
+            busy(b, true, t('saving'));
             try {
               if (picked.isNew) {
                 // 新建分支：姓名可能被改过（或 AI 未识别人名）→ 先重新解析同名；再走 Person 建档预览。
                 let res = resolution;
                 const newNameInputEl = candBox.querySelector('.cand input');
                 const newName = (newNameInputEl ? newNameInputEl.value : '').trim();
-                if (!newName) { busy(b, false, '确认并保存'); sheet.showErr('请填写新 Person 姓名'); return; }
+                if (!newName) { busy(b, false, t('confirm_save')); sheet.showErr(t('enter_new_person_name')); return; }
                 if (!res || newName !== res.displayName) {
                   res = await p360(ctx, 'resolveQuickCaptureName', { name: newName });
                   if (res.hasMore || !['available', 'confirm_new_qualified'].includes(res.status)) {
-                    busy(b, false, '确认并保存');
-                    sheet.showErr('该姓名存在同名候选，请改用已有候选或补充括号限定后重试'); return;
+                    busy(b, false, t('confirm_save'));
+                    sheet.showErr(t('same_name_exists')); return;
                   }
                 }
                 const pv = await p360(ctx, 'previewIdentity', { data: {
                   kind: 'person', idempotencyKey: uuid(),
                   displayName: res.displayName, nameKey: res.nameKey,
                 } });
-                busy(b, false, '确认并保存');
+                busy(b, false, t('confirm_save'));
                 sheet.swap(h('div', {}, [
                   previewBlock([
-                    kvRow('① 新建 Person', res.displayName),
-                    kvRow('② 交流记录', `${typeSel.value} · ${dateInput.value || todayStr()}`),
-                    kvRow('事实 / 信号', `${facts.length} 条 / ${signals.length} 条`),
-                    h('div', { class: 'sheet-note', style: 'margin-top:8px' },
-                      '一次确认产生两项写入：服务端先建档 Person，再落本次互动与事实/信号。'),
+                    kvRow(t('step1_new_person'), res.displayName),
+                    kvRow(t('step2_interaction'), `${t('interaction_type_' + (typeSel.value === '见面' ? 'meet' : typeSel.value === '吃饭' ? 'meal' : typeSel.value === '电话' ? 'call' : typeSel.value === '微信' ? 'wechat' : typeSel.value === '活动' ? 'activity' : 'other'))} · ${dateInput.value || todayStr()}`),
+                    kvRow(t('facts_signals'), `${facts.length} / ${signals.length}`),
+                    h('div', { class: 'sheet-note', style: 'margin-top:8px' }, t('two_writes_note')),
                   ]),
                   h('div', { class: 'sheet-actions' }, [
-                    h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => sheet.overlay.remove() }, '取消'),
+                    h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => sheet.overlay.remove() }, t('cancel')),
                     h('button', {
                       class: 'btn btn-primary', type: 'button',
                       onclick: async (ev) => {
                         const bb = ev.currentTarget;
-                        busy(bb, true, '建档并保存中…');
+                        busy(bb, true, t('creating_saving'));
                         try {
                           const created = await p360(ctx, 'executeIdentity', { data: { previewId: pv.previewId } });
-                          if (!created || !created.personId) throw new Error('建档未返回 Person');
+                          if (!created || !created.personId) throw new Error(t('create_failed'));
                           await commit(created.personId, res.displayName);
                           sheet.overlay.remove();
-                          ctx.toast(`已新建 Person 并保存互动 #${created.personId}`, 'ok');
+                          ctx.toast(`${t('new_person_saved')}${created.personId}`, 'ok');
                           if (onDone) onDone();
-                        } catch (err) { busy(bb, false, '确认建档并保存'); sheet.showErr(err.message); }
+                        } catch (err) { busy(bb, false, t('confirm_create_save')); sheet.showErr(err.message); }
                       },
-                    }, '确认建档并保存'),
+                    }, t('confirm_create_save')),
                   ]),
                 ]));
                 return;
               }
               await commit(picked.id, picked.displayName || picked.display_name);
               sheet.overlay.remove();
-              ctx.toast('已记录并保存互动', 'ok');
+              ctx.toast(t('interaction_saved'), 'ok');
               if (onDone) onDone();
             } catch (err) {
-              busy(b, false, '确认并保存');
+              busy(b, false, t('confirm_save'));
               sheet.showErr(String(err.message || '').includes('Selected Person')
-                ? '所选 Person 身份已变化，请重新打开并选择' : err.message);
+                ? t('person_changed') : err.message);
             }
           },
-        }, '确认并保存'),
+        }, t('confirm_save')),
       ]),
     ]);
     sheet.swap(sheetBody);
@@ -628,7 +630,7 @@ export function openQuickCapture(ctx, { personId, onDone } = {}) {
       const rowEl = h('div', { class: 'sheet-item-row' }, [
         h('textarea', { class: 'sheet-textarea', style: 'min-height:44px;flex:1' }, value || ''),
         h('button', {
-          class: 'btn btn-ghost btn-sm', type: 'button', 'aria-label': '删除',
+          class: 'btn btn-ghost btn-sm', type: 'button', 'aria-label': t('delete_aria'),
           onclick: () => { rowEl.remove(); if (!rowsEl.children.length) addRow(''); },
         }, [ic('x')]),
       ]);
@@ -638,7 +640,7 @@ export function openQuickCapture(ctx, { personId, onDone } = {}) {
     const addBtn = h('button', {
       class: 'btn btn-ghost btn-sm', type: 'button', style: 'margin-top:6px',
       onclick: () => addRow(''),
-    }, [ic('plus'), '加一条']);
+    }, [ic('plus'), t('add_one')]);
     wrap.appendChild(h('label', {}, label));
     wrap.appendChild(rowsEl);
     wrap.appendChild(addBtn);
