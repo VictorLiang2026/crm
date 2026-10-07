@@ -13,6 +13,16 @@ import {
 
 const settled = (p) => Promise.resolve(p).then((v) => ({ ok: true, v }), (e) => ({ ok: false, e }));
 
+// 机会状态 i18n 映射（数据库值为中文）
+const OPP_STATUS_I18N = {
+  '发现': 'stage_discovered',
+  '沟通': 'stage_contacted',
+  '方案': 'stage_proposal',
+  '成交': 'stage_won',
+  '关闭': 'stage_closed',
+};
+function oppStatusLabel(status) { return t(OPP_STATUS_I18N[status] || status); }
+
 const WEEKDAY_KEYS = ['weekday_0', 'weekday_1', 'weekday_2', 'weekday_3', 'weekday_4', 'weekday_5', 'weekday_6'];
 
 function fmtBriefDate(d) {
@@ -277,7 +287,7 @@ export function renderToday(ctx) {
             h('div', { class: 'row-title' }, `${r.opportunity_type || t('opportunity')} · ${r.person ? r.person.display_name : t('unnamed')}`),
             h('div', { class: 'row-sub' }, textOf(r.next_action) || t('no_next_action')),
           ]),
-          bdg(r.status || t('discovered'), 'gold'),
+          bdg(oppStatusLabel(r.status) || t('discovered'), 'gold'),
         ])) : [emptyNote(t('no_opportunities'), '')],
     });
   });

@@ -18,6 +18,16 @@ const TYPE_LABEL = () => ({
   meeting: t('type_meeting'), call: t('type_call'), message: t('type_message'), note: t('type_note'),
 });
 
+// 机会状态 i18n 映射（数据库值为中文）
+const OPP_STATUS_I18N = {
+  '发现': 'stage_discovered',
+  '沟通': 'stage_contacted',
+  '方案': 'stage_proposal',
+  '成交': 'stage_won',
+  '关闭': 'stage_closed',
+};
+function oppStatusLabel(status) { return t(OPP_STATUS_I18N[status] || status); }
+
 function rowsBlock(rows, renderRow, emptyTitle, emptyNoteText) {
   if (!rows || !rows.length) return emptyNote(emptyTitle, emptyNoteText || '');
   return h('div', {}, rows.map(renderRow));
@@ -250,8 +260,8 @@ function opportunitiesNode(ctx, id) {
             h('div', { class: 'row-title' }, `${r.opportunity_type || t('opp_default')} · ${textOf(r.last_progress) || t('opp_no_progress')}`),
             h('div', { class: 'row-sub' }, `${t('label_next_action')}：${textOf(r.next_action) || t('label_none')}${r.next_action_date ? ' · ' + dueLabel(r.next_action_date) : ''} · ${t('label_discovered')} ${fmtDate(r.discovered_at)}`),
           ]),
-          bdg(r.status || t('opp_status_default'), r.status === t('opp_status_won') ? 'jade' : r.status === t('opp_status_closed') ? 'gray' : 'gold'),
-          r.status !== t('opp_status_won') && r.status !== t('opp_status_closed') ? h('button', {
+          bdg(oppStatusLabel(r.status) || t('opp_status_default'), r.status === '成交' ? 'jade' : r.status === '关闭' ? 'gray' : 'gold'),
+          r.status !== '成交' && r.status !== '关闭' ? h('button', {
             class: 'btn btn-ghost btn-sm', type: 'button',
             onclick: () => openOpportunityAdvance(ctx, { opportunity: r, onDone }),
           }, t('btn_advance_close')) : null,

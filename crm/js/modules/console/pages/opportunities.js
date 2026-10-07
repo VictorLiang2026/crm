@@ -15,6 +15,16 @@ const COL_KEYS = [
   ['opp_col_won', 'v3', '成交'],
 ];
 
+// 机会状态 i18n 映射（数据库值为中文）
+const OPP_STATUS_I18N = {
+  '发现': 'stage_discovered',
+  '沟通': 'stage_contacted',
+  '方案': 'stage_proposal',
+  '成交': 'stage_won',
+  '关闭': 'stage_closed',
+};
+function oppStatusLabel(status) { return t(OPP_STATUS_I18N[status] || status); }
+
 function describeDraft(d) {
   if (!d) return t('candidate_preview');
   if (typeof d === 'string') return d.slice(0, 140);
@@ -45,7 +55,7 @@ function oppCard(ctx, row, reload) {
           openOpportunityAdvance(ctx, { opportunity: row, personName: name, onDone: reload });
         },
       }, t('opp_btn_advance_close')),
-    ]) : bdg(row.status || '', row.status === '成交' ? 'jade' : 'gray'),
+    ]) : bdg(oppStatusLabel(row.status) || '', row.status === '成交' ? 'jade' : 'gray'),
   ]);
 }
 

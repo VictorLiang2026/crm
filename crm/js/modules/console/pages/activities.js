@@ -10,6 +10,17 @@ import {
 } from '../ui.js';
 
 const ACT_TABS = ['act_tab_flow', 'act_tab_attend', 'act_tab_acts', 'act_tab_candidates', 'act_tab_gifts', 'act_tab_photos', 'act_tab_review'];
+
+// 活动状态 i18n 映射
+const ACT_STATUS_I18N = {
+  'planned': 'act_status_planned',
+  'ongoing': 'act_status_ongoing',
+  'ended': 'act_status_ended',
+  'cancelled': 'act_status_cancelled',
+  'reviewed': 'act_status_reviewed',
+};
+function actStatusLabel(status) { return t(ACT_STATUS_I18N[status] || status); }
+
 const TASK_STATUS = {
   pending: ['status_pending', 'gray'], in_progress: ['status_in_progress', 'gold'],
   completed: ['status_completed', 'jade'], skipped: ['status_skipped', 'gray'],
@@ -65,7 +76,7 @@ export function renderActivities(ctx) {
             h('div', { class: 'row-sub' },
               [dateText, a.activity_type, a.location].map(textOf).filter(Boolean).join(' · ')),
           ]),
-          a.status ? bdg(a.status, diff != null && diff < 0 ? 'gray' : 'gold') : null,
+          a.status ? bdg(actStatusLabel(a.status), diff != null && diff < 0 ? 'gray' : 'gold') : null,
           ic('chevron', 'mut'),
         ]);
       }));
