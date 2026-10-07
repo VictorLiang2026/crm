@@ -45,16 +45,19 @@ PMC-00 文档发布后，以上 Git 基线将前移一个文档提交（无云�
 
 ## 5. 已登记缺口（观察项，非阻塞；修复须另获授权）
 
-| # | 缺口 | 影响 | 建议 |
-| --- | --- | --- | --- |
-| G1 | 外部迁移双备份滞后：`C:\Users\victor\cloudbase\migrations\` 51 份（最新 2026-10-03）vs 本地 82 份（最新 2026-10-07），约 31 份未同步 | 若本地盘故障，10-03 后的迁移无外部备份 | 下一个涉及数据库的包开工前先补齐双备份（纯复制操作，可届时请示） |
-| G2 | `tcb -v` 触发意外交互式部署计划（28 函数覆盖更新确认），停于 Y/n 未执行；事后 sync-check 证明零变化 | 误操作风险 | 只用显式命令（`fn list` 等）；禁用模糊参数；交互式提示出现立即停止 |
-| G3 | cloudbase-mcp 未注册为 Trae 会话可调用工具 | Trae 内不能直接调 queryPgDatabase | 已验证替代路径：Node 直启 `C:/Users/victor/AppData/Local/npm-cache/_npx/88d9f76c32260533/node_modules/@cloudbase/cloudbase-mcp/dist/cli.cjs`（stdio MCP，2.34.8） |
-| G4 | `tests/wp01/static.cjs` 一致性爬虫只从 admin.html 出发，console.html 模块链不在 sync-check 覆盖内 | console 文件漏部署不会被拦截（WP1 白屏事故根因） | console 相关部署人工核对 git 清单；待后续工作包把 console.html 加入遍历入口 |
+> 2026-10-07 用户指示处置；处置结果见 evidence/PMC-00.md 第九节。
+
+| # | 缺口 | 处置结果（2026-10-07） |
+| --- | --- | --- |
+| G1 | 外部迁移双备份滞后：`C:\Users\victor\cloudbase\migrations\` 与本地分叉（51 vs 82：43 缺失、13 同名旧草稿、12 本地已不存在的旧稿） | **待用户执行**：新增 `tools/sync-migration-backup.ps1`（先归档旧稿到 `_archive-20261007/` 再镜像、哈希校验，支持 `-DryRun`）。Trae 沙箱宿主拒绝向该外部目录写入（`dangerouslyDisableSandbox` 仍被拦），需用户在普通 PowerShell 运行一次：`powershell -NoProfile -ExecutionPolicy Bypass -File tools\sync-migration-backup.ps1`。用户运行并回报 `[PASS]` 后本项关闭 |
+| G2 | `tcb -v` 触发意外交互式部署计划 | **已修复**：`tools/tcb.ps1` 增加显式子命令守卫（无命令/首参数为 flag 即拒绝）；已双向验证（`-v` 两种调用方式均拦截，`fn list` 正常） |
+| G3 | cloudbase-mcp 未注册为 Trae 会话可调用工具 | **已修复**：新增 `tools/pg-readonly.cjs`——Trae/Codex 共用，经本机 cloudbase-mcp 执行单条 SELECT/WITH 只读查询；客户端拒绝 DDL/DML/多语句；已验证正常查询与三类拒绝路径。IDE 内 MCP 注册仍为可选项 |
+| G4 | 称静态爬虫不覆盖 console.html 模块链 | **核实为过时记录，已更正**：`tests/wp01/static.cjs` 的 PAGES 早已含 `console.html`（WP2 加入）；50 个受检资产 = 2 HTML + 48 个 console 模块链 JS/CSS；两次 sync-check 实测全绿。无需改代码 |
 
 ## 6. 失败与未验证项
 
 - PMC-00 范围内无失败项。
+- 待办验证：G1 外部备份同步脚本需用户在沙箱外运行并回报 `[PASS]`（82/82 哈希一致）。
 - 未验证（本包不要求）：业务回归、全量数据库结构盘点（沿用 2026-10-02 盘点基线）、`pr` schema 现状（禁入，不盘点）、真实登录与页面操作、`pr_*` 函数清单全量核对（仅确认存在）。
 
 ## 7. 状态口径
