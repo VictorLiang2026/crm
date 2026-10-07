@@ -6,3 +6,4 @@ export { renderOpportunities } from './pages/opportunities.js';
 export { renderActivities, renderActivity } from './pages/activities.js';
 export { renderRecruit } from './pages/recruit.js';
 export { renderAI, renderMore } from './pages/misc.js';
+export { renderSettings } from './pages/settings.js';

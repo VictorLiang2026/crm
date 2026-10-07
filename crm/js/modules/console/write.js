@@ -9,6 +9,7 @@
 import { h } from './dom.js';
 import { ic } from './icons.js';
 import { bdg, fmtDate, dueLabel, textOf } from './ui.js';
+import { t } from './i18n.js';
 
 // ---------- 调用与错误归一 ----------
 async function p360(ctx, action, extra) {
@@ -110,9 +111,9 @@ export function openWorkItemDone(ctx, { row, onDone }) {
   const titleText = kind === 'action' ? (row.title || '未命名行动') : (row.content || '未填写承诺');
   const body = h('div', {}, [
     h('p', { class: 'sheet-note', style: 'margin:0 0 10px' },
-      '先由服务端核对当前状态并生成预览，你确认后才写入完成状态。'),
+      t('preview_note')),
   ]);
-  const sheet = openSheet({ title: kind === 'action' ? '完成行动' : '完成承诺', sub: titleText, body });
+  const sheet = openSheet({ title: kind === 'action' ? t('complete_action') : t('complete_commitment'), sub: titleText, body });
   document.body.appendChild(sheet.overlay);
   (async () => {
     const res = await p360(ctx, 'previewWorkItem', { data: {
@@ -122,65 +123,65 @@ export function openWorkItemDone(ctx, { row, onDone }) {
     const pv = res.preview || {};
     sheet.swap(h('div', {}, [
       previewBlock([
-        kvRow('对象', pv.personName || ''),
-        kvRow('内容', titleText),
-        kvRow('到期', row.due_at ? dueLabel(String(row.due_at).slice(0, 10)) : ''),
+        kvRow(t('target'), pv.personName || ''),
+        kvRow(t('content'), titleText),
+        kvRow(t('due'), row.due_at ? dueLabel(String(row.due_at).slice(0, 10)) : ''),
         h('div', { class: 'kv-line' }, [
-          h('span', { class: 'kv-k' }, '状态'), bdg('待完成', 'gold'), h('span', {}, ' → '), bdg('已完成', 'jade'),
+          h('span', { class: 'kv-k' }, t('status')), bdg(t('pending'), 'gold'), h('span', {}, ' → '), bdg(t('completed'), 'jade'),
         ]),
         res.expiresAt ? h('div', { class: 'sheet-note', style: 'margin-top:8px' },
-          `预览有效期至 ${fmtDate(String(res.expiresAt).slice(0, 10))}，超时后需重新预览。`) : null,
+          `${t('preview_valid_until')} ${fmtDate(String(res.expiresAt).slice(0, 10))}${t('preview_expires_note')}`) : null,
       ]),
       h('div', { class: 'sheet-actions' }, [
-        h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => sheet.overlay.remove() }, '取消'),
+        h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => sheet.overlay.remove() }, t('cancel')),
         h('button', {
           class: 'btn btn-primary', type: 'button',
           onclick: async (e) => {
             const btn = e.currentTarget;
-            busy(btn, true, '写入中…');
+            busy(btn, true, t('writing'));
             try {
               await p360(ctx, 'executeWorkItem', { previewId: res.previewId });
               sheet.overlay.remove();
-              ctx.toast(kind === 'action' ? '行动已完成' : '承诺已履行', 'ok');
+              ctx.toast(kind === 'action' ? t('action_completed') : t('commitment_fulfilled'), 'ok');
               if (onDone) onDone();
-            } catch (err) { busy(btn, false, '确认完成'); sheet.showErr(err.message); }
+            } catch (err) { busy(btn, false, t('confirm_complete')); sheet.showErr(err.message); }
           },
-        }, '确认完成'),
+        }, t('confirm_complete')),
       ]),
     ]));
   })().catch((err) => {
     sheet.swap(h('div', {}, [h('div', { class: 'sheet-err' },
       (err.message || '').includes('state changed')
-        ? '该条目状态已变化（可能已完成或取消），请刷新列表后重试。'
-        : (err.message || '预览失败'))]));
+        ? t('state_changed')
+        : (err.message || t('preview_failed')))]));
   });
 }
 
 // ---------- 机会：推进 / 关闭 ----------
 export function openOpportunityAdvance(ctx, { opportunity, personName, onDone }) {
   const status = opportunity.status || '发现';
-  const modeSel = sel([['stage', '推进阶段'], ['close', '关闭 / 成交']], 'stage');
+  const modeSel = sel([['stage', t('advance_stage')], ['close', t('close_won')]], 'stage');
   const stageSel = sel(STAGE_OPTIONS.filter((s) => s !== status).map((s) => [s, s]), '沟通');
-  const closeSel = sel([['成交', '成交'], ['关闭', '关闭']], '成交');
-  const resultTa = h('textarea', { class: 'sheet-textarea', placeholder: '必填：记录本次结果（Outcome），≤4000 字' });
+  const closeSel = sel([['成交', t('won')], ['关闭', t('closed')]], '成交');
+  const resultTa = h('textarea', { class: 'sheet-textarea', placeholder: t('outcome_required') });
   const form = h('div', {}, [
-    fieldRow('操作', modeSel),
-    h('div', { id: 'opp-stage-wrap' }, [fieldRow('推进到', stageSel,
-      `当前阶段：${status}；阶段不由 AI 自动推进`)]),
+    fieldRow(t('operation'), modeSel),
+    h('div', { id: 'opp-stage-wrap' }, [fieldRow(t('advance_to'), stageSel,
+      `${t('current_stage')}${status}；${t('no_auto_advance')}`)]),
     h('div', { id: 'opp-close-wrap', style: 'display:none' }, [
-      fieldRow('结果', closeSel),
-      fieldRow('结果说明', resultTa, '服务端会核对机会状态未变；关闭同时记录 Outcome。'),
+      fieldRow(t('result'), closeSel),
+      fieldRow(t('result_note'), resultTa, t('close_check_note')),
     ]),
   ]);
   const sheet = openSheet({
-    title: '推进 / 关闭机会',
-    sub: `${OPP_TYPE_CN[opportunity.opportunity_type] || opportunity.opportunity_type || '机会'} · ${personName || ''}`,
+    title: t('advance_close_opp'),
+    sub: `${OPP_TYPE_CN[opportunity.opportunity_type] || opportunity.opportunity_type || t('opportunity')} · ${personName || ''}`,
     body: h('div', {}, [
-      h('p', { class: 'sheet-note', style: 'margin:0 0 10px' }, '先预览变更，确认后才写入。'),
+      h('p', { class: 'sheet-note', style: 'margin:0 0 10px' }, t('preview_before_write')),
       form,
       h('div', { class: 'sheet-actions' }, [
-        h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => sheet.overlay.remove() }, '取消'),
-        h('button', { class: 'btn btn-primary', type: 'button', onclick: (e) => doPreview(e.currentTarget) }, '生成预览'),
+        h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => sheet.overlay.remove() }, t('cancel')),
+        h('button', { class: 'btn btn-primary', type: 'button', onclick: (e) => doPreview(e.currentTarget) }, t('generate_preview')),
       ]),
     ]),
   });
@@ -207,31 +208,31 @@ export function openOpportunityAdvance(ctx, { opportunity, personName, onDone })
   function renderConfirm(res, draft) {
     sheet.swap(h('div', {}, [
       previewBlock([
-        kvRow('对象', (res.preview && res.preview.personName) || personName || ''),
-        kvRow('内容', `${OPP_TYPE_CN[opportunity.opportunity_type] || '机会'}（${status}）`),
+        kvRow(t('target'), (res.preview && res.preview.personName) || personName || ''),
+        kvRow(t('content'), `${OPP_TYPE_CN[opportunity.opportunity_type] || t('opportunity')}（${status}）`),
         h('div', { class: 'kv-line' }, [
-          h('span', { class: 'kv-k' }, '变更'),
+          h('span', { class: 'kv-k' }, t('change')),
           bdg(status, 'gray'), h('span', {}, ' → '),
           bdg(draft.status, draft.status === '成交' ? 'jade' : 'gold'),
         ]),
-        draft.result ? kvRow('结果说明', draft.result.slice(0, 120)) : null,
-        h('div', { class: 'sheet-note', style: 'margin-top:8px' }, '预览不写业务数据；执行后立即生效。'),
+        draft.result ? kvRow(t('result_note'), draft.result.slice(0, 120)) : null,
+        h('div', { class: 'sheet-note', style: 'margin-top:8px' }, t('preview_no_write')),
       ]),
       h('div', { class: 'sheet-actions' }, [
-        h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => sheet.overlay.remove() }, '取消'),
+        h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => sheet.overlay.remove() }, t('cancel')),
         h('button', {
           class: 'btn btn-primary', type: 'button',
           onclick: async (e) => {
             const btn = e.currentTarget;
-            busy(btn, true, '写入中…');
+            busy(btn, true, t('writing'));
             try {
               await p360(ctx, 'executeOpportunity', { previewId: res.previewId });
               sheet.overlay.remove();
-              ctx.toast(draft.status === '成交' ? '恭喜，机会已成交' : '机会已更新', 'ok');
+              ctx.toast(draft.status === '成交' ? t('opp_won') : t('opp_updated'), 'ok');
               if (onDone) onDone();
-            } catch (err) { busy(btn, false, '确认执行'); sheet.showErr(err.message); }
+            } catch (err) { busy(btn, false, t('confirm_execute')); sheet.showErr(err.message); }
           },
-        }, '确认执行'),
+        }, t('confirm_execute')),
       ]),
     ]));
   }
@@ -248,29 +249,29 @@ export function openOpportunityCreate(ctx, { onDone }) {
   const dateInput = h('input', { class: 'sheet-input', type: 'date' });
   let picked = null;
   const sheet = openSheet({
-    title: '新建机会', sub: '先核对 Person，再填写机会信息；预览确认后才写入。',
+    title: t('new_opp'), sub: t('new_opp_sub'),
     body: h('div', {}, [
-      fieldRow('关联 Person', h('div', { style: 'display:flex;gap:8px' }, [nameInput, searchBtn])),
+      fieldRow(t('link_person'), h('div', { style: 'display:flex;gap:8px' }, [nameInput, searchBtn])),
       candBox,
-      fieldRow('机会类型', typeSel),
-      fieldRow('当前进展', progressTa),
-      fieldRow('下一步', nextInput),
-      fieldRow('下一步日期', dateInput, '可留空 = 暂不排期'),
+      fieldRow(t('opp_type'), typeSel),
+      fieldRow(t('current_progress'), progressTa),
+      fieldRow(t('next_step'), nextInput),
+      fieldRow(t('next_date'), dateInput, t('date_optional')),
       h('div', { class: 'sheet-actions' }, [
-        h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => sheet.overlay.remove() }, '取消'),
-        h('button', { class: 'btn btn-primary', type: 'button', onclick: (e) => doPreview(e.currentTarget) }, '生成预览'),
+        h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => sheet.overlay.remove() }, t('cancel')),
+        h('button', { class: 'btn btn-primary', type: 'button', onclick: (e) => doPreview(e.currentTarget) }, t('generate_preview')),
       ]),
     ]),
   });
   document.body.appendChild(sheet.overlay);
   async function doSearch() {
     const name = nameInput.value.trim();
-    candBox.replaceChildren(h('div', { class: 'sheet-note' }, '搜索中…'));
-    if (!name) { candBox.replaceChildren(h('div', { class: 'sheet-note' }, '请输入姓名')); return; }
+    candBox.replaceChildren(h('div', { class: 'sheet-note' }, t('searching')));
+    if (!name) { candBox.replaceChildren(h('div', { class: 'sheet-note' }, t('enter_name'))); return; }
     try {
       const res = await p360(ctx, 'search', { name });
       const rows = res.candidates || [];
-      if (!rows.length) { candBox.replaceChildren(h('div', { class: 'sheet-err' }, '未找到同名 Person')); return; }
+      if (!rows.length) { candBox.replaceChildren(h('div', { class: 'sheet-err' }, t('no_person_found'))); return; }
       picked = rows.length === 1 ? rows[0] : null;
       candBox.replaceChildren(rows.map((c) => h('div', {
         class: 'cand' + (rows.length === 1 ? ' active' : ''),
@@ -279,17 +280,17 @@ export function openOpportunityCreate(ctx, { onDone }) {
           candBox.querySelectorAll('.cand').forEach((n) => n.classList.remove('active'));
           e.currentTarget.classList.add('active');
         },
-      }, `${c.display_name || c.displayName}（${c.occupation || '职业未填'} · ${c.organization || '机构未填'}）#${c.id}`)),
+      }, `${c.display_name || c.displayName}（${c.occupation || t('occupation_empty')} · ${c.organization || t('organization_empty')}）#${c.id}`)),
       h('div', { class: 'sheet-note', style: 'margin-top:6px' },
-        rows.length === 1 ? '已自动选定唯一候选' : '请点选明确的 Person'));
+        rows.length === 1 ? t('auto_selected') : t('select_person')));
     } catch (err) { candBox.replaceChildren(h('div', { class: 'sheet-err' }, err.message)); }
   }
   async function doPreview(btn) {
     sheet.showErr('');
-    if (!picked) { sheet.showErr('请先搜索并点选 Person'); return; }
-    if (!progressTa.value.trim()) { sheet.showErr('请填写当前进展'); return; }
-    if (!nextInput.value.trim()) { sheet.showErr('请填写下一步'); return; }
-    busy(btn, true, '预览中…');
+    if (!picked) { sheet.showErr(t('select_person_first')); return; }
+    if (!progressTa.value.trim()) { sheet.showErr(t('fill_progress')); return; }
+    if (!nextInput.value.trim()) { sheet.showErr(t('fill_next_step')); return; }
+    busy(btn, true, t('previewing'));
     try {
       const res = await p360(ctx, 'previewOpportunity', { data: {
         idempotencyKey: uuid(), operation: 'create',

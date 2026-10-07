@@ -3,22 +3,23 @@ import { h } from '../dom.js';
 import { ic } from '../icons.js';
 import { data } from '../data.js';
 import { wpTag, pageHead, emptyNote, loadInto, bdg, textOf } from '../ui.js';
+import { t } from '../i18n.js';
 
 const PAGE_SIZE = 20;
-const ROLE_BADGE = {
-  customer: ['客户', 'ink'],
-  recruit: ['增员', 'gold'],
-  speaker: ['嘉宾', 'jade'],
-};
+const ROLE_BADGE = () => ({
+  customer: [t('customer'), 'ink'],
+  recruit: [t('recruit'), 'gold'],
+  speaker: [t('speaker'), 'jade'],
+});
 
-const SORT_COLUMNS = [
-  { field: 'display_name', label: '姓名' },
-  { field: 'sales_priority', label: '优先级' },
-  { field: 'customer_stage', label: '客户经营阶段' },
-  { field: 'latest_followup_date', label: '本次跟进日期' },
-  { field: 'next_followup_date', label: '下次跟进日期' },
-  { field: 'id', label: '编号' },
-];
+const SORT_COLUMNS = () => ([
+  { field: 'display_name', label: t('col_name') },
+  { field: 'sales_priority', label: t('col_priority') },
+  { field: 'customer_stage', label: t('col_customer_stage'), full: t('col_customer_stage_full') },
+  { field: 'latest_followup_date', label: t('col_latest_followup'), full: t('col_latest_followup_full') },
+  { field: 'next_followup_date', label: t('col_next_followup'), full: t('col_next_followup_full') },
+  { field: 'id', label: t('col_id') },
+]);
 
 function fmtDate(v) {
   if (!v) return '-';
@@ -30,9 +31,9 @@ export function renderPeople(ctx) {
   const state = { page: 1, keyword: '', sortField: 'id', sortDir: 'desc' };
   const listEl = h('div', {});
   const metaEl = h('span', { class: 'foot-note' }, '');
-  const input = h('input', { placeholder: '搜索姓名' });
-  const prevBtn = h('button', { class: 'btn btn-ghost btn-sm', type: 'button' }, '上一页');
-  const nextBtn = h('button', { class: 'btn btn-ghost btn-sm', type: 'button' }, '下一页');
+  const input = h('input', { placeholder: t('search_name_ph') });
+  const prevBtn = h('button', { class: 'btn btn-ghost btn-sm', type: 'button' }, t('btn_prev'));
+  const nextBtn = h('button', { class: 'btn btn-ghost btn-sm', type: 'button' }, t('btn_next'));
   const pageInfo = h('span', { class: 'pager-info' }, '');
 
   function arrow(field) {
@@ -47,32 +48,38 @@ export function renderPeople(ctx) {
         sortField: state.sortField, sortDir: state.sortDir,
       });
       const rows = res.rows || [];
-      metaEl.textContent = state.keyword ? `「${state.keyword}」共 ${res.total} 人` : `共 ${res.total} 人`;
+      metaEl.textContent = state.keyword
+        ? t('meta_total_kw').replace('{kw}', state.keyword).replace('{total}', res.total)
+        : t('meta_total').replace('{total}', res.total);
       pageInfo.textContent = `${res.page} / ${res.totalPages || 1}`;
       prevBtn.disabled = res.page <= 1;
       nextBtn.disabled = !res.hasMore;
       if (!rows.length) {
-        return h('div', { class: 'card-body' }, [emptyNote('没有匹配的人物', state.keyword ? '换个姓名关键词试试。' : '尚无人物记录。')]);
+        return h('div', { class: 'card-body' }, [emptyNote(t('empty_no_people'), state.keyword ? t('empty_people_hint') : t('empty_people_note'))]);
       }
-      const thead = h('thead', {}, h('tr', {}, SORT_COLUMNS.map((col) => {
-        const th = h('th', { class: 'sortable-th', onclick: () => {
-          if (state.sortField === col.field) {
-            state.sortDir = state.sortDir === 'asc' ? 'desc' : 'asc';
-          } else {
-            state.sortField = col.field;
-            state.sortDir = 'asc';
-          }
-          state.page = 1;
-          runQuery();
-        } }, `${col.label}${arrow(col.field)}`);
+      const thead = h('thead', {}, h('tr', {}, SORT_COLUMNS().map((col) => {
+        const th = h('th', {
+          class: 'sortable-th',
+          title: col.full || undefined,
+          onclick: () => {
+            if (state.sortField === col.field) {
+              state.sortDir = state.sortDir === 'asc' ? 'desc' : 'asc';
+            } else {
+              state.sortField = col.field;
+              state.sortDir = 'asc';
+            }
+            state.page = 1;
+            runQuery();
+          },
+        }, `${col.label}${arrow(col.field)}`);
         return th;
       })));
       const tbody = h('tbody', {}, rows.map((p) => {
         const badges = (p.roles || []).map((role) => {
-          const [label, tone] = ROLE_BADGE[role] || [role, 'gray'];
+          const [label, tone] = ROLE_BADGE()[role] || [role, 'gray'];
           return bdg(label, tone);
         });
-        if (p.recruit_id) badges.push(bdg('在增员', 'gold'));
+        if (p.recruit_id) badges.push(bdg(t('badge_recruiting'), 'gold'));
         return h('tr', { onclick: () => { location.hash = `#/person/${p.id}`; } }, [
           h('td', {}, h('a', {}, [p.display_name, h('span', { class: 'badge-stack' }, badges)])),
           h('td', {}, p.sales_priority || '-'),
@@ -97,13 +104,13 @@ export function renderPeople(ctx) {
 
   ctx.main.replaceChildren(
     pageHead({
-      kicker: 'PEOPLE', title: '人物目录', tag: wpTag('WP1 只读'),
-      sub: '客户、增员、嘉宾统一为 Person 身份；表头可点击排序。',
+      kicker: t('kicker_people'), title: t('title_people'), tag: wpTag(t('wp1_readonly')),
+      sub: t('sub_people'),
     }),
     h('div', { class: 'toolbar' }, [
       h('div', { class: 'searchbox' }, [
         ic('search'), input,
-        h('button', { class: 'btn btn-primary btn-sm', type: 'button', onclick: doSearch }, '搜索'),
+        h('button', { class: 'btn btn-primary btn-sm', type: 'button', onclick: doSearch }, t('btn_search')),
       ]),
     ]),
     h('section', { class: 'card' }, [

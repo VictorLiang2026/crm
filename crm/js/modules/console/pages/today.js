@@ -4,6 +4,7 @@
 import { h } from '../dom.js';
 import { ic } from '../icons.js';
 import { data } from '../data.js';
+import { t, getLang } from '../i18n.js';
 import { openWorkItemDone, openCandidate } from '../write.js';
 import {
   wpTag, sk, pageHead, card, emptyNote, loadInto, bdg, avatar,
@@ -17,7 +18,7 @@ function briefLoadingCard() {
   const week = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'][d.getDay()];
   return h('section', { class: 'brief' }, [
     h('div', { class: 'brief-head' }, [
-      ic('bell'), h('b', {}, '晨间简报'), wpTag('AI 生成'),
+      ic('bell'), h('b', {}, t('morning_brief')), wpTag(t('ai_generated')),
       h('span', { style: 'margin-left:auto;font-size:12px;opacity:.7' },
         `${d.getMonth() + 1} 月 ${d.getDate()} 日 · ${week}`),
     ]),
@@ -35,11 +36,11 @@ function briefCard(sections) {
   const mb = sections.morningBrief || {};
   const actions = sections.topActions || [];
   const counts = mb.counts || {};
-  const sourceTag = mb.guidanceSource === 'ai' ? 'AI 建议' : '规则建议';
+  const sourceTag = mb.guidanceSource === 'ai' ? t('ai_advice') : t('rule_advice');
   const sourceTone = mb.guidanceSource === 'ai' ? 'ink' : 'gray';
   return h('section', { class: 'brief' }, [
     h('div', { class: 'brief-head' }, [
-      ic('bell'), h('b', {}, '晨间简报'), bdg(sourceTag, sourceTone),
+      ic('bell'), h('b', {}, t('morning_brief')), bdg(sourceTag, sourceTone),
       h('span', { style: 'margin-left:auto;font-size:12px;opacity:.7' },
         `${d.getMonth() + 1} 月 ${d.getDate()} 日 · ${week}`),
     ]),
@@ -52,19 +53,19 @@ function briefCard(sections) {
         h('a', { class: 'brief-row data-row', href: a.target || '#/today' }, [
           h('span', { class: 'brief-num' }, String(i + 1)),
           h('div', { style: 'flex:1;min-width:0' }, [
-            h('div', { class: 'row-title' }, a.title || '未命名行动'),
+            h('div', { class: 'row-title' }, a.title || t('unnamed_action')),
             h('div', { class: 'row-sub' }, [
               a.personName ? `${a.personName} · ` : '',
               a.whyNow || '',
               a.source ? h('span', { class: 'src-tag', title: a.source }, a.source.split('#')[0]) : null,
             ].filter(Boolean)),
           ]),
-        ])) : [h('div', { class: 'brief-empty' }, '当前没有优先行动')]),
+        ])) : [h('div', { class: 'brief-empty' }, t('no_actions'))]),
     ]),
     counts && Object.values(counts).some(Boolean) ? h('div', { class: 'brief-foot' }, [
-      counts.overdueCommitments ? bdg(`逾期承诺 ${counts.overdueCommitments}`, 'red') : null,
-      counts.needConfirmation ? bdg(`待确认 ${counts.needConfirmation}`, 'gold') : null,
-      counts.opportunities ? bdg(`开放机会 ${counts.opportunities}`, 'ink') : null,
+      counts.overdueCommitments ? bdg(`${t('overdue')} ${counts.overdueCommitments}`, 'red') : null,
+      counts.needConfirmation ? bdg(`${t('pending')} ${counts.needConfirmation}`, 'gold') : null,
+      counts.opportunities ? bdg(`${t('opportunities')} ${counts.opportunities}`, 'ink') : null,
     ].filter(Boolean)) : null,
   ]);
 }
@@ -88,30 +89,30 @@ function rankActions(rows) {
 }
 
 function actionRow(ctx, item, onDone) {
-  const name = item.person_name || '未命名';
-  const labelMap = { M: ['必做', 'red'], R: ['应做', 'ink'], O: ['可做', 'gray'] };
+  const name = item.person_name || t('unnamed');
+  const labelMap = { M: [t('must_do'), 'red'], R: [t('should_do'), 'ink'], O: [t('can_do'), 'gray'] };
   const [text, tone] = labelMap[item.level];
   return h('div', { class: 'list-row' }, [
     avatar(name),
     h('div', { style: 'flex:1;min-width:0' }, [
-      h('div', { class: 'row-title' }, item.title || '未命名行动'),
+      h('div', { class: 'row-title' }, item.title || t('unnamed_action')),
       h('div', { class: 'row-sub' }, `${name} · ${dueLabel(item._due)}`),
     ]),
     bdg(text, tone),
     h('button', {
       class: 'btn btn-ghost btn-sm', type: 'button',
       onclick: () => openWorkItemDone(ctx, { row: item, onDone }),
-    }, [ic('check'), '完成']),
+    }, [ic('check'), t('done')]),
   ]);
 }
 
 function describeCandidate(row) {
   const d = row.draft;
-  if (!d) return '机会候选（详情待预览）';
+  if (!d) return t('candidate_preview');
   if (typeof d === 'string') return d.slice(0, 140);
   const t = d.opportunity_type || d.title || d.type || '';
   const p = d.last_progress || d.reason || d.summary || '';
-  return [t, p].filter(Boolean).join(' · ').slice(0, 140) || '机会候选（详情待预览）';
+  return [t, p].filter(Boolean).join(' · ').slice(0, 140) || t('candidate_preview');
 }
 
 export function renderToday(ctx) {
@@ -151,15 +152,15 @@ export function renderToday(ctx) {
       h('span', {}, label),
     ]);
     return h('div', { class: 'stat-row' }, [
-      stat('待办行动', activeCount, 'var(--red)'),
-      stat('待履承诺', dueCount, 'var(--gold)'),
-      stat('待确认候选', pendingCount, 'var(--ink-2)'),
-      stat('近期活动', upcomingCount, 'var(--jade)'),
+      stat(t('todo_actions'), activeCount, 'var(--red)'),
+      stat(t('due_commitments'), dueCount, 'var(--gold)'),
+      stat(t('pending_candidates'), pendingCount, 'var(--ink-2)'),
+      stat(t('upcoming_activities'), upcomingCount, 'var(--jade)'),
     ]);
   }, h('div', { class: 'stat-row' },
     [1, 2, 3, 4].map(() => h('div', { class: 'stat' }, [
       h('b', {}, h('span', { class: 'sk', style: 'width:26px;height:22px;display:inline-block' })),
-      h('span', {}, '加载中'),
+      h('span', {}, t('loading')),
     ]))));
 
   loadInto(today5El, async () => {
@@ -167,10 +168,10 @@ export function renderToday(ctx) {
     if (!work.ok) throw work.e;
     const picks = rankActions(work.v.rows);
     return card({
-      title: '优先行动 · Today 5', icon: 'chevron', tag: wpTag('事实版'),
-      body: picks.length ? picks.map((r) => actionRow(ctx, r, reload)) : [emptyNote('今天没有待办行动', '开放行动都已完成，或还没有记录行动。')],
+      title: t('priority_actions'), icon: 'chevron', tag: wpTag(t('fact')),
+      body: picks.length ? picks.map((r) => actionRow(ctx, r, reload)) : [emptyNote(t('no_actions_today'), t('no_actions_note'))],
       foot: [
-        h('span', { class: 'foot-note' }, '按 必做 M（红）/ 应做 R（墨）/ 可做 O（灰）规则排序；完成后需在弹层确认'),
+        h('span', { class: 'foot-note' }, t('today_foot')),
       ],
     });
   });
@@ -180,22 +181,22 @@ export function renderToday(ctx) {
     if (!pending.ok) throw pending.e;
     const rows = pending.v.rows || [];
     return card({
-      title: '需要你确认', icon: 'shield', tag: wpTag('写入'),
+      title: t('need_confirmation'), icon: 'shield', tag: wpTag(t('write')),
       body: rows.length
         ? rows.slice(0, 5).map((row) => h('div', { class: 'list-row' }, [
           avatar(row.personName, true),
           h('div', { style: 'flex:1;min-width:0' }, [
-            h('div', { class: 'row-title' }, row.personName || '未命名'),
+            h('div', { class: 'row-title' }, row.personName || t('unnamed')),
             h('div', { class: 'row-sub' }, describeCandidate(row)),
           ]),
-          bdg('候选', 'gold'),
+          bdg(t('candidate'), 'gold'),
           h('button', {
             class: 'btn btn-soft btn-sm', type: 'button',
             onclick: () => openCandidate(ctx, { row, onDone: reload }),
-          }, '审核'),
+          }, t('review')),
         ]))
-        : [emptyNote('暂无待确认候选', '机会候选由服务端在互动中生成，审核后才建真实机会。')],
-      foot: [h('span', { class: 'foot-note' }, '拒绝 / 编辑 / 接受并建机会，全部先经服务端预览，由你确认')],
+        : [emptyNote(t('no_pending_candidates'), t('no_pending_note'))],
+      foot: [h('span', { class: 'foot-note' }, t('candidate_foot'))],
     });
   });
 
@@ -206,7 +207,7 @@ export function renderToday(ctx) {
     const reminders = (cp.v.reminders || []).slice(0, 2);
     const trendTone = { up: 'jade', down: 'red', flat: 'gray' };
     return card({
-      title: '今日节奏', icon: 'bell', tag: wpTag('规则'),
+      title: t('today_rhythm'), icon: 'bell', tag: wpTag(t('rule')),
       body: [
         h('div', { class: 'mini-grid' }, trends.map((t) =>
           h('div', { class: 'mini' }, [
@@ -231,13 +232,13 @@ export function renderToday(ctx) {
       ...due.v.dueSoon.map((r) => ({ ...r, _grp: 'dueSoon' }))].slice(0, 4);
     const typeMap = { THEY_PROMISED: ['对方承诺', 'gold'], I_PROMISED: ['我承诺', 'ink'], MUTUAL: ['双向', 'red'] };
     return card({
-      title: '双向承诺', icon: 'shield', tag: wpTag('事实'),
+      title: t('mutual_commitments'), icon: 'shield', tag: wpTag(t('fact')),
       body: rows.length ? rows.map((r) => {
-        const [label, tone] = typeMap[r.commitment_type] || ['承诺', 'gray'];
+        const [label, tone] = typeMap[r.commitment_type] || [t('commitment'), 'gray'];
         return h('div', { class: 'list-row' }, [
           h('div', { style: 'flex:1;min-width:0' }, [
-            h('div', { class: 'row-title' }, r.content || '未填写内容'),
-            h('div', { class: 'row-sub' }, `${r.person_name || '未命名'} · ${dueLabel(String(r.due_at || '').slice(0, 10))}`),
+            h('div', { class: 'row-title' }, r.content || t('no_content')),
+            h('div', { class: 'row-sub' }, `${r.person_name || t('unnamed')} · ${dueLabel(String(r.due_at || '').slice(0, 10))}`),
           ]),
           bdg(label, tone),
           h('button', {
@@ -247,15 +248,15 @@ export function renderToday(ctx) {
                 content: r.content, due_at: r.due_at },
               onDone: reload,
             }),
-          }, [ic('check'), '完成']),
+          }, [ic('check'), t('done')]),
         ]);
-      }) : [emptyNote('近期没有到期承诺', '')],
+      }) : [emptyNote(t('no_due_commitments'), '')],
     });
   });
 
   const riskCard = card({
-    title: '关系风险', icon: 'sparkle', tag: wpTag('后续'),
-    body: [emptyNote('批量关系风险需新增只读接口', '按本轮范围（零云函数变更）保留骨架，待后续单独报批。')],
+    title: t('relation_risk'), icon: 'sparkle', tag: wpTag(t('later')),
+    body: [emptyNote(t('risk_placeholder'), t('risk_note'))],
   });
 
   loadInto(oppEl, async () => {
@@ -263,15 +264,15 @@ export function renderToday(ctx) {
     if (!opps.ok) throw opps.e;
     const rows = (opps.v.rows || []).filter((r) => !['成交', '关闭'].includes(r.status));
     return card({
-      title: '机会速览', icon: 'target', tag: wpTag('事实'),
+      title: t('opportunity_overview'), icon: 'target', tag: wpTag(t('fact')),
       body: rows.length ? rows.slice(0, 5).map((r) =>
         h('a', { class: 'list-row data-row', href: r.person ? `#/person/${r.person.id}` : '#/opportunities' }, [
           h('div', { style: 'flex:1;min-width:0' }, [
-            h('div', { class: 'row-title' }, `${r.opportunity_type || '机会'} · ${r.person ? r.person.display_name : '未关联人物'}`),
-            h('div', { class: 'row-sub' }, textOf(r.next_action) || '暂无下一步'),
+            h('div', { class: 'row-title' }, `${r.opportunity_type || t('opportunity')} · ${r.person ? r.person.display_name : t('unnamed')}`),
+            h('div', { class: 'row-sub' }, textOf(r.next_action) || t('no_next_action')),
           ]),
-          bdg(r.status || '发现', 'gold'),
-        ])) : [emptyNote('暂无进行中的机会', '')],
+          bdg(r.status || t('discovered'), 'gold'),
+        ])) : [emptyNote(t('no_opportunities'), '')],
     });
   });
 
@@ -283,8 +284,8 @@ export function renderToday(ctx) {
 
   ctx.main.replaceChildren(
     pageHead({
-      kicker: 'TODAY', title: `早安，${ctx.operator.name || 'Victor'} · 今天先做什么`,
-      sub: '先定要事，再看数字。Today 5 为规则排序的开放行动；晨间简报经 AI Gateway 生成。',
+      kicker: t('kicker_today'), title: `${t('good_morning')}，${ctx.operator.name || 'Victor'} · ${t('today_first')}`,
+      sub: t('today_sub'),
     }),
     h('div', { class: 'today-grid' }, [
       h('div', {}, [

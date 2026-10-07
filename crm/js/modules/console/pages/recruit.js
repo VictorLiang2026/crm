@@ -4,13 +4,23 @@ import { h } from '../dom.js';
 import { ic } from '../icons.js';
 import { data } from '../data.js';
 import { wpTag, pageHead, emptyNote, loadInto, bdg, fmtDate, dayDiffFromToday, textOf } from '../ui.js';
+import { t } from '../i18n.js';
 
-const FUNNEL_STAGES = ['新增人才', '互动破冰', '初次面谈', '增员活动', '精准面谈', '入职申请', '签约入职', '流失'];
+const FUNNEL_STAGES = () => [
+  t('funnel_stage_new'),
+  t('funnel_stage_icebreak'),
+  t('funnel_stage_first_meeting'),
+  t('funnel_stage_activity'),
+  t('funnel_stage_precision_meeting'),
+  t('funnel_stage_onboarding_apply'),
+  t('funnel_stage_signed'),
+  t('funnel_stage_lost'),
+];
 
 function stageTone(stage) {
-  if (stage === '流失') return 'gray';
-  if (stage === '签约入职') return 'jade';
-  if (stage === '入职申请' || stage === '精准面谈') return 'red';
+  if (stage === t('funnel_stage_lost')) return 'gray';
+  if (stage === t('funnel_stage_signed')) return 'jade';
+  if (stage === t('funnel_stage_onboarding_apply') || stage === t('funnel_stage_precision_meeting')) return 'red';
   return 'gold';
 }
 
@@ -37,31 +47,31 @@ function listNode(ctx) {
       ...(legacy.rows || []).map((r) => norm(r, 'legacy')),
       ...(personOnly.rows || []).map((r) => norm(r, 'person')),
     ].sort((a, b) => String(b.nextDate || '').localeCompare(String(a.nextDate || '')));
-    if (!rows.length) return emptyNote('暂无增员候选人', '新增人才在 WP2 接入。');
+    if (!rows.length) return emptyNote(t('empty_no_recruit_candidates'), t('empty_no_recruit_candidates_note'));
 
     function openPerson(row, ev) {
       ev.preventDefault();
       if (row.personId) { location.hash = `#/person/${row.personId}`; return; }
       data.lookupCustomer(ctx, row.customerId).then((res) => {
         location.hash = `#/person/${res.personId}`;
-      }).catch(() => ctx.toast('该旧客户尚未建立 Person 身份，WP2 接入身份处理'));
+      }).catch(() => ctx.toast(t('toast_no_person_identity')));
     }
     return h('div', { class: 'card-body' }, rows.map((row) => {
       const diff = dayDiffFromToday(row.nextDate);
       const subParts = [
         row.occupation,
-        textOf(row.nextAction) ? '下一步：' + row.nextAction : '',
-        row.nextDate ? `${fmtDate(row.nextDate)}${diff != null && diff < 0 ? '（已过 ' + -diff + ' 天）' : ''}` : '',
-        row.idleDays ? `停留 ${row.idleDays} 天` : '',
+        textOf(row.nextAction) ? t('next_step') + row.nextAction : '',
+        row.nextDate ? `${fmtDate(row.nextDate)}${diff != null && diff < 0 ? t('overdue_days_prefix') + (-diff) + t('day_unit') + t('overdue_days_suffix') : ''}` : '',
+        row.idleDays ? t('idle_days_prefix') + row.idleDays + t('day_unit') : '',
       ].filter(Boolean);
       return h('a', { class: 'list-row data-row', href: '#', onclick: (ev) => openPerson(row, ev) }, [
-        h('span', { class: 'pavatar sm gold' }, (row.name || '人').charAt(0)),
+        h('span', { class: 'pavatar sm gold' }, (row.name || t('person_fallback')).charAt(0)),
         h('div', { style: 'flex:1;min-width:0' }, [
           h('div', { class: 'row-title' }, [
-            bdg(row.stage || '阶段未知', stageTone(row.stage)),
-            row.score != null ? bdg('潜力 ' + row.score, 'ink') : null,
+            bdg(row.stage || t('stage_unknown'), stageTone(row.stage)),
+            row.score != null ? bdg(t('potential_score') + row.score, 'ink') : null,
             row.source === 'person' ? bdg('Person', 'jade') : null,
-            h('span', { style: 'margin-left:6px' }, row.name || '未命名'),
+            h('span', { style: 'margin-left:6px' }, row.name || t('unnamed')),
           ]),
           h('div', { class: 'row-sub' }, subParts.join(' · ')),
         ]),
@@ -82,25 +92,25 @@ function sideNode(ctx) {
   ]).then(([funnel, progress]) => {
     if (funnel._error) throw funnel._error;
     const counts = funnel.funnel || {};
-    const allStages = [...FUNNEL_STAGES];
+    const allStages = [...FUNNEL_STAGES()];
     Object.keys(counts).forEach((s) => { if (!allStages.includes(s)) allStages.push(s); });
     const max = Math.max(1, ...allStages.map((s) => counts[s] || 0));
     const funnelCard = {
-      title: '八阶段漏斗', icon: 'recruit', tag: wpTag('事实'),
+      title: t('funnel_title'), icon: 'recruit', tag: wpTag(t('fact')),
       body: [h('div', {}, allStages.map((s) => {
         const n = counts[s] || 0;
         return h('div', { class: 'funnel-row' }, [
-          h('span', { class: s === '流失' ? 'funnel-lost' : '' }, s),
+          h('span', { class: s === t('funnel_stage_lost') ? 'funnel-lost' : '' }, s),
           h('span', { class: 'funnel-bar-track' },
-            h('span', { class: 'funnel-bar' + (s === '流失' ? ' lost' : ''), style: `width:${Math.round((n / max) * 100)}%` })),
+            h('span', { class: 'funnel-bar' + (s === t('funnel_stage_lost') ? ' lost' : ''), style: `width:${Math.round((n / max) * 100)}%` })),
           h('span', { class: 'funnel-n' }, String(n)),
         ]);
       }))],
-      foot: [h('span', { class: 'foot-note' }, `总数 ${funnel.total ?? allStages.reduce((a, s) => a + (counts[s] || 0), 0)} · 小样本（<3）只显示数字，不做趋势判断`)],
+      foot: [h('span', { class: 'foot-note' }, t('funnel_total_prefix') + (funnel.total ?? allStages.reduce((a, s) => a + (counts[s] || 0), 0)) + t('funnel_total_suffix'))],
     };
     const goalRows = (progress.rows || []).filter((r) => (r.target || 0) > 0 || (r.actual || 0) > 0);
     const goalCard = {
-      title: `${month} 月度目标`, icon: 'calendar', tag: wpTag('事实'),
+      title: month + ' ' + t('goals_title'), icon: 'calendar', tag: wpTag(t('fact')),
       body: goalRows.length ? [h('div', {}, goalRows.map((r) => h('div', { class: 'goal-row' }, [
         h('span', {}, r.stage),
         h('span', { class: 'goal-bar-track' }, h('span', {
@@ -108,7 +118,7 @@ function sideNode(ctx) {
           style: `width:${Math.min(100, r.target ? Math.round((r.actual / r.target) * 100) : 0)}%`,
         })),
         h('span', { class: 'goal-n' }, `${r.actual}/${r.target}`),
-      ])))] : [emptyNote('本月未设定目标', '目标维护在旧版 admin.html。')],
+      ])))] : [emptyNote(t('empty_no_goals'), t('empty_no_goals_note'))],
     };
     return h('div', { style: 'display:flex;flex-direction:column;gap:14px' }, [
       h('section', { class: 'card' }, [
@@ -132,11 +142,11 @@ export function renderRecruit(ctx) {
 
   ctx.main.replaceChildren(
     pageHead({
-      kicker: 'RECRUIT', title: '组织发展工作台', tag: wpTag('WP1 只读'),
-      sub: '八阶段漏斗 · 候选人统一以 Person 身份归档；点候选人进入 Person 360。',
+      kicker: t('kicker_recruit'), title: t('title_recruit'), tag: wpTag(t('wp1_readonly')),
+      sub: t('sub_recruit'),
       actions: [
-        h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => ctx.toast('目标维护当前在 admin.html，console 编辑在 WP2 接入') }, [ic('calendar'), '月度目标']),
-        h('button', { class: 'btn btn-primary', type: 'button', onclick: () => ctx.toast('新增人才在 WP2 接入') }, [ic('plus'), '新增人才']),
+        h('button', { class: 'btn btn-ghost', type: 'button', title: t('goals_title'), onclick: () => ctx.toast(t('toast_goals_wp2')) }, [ic('calendar'), t('goals_short')]),
+        h('button', { class: 'btn btn-primary', type: 'button', title: t('new_recruit'), onclick: () => ctx.toast(t('toast_new_recruit_wp2')) }, [ic('plus'), t('new_recruit_short')]),
       ],
     }),
     h('div', { class: 'today-grid' }, [

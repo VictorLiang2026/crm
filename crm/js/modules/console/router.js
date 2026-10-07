@@ -2,6 +2,7 @@
 import {
   renderToday, renderPeople, renderPerson, renderOpportunities,
   renderActivities, renderActivity, renderRecruit, renderAI, renderMore,
+  renderSettings,
 } from './views.js';
 
 const EXACT = new Map([
@@ -12,6 +13,7 @@ const EXACT = new Map([
   ['#/recruit', renderRecruit],
   ['#/ai', renderAI],
   ['#/more', renderMore],
+  ['#/settings', renderSettings],
 ]);
 
 const PATTERNS = [
@@ -28,6 +30,7 @@ const NAV_OF = {
   '#/recruit': '#/recruit',
   '#/ai': '#/ai',
   '#/more': '#/more',
+  '#/settings': '#/more',
 };
 
 export function navHashFor(raw) {

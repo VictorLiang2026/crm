@@ -2,6 +2,7 @@
 // 所有业务数据均由 data.js 经既有云函数只读取得；本文件不含任何云调用。
 import { h } from './dom.js';
 import { ic } from './icons.js';
+import { t } from './i18n.js';
 
 // ---------- 结构件（沿用 WP0 约定） ----------
 export function wpTag(text, hot) {
@@ -39,9 +40,9 @@ export function emptyNote(title, note) {
 }
 export function errorBox(err, onRetry) {
   return h('div', { class: 'error-box' }, [
-    h('b', {}, '数据加载失败'),
-    h('p', {}, (err && err.message) ? String(err.message).slice(0, 160) : '请稍后重试'),
-    h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => onRetry() }, [ic('refresh'), '重试']),
+    h('b', {}, t('data_load_failed')),
+    h('p', {}, (err && err.message) ? String(err.message).slice(0, 160) : t('try_later')),
+    h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => onRetry() }, [ic('refresh'), t('retry')]),
   ]);
 }
 
@@ -110,11 +111,11 @@ export function dayDiffFromToday(s) {
 }
 export function dueLabel(s) {
   const diff = dayDiffFromToday(s);
-  if (diff === null) return '无日期';
-  if (diff < 0) return `逾期 ${-diff} 天`;
-  if (diff === 0) return '今天';
-  if (diff === 1) return '明天';
-  if (diff <= 7) return `${diff} 天后`;
+  if (diff === null) return t('no_date');
+  if (diff < 0) return `${t('overdue')} ${-diff} ${t('day_unit')}`;
+  if (diff === 0) return t('today');
+  if (diff === 1) return t('tomorrow');
+  if (diff <= 7) return `${diff} ${t('days_later')}`;
   return fmtDate(s);
 }
 export function toneByDue(s) {

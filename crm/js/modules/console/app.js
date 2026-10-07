@@ -132,6 +132,7 @@ function enterApp(appRoot) {
   if (!hashBound) {
     hashBound = true;
     window.addEventListener('hashchange', route);
+    window.addEventListener('popstate', route);
   }
   route();
 }
