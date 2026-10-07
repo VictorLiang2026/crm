@@ -33,5 +33,7 @@
 
 ## 5. 发布记录
 
-- 发布标签：见 tasks.md PMC-02 结果行（发布后回填）。
-- 云端业务产物：**未改变**（纯文档包；静态页面与云函数均无部署）。
+- 主发布：提交 `cdc1cf9`，标签 `release-20261007-223725`（原子推送；发布前 WP01 gate PASS、发布前三端云端核验 28 函数 170 文件 / 56 共享副本 / 50 静态资产全绿，发布后 sync-check 全绿）。
+- WP01 门槛细节：releaseGate=PASS_WITH_LIMITATIONS、blockers=[]；catalog 784 项检查 PASS（47 表/12 视图/36 序列/33 例程）；回归 107 PASS / 0 FAIL / 5 SKIP；anonymous 探针 59/59；login=MANUAL_LOGIN（非阻断，已知）；service-runtime/live-writes/mobile=UNVERIFIED（如实声明，本包不涉及）。
+- 云端业务产物：**未改变**（纯文档包；静态页面与云函数均无部署——sync-check 云端核验即一致性证明）。
+- 本补录提交：见 tasks.md PMC-02 结果行与 Git 标签记录（发布记录回填）。
