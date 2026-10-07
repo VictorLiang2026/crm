@@ -25,6 +25,26 @@ const OPP_STATUS_I18N = {
 };
 function oppStatusLabel(status) { return t(OPP_STATUS_I18N[status] || status); }
 
+// 机会类型 i18n 映射（数据库值为中文或英文 key）
+const OPP_TYPE_I18N = {
+  '医疗保障': 'opp_type_insurance',
+  '重疾保障': 'opp_type_insurance',
+  '养老规划': 'opp_type_insurance',
+  '教育规划': 'opp_type_insurance',
+  '财富规划': 'opp_type_insurance',
+  '家庭保障': 'opp_type_insurance',
+  '转介绍': 'opp_type_referral',
+  'insurance': 'opp_type_insurance',
+  'recruit': 'opp_type_recruit',
+  'referral': 'opp_type_referral',
+  'activity': 'opp_type_activity',
+  'speaker': 'opp_type_speaker',
+  'partnership': 'opp_type_partnership',
+  'service': 'opp_type_service',
+  'relationship': 'opp_type_relationship',
+};
+function oppTypeLabel(type) { return t(OPP_TYPE_I18N[type] || type); }
+
 function describeDraft(d) {
   if (!d) return t('candidate_preview');
   if (typeof d === 'string') return d.slice(0, 140);
@@ -41,7 +61,7 @@ function oppCard(ctx, row, reload) {
     class: 'kcard',
     onclick: () => { location.hash = nav; },
   }, [
-    h('div', { class: 'kcard-title' }, row.opportunity_type || t('opp_default_title')),
+    h('div', { class: 'kcard-title' }, oppTypeLabel(row.opportunity_type) || t('opp_default_title')),
     h('div', { class: 'kcard-name' }, name),
     h('div', { class: 'kcard-note' }, textOf(row.next_action) || t('opp_no_next_action')),
     row.next_action_date ? h('div', { class: 'kcard-date' }, fmtDate(row.next_action_date)) : null,

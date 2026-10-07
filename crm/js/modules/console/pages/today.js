@@ -23,6 +23,26 @@ const OPP_STATUS_I18N = {
 };
 function oppStatusLabel(status) { return t(OPP_STATUS_I18N[status] || status); }
 
+// 机会类型 i18n 映射（数据库值为中文或英文 key）
+const OPP_TYPE_I18N = {
+  '医疗保障': 'opp_type_insurance',
+  '重疾保障': 'opp_type_insurance',
+  '养老规划': 'opp_type_insurance',
+  '教育规划': 'opp_type_insurance',
+  '财富规划': 'opp_type_insurance',
+  '家庭保障': 'opp_type_insurance',
+  '转介绍': 'opp_type_referral',
+  'insurance': 'opp_type_insurance',
+  'recruit': 'opp_type_recruit',
+  'referral': 'opp_type_referral',
+  'activity': 'opp_type_activity',
+  'speaker': 'opp_type_speaker',
+  'partnership': 'opp_type_partnership',
+  'service': 'opp_type_service',
+  'relationship': 'opp_type_relationship',
+};
+function oppTypeLabel(type) { return t(OPP_TYPE_I18N[type] || type); }
+
 const WEEKDAY_KEYS = ['weekday_0', 'weekday_1', 'weekday_2', 'weekday_3', 'weekday_4', 'weekday_5', 'weekday_6'];
 
 function fmtBriefDate(d) {
@@ -284,7 +304,7 @@ export function renderToday(ctx) {
       body: rows.length ? rows.slice(0, 5).map((r) =>
         h('a', { class: 'list-row data-row', href: r.person ? `#/person/${r.person.id}` : '#/opportunities' }, [
           h('div', { style: 'flex:1;min-width:0' }, [
-            h('div', { class: 'row-title' }, `${r.opportunity_type || t('opportunity')} · ${r.person ? r.person.display_name : t('unnamed')}`),
+            h('div', { class: 'row-title' }, `${oppTypeLabel(r.opportunity_type) || t('opportunity')} · ${r.person ? r.person.display_name : t('unnamed')}`),
             h('div', { class: 'row-sub' }, textOf(r.next_action) || t('no_next_action')),
           ]),
           bdg(oppStatusLabel(r.status) || t('discovered'), 'gold'),

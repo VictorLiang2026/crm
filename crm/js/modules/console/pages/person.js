@@ -28,6 +28,26 @@ const OPP_STATUS_I18N = {
 };
 function oppStatusLabel(status) { return t(OPP_STATUS_I18N[status] || status); }
 
+// 机会类型 i18n 映射（数据库值为中文或英文 key）
+const OPP_TYPE_I18N = {
+  '医疗保障': 'opp_type_insurance',
+  '重疾保障': 'opp_type_insurance',
+  '养老规划': 'opp_type_insurance',
+  '教育规划': 'opp_type_insurance',
+  '财富规划': 'opp_type_insurance',
+  '家庭保障': 'opp_type_insurance',
+  '转介绍': 'opp_type_referral',
+  'insurance': 'opp_type_insurance',
+  'recruit': 'opp_type_recruit',
+  'referral': 'opp_type_referral',
+  'activity': 'opp_type_activity',
+  'speaker': 'opp_type_speaker',
+  'partnership': 'opp_type_partnership',
+  'service': 'opp_type_service',
+  'relationship': 'opp_type_relationship',
+};
+function oppTypeLabel(type) { return t(OPP_TYPE_I18N[type] || type); }
+
 // 招募阶段 i18n 映射（数据库值为中文）
 const RECRUIT_STAGE_I18N = {
   '新增人才': 'funnel_stage_new',
@@ -270,7 +290,7 @@ function opportunitiesNode(ctx, id) {
         sectionTitle(`${t('sec_opportunities')}（${rows.length}）`),
         rowsBlock(rows, (r) => h('div', { class: 'list-row' }, [
           h('div', { style: 'flex:1;min-width:0' }, [
-            h('div', { class: 'row-title' }, `${r.opportunity_type || t('opp_default')} · ${textOf(r.last_progress) || t('opp_no_progress')}`),
+            h('div', { class: 'row-title' }, `${oppTypeLabel(r.opportunity_type) || t('opp_default')} · ${textOf(r.last_progress) || t('opp_no_progress')}`),
             h('div', { class: 'row-sub' }, `${t('label_next_action')}：${textOf(r.next_action) || t('label_none')}${r.next_action_date ? ' · ' + dueLabel(r.next_action_date) : ''} · ${t('label_discovered')} ${fmtDate(r.discovered_at)}`),
           ]),
           bdg(oppStatusLabel(r.status) || t('opp_status_default'), r.status === '成交' ? 'jade' : r.status === '关闭' ? 'gray' : 'gold'),
