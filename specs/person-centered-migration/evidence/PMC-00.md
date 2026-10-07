@@ -124,6 +124,16 @@ tools/sync-check.ps1（完整模式）→ 全绿：
 
 - 发布后验证：sync-check 关键项复核 + `git status` 干净 + 三端一致性核对，见下方"发布后核对"。
 
+### 发布后核对（实测）
+
+- `git status --porcelain`：空（工作树干净）。
+- 本地 HEAD = `d477b699dfdbdcb338c80a603d845aed33e5f7fa`；`git ls-remote origin` master = 同值；标签 `release-20261007-1153`（annotated，tag 对象 `e723b79…`）指向该提交。
+- 提交内容核查：`git show --name-only release-20261007-1153` 仅含 `specs/person-centered-migration/` 下 9 个文档，无业务文件。
+- `tools/release.ps1` 内置发布后完整 sync-check 全绿：56 份共享副本一致；GitHub master 与 release 标签同指 `d477b69…`；线上 admin.html SHA-256 一致；50 个静态资源一致；28 函数 170 文件一致（证据目录 `D:\Temp\crm-cloud-audit-088955a7312b4d379db7b5d4f3ad94cc`）；结论行 `[PASS] Local / GitHub / cloud sources match`。
+- 云端产物未改变的证明：本包零部署动作 + 上述云端源码逐文件一致。
+
+> 本"发布后核对"小节为发布后补录（提交 `d477b69` 发布时该节尚未来得及包含实测结果），补录本身随后续小文档提交发布；属文档补记，不改变 d477b69 的发布事实。
+
 ## 七、恢复方案
 
 - 本包回退：`git revert` 文档提交（或按标签检出前一基线 `c5847b4`）→ 推送；无云端产物、无数据库对象，无需数据回滚。
