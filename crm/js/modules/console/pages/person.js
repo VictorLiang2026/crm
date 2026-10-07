@@ -28,6 +28,19 @@ const OPP_STATUS_I18N = {
 };
 function oppStatusLabel(status) { return t(OPP_STATUS_I18N[status] || status); }
 
+// 招募阶段 i18n 映射（数据库值为中文）
+const RECRUIT_STAGE_I18N = {
+  '新增人才': 'funnel_stage_new',
+  '互动暖客': 'funnel_stage_icebreak',
+  '初次面谈': 'funnel_stage_first_meeting',
+  '增员活动': 'funnel_stage_activity',
+  '精准面谈': 'funnel_stage_precision_meeting',
+  '入职申请': 'funnel_stage_onboarding_apply',
+  '签约入司': 'funnel_stage_signed',
+  '流失': 'funnel_stage_lost',
+};
+function stageLabel(stage) { return t(RECRUIT_STAGE_I18N[stage] || stage); }
+
 function rowsBlock(rows, renderRow, emptyTitle, emptyNoteText) {
   if (!rows || !rows.length) return emptyNote(emptyTitle, emptyNoteText || '');
   return h('div', {}, rows.map(renderRow));
@@ -289,7 +302,7 @@ function recruitNode(ctx, id) {
       rowsBlock(rows, (r) => h('div', { class: 'recruit-block' }, [
         h('div', { class: 'list-row' }, [
           h('div', { style: 'flex:1;min-width:0' }, [
-            h('div', { class: 'row-title' }, [bdg(r.stage || t('stage_unknown'), 'gold'), r.potentialScore != null ? bdg(t('label_score') + ' ' + r.potentialScore, 'ink') : null]),
+            h('div', { class: 'row-title' }, [bdg(stageLabel(r.stage) || t('stage_unknown'), 'gold'), r.potentialScore != null ? bdg(t('label_score') + ' ' + r.potentialScore, 'ink') : null]),
             h('div', { class: 'row-sub' }, `${t('label_motivation')}：${textOf(r.motivation) || '—'}；${t('label_concerns')}：${textOf(r.concerns) || '—'}`),
             h('div', { class: 'row-sub' }, `${t('label_career_plan')}：${textOf(r.careerPlan) || '—'}`),
           ]),
