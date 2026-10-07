@@ -3,7 +3,7 @@ import { h } from '../dom.js';
 import { ic } from '../icons.js';
 import { data } from '../data.js';
 import { wpTag, pageHead, emptyNote, loadInto, bdg, textOf } from '../ui.js';
-import { t } from '../i18n.js';
+import { t, translateEnum } from '../i18n.js';
 
 const PAGE_SIZE = 20;
 const ROLE_BADGE = () => ({
@@ -82,8 +82,8 @@ export function renderPeople(ctx) {
         if (p.recruit_id) badges.push(bdg(t('badge_recruiting'), 'gold'));
         return h('tr', { onclick: () => { location.hash = `#/person/${p.id}`; } }, [
           h('td', {}, h('a', {}, [p.display_name, h('span', { class: 'badge-stack' }, badges)])),
-          h('td', {}, p.sales_priority || '-'),
-          h('td', {}, p.customer_stage ? h('span', { class: 'badge stage' }, p.customer_stage) : '-'),
+          h('td', {}, p.sales_priority ? translateEnum('sales_priority', p.sales_priority) : '-'),
+          h('td', {}, p.customer_stage ? h('span', { class: 'badge stage' }, translateEnum('customer_stage', p.customer_stage)) : '-'),
           h('td', {}, fmtDate(p.latest_followup_date)),
           h('td', {}, fmtDate(p.next_followup_date)),
           h('td', {}, String(p.id)),

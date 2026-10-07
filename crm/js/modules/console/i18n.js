@@ -715,11 +715,125 @@ const DICT = {
   'act_review_only': { 'zh-CN': '仅生成候选，不写入业务数据。', 'en': 'Candidates only, no business data written.' },
   'act_activity_not_found': { 'zh-CN': '活动不存在', 'en': 'Activity not found' },
   'act_person': { 'zh-CN': '人员', 'en': 'Person' },
+
+  // enum translations (used by translateEnum)
+  'customer_stage_new': { 'zh-CN': '新认识', 'en': 'New' },
+  'customer_stage_maintenance': { 'zh-CN': '关系维护', 'en': 'Maintaining' },
+  'customer_stage_discovery': { 'zh-CN': '需求挖掘', 'en': 'Discovery' },
+  'customer_stage_proposal': { 'zh-CN': '方案沟通', 'en': 'Proposal' },
+  'customer_stage_closing': { 'zh-CN': '成交推进', 'en': 'Closing' },
+  'customer_stage_referral': { 'zh-CN': '转介绍经营', 'en': 'Referral' },
+
+  'priority_a': { 'zh-CN': 'A', 'en': 'A' },
+  'priority_b': { 'zh-CN': 'B', 'en': 'B' },
+  'priority_c': { 'zh-CN': 'C', 'en': 'C' },
+  'priority_d': { 'zh-CN': 'D', 'en': 'D' },
+  'priority_e': { 'zh-CN': 'E', 'en': 'E' },
+
+  'marital_single': { 'zh-CN': '未婚', 'en': 'Single' },
+  'marital_married': { 'zh-CN': '已婚', 'en': 'Married' },
+  'marital_unknown': { 'zh-CN': '未知', 'en': 'Unknown' },
+
+  'gender_male': { 'zh-CN': '男', 'en': 'Male' },
+  'gender_female': { 'zh-CN': '女', 'en': 'Female' },
+  'gender_unknown': { 'zh-CN': '未知', 'en': 'Unknown' },
+
+  'activity_type_thanks': { 'zh-CN': '客户答谢', 'en': 'Thanks' },
+  'activity_type_presentation': { 'zh-CN': '产说会', 'en': 'Presentation' },
+  'activity_type_salon': { 'zh-CN': '沙龙', 'en': 'Salon' },
+  'activity_type_wine': { 'zh-CN': '酒会', 'en': 'Wine Party' },
+  'activity_type_recruit': { 'zh-CN': '增员活动', 'en': 'Recruit Event' },
+  'activity_type_social': { 'zh-CN': '联谊会', 'en': 'Social' },
+  'activity_type_other': { 'zh-CN': '其他', 'en': 'Other' },
+
+  'channel_wechat': { 'zh-CN': '微信', 'en': 'WeChat' },
+  'channel_phone': { 'zh-CN': '电话', 'en': 'Phone' },
+  'channel_meeting': { 'zh-CN': '面谈', 'en': 'Meeting' },
+  'channel_face2face': { 'zh-CN': '面对面', 'en': 'In Person' },
+  'channel_activity': { 'zh-CN': '活动', 'en': 'Activity' },
+
+  'opp_type_other': { 'zh-CN': '其他', 'en': 'Other' },
+
   'close_aria': { 'zh-CN': '关闭', 'en': 'Close' },
   'delete_aria': { 'zh-CN': '删除', 'en': 'Delete' },
 };
 
 let _lang = null;
+
+/** Centralized enum registry: one source of truth for all database enums.
+ *  Keys: enum type name; Values: map of raw DB value → i18n key.
+ *  Missing mappings are warned in dev mode so they surface during testing. */
+export const ENUM_I18N = {
+  opportunity_type: {
+    '医疗保障': 'opp_type_insurance', '重疾保障': 'opp_type_insurance', '养老规划': 'opp_type_insurance',
+    '教育规划': 'opp_type_insurance', '财富规划': 'opp_type_insurance', '家庭保障': 'opp_type_insurance',
+    '转介绍': 'opp_type_referral',
+    'insurance': 'opp_type_insurance', 'recruit': 'opp_type_recruit', 'referral': 'opp_type_referral',
+    'activity': 'opp_type_activity', 'speaker': 'opp_type_speaker', 'partnership': 'opp_type_partnership',
+    'service': 'opp_type_service', 'relationship': 'opp_type_relationship',
+    '其他': 'opp_type_other', 'other': 'opp_type_other',
+  },
+  opportunity_status: {
+    '发现': 'stage_discovered', '沟通': 'stage_contacted', '方案': 'stage_proposal',
+    '成交': 'stage_won', '关闭': 'stage_closed',
+  },
+  activity_status: {
+    'planned': 'act_status_planned', 'ongoing': 'act_status_ongoing', 'ended': 'act_status_ended',
+    'cancelled': 'act_status_cancelled', 'reviewed': 'act_status_reviewed',
+  },
+  recruit_stage: {
+    '新增人才': 'funnel_stage_new', '互动暖客': 'funnel_stage_icebreak',
+    '初次面谈': 'funnel_stage_first_meeting', '增员活动': 'funnel_stage_activity',
+    '精准面谈': 'funnel_stage_precision_meeting', '入职申请': 'funnel_stage_onboarding_apply',
+    '签约入司': 'funnel_stage_signed', '流失': 'funnel_stage_lost',
+  },
+  customer_stage: {
+    '新认识': 'customer_stage_new', '关系维护': 'customer_stage_maintenance',
+    '需求挖掘': 'customer_stage_discovery', '方案沟通': 'customer_stage_proposal',
+    '成交推进': 'customer_stage_closing', '转介绍经营': 'customer_stage_referral',
+  },
+  sales_priority: {
+    'A': 'priority_a', 'B': 'priority_b', 'C': 'priority_c', 'D': 'priority_d', 'E': 'priority_e',
+  },
+  marital_status: {
+    '未婚': 'marital_single', '已婚': 'marital_married', '未知': 'marital_unknown',
+  },
+  gender: {
+    '男': 'gender_male', '女': 'gender_female', '未知': 'gender_unknown',
+  },
+  activity_type: {
+    '客户答谢': 'activity_type_thanks', '产说会': 'activity_type_presentation',
+    '沙龙': 'activity_type_salon', '酒会': 'activity_type_wine',
+    '增员活动': 'activity_type_recruit', '联谊会': 'activity_type_social',
+    '其他': 'activity_type_other',
+  },
+  channel: {
+    '微信': 'channel_wechat', '电话': 'channel_phone', '面谈': 'channel_meeting',
+    '面对面': 'channel_face2face', '活动': 'channel_activity',
+  },
+  // write.js opportunity advance options (superset of opportunity_status)
+  opportunity_stage: {
+    '发现': 'stage_discovered', '沟通': 'stage_contacted', '方案': 'stage_proposal',
+    '潜在线索': 'stage_potential', '已介绍': 'stage_introduced', '已联系': 'stage_connected',
+    '已建立关系': 'stage_relationship', '成交': 'stage_won', '关闭': 'stage_closed',
+  },
+};
+
+/** Translate a database enum value through the centralized registry.
+ *  Falls back to the raw value; logs a warning in dev mode for missing mappings. */
+export function translateEnum(type, value) {
+  if (!value) return value;
+  const map = ENUM_I18N[type];
+  if (!map) return value;
+  const key = map[value];
+  if (!key) {
+    if (typeof window !== 'undefined' && window.__DEV__) {
+      console.warn(`[i18n] Missing enum mapping: type="${type}", value="${value}"`);
+    }
+    return value;
+  }
+  return t(key);
+}
 
 export function getLang() {
   if (_lang) return _lang;

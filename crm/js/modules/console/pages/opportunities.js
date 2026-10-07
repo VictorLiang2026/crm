@@ -6,7 +6,7 @@ import { ic } from '../icons.js';
 import { data } from '../data.js';
 import { openCandidate, openOpportunityAdvance, openOpportunityCreate } from '../write.js';
 import { wpTag, pageHead, card, emptyNote, loadInto, bdg, fmtDate, textOf } from '../ui.js';
-import { t, tFull } from '../i18n.js';
+import { t, tFull, translateEnum } from '../i18n.js';
 
 const COL_KEYS = [
   ['opp_col_discovered', 'v0', '发现'],
@@ -15,35 +15,9 @@ const COL_KEYS = [
   ['opp_col_won', 'v3', '成交'],
 ];
 
-// 机会状态 i18n 映射（数据库值为中文）
-const OPP_STATUS_I18N = {
-  '发现': 'stage_discovered',
-  '沟通': 'stage_contacted',
-  '方案': 'stage_proposal',
-  '成交': 'stage_won',
-  '关闭': 'stage_closed',
-};
-function oppStatusLabel(status) { return t(OPP_STATUS_I18N[status] || status); }
-
-// 机会类型 i18n 映射（数据库值为中文或英文 key）
-const OPP_TYPE_I18N = {
-  '医疗保障': 'opp_type_insurance',
-  '重疾保障': 'opp_type_insurance',
-  '养老规划': 'opp_type_insurance',
-  '教育规划': 'opp_type_insurance',
-  '财富规划': 'opp_type_insurance',
-  '家庭保障': 'opp_type_insurance',
-  '转介绍': 'opp_type_referral',
-  'insurance': 'opp_type_insurance',
-  'recruit': 'opp_type_recruit',
-  'referral': 'opp_type_referral',
-  'activity': 'opp_type_activity',
-  'speaker': 'opp_type_speaker',
-  'partnership': 'opp_type_partnership',
-  'service': 'opp_type_service',
-  'relationship': 'opp_type_relationship',
-};
-function oppTypeLabel(type) { return t(OPP_TYPE_I18N[type] || type); }
+// 枚举翻译统一走 i18n.js 集中注册表
+const oppStatusLabel = (s) => translateEnum('opportunity_status', s);
+const oppTypeLabel = (type) => translateEnum('opportunity_type', type);
 
 function describeDraft(d) {
   if (!d) return t('candidate_preview');

@@ -4,20 +4,13 @@ import { h } from '../dom.js';
 import { ic } from '../icons.js';
 import { data } from '../data.js';
 import { wpTag, pageHead, emptyNote, loadInto, bdg, fmtDate, dayDiffFromToday, textOf } from '../ui.js';
-import { t } from '../i18n.js';
+import { t, translateEnum } from '../i18n.js';
 
+// 服务端固定返回中文 key 数组，用于保证列顺序一致
 const FUNNEL_STAGES_CN = ['新增人才','互动暖客','初次面谈','增员活动','精准面谈','入职申请','签约入司','流失'];
-const FUNNEL_STAGE_I18N = {
-  '新增人才': 'funnel_stage_new',
-  '互动暖客': 'funnel_stage_icebreak',
-  '初次面谈': 'funnel_stage_first_meeting',
-  '增员活动': 'funnel_stage_activity',
-  '精准面谈': 'funnel_stage_precision_meeting',
-  '入职申请': 'funnel_stage_onboarding_apply',
-  '签约入司': 'funnel_stage_signed',
-  '流失': 'funnel_stage_lost',
-};
-function stageLabel(stage) { return t(FUNNEL_STAGE_I18N[stage] || stage); }
+
+// 枚举翻译统一走 i18n.js 集中注册表
+const stageLabel = (stage) => translateEnum('recruit_stage', stage);
 
 function stageTone(stage) {
   if (stage === '流失') return 'gray';

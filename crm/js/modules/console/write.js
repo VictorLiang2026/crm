@@ -38,15 +38,10 @@ function uuid() {
   });
 }
 const OPP_TYPES = ['insurance', 'recruit', 'referral', 'activity', 'speaker', 'partnership', 'service', 'relationship'];
-const OPP_TYPE_I18N = {
-  insurance: 'opp_type_insurance', recruit: 'opp_type_recruit', referral: 'opp_type_referral', activity: 'opp_type_activity',
-  speaker: 'opp_type_speaker', partnership: 'opp_type_partnership', service: 'opp_type_service', relationship: 'opp_type_relationship',
-};
 const STAGE_OPTIONS = ['发现', '沟通', '方案', '潜在线索', '已介绍', '已联系', '已建立关系'];
-const STAGE_I18N = {
-  '发现': 'stage_discovered', '沟通': 'stage_contacted', '方案': 'stage_proposal',
-  '潜在线索': 'stage_potential', '已介绍': 'stage_introduced', '已联系': 'stage_connected', '已建立关系': 'stage_relationship',
-};
+// 枚举翻译统一走 i18n.js 集中注册表
+const oppTypeLabel = (type) => translateEnum('opportunity_type', type);
+const stageLabel = (s) => translateEnum('opportunity_stage', s);
 const todayStr = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -165,13 +160,13 @@ export function openWorkItemDone(ctx, { row, onDone }) {
 export function openOpportunityAdvance(ctx, { opportunity, personName, onDone }) {
   const status = opportunity.status || '发现';
   const modeSel = sel([['stage', t('advance_stage')], ['close', t('close_won')]], 'stage');
-  const stageSel = sel(STAGE_OPTIONS.filter((s) => s !== status).map((s) => [s, t(STAGE_I18N[s])]), '沟通');
+  const stageSel = sel(STAGE_OPTIONS.filter((s) => s !== status).map((s) => [s, stageLabel(s)]), '沟通');
   const closeSel = sel([['成交', t('won')], ['关闭', t('closed')]], '成交');
   const resultTa = h('textarea', { class: 'sheet-textarea', placeholder: t('outcome_required') });
   const form = h('div', {}, [
     fieldRow(t('operation'), modeSel),
     h('div', { id: 'opp-stage-wrap' }, [fieldRow(t('advance_to'), stageSel,
-      `${t('current_stage')}${t(STAGE_I18N[status])}；${t('no_auto_advance')}`)]),
+      `${t('current_stage')}${stageLabel(status)}；${t('no_auto_advance')}`)]),
     h('div', { id: 'opp-close-wrap', style: 'display:none' }, [
       fieldRow(t('result'), closeSel),
       fieldRow(t('result_note'), resultTa, t('close_check_note')),
@@ -179,7 +174,7 @@ export function openOpportunityAdvance(ctx, { opportunity, personName, onDone })
   ]);
   const sheet = openSheet({
     title: t('advance_close_opp'),
-    sub: `${t(OPP_TYPE_I18N[opportunity.opportunity_type]) || opportunity.opportunity_type || t('opportunity')} · ${personName || ''}`,
+    sub: `${oppTypeLabel(opportunity.opportunity_type) || opportunity.opportunity_type || t('opportunity')} · ${personName || ''}`,
     body: h('div', {}, [
       h('p', { class: 'sheet-note', style: 'margin:0 0 10px' }, t('preview_before_write')),
       form,
@@ -213,11 +208,11 @@ export function openOpportunityAdvance(ctx, { opportunity, personName, onDone })
     sheet.swap(h('div', {}, [
       previewBlock([
         kvRow(t('target'), (res.preview && res.preview.personName) || personName || ''),
-        kvRow(t('content'), `${t(OPP_TYPE_I18N[opportunity.opportunity_type]) || t('opportunity')}（${t(STAGE_I18N[status])}）`),
+        kvRow(t('content'), `${oppTypeLabel(opportunity.opportunity_type) || t('opportunity')}（${stageLabel(status)}）`),
         h('div', { class: 'kv-line' }, [
           h('span', { class: 'kv-k' }, t('change')),
-          bdg(t(STAGE_I18N[status]), 'gray'), h('span', {}, ' → '),
-          bdg(t(STAGE_I18N[draft.status]) || draft.status, draft.status === '成交' ? 'jade' : 'gold'),
+          bdg(stageLabel(status), 'gray'), h('span', {}, ' → '),
+          bdg(stageLabel(draft.status) || draft.status, draft.status === '成交' ? 'jade' : 'gold'),
         ]),
         draft.result ? kvRow(t('result_note'), draft.result.slice(0, 120)) : null,
         h('div', { class: 'sheet-note', style: 'margin-top:8px' }, t('preview_no_write')),
@@ -247,7 +242,7 @@ export function openOpportunityCreate(ctx, { onDone }) {
   const nameInput = h('input', { class: 'sheet-input', placeholder: t('search_person') });
   const searchBtn = h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => doSearch() }, t('search_person'));
   const candBox = h('div', {});
-  const typeSel = sel(OPP_TYPES.map((k) => [k, t(OPP_TYPE_I18N[k])]), 'insurance');
+  const typeSel = sel(OPP_TYPES.map((k) => [k, oppTypeLabel(k)]), 'insurance');
   const progressTa = h('textarea', { class: 'sheet-textarea', placeholder: t('placeholder_progress') });
   const nextInput = h('input', { class: 'sheet-input', placeholder: t('placeholder_next_action') });
   const dateInput = h('input', { class: 'sheet-input', type: 'date' });
@@ -308,7 +303,7 @@ export function openOpportunityCreate(ctx, { onDone }) {
       sheet.swap(h('div', {}, [
         previewBlock([
           kvRow(t('target'), `${picked.display_name || picked.displayName} #${picked.id}`),
-          kvRow(t('type'), t(OPP_TYPE_I18N[typeSel.value])),
+          kvRow(t('type'), oppTypeLabel(typeSel.value)),
           kvRow(t('progress'), progressTa.value.trim().slice(0, 120)),
           kvRow(t('next_action_label'), `${nextInput.value.trim()}${dateInput.value ? ' · ' + dateInput.value : ''}`),
           h('div', { class: 'sheet-note', style: 'margin-top:8px' }, t('new_opp_stage')),
@@ -355,7 +350,7 @@ export function openCandidate(ctx, { row, onDone }) {
 
   function renderEditor(preview, expiresAt) {
     const d = preview.after || {};
-    typeSel = sel(OPP_TYPES.map((k) => [k, t(OPP_TYPE_I18N[k])]), d.opportunity_type || 'insurance');
+    typeSel = sel(OPP_TYPES.map((k) => [k, oppTypeLabel(k)]), d.opportunity_type || 'insurance');
     reasonTa = h('textarea', { class: 'sheet-textarea' }, d.reason || '');
     nextTa = h('textarea', { class: 'sheet-textarea' }, d.next_action || '');
     const evidence = preview.evidence || [];

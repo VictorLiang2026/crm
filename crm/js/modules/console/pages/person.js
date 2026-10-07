@@ -10,7 +10,7 @@ import {
   wpTag, pageHead, emptyNote, loadInto, bdg, kvGrid, sectionTitle,
   fmtDate, weekdayCN, dueLabel, toneByDue, textOf,
 } from '../ui.js';
-import { t } from '../i18n.js';
+import { t, translateEnum } from '../i18n.js';
 
 const TABS = () => [t('tab_overview'), t('tab_timeline'), t('tab_facts'), t('tab_family'), t('tab_insurance'), t('tab_opportunities'), t('tab_recruit'), t('tab_activities')];
 const TYPE_LABEL = () => ({
@@ -18,48 +18,10 @@ const TYPE_LABEL = () => ({
   meeting: t('type_meeting'), call: t('type_call'), message: t('type_message'), note: t('type_note'),
 });
 
-// 机会状态 i18n 映射（数据库值为中文）
-const OPP_STATUS_I18N = {
-  '发现': 'stage_discovered',
-  '沟通': 'stage_contacted',
-  '方案': 'stage_proposal',
-  '成交': 'stage_won',
-  '关闭': 'stage_closed',
-};
-function oppStatusLabel(status) { return t(OPP_STATUS_I18N[status] || status); }
-
-// 机会类型 i18n 映射（数据库值为中文或英文 key）
-const OPP_TYPE_I18N = {
-  '医疗保障': 'opp_type_insurance',
-  '重疾保障': 'opp_type_insurance',
-  '养老规划': 'opp_type_insurance',
-  '教育规划': 'opp_type_insurance',
-  '财富规划': 'opp_type_insurance',
-  '家庭保障': 'opp_type_insurance',
-  '转介绍': 'opp_type_referral',
-  'insurance': 'opp_type_insurance',
-  'recruit': 'opp_type_recruit',
-  'referral': 'opp_type_referral',
-  'activity': 'opp_type_activity',
-  'speaker': 'opp_type_speaker',
-  'partnership': 'opp_type_partnership',
-  'service': 'opp_type_service',
-  'relationship': 'opp_type_relationship',
-};
-function oppTypeLabel(type) { return t(OPP_TYPE_I18N[type] || type); }
-
-// 招募阶段 i18n 映射（数据库值为中文）
-const RECRUIT_STAGE_I18N = {
-  '新增人才': 'funnel_stage_new',
-  '互动暖客': 'funnel_stage_icebreak',
-  '初次面谈': 'funnel_stage_first_meeting',
-  '增员活动': 'funnel_stage_activity',
-  '精准面谈': 'funnel_stage_precision_meeting',
-  '入职申请': 'funnel_stage_onboarding_apply',
-  '签约入司': 'funnel_stage_signed',
-  '流失': 'funnel_stage_lost',
-};
-function stageLabel(stage) { return t(RECRUIT_STAGE_I18N[stage] || stage); }
+// 枚举翻译统一走 i18n.js 集中注册表
+const oppStatusLabel = (s) => translateEnum('opportunity_status', s);
+const oppTypeLabel = (type) => translateEnum('opportunity_type', type);
+const stageLabel = (stage) => translateEnum('recruit_stage', stage);
 
 function rowsBlock(rows, renderRow, emptyTitle, emptyNoteText) {
   if (!rows || !rows.length) return emptyNote(emptyTitle, emptyNoteText || '');
@@ -78,10 +40,10 @@ function overviewNode(ctx, id, setName) {
     setName(name);
     const f = profile.fields || {};
     const infoPairs = [
-      [t('field_phone'), f.phone], [t('field_gender'), f.gender], [t('field_birthday'), f.birthday],
+      [t('field_phone'), f.phone], [t('field_gender'), translateEnum('gender', f.gender)], [t('field_birthday'), f.birthday],
       [t('field_occupation'), f.occupation], [t('field_organization'), f.organization], [t('field_education'), f.education],
-      [t('field_source'), f.source], [t('field_customer_stage'), f.customer_stage], [t('field_sales_priority'), f.sales_priority],
-      [t('field_marital'), f.marital_status], [t('field_income'), f.annual_income], [t('field_updated'), fmtDate(f.updated_at)],
+      [t('field_source'), f.source], [t('field_customer_stage'), translateEnum('customer_stage', f.customer_stage)], [t('field_sales_priority'), translateEnum('sales_priority', f.sales_priority)],
+      [t('field_marital'), translateEnum('marital_status', f.marital_status)], [t('field_income'), f.annual_income], [t('field_updated'), fmtDate(f.updated_at)],
     ];
     const activeWorks = (works.rows || []).filter((r) =>
       (r.kind === 'action' && (r.status === 'open' || r.status === 'in_progress')) ||
@@ -106,7 +68,7 @@ function overviewNode(ctx, id, setName) {
       rowsBlock((interactions.rows || []).slice(0, 5), (r) => h('div', { class: 'list-row' }, [
         h('div', { style: 'flex:1;min-width:0' }, [
           h('div', { class: 'row-title' }, textOf(r.summary) || t('no_summary')),
-          h('div', { class: 'row-sub' }, `${fmtDate(r.interaction_at)} ${weekdayCN(r.interaction_at)} · ${r.interaction_type || t('interaction_default')}`),
+          h('div', { class: 'row-sub' }, `${fmtDate(r.interaction_at)} ${weekdayCN(r.interaction_at)} · ${translateEnum('channel', r.interaction_type) || r.interaction_type || t('interaction_default')}`),
         ]),
       ]), t('empty_no_interactions')),
     ]);
@@ -127,7 +89,7 @@ function timelineNode(ctx, id) {
       h('div', { style: 'flex:1;min-width:0' }, [
         h('div', { class: 'row-title' }, textOf(r.summary) || t('no_summary')),
         h('div', { class: 'row-sub', title: fullLabel || undefined },
-          `${fmtDate(r.at)} ${weekdayCN(r.at)} · ${typeLabel}${r.channel ? ' · ' + r.channel : ''}`),
+          `${fmtDate(r.at)} ${weekdayCN(r.at)} · ${typeLabel}${r.channel ? ' · ' + translateEnum('channel', r.channel) : ''}`),
         h('div', { class: 'row-source' }, r.source || ''),
       ]),
       r.activityId ? h('a', { class: 'btn btn-ghost btn-sm', href: `#/activity/${r.activityId}` }, t('btn_activity')) : null,
@@ -345,7 +307,7 @@ function activitiesNode(ctx, id) {
       rowsBlock(rows, (r) => h('a', { class: 'list-row data-row', href: `#/activity/${r.activityId}` }, [
         h('div', { style: 'flex:1;min-width:0' }, [
           h('div', { class: 'row-title' }, textOf(r.summary) || t('activity_participation_default')),
-          h('div', { class: 'row-sub' }, `${fmtDate(r.at)} ${weekdayCN(r.at)}${r.channel ? ' · ' + r.channel : ''}`),
+          h('div', { class: 'row-sub' }, `${fmtDate(r.at)} ${weekdayCN(r.at)}${r.channel ? ' · ' + translateEnum('channel', r.channel) : ''}`),
         ]),
         ic('chevron', 'mut'),
       ]), t('empty_no_activities_person')),

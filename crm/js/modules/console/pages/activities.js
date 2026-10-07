@@ -3,7 +3,7 @@
 import { h } from '../dom.js';
 import { ic } from '../icons.js';
 import { data } from '../data.js';
-import { t } from '../i18n.js';
+import { t, translateEnum } from '../i18n.js';
 import {
   wpTag, pageHead, emptyNote, loadInto, bdg, kvGrid, sectionTitle,
   fmtDate, weekdayCN, dayDiffFromToday, textOf,
@@ -11,15 +11,8 @@ import {
 
 const ACT_TABS = ['act_tab_flow', 'act_tab_attend', 'act_tab_acts', 'act_tab_candidates', 'act_tab_gifts', 'act_tab_photos', 'act_tab_review'];
 
-// 活动状态 i18n 映射
-const ACT_STATUS_I18N = {
-  'planned': 'act_status_planned',
-  'ongoing': 'act_status_ongoing',
-  'ended': 'act_status_ended',
-  'cancelled': 'act_status_cancelled',
-  'reviewed': 'act_status_reviewed',
-};
-function actStatusLabel(status) { return t(ACT_STATUS_I18N[status] || status); }
+// 枚举翻译统一走 i18n.js 集中注册表
+const actStatusLabel = (s) => translateEnum('activity_status', s);
 
 const TASK_STATUS = {
   pending: ['status_pending', 'gray'], in_progress: ['status_in_progress', 'gold'],
@@ -74,7 +67,7 @@ export function renderActivities(ctx) {
           h('div', { style: 'flex:1;min-width:0' }, [
             h('div', { class: 'row-title' }, a.name),
             h('div', { class: 'row-sub' },
-              [dateText, a.activity_type, a.location].map(textOf).filter(Boolean).join(' · ')),
+              [dateText, translateEnum('activity_type', a.activity_type), a.location].map(textOf).filter(Boolean).join(' · ')),
           ]),
           a.status ? bdg(actStatusLabel(a.status), diff != null && diff < 0 ? 'gray' : 'gold') : null,
           ic('chevron', 'mut'),
@@ -109,7 +102,7 @@ function flowNode(ctx, id) {
       sectionTitle(t('act_info')),
       kvGrid([
         [t('act_name'), a.name], [t('act_date'), a.activity_date ? `${fmtDate(a.activity_date)} ${weekdayCN(a.activity_date)}` : ''],
-        [t('act_type'), a.activity_type], [t('act_location'), a.location], [t('act_status'), a.status], [t('act_desc'), a.description],
+        [t('act_type'), translateEnum('activity_type', a.activity_type)], [t('act_location'), a.location], [t('act_status'), actStatusLabel(a.status)], [t('act_desc'), a.description],
       ]),
       sectionTitle(`${t('act_prep_tasks')}（${tasks.length}）`),
       tasks.length ? h('div', {}, tasks.map((task) => h('div', { class: 'list-row' }, [
@@ -181,7 +174,7 @@ function interactionNode(ctx, id) {
           ]),
           r.summary ? h('div', { class: 'row-sub' }, r.summary) : null,
           h('div', { class: 'row-sub' }, [
-            r.channel ? `${t('act_channel')}: ${r.channel}` : null,
+            r.channel ? `${t('act_channel')}: ${translateEnum('channel', r.channel)}` : null,
             r.interactionAt ? ` · ${fmtDate(r.interactionAt)}` : null,
             r.importance ? ` · ${t('act_importance')} ${r.importance}` : null,
           ].filter(Boolean)),
