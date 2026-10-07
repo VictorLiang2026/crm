@@ -21,7 +21,8 @@
 
 ### 视图与权限要点
 
-- 2026-10-02 盘点：`public` 37 表、10 视图、28 个 CRM 云函数；37/37 表启用 RLS，10/10 视图启用 `security_invoker`。每次涉及基表改列必须重建依赖视图（`pg-view-rebuild-check` skill）。
+- **2026-10-07 PMC-01 实测基线（替换下列 2026-10-02 旧盘点）**：`public` 47 表、12 视图、33 个数据库函数、66 条外键、36 个序列、91 个触发器；47/47 表启用 RLS（41 表单策略、6 表多策略），12/12 视图启用 `security_invoker`；云端 54 函数 = 28 CRM + 26 `pr_*`。证据：`tests/security/.results/pmc01-catalog-20261007.json`（gitignored）+ [impact-matrix.md](impact-matrix.md) PMC-01 节。
+- 2026-10-02 旧盘点记录（保留备查，已被上方取代）：`public` 37 表、10 视图、28 个 CRM 云函数；37/37 表启用 RLS，10/10 视图启用 `security_invoker`。每次涉及基表改列必须重建依赖视图（`pg-view-rebuild-check` skill）。
 - 新增视图不授权给 authenticated；新表必须加 `*_fn_only` RLS 策略（AI Runtime 底座表按例外走 service_role）。
 - 环境中另有 26 个 `pr_*` 函数与 `pr` schema——一律禁入，发现依赖即停止报告。
 
@@ -29,7 +30,7 @@
 
 - Legacy：`admin.html` 单文件（hash 路由 10 条），`callFn` 唯一数据入口。
 - 新 AI-native Console：`crm/console.html` + `crm/js/modules/console/`（i18n 字典 `i18n.js`，`t(key)` 双语）；复用 `crm/js/core/`、`crm/js/components/`、`crm/css/`。
-- 注意：`tests/wp01/static.cjs` 一致性爬虫只从 `admin.html` 出发遍历 import，`console.html` 模块链不在 sync-check 覆盖内——console 相关部署必须人工核对文件清单（已知缺口，handoff 登记）。
+- ~~注意：`tests/wp01/static.cjs` 一致性爬虫只从 `admin.html` 出发遍历 import，`console.html` 模块链不在 sync-check 覆盖内~~（**已于 2026-10-07 PMC-00 G4 核实为过时记录并更正**：`static.cjs` 的 PAGES 早已含 `console.html`，50 受检资产 = 2 HTML + 48 个 console 模块链；证据见 [evidence/PMC-00.md](evidence/PMC-00.md) 第九节 G4）。
 
 ### AI
 
@@ -42,7 +43,8 @@
 | 包 | 设计状态 | 摘要 |
 | --- | --- | --- |
 | PMC-00 | 已完成 | 接管检查 + 档案建立，无业务变更；见 [evidence/PMC-00.md](evidence/PMC-00.md) |
-| PMC-01～PMC-20 | 未收到指令 | 不预写；收到指令后逐包登记完整指令与验收范围 |
+| PMC-01 | 已完成（纯只读盘点） | 全量影响盘点：无业务设计变更；产出为 [impact-matrix.md](impact-matrix.md) PMC-01 节（47 表/12 视图/33 函数实测、字段重复与一致性统计、66 FK 分类、视图依赖、28 函数 × action 矩阵、5 专项调用链核查、未知项 U1–U8）；见 [evidence/PMC-01.md](evidence/PMC-01.md) |
+| PMC-02～PMC-20 | 未收到指令 | 不预写；收到指令后逐包登记完整指令与验收范围 |
 
 ## 三、迁移总体取向（已确认原则，非实施授权）
 
