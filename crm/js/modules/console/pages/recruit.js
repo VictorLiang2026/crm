@@ -6,21 +6,23 @@ import { data } from '../data.js';
 import { wpTag, pageHead, emptyNote, loadInto, bdg, fmtDate, dayDiffFromToday, textOf } from '../ui.js';
 import { t } from '../i18n.js';
 
-const FUNNEL_STAGES = () => [
-  t('funnel_stage_new'),
-  t('funnel_stage_icebreak'),
-  t('funnel_stage_first_meeting'),
-  t('funnel_stage_activity'),
-  t('funnel_stage_precision_meeting'),
-  t('funnel_stage_onboarding_apply'),
-  t('funnel_stage_signed'),
-  t('funnel_stage_lost'),
-];
+const FUNNEL_STAGES_CN = ['新增人才','互动暖客','初次面谈','增员活动','精准面谈','入职申请','签约入司','流失'];
+const FUNNEL_STAGE_I18N = {
+  '新增人才': 'funnel_stage_new',
+  '互动暖客': 'funnel_stage_icebreak',
+  '初次面谈': 'funnel_stage_first_meeting',
+  '增员活动': 'funnel_stage_activity',
+  '精准面谈': 'funnel_stage_precision_meeting',
+  '入职申请': 'funnel_stage_onboarding_apply',
+  '签约入司': 'funnel_stage_signed',
+  '流失': 'funnel_stage_lost',
+};
+function stageLabel(stage) { return t(FUNNEL_STAGE_I18N[stage] || stage); }
 
 function stageTone(stage) {
-  if (stage === t('funnel_stage_lost')) return 'gray';
-  if (stage === t('funnel_stage_signed')) return 'jade';
-  if (stage === t('funnel_stage_onboarding_apply') || stage === t('funnel_stage_precision_meeting')) return 'red';
+  if (stage === '流失') return 'gray';
+  if (stage === '签约入司') return 'jade';
+  if (stage === '入职申请' || stage === '精准面谈') return 'red';
   return 'gold';
 }
 
@@ -68,7 +70,7 @@ function listNode(ctx) {
         h('span', { class: 'pavatar sm gold' }, (row.name || t('person_fallback')).charAt(0)),
         h('div', { style: 'flex:1;min-width:0' }, [
           h('div', { class: 'row-title' }, [
-            bdg(row.stage || t('stage_unknown'), stageTone(row.stage)),
+            bdg(stageLabel(row.stage) || t('stage_unknown'), stageTone(row.stage)),
             row.score != null ? bdg(t('potential_score') + row.score, 'ink') : null,
             row.source === 'person' ? bdg('Person', 'jade') : null,
             h('span', { style: 'margin-left:6px' }, row.name || t('unnamed')),
@@ -92,7 +94,7 @@ function sideNode(ctx) {
   ]).then(([funnel, progress]) => {
     if (funnel._error) throw funnel._error;
     const counts = funnel.funnel || {};
-    const allStages = [...FUNNEL_STAGES()];
+    const allStages = [...FUNNEL_STAGES_CN];
     Object.keys(counts).forEach((s) => { if (!allStages.includes(s)) allStages.push(s); });
     const max = Math.max(1, ...allStages.map((s) => counts[s] || 0));
     const funnelCard = {
@@ -100,9 +102,9 @@ function sideNode(ctx) {
       body: [h('div', {}, allStages.map((s) => {
         const n = counts[s] || 0;
         return h('div', { class: 'funnel-row' }, [
-          h('span', { class: s === t('funnel_stage_lost') ? 'funnel-lost' : '' }, s),
+          h('span', { class: s === '流失' ? 'funnel-lost' : '' }, stageLabel(s)),
           h('span', { class: 'funnel-bar-track' },
-            h('span', { class: 'funnel-bar' + (s === t('funnel_stage_lost') ? ' lost' : ''), style: `width:${Math.round((n / max) * 100)}%` })),
+            h('span', { class: 'funnel-bar' + (s === '流失' ? ' lost' : ''), style: `width:${Math.round((n / max) * 100)}%` })),
           h('span', { class: 'funnel-n' }, String(n)),
         ]);
       }))],
@@ -112,7 +114,7 @@ function sideNode(ctx) {
     const goalCard = {
       title: month + ' ' + t('goals_title'), icon: 'calendar', tag: wpTag(t('fact')),
       body: goalRows.length ? [h('div', {}, goalRows.map((r) => h('div', { class: 'goal-row' }, [
-        h('span', {}, r.stage),
+        h('span', {}, stageLabel(r.stage)),
         h('span', { class: 'goal-bar-track' }, h('span', {
           class: 'goal-bar',
           style: `width:${Math.min(100, r.target ? Math.round((r.actual / r.target) * 100) : 0)}%`,

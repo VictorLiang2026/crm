@@ -328,7 +328,7 @@ const DICT = {
   'facts_signals': { 'zh-CN': '事实 / 信号', 'en': 'Facts / Signals' },
   // recruit page
   'funnel_stage_new': { 'zh-CN': '新增人才', 'en': 'New' },
-  'funnel_stage_icebreak': { 'zh-CN': '互动破冰', 'en': 'Icebreak' },
+  'funnel_stage_icebreak': { 'zh-CN': '互动暖客', 'en': 'Icebreak' },
   'funnel_stage_first_meeting': { 'zh-CN': '初次面谈', 'en': '1st Meet' },
   'funnel_stage_activity': { 'zh-CN': '增员活动', 'en': 'Activity' },
   'funnel_stage_precision_meeting': { 'zh-CN': '精准面谈', 'en': 'Precision' },
