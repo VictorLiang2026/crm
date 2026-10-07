@@ -180,12 +180,10 @@ tools/sync-check.ps1（完整模式）→ 全绿：
 ### PMC-01 状态核实
 
 - 结论：**PMC-01 未完成——准确说是从未开始**。
-- 证据：`tasks.md` 中 PMC-01 标记 `[ ]`、"指令：未收到"；全仓库无 PMC-01 设计/evidence；PMC-00 发布（`4a700a1`）后无新提交；handoff 明确"下一步唯一允许执行的动作 = 等待用户下发 PMC-01 指令"。
+- 证据：`tasks.md` 中 PMC-01 标记 `[ ]`、"指令：未收到"；全仓库无 PMC-01 设计/evidence；Git 历史中无任何 PMC-01 业务提交（其后的 `f9e7345` 仅为本次 PMC-00 缺口处置的工具/文档提交）；handoff 明确"下一步唯一允许执行的动作 = 等待用户下发 PMC-01 指令"。
 
 ### 本处置包发布
 
-- 变更文件：`tools/tcb.ps1`（修改）、`tools/sync-migration-backup.ps1`（新增）、`tools/pg-readonly.cjs`（新增）、PMC 档案 4 个文档更新。
+- 变更文件：`tools/tcb.ps1`（修改）、`tools/sync-migration-backup.ps1`（新增）、`tools/pg-readonly.cjs`（新增）、PMC 档案 6 个文档更新（README/handoff/evidence/decisions/impact-matrix/tasks）。
 - 云端产物：未改变（工具与文档不部署；发布后 sync-check 复核云端）。
-- 标签：见本节末尾（发布后补录）。
-
-> 发布标签补录：`release-20261007-1240`（见发布后 Git 记录；纯工具/文档提交，发布后完整 sync-check 全绿）。
+- 发布标签：`release-20261007-125802`（提交 `f9e7345`）；发布后完整 sync-check 全绿：28 函数 170 文件一致、50 静态资产一致、共享副本 56 份一致、GitHub master 与标签一致。

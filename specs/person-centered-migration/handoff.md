@@ -23,7 +23,7 @@
 | 数据库迁移 | 本地 `cloudbase/migrations/` 82 份 + `cloudbase/rollbacks/`；最新 `20261007000000_person_directory_customer_columns.sql`。外部双备份 `C:\Users\victor\cloudbase\migrations\` 仅 51 份、最新 2026-10-03（滞后，见缺口 G1） |
 | 数据规模抽查 | `public.persons` 784 行（2026-10-07 只读 count；2026-10-02 规划基线 779，为正常业务增长） |
 
-PMC-00 文档发布后，以上 Git 基线将前移一个文档提交（无云端产物变化）；开工 PMC-01 前必须按 execution-contract B 重新核对。
+PMC-00 两次文档发布后基线前移至 `4a700a1`（标签 `release-20261007-1153`/`-1209`）；G1–G4 缺口处置发布后当前基线为 `f9e73455c1fb18750fc8e92edae9505431a0ac7c`（标签 `release-20261007-125802`），发布时三端 sync-check 全绿（28 函数 170 文件、50 静态资产、56 共享副本），云端业务产物未改变。开工 PMC-01 前仍必须按 execution-contract B 重新核对。
 
 ## 3. 各模块读写权威来源与兼容方向
 
