@@ -1,9 +1,10 @@
-// AI 助手页与更多页：WP0 静态内容沿用，AI 能力在 WP3 接入。
+// AI 助手页与更多页：WP0 静态内容沿用；WP3 AI 能力（摘要/会前准备/对话策略/复盘候选）已上线。
 import { h } from '../dom.js';
 import { ic } from '../icons.js';
 import { data } from '../data.js';
 import { wpTag, pageHead, card, emptyNote, loadInto, sk, bdg } from '../ui.js';
 import { t } from '../i18n.js';
+import { openQuickCapture } from '../write.js';
 
 function searchExamples() {
   return [
@@ -95,9 +96,9 @@ export function renderAI(ctx) {
   const items = [
     ['sparkle', t('ai_item_nl_command'), t('ai_item_nl_command_desc'), 'WP3', 'hot'],
     ['users', t('ai_item_person_summary'), t('ai_item_person_summary_desc'), 'WP3', ''],
-    ['shield', t('ai_item_prep'), t('ai_item_prep_desc'), t('ai_status_planning'), ''],
+    ['shield', t('ai_item_prep'), t('ai_item_prep_desc'), 'WP3', ''],
     ['target', t('ai_item_opportunity'), t('ai_item_opportunity_desc'), t('ai_status_planning'), ''],
-    ['calendar', t('ai_item_review'), t('ai_item_review_desc'), t('ai_status_planning'), ''],
+    ['calendar', t('ai_item_review'), t('ai_item_review_desc'), 'WP3', ''],
   ];
   ctx.main.replaceChildren(
     pageHead({
@@ -142,10 +143,10 @@ export function renderMore(ctx) {
     h('div', { class: 'tile-grid' }, tiles.map(([hash, icon, name, desc]) =>
       hash
         ? h('a', { class: 'tile', href: hash }, [ic(icon), h('b', {}, name), h('span', {}, desc)])
-        : h('button', { class: 'tile', type: 'button', onclick: () => ctx.toast(t('toast_quick_record_wp2')) }, [ic(icon), h('b', {}, name), h('span', {}, desc)]))),
+        : h('button', { class: 'tile', type: 'button', onclick: () => openQuickCapture(ctx) }, [ic(icon), h('b', {}, name), h('span', {}, desc)]))),
     h('div', { style: 'height:16px' }),
     card({
-      title: t('console_schedule_title'), icon: 'grid', tag: wpTag(t('wp1_progress')),
+      title: t('console_schedule_title'), icon: 'grid', tag: wpTag(t('ai_status_live')),
       body: [
         h('p', { class: 'foot-note', style: 'margin:0 0 10px' }, t('console_schedule_desc')),
         h('ul', { class: 'plan-list' }, [
