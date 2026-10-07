@@ -163,7 +163,19 @@
 - [x] 未知项有具体补查任务：U1–U8 已列出，含影响评估和优先级。
 - [x] 影响后续设计的未知项已识别：U1（3 个无 Person 的 customers）、U5/U6（双 FK 过渡期）标记为高优先级，必须先解决。
 - [x] 旧文档与当前事实冲突已处理：design.md 已更新 47 表/12 视图基线，旧记录保留并标注"已被取代"。
-- [ ] 发布执行（待完成）：刷新 WP01 门槛 → `release.ps1` → 三端核对 → 向用户汇报。
+- [x] 发布执行：WP01 gate PASS → `release.ps1` 发布成功 → 标签 `release-20261007-193230`（提交 `42787ff`）→ 三端核对一致。
+
+### 发布后核对（2026-10-07 实测）
+
+```
+git status --short          → 干净
+git rev-parse HEAD          → 42787ff5dbc9202dd15882f6ffe12d09d2f8c44a
+git ls-remote origin master → 42787ff5dbc9202dd15882f6ffe12d09d2f8c44a
+git tag --points-at HEAD    → release-20261007-193230
+```
+
+发布前 sync-check：28 函数 170 文件一致、50 静态资产一致、56 共享副本一致、admin.html SHA-256 一致。
+发布后 sync-check：同上，全绿。
 
 ---
 

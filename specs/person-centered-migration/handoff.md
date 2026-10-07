@@ -7,18 +7,18 @@
 | 项 | 值 |
 | --- | --- |
 | 当前执行工具 | Trae（Kimi-K3 agent），2026-10-07 执行 PMC-01 |
-| 最后完成包 | PMC-00（接管检查及执行档案建立；状态：已验收，证据见 evidence/PMC-00.md） |
-| 正在执行包 | **PMC-01（全量影响盘点）**——只做只读审计和文档更新，不修改业务代码、表结构或业务数据 |
-| 下一步唯一允许执行的动作 | 1) 完成 evidence/PMC-01.md 及 tasks/handoff/README 更新；2) 刷新 WP01 门槛证据；3) 执行 release.ps1 发布；4) 三端核对；5) 向用户汇报验收。本包纯文档，无业务/数据库/云端变更。
+| 最后完成包 | **PMC-01（全量影响盘点）**——已发布，标签 `release-20261007-193230`（提交 `42787ff`）；证据见 [evidence/PMC-01.md](evidence/PMC-01.md) |
+| 正在执行包 | 无 |
+| 下一步唯一允许执行的动作 | 等待用户验收 PMC-01 并下发 PMC-02 指令；收到后按 execution-contract A 开包。 |
 | 回滚条件 | 本包仅新增文档；如需回退，git revert 文档提交并删除远端标签对应提交引用即可（无云端产物、无数据库变更） |
 
 ## 2. 版本基线（2026-10-07 实测）
 
 | 端 | 值 |
 | --- | --- |
-| 本地 | `master` @ `3760891806dbbae9a9526a06ce5adc8ae50c5536`，工作树有 2 个修改（`design.md`、`impact-matrix.md`，均为 PMC-01 文档更新） |
-| GitHub | `origin/master` @ `3760891…`（fetch 后一致）；共 175 个标签（含 PMC-00 文档发布及 G1–G4 处置标签） |
-| 标签 | `release-20261007-184445`（G1 执行关闭）→ `3760891…` |
+| 本地 | `master` @ `42787ff5dbc9202dd15882f6ffe12d09d2f8c44a`，工作树干净 |
+| GitHub | `origin/master` @ `42787ff…`（fetch 后一致）；共 176 个标签 |
+| 标签 | `release-20261007-193230`（PMC-01 发布）→ `42787ff…` |
 | 云端 | admin.html SHA-256 一致；50 个静态资源一致；28 个函数 170 个文件一致；56 份共享副本一致（sync-check 全绿） |
 | 数据库迁移 | 本地 `cloudbase/migrations/` 82 份 + `cloudbase/rollbacks/`；最新 `20261007000000_person_directory_customer_columns.sql`。外部双备份 82/82 哈希一致（旧稿 25 份归档于 `_archive-20261007/`，G1 已关闭） |
 | 数据规模抽查 | `public.persons` 784 行（2026-10-07 PMC-01 核实；含 3 条软删除）；`customers` 783 行（含 1 条软删除）；780/784 persons 已映射 `legacy_customer_id` |
