@@ -117,10 +117,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools/release.ps1 -Message "
 ```
 
 **回填项**：
-- 主提交 SHA：`ca988ef`（PMC-04 收尾回填）→ 本次发布提交 `313e23c`（PMC-04）→ `ca988ef`（PMC-05 产物）
-- 发布标签（时间戳）：`release-20261008-1830`
+- 主提交 SHA：`ac78bdd`（PMC-05 产物）
+- 发布标签（时间戳）：`release-20261008-1905`
 - 是否首提交（需 semver）：否
-- GitHub push 结果：成功（`ca988ef` 已推送）
+- GitHub push 结果：成功（`ac78bdd` + `release-20261008-1905` 已推送）
 - 云端部署范围：无业务产物部署（纯 migration SQL + 文档/工具；migration 已通过 tcb db execute 直接应用到数据库）
 - sync-check.ps1 结果：WP01 gate PASS；56 份共享副本一致；50 个静态资源一致；28 个函数 170 个文件一致；云端 admin.html SHA-256 一致
 - 三端一致性：全绿 ✅
