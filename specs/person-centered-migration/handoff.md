@@ -6,11 +6,11 @@
 
 | 项 | 值 |
 | --- | --- |
-| 当前执行工具 | Trae（Kimi-K3 agent），2026-10-08 执行 PMC-07 |
-| 最后完成包 | **PMC-06（分批回填 Person 基础资料和业务关联）——已发布，待用户验收**：B1 批次回填完成——`customers.person_id` 已回填 779 行（M1 已确认对）；孤立引用 0、一对一完整性 0；未处理 A1–A3/A5/D1/E1–E7 留待后续确认；发布 `3be6520`/`release-20261008-1945`；三端 sync-check 全绿 |
-| 正在执行包 | **PMC-07（建立 Person 统一写入服务及安全恢复机制）——已发布，待用户验收**：`person_360/index.js` 新增 `updatePerson`（乐观锁+字段映射）；`customers/index.js` `update` 增加 Person 字段映射（阶段 2 双写 T2）；`ocr_records/index.js` `remove` 返回 `personSnapshot`；三函数已部署 |
-| 下一步唯一允许执行的动作 | 运行 WP01 门槛测试 → 三端核对 `sync-check.ps1` → 回填 evidence/PMC-07.md §5 → 停止等待用户验收 |
-| 回滚条件 | 代码回滚：git revert 本包提交（`1744975`）→ 重新部署三函数旧版本；数据回滚：无需（本包未修改数据） |
+| 当前执行工具 | Trae，2026-10-08 执行 PMC-08 |
+| 最后完成包 | **PMC-07（建立 Person 统一写入服务及安全恢复机制）——已验收**：`person_360/index.js` 新增 `updatePerson`；`customers/index.js` `update` 增加 Person 字段映射；`ocr_records/index.js` `remove` 返回 `personSnapshot`；三函数已部署 |
+| 正在执行包 | **PMC-08（接管客户、Person 及跨模块基础信息写入口）——已发布，待用户验收**：customers.create 接管（建/关联 Person）、customers.update 移除双重同步+OCR 恢复保护、activity_speakers.create 接管；customers/activity_speakers 已部署；线上 invoke 未测试（tcb Cam auth 失败） |
+| 下一步唯一允许执行的动作 | 等待用户验收 PMC-08；验收通过后进入 PMC-09（指令已收到） |
+| 回滚条件 | 代码回滚：git revert 本包提交 → 重新部署 customers/activity_speakers 旧版本；数据回滚：无需（本包未修改数据） |
 
 ## 2. 版本基线（2026-10-07 实测）
 

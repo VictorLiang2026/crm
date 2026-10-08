@@ -112,7 +112,51 @@ async function create(event) {
   const payload = normFields(data, FIELDS);
   if (!Object.keys(payload).length) return { error: 'no valid fields' };
   const r = assertOk(await rdb.from('customers').insert(payload).select('Id'));
-  return { id: r.data[0].Id };
+  const customerId = r.data[0].Id;
+
+  // PMC-08: 创建客户时自动建/关联 Person（统一基础资料写入口接管）
+  // 不凭同名自动合并：persons 中 display_name 完全匹配且唯一则关联，多个则报错，无则新建
+  const nameKey = String(data.customer_name).trim().toLowerCase().replace(/\s+/g, ' ');
+  const personMatch = assertOk(await rdb.from('persons')
+    .select('id, display_name')
+    .eq('display_name', data.customer_name)
+    .is('deleted_at', null)
+    .limit(2));
+  const matches = personMatch.data || [];
+  let personId;
+  if (matches.length === 1) {
+    // 唯一匹配 → 关联
+    personId = matches[0].id;
+    assertOk(await rdb.from('persons')
+      .update({ legacy_customer_id: customerId, updated_at: nowIso() })
+      .eq('id', personId));
+  } else if (matches.length > 1) {
+    // 同名不同人 → 报错让人工确认（不自动选择）
+    return { error: '存在多个同名人物，请通过 Person 身份解析确认后关联', customerId };
+  } else {
+    // 无匹配 → 创建新 Person
+    const personPayload = {
+      display_name: data.customer_name,
+      name_key: nameKey,
+      phone: data.phone || null,
+      wechat: data.wx_account || null,
+      gender: data.gender || null,
+      birthday: data.birthday || null,
+      occupation: data.occupation || null,
+      education: data.education || null,
+      source: '客户建档',
+      legacy_customer_id: customerId,
+    };
+    const pr = assertOk(await rdb.from('persons').insert(personPayload).select('id'));
+    personId = pr.data[0].id;
+  }
+  // 设置 customers.person_id（PMC-05 新增列）
+  if (personId) {
+    assertOk(await rdb.from('customers')
+      .update({ person_id: personId, updated_at: nowIso() })
+      .eq('Id', customerId));
+  }
+  return { id: customerId, personId: String(personId) };
 }
 
 async function update(event) {
@@ -123,37 +167,38 @@ async function update(event) {
     FIELDS.concat(['updated_at'])
   );
   if (!Object.keys(payload).length) return { ok: true, updated: false };
+
+  // PMC-08: OCR 恢复保护——检测疑似快照整包覆盖
+  // 基础字段集合（与数据库触发器 customer_person_identity_bridge 同步的字段）
+  const PERSON_BRIDGE_FIELDS = ['customer_name', 'phone', 'wx_account', 'gender', 'birthday', 'occupation', 'education'];
+  const bridgeFieldsInPayload = PERSON_BRIDGE_FIELDS.filter(f => Object.prototype.hasOwnProperty.call(payload, f));
+  const isSnapshotRestore = bridgeFieldsInPayload.length >= 3;
+
+  if (isSnapshotRestore && !event.forceRestore) {
+    // 疑似 OCR 快照恢复：比较当前值，有冲突则要求重新预览
+    const cur = assertOk(await rdb.from('customers')
+      .select(PERSON_BRIDGE_FIELDS.join(','))
+      .eq('Id', id).maybeSingle());
+    const curData = cur.data || {};
+    const conflicts = bridgeFieldsInPayload.filter(f => {
+      const curVal = curData[f] == null ? '' : String(curData[f]);
+      const newVal = payload[f] == null ? '' : String(payload[f]);
+      return curVal !== newVal;
+    });
+    if (conflicts.length) {
+      return {
+        error: 'OCR_SNAPSHOT_RESTORE_CONFLICT',
+        message: '快照恢复将覆盖已变更的基础资料，请重新预览后确认',
+        conflicts,
+        suggestion: '通过 Person 身份解析或 OCR 重新预览确认后再执行恢复',
+      };
+    }
+  }
+
   const r = assertOk(await rdb.from('customers').update(payload).eq('Id', id).select('Id'));
   const n = (r.data || []).length;
-
-  // PMC-07: 阶段 2 双写——基础字段变更同步映射到 persons（T2 模式）
-  // 字段映射：customers 列 → persons 列（权威方向 persons→customers，此处反向写 persons）
-  const PERSON_FIELD_MAP = {
-    customer_name: 'display_name',
-    phone: 'phone',
-    birthday: 'birthday',
-    gender: 'gender',
-    occupation: 'occupation',
-    education: 'education',
-    wx_account: 'wechat',
-  };
-  const personPayload = {};
-  for (const [customerField, personField] of Object.entries(PERSON_FIELD_MAP)) {
-    if (Object.prototype.hasOwnProperty.call(payload, customerField)) {
-      personPayload[personField] = payload[customerField];
-    }
-  }
-  if (Object.keys(personPayload).length) {
-    // 查找关联的 person_id
-    const personR = assertOk(await rdb.from('customers')
-      .select('person_id').eq('Id', id).maybeSingle());
-    const personId = personR.data?.person_id;
-    if (personId) {
-      // 更新 persons 表（不设置 updated_at 触发器会自动更新）
-      assertOk(await rdb.from('persons')
-        .update(personPayload).eq('id', personId).is('deleted_at', null));
-    }
-  }
+  // PMC-08: 移除应用层 Person 映射——数据库触发器 customer_person_identity_bridge_trigger
+  // 已在 AFTER UPDATE 时经 legacy_customer_id 同步 customers→persons，避免双重更新
 
   return { ok: n === 1, updated: n };
 }

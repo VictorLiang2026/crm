@@ -131,12 +131,42 @@ async function create(event) {
     if (dups.length === 1) {
       d.customer_id = dups[0].Id;
     } else if (dups.length === 0) {
+      // PMC-08: 经统一写入口创建客户+Person（不直接 INSERT customers 绕过 Person 接管）
+      const customerPayload = {
+        customer_name: exactName,
+        phone: d.phone || null,
+        source: d.source ? ('嘉宾：' + d.source) : '嘉宾（自动建档）',
+      };
+      // 复用 customers.create 的接管逻辑：建 Person + 设置 person_id/legacy_customer_id
+      const nameKey = exactName.toLowerCase().replace(/\s+/g, ' ');
+      const personMatch = assertOk(await rdb.from('persons')
+        .select('id, display_name')
+        .eq('display_name', exactName)
+        .is('deleted_at', null)
+        .limit(2));
+      const pMatches = personMatch.data || [];
+      let personId;
+      if (pMatches.length === 1) {
+        personId = pMatches[0].id;
+      } else if (pMatches.length > 1) {
+        return { error: '存在多个同名人物，请通过 Person 身份解析确认后关联' };
+      } else {
+        const pr = assertOk(await rdb.from('persons').insert({
+          display_name: exactName, name_key: nameKey, source: '嘉宾建档',
+        }).select('id'));
+        personId = pr.data[0].id;
+      }
       const cr = assertOk(await rdb.from('customers').insert({
         customer_name: exactName,
+        phone: d.phone || null,
         source: d.source ? ('嘉宾：' + d.source) : '嘉宾（自动建档）',
+        person_id: personId,
         created_at: nowIso(), updated_at: nowIso(),
       }).select('Id'));
       d.customer_id = cr.data[0].Id;
+      assertOk(await rdb.from('persons')
+        .update({ legacy_customer_id: d.customer_id, updated_at: nowIso() })
+        .eq('id', personId));
     } else {
       return { error: '存在 ' + dups.length + ' 个同名客户，请在界面确认要关联的客户后重试', dup_customers: dups };
     }
