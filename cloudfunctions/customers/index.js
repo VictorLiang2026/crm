@@ -125,6 +125,36 @@ async function update(event) {
   if (!Object.keys(payload).length) return { ok: true, updated: false };
   const r = assertOk(await rdb.from('customers').update(payload).eq('Id', id).select('Id'));
   const n = (r.data || []).length;
+
+  // PMC-07: 阶段 2 双写——基础字段变更同步映射到 persons（T2 模式）
+  // 字段映射：customers 列 → persons 列（权威方向 persons→customers，此处反向写 persons）
+  const PERSON_FIELD_MAP = {
+    customer_name: 'display_name',
+    phone: 'phone',
+    birthday: 'birthday',
+    gender: 'gender',
+    occupation: 'occupation',
+    education: 'education',
+    wx_account: 'wechat',
+  };
+  const personPayload = {};
+  for (const [customerField, personField] of Object.entries(PERSON_FIELD_MAP)) {
+    if (Object.prototype.hasOwnProperty.call(payload, customerField)) {
+      personPayload[personField] = payload[customerField];
+    }
+  }
+  if (Object.keys(personPayload).length) {
+    // 查找关联的 person_id
+    const personR = assertOk(await rdb.from('customers')
+      .select('person_id').eq('Id', id).maybeSingle());
+    const personId = personR.data?.person_id;
+    if (personId) {
+      // 更新 persons 表（不设置 updated_at 触发器会自动更新）
+      assertOk(await rdb.from('persons')
+        .update(personPayload).eq('id', personId).is('deleted_at', null));
+    }
+  }
+
   return { ok: n === 1, updated: n };
 }
 

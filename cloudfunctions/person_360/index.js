@@ -340,6 +340,51 @@ function createService({ request = pgRequest, rpc = pgRpc, disclosure = disclose
     return rpc('person_identity_execute_v1', { p_actor_uid: uid, p_preview_id: previewId });
   }
 
+  // PMC-07: 修改已确认人物的基础资料（persons 表）
+  // 与 resolveName（解析候选身份）严格区分：本 action 只接受已知 personId，不凭姓名匹配
+  const PERSON_EDITABLE_FIELDS = new Set([
+    'display_name', 'phone', 'birthday', 'gender',
+    'occupation', 'organization', 'education', 'wechat', 'notes',
+  ]);
+  const PERSON_FIELD_MAP = {
+    displayName: 'display_name', phone: 'phone', birthday: 'birthday',
+    gender: 'gender', occupation: 'occupation', organization: 'organization',
+    education: 'education', wechat: 'wechat', notes: 'notes',
+  };
+
+  async function updatePerson(data, uid) {
+    if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('Invalid update payload');
+    const personId = idOf(data.personId);
+    if (!personId) throw new Error('personId required');
+    const expectedUpdatedAt = String(data.expectedUpdatedAt || '');
+    if (!expectedUpdatedAt) throw new Error('expectedUpdatedAt required (optimistic lock)');
+
+    // 只保留允许的字段，且与入参 camelCase 映射到数据库 snake_case
+    const payload = {};
+    for (const [camelKey, snakeKey] of Object.entries(PERSON_FIELD_MAP)) {
+      if (Object.prototype.hasOwnProperty.call(data, camelKey) &&
+          PERSON_EDITABLE_FIELDS.has(snakeKey)) {
+        const val = data[camelKey];
+        payload[snakeKey] = (typeof val === 'string' && val.trim() === '') ? null : val;
+      }
+    }
+    if (!Object.keys(payload).length) return { ok: true, updated: false };
+
+    // 乐观锁：WHERE updated_at = expectedUpdatedAt
+    payload.updated_at = new Date().toISOString();
+    const result = await request('persons', 'PATCH', {
+      id: `eq.${personId}`,
+      updated_at: `eq.${expectedUpdatedAt}`,
+      deleted_at: 'is.null',
+    }, payload);
+
+    if (!result || result.length === 0) {
+      return { ok: false, updated: false, conflict: true,
+        message: 'Concurrent modification detected; please refresh and retry' };
+    }
+    return { ok: true, updated: true, id: personId, updatedAt: payload.updated_at };
+  }
+
   async function listOpportunityDirectory(event = {}) {
     const { page, pageSize, offset } = directoryPage(event);
     const rows = await request('opportunities', 'GET', {
@@ -705,6 +750,7 @@ exports.main = async event => {
       case 'resolveIdentity': return await service.resolveIdentity(event.name);
       case 'previewIdentity': return await service.previewIdentity(event.data, uid);
       case 'executeIdentity': return await service.executeIdentity(event.data, uid);
+      case 'updatePerson': return await service.updatePerson(event.data, uid);
       case 'listOpportunityDirectory': return await service.listOpportunityDirectory(event);
       case 'listPendingOpportunityCandidates': return await new OpportunityWorkflowService({request:pgRequest,rpc:pgRpc}).listPending(uid);
       case 'listOpportunities': return await service.listOpportunities(event.personId);

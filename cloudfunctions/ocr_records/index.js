@@ -75,9 +75,30 @@ async function remove(event) {
   if (!id) return { error: 'id required' };
   // 删除前先取 customer_snapshot，供前端恢复客户信息
   const fetched = assertOk(await rdb.from('ocr_records')
-    .select('id, customer_snapshot')
+    .select('id, customer_snapshot, customer_id')
     .eq('id', id));
-  const snapshot = (fetched.data && fetched.data[0]) ? fetched.data[0].customer_snapshot : null;
+  const record = (fetched.data && fetched.data[0]) || null;
+  const snapshot = record?.customer_snapshot || null;
+
+  // PMC-07: 同时返回关联 Person 的当前基础字段快照，供恢复前比较
+  let personSnapshot = null;
+  if (record?.customer_id) {
+    const custR = assertOk(await rdb.from('customers')
+      .select('person_id')
+      .eq('Id', record.customer_id)
+      .maybeSingle());
+    if (custR.data?.person_id) {
+      const personR = assertOk(await rdb.from('persons')
+        .select('id, display_name, phone, birthday, gender, occupation, organization, education, wechat, updated_at')
+        .eq('id', custR.data.person_id)
+        .is('deleted_at', null)
+        .maybeSingle());
+      if (personR.data) {
+        personSnapshot = personR.data;
+      }
+    }
+  }
+
   const r = assertOk(await rdb.from('ocr_records').delete().eq('id', id));
-  return { ok: (r.data || []).length === 1, customer_snapshot: snapshot };
+  return { ok: (r.data || []).length === 1, customer_snapshot: snapshot, personSnapshot };
 }
