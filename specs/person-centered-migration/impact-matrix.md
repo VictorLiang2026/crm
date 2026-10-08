@@ -410,3 +410,16 @@ persons.legacy_customer_id（自引用）
 | **不变项**：legacy_customer_id 列及复合 FK | 保留（D8 退出条件未满足） | 桥接查询 | PMC-05+ | 保留 | evidence/PMC-05.md §3 |
 | **不变项**：RLS 策略 | 不修改（C7 权限不变） | security_invoker 视图 | PMC-05 | 不变 | evidence/PMC-05.md §4 |
 | **不变项**：12 个视图 | 不重建（显式列名；视图重建属阶段 3） | 查询路径 | PMC-05 | 不变 | evidence/PMC-05.md §5 |
+
+---
+
+## PMC-06：数据回填（2026-10-08）
+
+| 对象 | 变更类型 | 调用方/消费者 | 所属包 | 状态 | 证据 |
+| --- | --- | --- | --- | --- | --- |
+| `public.customers.person_id` | 数据回填（779 行） | 阶段 2 双写（待 PMC-07+） | PMC-06 | 已回填 | evidence/PMC-06.md §3 |
+| `tests/security/.results/pmc06-batch-log.json` | 批次日志（本次单批次 UPDATE） | 审计/回滚依据 | PMC-06 | 已落盘 | evidence/PMC-06.md §4 |
+| **未处理项**：A1–A3（customer 786/789/790 无 Person） | 跳过（留待后续确认） | — | PMC-06 | 跳过 | evidence/PMC-06.md §5 |
+| **未处理项**：A5（person 787 身份核实） | 跳过（留待后续确认） | — | PMC-06 | 跳过 | evidence/PMC-06.md §5 |
+| **未处理项**：D1（occupation 单边差异） | 跳过（留待后续确认） | — | PMC-06 | 跳过 | evidence/PMC-06.md §5 |
+| **未处理项**：E1–E7（7 组同名不同人） | 跳过（基础资料全空，需人工核实） | — | PMC-06 | 跳过 | evidence/PMC-06.md §5 |

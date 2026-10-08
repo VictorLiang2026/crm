@@ -6,11 +6,11 @@
 
 | 项 | 值 |
 | --- | --- |
-| 当前执行工具 | Trae（Kimi-K3 agent），2026-10-08 执行 PMC-05 |
-| 最后完成包 | **PMC-04（人物身份及数据冲突确认）——已验收**：两轮只读冲突检测+脱敏清单+五分类确认；发布 `313e23c`/`release-20261008-115430`；2026-10-08 用户确认"都完成" |
-| 正在执行包 | **PMC-05（兼容性的数据库结构扩展）——产物已落盘+Migration 已应用，待发布与用户验收**：customers.person_id bigint NULLABLE+UNIQUE+FK RESTRICT+部分索引；4 步 migration 已应用（40ms）；旧约束完整 5 个、视图 12 个正常、数据 783 行 person_id 全 NULL；不修改 RLS/视图/云函数 |
-| 下一步唯一允许执行的动作 | 发布 PMC-05 产物（`tools/release.ps1` 含 migration SQL + 文档/工具）→ 三端核对 `sync-check.ps1` → 回填 evidence/PMC-05.md §7 → 停止等待用户验收 |
-| 回滚条件 | 数据库回滚：执行 `cloudbase/rollbacks/20261008120000_customers_person_id.sql`（4 步：DROP CONSTRAINT FK+UNIQUE+INDEX+COLUMN）；当前 person_id 全 NULL 无消费者，回滚安全；代码回滚：git revert 本包提交即可（无云函数部署、无视图重建） |
+| 当前执行工具 | Trae（Kimi-K3 agent），2026-10-08 执行 PMC-06 |
+| 最后完成包 | **PMC-05（兼容性的数据库结构扩展）——已发布，待用户验收**：customers.person_id bigint NULLABLE+UNIQUE+FK RESTRICT+部分索引；4 步 migration 已应用（40ms）；旧约束完整 5 个、视图 12 个正常、数据 783 行 person_id 全 NULL；发布 `ac78bdd`/`release-20261008-1905`；三端 sync-check 全绿 |
+| 正在执行包 | **PMC-06（分批回填 Person 基础资料和业务关联）——B1 批次回填完成，待发布与用户验收**：customers.person_id 已回填 779 行（M1 已确认对）；孤立引用 0、一对一完整性 0；未处理 A1–A3/A5/D1/E1–E7 留待后续确认 |
+| 下一步唯一允许执行的动作 | 发布 PMC-06 产物（`tools/release.ps1`）→ 三端核对 `sync-check.ps1` → 回填 evidence/PMC-06.md §6 → 停止等待用户验收 |
+| 回滚条件 | 数据库回滚：执行 `UPDATE customers SET person_id = NULL WHERE person_id IS NOT NULL AND "Id" IN (SELECT legacy_customer_id FROM persons WHERE deleted_at IS NULL)`（需先备份）；当前已回填 779 行，回滚需用户确认；代码回滚：git revert 本包提交即可（无云函数部署、无视图重建） |
 
 ## 2. 版本基线（2026-10-07 实测）
 
