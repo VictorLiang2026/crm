@@ -392,3 +392,21 @@ persons.legacy_customer_id（自引用）
 | 活动 | #/activity/customer | activities 页 | activities / activity_reports / activity_tasks / activity_topics / activity_speakers | 活动详情互动/名单/机会候选页签已上线 |
 | 招募 | #/recruit、#/recruit/:id | — | recruit_candidates / recruit_followups / recruit_goals / recruit_score / recruit_recommend | WP13 未实施；Person-only 招募待设计 |
 | AI | #/ai-suggestions | assistant 相关页面 | assistant / ai_parse / ai_recommend / ai_recommendations / ai_activity / ai_followup / today_coach / funnel_insight / ai_referral | 模型由 AI Gateway 配置 |
+
+---
+
+## PMC-05：数据库结构扩展（2026-10-08）
+
+| 对象 | 变更类型 | 调用方/消费者 | 所属包 | 状态 | 证据 |
+| --- | --- | --- | --- | --- | --- |
+| `public.customers.person_id` | 新增列 bigint NULLABLE | 阶段 2 双写（待 PMC-06+）；当前无消费者 | PMC-05 | 已应用 | evidence/PMC-05.md §3 |
+| `idx_customers_person_id` | 新建部分索引（WHERE person_id IS NOT NULL） | 查询优化器；当前空索引 | PMC-05 | 已应用 | evidence/PMC-05.md §3 |
+| `customers_person_id_key` | UNIQUE(person_id) 约束 | 回填时保证一对一 | PMC-05 | 已应用 | evidence/PMC-05.md §3 |
+| `customers_person_id_fkey` | FK→persons(id) ON DELETE RESTRICT | D10：删客户角色不级联删 Person | PMC-05 | 已应用 | evidence/PMC-05.md §3 |
+| `tools/migration-apply.cjs` | 新增：migration 执行工具（经 cloudbase-mcp，支持 DDL） | PMC-05+ 后续 migration | PMC-05 | 已落盘（MCP 认证失效未用上；实际用 tcb db execute） | evidence/PMC-05.md §6 |
+| `cloudbase/migrations/20261008120000_customers_person_id.sql` | 新增：主 migration（4 步） | 数据库 | PMC-05 | 已应用 | evidence/PMC-05.md §2 |
+| `cloudbase/rollbacks/20261008120000_customers_person_id.sql` | 新增：回滚（4 步） | 数据库 | PMC-05 | 已落盘 | evidence/PMC-05.md §6 |
+| **不变项**：customers.customer_name UNIQUE（客户列表_姓名_key） | 保留（D5 退出条件未满足） | 客户建档流程 | PMC-05+ | 保留 | evidence/PMC-05.md §3 |
+| **不变项**：legacy_customer_id 列及复合 FK | 保留（D8 退出条件未满足） | 桥接查询 | PMC-05+ | 保留 | evidence/PMC-05.md §3 |
+| **不变项**：RLS 策略 | 不修改（C7 权限不变） | security_invoker 视图 | PMC-05 | 不变 | evidence/PMC-05.md §4 |
+| **不变项**：12 个视图 | 不重建（显式列名；视图重建属阶段 3） | 查询路径 | PMC-05 | 不变 | evidence/PMC-05.md §5 |

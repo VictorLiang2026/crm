@@ -15,6 +15,7 @@
 | 2026-10-07 | **PMC-02 设计获用户批准："全部按建议 A 批准"**——D1/D2/D3/D4/D6/D7/D9/D10/D11 按 A 批准；D5/D8 批准的是建议路径（约束现状维持，解除/退出动作届时在独立包单独批准，不提前授权删除） | 用户原话："全部按建议 A 批准" | 批准全文落 [data-model.md](data-model.md) §8。设计基线锁定；后续实施包以该设计为准。**仍未批准**：任何具体实施包（PMC-03+ 指令未收到）、删除/重命名既有对象、所有数据库变更（须 migration/rollback + 针对性确认） |
 | 2026-10-08 | PMC-03 范围限定为测试/只读核对/恢复准备工具，不切换业务行为、不迁移真实数据；新测试不接入 release gate（不改门槛跳过）；恢复能力未演练前不声称"可安全回滚" | 用户 PMC-03 指令明确指定 | 产物：pmc-03-verification.md、tools/migration-check.{sql,cjs}、tests/pmc/、evidence/PMC-03.md。R11 发现 sync-shared.cjs 不追踪 person-service.js（列为缺口，扩展属 PMC-04+） |
 | 2026-10-08 | PMC-04 范围限定为只读冲突检测+脱敏清单+五分类确认，不自动合并、不批量改写真实人物、不执行生产数据修复；待确认项不计入迁移成功率；E1–E7 阻断 D5 但不阻断 person_id 回填 | 用户 PMC-04 指令明确指定 | 产物：pmc-04-confirmation.md、tools/conflict-check{,-detail}.sql、evidence/PMC-04.md。待确认项（A1–A3/A5/D1/E1–E7）留待 PMC-06 |
+| 2026-10-08 | PMC-05 范围限定为兼容性结构扩展（加列+索引+约束），不强制 NOT NULL（PMC-04 有 3 个 customer 无 Person 待 PMC-06）、不移除旧约束（D5/D8 退出条件未满足）、不重建视图（阶段 3）、不修改 RLS/云函数、不回填数据 | 用户 PMC-05 指令明确指定+授权执行 migration 部署 | 产物：pmc-05-implementation.md、cloudbase/migrations/rollbacks/20261008120000_*.sql、tools/migration-apply.cjs、evidence/PMC-05.md。Migration 已应用（4 步 40ms）；旧约束 5 个完整、12 视图正常、数据 783 行 person_id 全 NULL |
 
 ## 历史批准的继承关系
 

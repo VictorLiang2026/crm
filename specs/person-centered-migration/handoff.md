@@ -6,11 +6,11 @@
 
 | 项 | 值 |
 | --- | --- |
-| 当前执行工具 | Trae（Kimi-K3 agent），2026-10-08 执行 PMC-04 |
-| 最后完成包 | **PMC-03（迁移验证及恢复基线）——已验收**：14/14 测试通过；migration-check `status=PASS blockers=0`；R11 三份 person-service.js 副本 SHA-256 一致无漂移；发布 `219482b`/`release-20261008-110225`；三端 sync-check 全绿；恢复能力设计已定义未演练；2026-10-08 用户验收通过 |
-| 正在执行包 | **PMC-04（人物身份及数据冲突确认）——已发布，待用户验收**：两轮只读冲突检测 SQL+脱敏清单+五分类确认清单；缺失 3 customer+4 person、字段冲突 1 处、同名不同人 7 组 14 人（基础资料全空）；阻断 E1–E7→D5；不自动合并、不执行生产数据修复；发布 `313e23c`/`release-20261008-115430`；三端 sync-check 全绿 |
-| 下一步唯一允许执行的动作 | 等待用户验收 PMC-04；验收通过后才进入 PMC-05（指令未收到，不可启动） |
-| 回滚条件 | 本包新增 tools/conflict-check*.sql、specs/.../pmc-04-confirmation.md、evidence/PMC-04.md、tests/security/.results/pmc04-*.json；如需回退 git revert 即可（纯文档/工具，无云端业务产物、无数据库变更、无云函数部署） |
+| 当前执行工具 | Trae（Kimi-K3 agent），2026-10-08 执行 PMC-05 |
+| 最后完成包 | **PMC-04（人物身份及数据冲突确认）——已验收**：两轮只读冲突检测+脱敏清单+五分类确认；发布 `313e23c`/`release-20261008-115430`；2026-10-08 用户确认"都完成" |
+| 正在执行包 | **PMC-05（兼容性的数据库结构扩展）——产物已落盘+Migration 已应用，待发布与用户验收**：customers.person_id bigint NULLABLE+UNIQUE+FK RESTRICT+部分索引；4 步 migration 已应用（40ms）；旧约束完整 5 个、视图 12 个正常、数据 783 行 person_id 全 NULL；不修改 RLS/视图/云函数 |
+| 下一步唯一允许执行的动作 | 发布 PMC-05 产物（`tools/release.ps1` 含 migration SQL + 文档/工具）→ 三端核对 `sync-check.ps1` → 回填 evidence/PMC-05.md §7 → 停止等待用户验收 |
+| 回滚条件 | 数据库回滚：执行 `cloudbase/rollbacks/20261008120000_customers_person_id.sql`（4 步：DROP CONSTRAINT FK+UNIQUE+INDEX+COLUMN）；当前 person_id 全 NULL 无消费者，回滚安全；代码回滚：git revert 本包提交即可（无云函数部署、无视图重建） |
 
 ## 2. 版本基线（2026-10-07 实测）
 
