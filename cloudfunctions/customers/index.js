@@ -72,6 +72,21 @@ async function get(event) {
   if (!id) return { error: 'id required' };
   const c = assertOk(await rdb.from('customers').select().eq('Id', id).is('deleted_at', null).maybeSingle());
   if (!c.data) return { error: 'not found' };
+  // PMC-09: 基础字段从 persons 读取（经 person_id），persons 无值时回退 customers
+  if (c.data.person_id) {
+    const p = assertOk(await rdb.from('persons')
+      .select('display_name, phone, wechat, gender, birthday, occupation, education')
+      .eq('id', c.data.person_id).is('deleted_at', null).maybeSingle());
+    if (p.data) {
+      c.data.customer_name = p.data.display_name || c.data.customer_name;
+      c.data.phone = p.data.phone || c.data.phone;
+      c.data.wx_account = p.data.wechat || c.data.wx_account;
+      c.data.gender = p.data.gender || c.data.gender;
+      c.data.birthday = p.data.birthday || c.data.birthday;
+      c.data.occupation = p.data.occupation || c.data.occupation;
+      c.data.education = p.data.education || c.data.education;
+    }
+  }
   const [fol, prod, gif, pho, ai, rpt] = await Promise.all([
     rdb.from('followups').select().eq('customer_id', id).is('deleted_at', null)
       .order('followup_date', { ascending: false, nullsFirst: false })

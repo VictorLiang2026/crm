@@ -39,7 +39,7 @@
   - 验收：统一写服务和恢复契约可用且可验证；尚未接入的入口列明，不宣称全系统已完成切换。更新 design、接口契约、影响矩阵、恢复说明和交接；按约定发布后停止。
   - 结果：三项变更完成——`person_360/index.js` 新增 `updatePerson` action（修改已确认人物基础资料，乐观锁 `expectedUpdatedAt`，允许字段 display_name/phone/birthday/gender/occupation/organization/education/wechat/notes）；`customers/index.js` `update` action 增加 Person 字段映射（customer_name→display_name, wx_account→wechat 等，阶段 2 双写 T2 模式）；`ocr_records/index.js` `remove` 返回增加 `personSnapshot`（供恢复前比较当前值）。**三函数已部署**（customers/ocr_records/person_360）。证据见 [evidence/PMC-07.md](evidence/PMC-07.md)；发布标签见 §5。
 - [v] **PMC-08｜接管客户、Person 及跨模块基础信息写入口**　依赖：PMC-07（已验收）。开包日期：2026-10-08。
-- [ ] **PMC-09**　依赖：PMC-08。指令：未收到。
+- [v] **PMC-09｜客户列表、详情、搜索和表单读取 Person**　依赖：PMC-08（已发布）。开包日期：2026-10-08。
 - [ ] **PMC-10**　依赖：PMC-09。指令：未收到。
 - [ ] **PMC-11**　依赖：PMC-10。指令：未收到。
 - [ ] **PMC-12**　依赖：PMC-11。指令：未收到。
