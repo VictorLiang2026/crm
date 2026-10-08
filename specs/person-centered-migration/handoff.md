@@ -6,11 +6,11 @@
 
 | 项 | 值 |
 | --- | --- |
-| 当前执行工具 | Trae（Kimi-K3 agent），2026-10-07 执行 PMC-02 |
-| 最后完成包 | **PMC-02（目标数据模型和接口契约设计）——已验收**：2026-10-07 用户"全部按建议 A 批准"D1–D11；产出 [data-model.md](data-model.md)（字段字典/ID 精度契约/角色基数/接口契约/切换方案）；主发布 `cdc1cf9` / 标签 `release-20261007-223725`，补录 `cb0185d` / `release-20261007-225115`；证据见 [evidence/PMC-02.md](evidence/PMC-02.md) |
-| 正在执行包 | 无（等待用户下发 PMC-03+ 实施包指令） |
-| 下一步唯一允许执行的动作 | **等待用户下发下一包指令**；实施包必须以已批准的 data-model.md 为基线（D5/D8 退出动作届时单独授权），PMC-03+ 指令未收到不猜写 |
-| 回滚条件 | 本包仅新增/修改文档；如需回退，git revert 文档提交即可（无云端产物、无数据库变更） |
+| 当前执行工具 | Trae（Kimi-K3 agent），2026-10-08 执行 PMC-03 |
+| 最后完成包 | **PMC-02（目标数据模型和接口契约设计）——已验收**：D1–D11 全部按建议 A 批准；data-model.md 设计基线锁定；主发布 `cdc1cf9`/`release-20261007-223725`，批准落档 `0a414e0`/`release-20261007-233237`（另含 Console misc/i18n 业务上线 `7f2ce0c`/`release-20261007-233217`） |
+| 正在执行包 | **PMC-03（迁移验证及恢复基线）——产物已落盘并实测，待发布与用户验收**：14/14 测试通过；migration-check `status=PASS blockers=0`；R11 三份 person-service.js 副本 SHA-256 一致无漂移；恢复能力设计已定义未演练 |
+| 下一步唯一允许执行的动作 | 发布 PMC-03 产物（`tools/release.ps1` 纯测试/工具/文档，无云端业务产物部署）→ 三端核对 `sync-check.ps1` → 回填 evidence/PMC-03.md §7 → 停止等待用户验收 |
+| 回滚条件 | 本包新增 tests/pmc/、tools/migration-check.*、specs/.../pmc-03-verification.md、evidence/PMC-03.md；如需回退，git revert 本包提交即可（无云端业务产物、无数据库变更、无云函数部署） |
 
 ## 2. 版本基线（2026-10-07 实测）
 

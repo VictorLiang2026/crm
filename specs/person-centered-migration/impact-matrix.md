@@ -359,9 +359,22 @@ persons.legacy_customer_id（自引用）
 | `tools/pg-readonly.cjs` | 新增：Trae/Codex 共用只读 PG 查询（SELECT/WITH 单语句，拒绝 DDL/DML/多语句） | PMC 各包只读证据采集（替代临时候选脚本） | PMC-00 缺口处置 | 已验证（persons=784 + 3 类拒绝路径） | evidence/PMC-00.md 第九节 G3 |
 | `tests/wp01/static.cjs` | 无变更（核实 console.html 入口早已存在） | sync-check / WP01 gate | PMC-00 缺口处置 | 已核实：50 资产含 48 console 链 | evidence/PMC-00.md 第九节 G4 |
 
+## PMC-03：迁移验证及恢复基线（2026-10-08，仅测试/工具/文档）
+
+| 对象 | 变化类型 | 调用方/消费者 | 所属包 | 状态 | 证据 |
+| --- | --- | --- | --- | --- | --- |
+| `tools/migration-check.sql` | 新增：只读 WITH→snapshot JSON（counts/mappings/orphans/roles/softdeleteCross/multiRole/nulls/pagination，无 PII） | migration-check.cjs、PMC 实施包迁移前后核对 | PMC-03 | 代码就绪待执行 | evidence/PMC-03.md §2 |
+| `tools/migration-check.cjs` | 新增：经 pg-readonly 通道执行 SQL+评估 failures+写报告 | PMC 实施包、发布前核对 | PMC-03 | 代码就绪待执行 | 同上 |
+| `tests/pmc/risk-cases.test.cjs` | 新增：R1–R10+R-ID1 离线契约测试（fixture，不触线上） | PMC 测试套件（独立运行，不接入 release gate） | PMC-03 | 代码就绪待执行 | evidence/PMC-03.md §3 |
+| `tests/pmc/shared-copy-drift.test.cjs` | 新增：R11 文件哈希漂移检测（person-service.js 三份副本） | PMC 测试套件 | PMC-03 | 代码就绪待执行 | 同上 |
+| `tests/pmc/README.md` | 新增：运行方法+覆盖矩阵+限制声明 | 人工/工具执行参考 | PMC-03 | 完成 | — |
+| `specs/.../pmc-03-verification.md` | 新增：测试映射+核对项+风险用例+恢复 runbook+隔离限制+WP01 核实+验收对照 | PMC 实施包设计依据 | PMC-03 | 完成 | — |
+| **R11 发现**：`tools/sync-shared.cjs` MODULES 仅 db.js/ai.js | **缺口（未修）** | person-service.js 三份副本（_shared/person_360/assistant）不受 sync-shared 追踪 | PMC-03 记录、扩展属 PMC-04+ | 已登记缺口 | evidence/PMC-03.md §3 |
+
 ## 已知共享模块消费者基线（接管时事实）
 
 - `cloudfunctions/_shared/db.js`、`ai.js`：28 个 CRM 函数目录各持副本，共 56 份；2026-10-07 sync-check 全部与 `_shared` 一致（SHA-256：db.js `124c6ac6…`、ai.js `6fa94a41…`）。任何修改须经 `npm run build:shared` + `check:shared` 并逐函数部署。
+- `cloudfunctions/_shared/person-service.js`：**未被 sync-shared.cjs 追踪**（MODULES 不含）；三份副本 `_shared`/`person_360`/`assistant`，漂移检测由 PMC-03 `tests/pmc/shared-copy-drift.test.cjs` 覆盖；是否扩展 MODULES 属 PMC-04+（共享模块改造单独授权）。
 - `crm/js/modules/console/i18n.js`：Console 全部页面消费；新增界面文本必须入字典（AGENTS.md 规则 17）。
 - 视图依赖：任何基表加列/改列前，用 `pg-view-rebuild-check` skill 核对依赖视图清单（2026-10-07 基线：12 个视图全部 security_invoker）。
 
