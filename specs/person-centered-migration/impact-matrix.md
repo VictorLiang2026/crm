@@ -442,3 +442,5 @@ persons.legacy_customer_id（自引用）
 | before/after 快照（166 行、6 类计数、distinct_names、null=0） | 统计差异=**零** | 验收证据 | PMC-10 | 已核对 | tests/security/.results/pmc10-before/after-snapshot.json |
 | 一致性核查（dup_person_rows=0、cust_with_multi_candidates=0、已映射姓名差异=0） | 无重复计数、展示内容零变化 | 验收证据 | PMC-10 | 已核对 | tests/security/.results/pmc10-consistency-check.json、pmc10-mismatch-breakdown.json |
 | **不变项**：优先级/到期/日期分桶/销售阶段/招募阶段/去重/下一步行动规则 | 不修改（本包不新增推荐算法） | 行动中心/Tasks/漏斗/活动量 | PMC-10 | 不变 | evidence/PMC-10.md §7 |
+| `public.persons` 权限 | **新增（用户特批方案 A）**：GRANT SELECT TO anon + RLS 策略 `persons_anon_read`（USING deleted_at IS NULL，只读、只暴露未软删行） | rdb() 匿名角色（全部云函数 persons 直读 + security_invoker 视图 JOIN persons） | PMC-10 验收修复 | 已应用（2026-10-08） | evidence/PMC-10.md §9；migration/rollback `20261008231500_pmc10_*` |
+| 验收教训 | pg-readonly 管理通道验证不能代表 rdb() 匿名角色权限；权限类回归必须经浏览器真实通道验收 | 后续所有 PMC 包的验证方法 | PMC-10 验收 | 已登记 | evidence/PMC-10.md §9.2 |
