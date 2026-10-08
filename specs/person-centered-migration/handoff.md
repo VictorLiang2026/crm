@@ -1,16 +1,16 @@
 # Handoff（接管状态）
 
-更新时间：2026-10-07（PMC-00 完成时）。任何工具接手前先读本文件与 execution-contract。
+更新时间：2026-10-08（PMC-04 开包时）。任何工具接手前先读本文件与 execution-contract。
 
 ## 1. 执行状态
 
 | 项 | 值 |
 | --- | --- |
-| 当前执行工具 | Trae（Kimi-K3 agent），2026-10-08 执行 PMC-03 |
-| 最后完成包 | **PMC-02（目标数据模型和接口契约设计）——已验收**：D1–D11 全部按建议 A 批准；data-model.md 设计基线锁定；主发布 `cdc1cf9`/`release-20261007-223725`，批准落档 `0a414e0`/`release-20261007-233237`（另含 Console misc/i18n 业务上线 `7f2ce0c`/`release-20261007-233217`） |
-| 正在执行包 | **PMC-03（迁移验证及恢复基线）——产物已落盘并实测，待发布与用户验收**：14/14 测试通过；migration-check `status=PASS blockers=0`；R11 三份 person-service.js 副本 SHA-256 一致无漂移；恢复能力设计已定义未演练 |
-| 下一步唯一允许执行的动作 | 发布 PMC-03 产物（`tools/release.ps1` 纯测试/工具/文档，无云端业务产物部署）→ 三端核对 `sync-check.ps1` → 回填 evidence/PMC-03.md §7 → 停止等待用户验收 |
-| 回滚条件 | 本包新增 tests/pmc/、tools/migration-check.*、specs/.../pmc-03-verification.md、evidence/PMC-03.md；如需回退，git revert 本包提交即可（无云端业务产物、无数据库变更、无云函数部署） |
+| 当前执行工具 | Trae（Kimi-K3 agent），2026-10-08 执行 PMC-04 |
+| 最后完成包 | **PMC-03（迁移验证及恢复基线）——已验收**：14/14 测试通过；migration-check `status=PASS blockers=0`；R11 三份 person-service.js 副本 SHA-256 一致无漂移；发布 `219482b`/`release-20261008-110225`；三端 sync-check 全绿；恢复能力设计已定义未演练；2026-10-08 用户验收通过 |
+| 正在执行包 | **PMC-04（人物身份及数据冲突确认）——执行中**：只读找出冲突+脱敏清单+分类确认，不自动合并/批量改写真实人物；本包默认不执行生产数据修复 |
+| 下一步唯一允许执行的动作 | 完成 PMC-04 六项任务（只读查询找冲突→脱敏清单→分类→确认清单→更新文档→发布）；不执行生产数据修复；待确认项留待 PMC-06 |
+| 回滚条件 | PMC-03 收尾补录（evidence §7 回填 + handoff 状态更新 + tasks PMC-03 验收标记）如需回退 git revert 即可；PMC-04 产物落盘后同样 git revert 可回退（纯文档包，无云端业务产物、无数据库变更） |
 
 ## 2. 版本基线（2026-10-07 实测）
 

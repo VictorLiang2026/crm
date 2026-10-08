@@ -124,21 +124,23 @@ node --test tests/pmc/risk-cases.test.cjs tests/pmc/shared-copy-drift.test.cjs
 powershell -NoProfile -ExecutionPolicy Bypass -File tools/release.ps1 -Message "PMC-03 迁移验证及恢复基线：测试映射+只读核对工具+11风险用例+恢复runbook；纯测试/工具/文档包，不切换业务行为、不迁移真实数据、云端业务产物未改变"
 ```
 
-**回填项**：
-- 主提交 SHA：____
-- 发布标签（时间戳）：`release-____________-____`
-- 是否首提交（需 semver）：否（当前基线 v2.1.0 已设，本包不递进）
-- GitHub push 结果：____
-- 云端部署范围：无业务产物部署（纯测试/工具/文档）
-- sync-check.ps1 结果：____
-- 三端一致性（本地/GitHub/云端 admin.html MD5）：____
+**回填项**（2026-10-08 实测）：
+- 主提交 SHA：`219482bb38d18eff78f072f39d8c4b9144b377c1`（`219482b`）
+- 发布标签（时间戳）：`release-20261008-110225`
+- 是否首提交（需 semver）：否（当前基线 v2.1.0 已设于 WP2，本包不递进 semver）
+- GitHub push 结果：`0a414e0..219482b HEAD -> master`；`[new tag] release-20261008-110225`
+- 云端部署范围：**无业务产物部署**（纯测试/工具/文档包；sync-check 仅做源码核对，未触发 tcb fn code update 或 hosting deploy）
+- sync-check.ps1 结果：全绿——56 份共享副本（db.js `124c6ac6…` / ai.js `6fa94a41…`）一致；50 个静态资源（2 HTML + 48 console 模块链）一致；28 个函数 170 个源/配置文件一致；GitHub master 与 release tags 一致 HEAD `219482b`；云端 admin.html HTTP 200 + SHA-256 一致
+- 三端一致性（本地/GitHub/云端 admin.html）：**全部一致**
 
 **验收对照**：
-- 可重复执行方法：是（migration-check.cjs + node --test）
+- 可重复执行方法：是（`node --test tests/pmc/*.cjs` + `node tools/migration-check.cjs --out <path>`）
 - 预期结果：是（pmc-03-verification.md §1–§6）
-- 当前结果：____（待回填）
-- 证据位置：本文件 + tests/security/.results/pmc03-*.json
-- 原有故障与新增故障可区分：是（PMC-03 测试独立运行，不接入 release gate）
+- 当前结果：14/14 测试通过；migration-check `status=PASS blockers=0`；R11 三份 person-service.js 副本 SHA-256 一致无漂移；WP01 门槛 `releaseGate=PASS_WITH_LIMITATIONS`（107 PASS/0 FAIL/5 SKIP，blockers=[]，open 项=login/service-runtime/live-writes/mobile 均为非阻断 UNVERIFIED/MANUAL_LOGIN）
+- 证据位置：本文件 + `tests/security/.results/pmc03-migration-before.json` + `tests/security/.results/wp01-report.json`
+- 原有故障与新增故障可区分：是（PMC-03 测试独立运行，不接入 release gate；WP01 重采中遇到的 `account.password`/`customers.pagination` 间歇性 puppeteer 超时为先前已存在问题，与本包无关，第三次运行已通过）
+
+**WP01 重采记录**：本次发布前需重采 catalog.sql/audit.sql 经 `pg-readonly.cjs --snapshot` 刷新 `wp01-catalog.json`/`wp04-audit.json`，再跑 `npm run test:wp01`。前两次运行 `account.password`、`customers.pagination` 间歇性超时 FAIL（puppeteer DOM 加载问题，非 PMC-03 引入），第三次 `{"PASS":107,"FAIL":0,"SKIP":5}` 通过。
 
 ---
 
