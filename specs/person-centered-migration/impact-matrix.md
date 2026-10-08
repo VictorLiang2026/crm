@@ -370,6 +370,10 @@ persons.legacy_customer_id（自引用）
 | `tests/pmc/README.md` | 新增：运行方法+覆盖矩阵+限制声明 | 人工/工具执行参考 | PMC-03 | 完成 | — |
 | `specs/.../pmc-03-verification.md` | 新增：测试映射+核对项+风险用例+恢复 runbook+隔离限制+WP01 核实+验收对照 | PMC 实施包设计依据 | PMC-03 | 完成 | — |
 | **R11 发现**：`tools/sync-shared.cjs` MODULES 仅 db.js/ai.js | **缺口（未修）** | person-service.js 三份副本（_shared/person_360/assistant）不受 sync-shared 追踪 | PMC-03 记录、扩展属 PMC-04+ | 已登记缺口 | evidence/PMC-03.md §3 |
+| `tools/conflict-check.sql` | 新增：只读冲突检测（缺失/一对多/多对一/孤立/软删除/字段冲突/同名不同人；脱敏 ID+差异标记+哈希） | PMC-05+ 实施包回填前重核 | PMC-04 | 已落盘 | evidence/PMC-04.md §2 |
+| `tools/conflict-check-detail.sql` | 新增：深查（无 legacy Person 角色引用+同名组 phone/wechat 哈希比对） | PMC-06 纠错包消费 | PMC-04 | 已落盘 | evidence/PMC-04.md §2 |
+| `specs/.../pmc-04-confirmation.md` | 新增：五分类确认清单（已确认可迁移/保留原值/不迁移/待确认/存在阻塞）+版本约束+后续消费方式 | PMC-05+ person_id 回填 + PMC-06 纠错 + D5 退出条件 | PMC-04 | 已落盘 | evidence/PMC-04.md §1 |
+| **PMC-04 阻断**：同名不同人 E1–E7（7 组 14 人，基础资料全空） | **阻断 D5**（customers UNIQUE(customer_name) 退出） | D5 退出前须 7 组全部人工确认 | PMC-04 登记、解除属 PMC-06 | 已登记 | pmc-04-confirmation.md §3.4.D + §4 |
 
 ## 已知共享模块消费者基线（接管时事实）
 
