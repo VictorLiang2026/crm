@@ -25,6 +25,56 @@ const aiStd = require('./ai');
 
 const OPERATOR_DEFAULT = { name: 'Victor', gender: '男', birthday: '1976-10' };
 
+// PMC-11：候选人人物基础资料统一取 Person（经 v_recruit_candidates.person_id）；
+// 增员领域字段（annual_income/mbti/motivation 等）仍取候选人视图。
+// 无 person_id / Person 已软删 → 回退视图旧值并标 unmapped；双源同字段不一致 → 记 conflicts（以 Person 为准，不猜测）。
+async function loadPersonIdentity(rdb, row) {
+  const fallback = {
+    name: row.customer_name || null, gender: row.gender || null,
+    birthday: row.birthday || null, phone: row.phone || null,
+    occupation: row.occupation || null, organization: null,
+    education: row.education || null, wechat: row.wx_account || null,
+  };
+  const identity = { source: 'customers_legacy', person_id: null, unmapped: true, conflicts: [] };
+  if (row.person_id == null) return Object.assign({}, fallback, { identity: identity });
+  const r = await rdb.from('persons')
+    .select('id, display_name, phone, wechat, gender, birthday, occupation, organization, education')
+    .eq('id', row.person_id).is('deleted_at', null).maybeSingle();
+  if (r.error) throw new Error(r.error);
+  const p = r.data;
+  if (!p) return Object.assign({}, fallback, { identity: identity });
+  identity.source = 'persons';
+  identity.person_id = String(p.id);
+  identity.unmapped = false;
+  const merged = {};
+  const pairs = [['display_name', 'name', row.customer_name], ['gender', 'gender', row.gender],
+    ['birthday', 'birthday', row.birthday], ['phone', 'phone', row.phone],
+    ['occupation', 'occupation', row.occupation], ['wechat', 'wechat', row.wx_account]];
+  pairs.forEach(function (pair) {
+    const pv = p[pair[0]] == null ? '' : String(p[pair[0]]).trim();
+    const lv = pair[2] == null ? '' : String(pair[2]).trim();
+    if (pv) {
+      merged[pair[1]] = p[pair[0]];
+      if (lv && pv !== lv) identity.conflicts.push({ field: pair[1], person: pv, legacy: lv });
+    } else merged[pair[1]] = pair[2] || null;
+  });
+  merged.organization = p.organization || null;
+  merged.education = p.education || null;
+  return Object.assign({}, fallback, merged, { identity: identity });
+}
+
+// 冲突/缺失给模型的显式标注（禁止模型自行猜测补齐）
+function identityNotice(identity) {
+  if (identity.unmapped) {
+    return '【人物身份】该候选人尚未关联 Person 档案，基础资料暂取自候选人档案；未提供的字段一律视为未知，禁止猜测补齐。';
+  }
+  if (identity.conflicts.length) {
+    return '【人物身份·资料冲突，一律以 Person 档案为准】' +
+      identity.conflicts.map(c => c.field + '：Person=' + c.person + ' / 候选人档案=' + c.legacy).join('；');
+  }
+  return null;
+}
+
 function buildSystem(op) {
   return [
     '你是资深保险增员顾问。根据候选人资料为操作员生成下一次接触建议。',
@@ -55,15 +105,16 @@ function buildSystem(op) {
 }
 
 // 统一七段 Context：只发非空事实，空字段直接省略（省 token、避免诱导模型脑补）
-function buildUser(c) {
+// PMC-11：姓名/性别/出生/职业/学历取 Person（ident），增员领域字段仍取候选人视图
+function buildUser(c, ident, notice) {
   var facts = [];
   [
-    ['姓名', c.customer_name || c.name],
-    ['性别', c.gender],
-    ['出生', c.birthday],
-    ['现职/行业', c.occupation],
+    ['姓名', ident.name],
+    ['性别', ident.gender],
+    ['出生', ident.birthday],
+    ['现职/行业', ident.occupation],
     ['年收入', c.annual_income],
-    ['学历', c.education],
+    ['学历', ident.education],
     ['MBTI', c.mbti],
     ['求职动机', c.motivation],
     ['顾虑点', c.concerns],
@@ -76,11 +127,13 @@ function buildUser(c) {
     var v = kv[1];
     if (v != null && String(v).trim() && String(v).trim() !== '无') facts.push(kv[0] + '：' + String(v).trim());
   });
-  return aiStd.buildContext({
+  var body = aiStd.buildContext({
     facts: facts,
     stage: '当前增员阶段：' + (c.stage || '名单') + '（增员五步法：接触 → 唤醒 → 面谈 → 促成 → 入司）',
     goal: '请基于以上事实，给出当前阶段的下一步接触建议；资料不足的字段按护栏处理，严禁补充候选人没说过的信息。',
   });
+  // PMC-11：缺失/冲突显式标注，置于上下文最前
+  return notice ? (notice + '\n\n' + body) : body;
 }
 
 exports.main = async (event, context) => {
@@ -92,6 +145,8 @@ exports.main = async (event, context) => {
       .select('*').eq('candidate_id', candidateId).maybeSingle());
     if (!c.data) return { error: 'candidate not found' };
     const candidate = c.data;
+    // PMC-11：人物基础资料 Person 化（缺失回退、冲突标注）
+    const ident = await loadPersonIdentity(rdb, candidate);
 
     const opIn = (event && event.operator) || {};
     const operator = {
@@ -102,13 +157,14 @@ exports.main = async (event, context) => {
 
     const messages = [
       { role: 'system', content: buildSystem(operator) },
-      { role: 'user', content: buildUser(candidate) },
+      { role: 'user', content: buildUser(candidate, ident, identityNotice(ident.identity)) },
     ];
     const { text: raw } = await generateText(messages, { timeout: 120000 });
     const parsed = extractJson(raw) || {};
     const nba = aiStd.normNba(parsed.nba, { legacy: true });
 
-    return { recommendation: Object.assign({}, parsed, { nba: nba }), raw: raw };
+    return { recommendation: Object.assign({}, parsed, { nba: nba }), raw: raw,
+      identity: ident.identity };
   } catch (e) {
     return { error: e.message };
   }

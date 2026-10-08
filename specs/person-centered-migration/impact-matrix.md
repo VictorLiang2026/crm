@@ -114,9 +114,9 @@ persons.legacy_customer_id（自引用）
 | gifts | list/create/update/remove | admin.html | gifts JOIN customers / gifts | gifts | customer_id/customer_name | customers | persons | authenticated | 需修改 | 4 个 action 同构 |
 | photos | list/get/create/update/remove | admin.html | photos JOIN customers / photos | photos | customer_id/customer_name | customers | persons | authenticated | 需修改 | 5 个 action 同构 |
 | products | list/upsert/remove | admin.html | products JOIN customers / products | products | customer_id/customer_name | customers | persons | authenticated | 需修改 | 3 个 action 同构 |
-| policy_review_reports | list/get/generate/update/remove | admin.html | policy_review_reports JOIN customers / 子表 | policy_review_reports | customer_id/customer_name | customers | persons | authenticated | 需修改 | 5 个 action 同构 |
+| policy_review_reports | list/get/generate/update/remove | admin.html | policy_review_reports JOIN customers / 子表 + persons（PMC-11） | policy_review_reports | customer_id/customer_name | customers+persons | persons | authenticated | PMC-11 已部署待验收（generate ctx 基础 8 字段取 Person、落库快照名取 Person；家庭/保单业务字段仍取 customers；list/get/update/remove 不变） | evidence/PMC-11.md |
 | ocr_records | list/create/update/remove | admin.html | ocr_records | ocr_records | customer_id | customers | persons | authenticated | 需修改 | remove 返回 customer_snapshot，前端调 customers.update 恢复 |
-| ai_recommendations | list/listAll/get/create/update/update_status | admin.html | ai_recommendations JOIN customers | ai_recommendations | customer_id/customer_name | customers | persons | authenticated | 需修改 | 6 个 action 同构 |
+| ai_recommendations | list/listAll/get/create/update/update_status | admin.html | ai_recommendations JOIN customers + persons（PMC-11） | ai_recommendations | customer_id/customer_name | customers+persons | persons | authenticated | PMC-11 已部署待验收（**非模型入口**：create 手工保存快照名取 Person 当前名；listAll 关键词双名匹配 Person 当前名+行内历史快照名；历史行不批量改写；list/get/update/update_status 不变） | evidence/PMC-11.md |
 
 #### 6.2 Person 域
 
@@ -206,8 +206,8 @@ persons.legacy_customer_id（自引用）
 | recruit_candidates | rcMap | admin.html 雷达图 | recruit_candidates | — | customer_id | customers | persons | authenticated | 需修改 | — |
 | recruit_followups | list/create/update/remove | admin.html 招募跟进 | recruit_followups | recruit_followups | candidate_id | recruit_candidates | persons | authenticated | 需修改 | 通过 candidate_id 间接关联 |
 | recruit_goals | listGoals/saveGoals/getProgress/listBenchmarks/saveBenchmarks | admin.html 招募目标 | recruit_goals + recruit_goal_benchmarks + recruit_milestones | recruit_goals + recruit_goal_benchmarks | — | — | — | authenticated | 仅回归 | RPC crm_recruit_goals_save_v1 |
-| recruit_score | （固定入口） | admin.html 增员评分 | v_recruit_candidates | recruit_candidates.potential_score/potential_reason | customer_id | customers | persons | authenticated | 需修改 | 读取视图含 customers 字段 |
-| recruit_recommend | （固定入口） | admin.html 增员推荐 | v_recruit_candidates | — | customer_id | customers | persons | authenticated | 需修改 | 同上 |
+| recruit_score | （固定入口） | admin.html 增员评分 | v_recruit_candidates + persons（PMC-11） | recruit_candidates.potential_score/potential_reason | customer_id/person_id | customers+persons | persons | authenticated | PMC-11 已部署待验收（评分 prompt 姓名/性别/出生/职业/学历取 Person；年收入/MBTI/动机/顾虑仍取候选人域；分数回写路径不变） | evidence/PMC-11.md |
+| recruit_recommend | （固定入口） | admin.html 增员推荐 | v_recruit_candidates + persons（PMC-11） | — | customer_id/person_id | customers+persons | persons | authenticated | PMC-11 已部署待验收（facts 基础字段取 Person + identity 回传；不持久化；业务字段仍取视图） | evidence/PMC-11.md |
 
 #### 6.5 机会域
 
@@ -234,15 +234,15 @@ persons.legacy_customer_id（自引用）
 | assistant | testSamples | admin.html 测试 | crm_test_records | crm_test_records | — | — | — | service_role | 仅回归 | 测试工具 |
 | ai_parse | quick_capture | Console 快速记录 | — | — | — | — | — | AI Gateway | 已核实无影响 | 纯 AI 解析，不读写 DB |
 | ai_parse | （默认 parse） | admin.html OCR | — | — | — | — | — | AI Gateway | 仅回归 | — |
-| ai_followup | analyze_profile | admin.html 客户详情 | customers + followups | ai_recommendations | customer_id | customers | persons | AI Gateway | 需修改 | 读取 customers |
-| ai_followup | analyze_recruit_profile | admin.html 招募详情 | recruit_candidates + recruit_followups | — | candidate_id | recruit_candidates | persons | AI Gateway | 需修改 | — |
-| ai_recommend | （固定入口） | admin.html AI 推荐 | customers + followups + products + gifts + activity_participants + opportunities | ai_recommendations | customer_id | customers | persons | AI Gateway | 需修改 | — |
-| ai_referral | （固定入口） | admin.html 转介绍 | customers + followups + products + gifts + activity_participants + opportunities | — | customer_id | customers | persons | AI Gateway | 需修改 | — |
-| ai_activity | activity_review | admin.html 活动复盘 | activities + activity_participants + activity_speakers | — | activity_id | — | — | AI Gateway + service_role (CRM_ACTIVITY_REVIEW_DB_API_KEY) | 需修改 | 读取参与者身份 |
+| ai_followup | analyze_profile / parse | admin.html 客户详情 | customers + followups + persons（PMC-11） | —（只返回不写库） | customer_id/person_id | customers+persons | persons | AI Gateway | PMC-11 已部署待验收（parse/analyze_profile 基础字段取 Person；爱好/婚况/客户阶段仍取 customers；冲突/未映射前置标注） | evidence/PMC-11.md |
+| ai_followup | analyze_recruit_profile | admin.html 招募详情 | recruit_candidates + recruit_followups + persons（PMC-11） | — | candidate_id/person_id | recruit+persons | persons | AI Gateway | PMC-11 已部署待验收（候选人基础字段取 Person；年收入/婚况仍取候选人域） | evidence/PMC-11.md |
+| ai_recommend | （固定入口） | admin.html AI 推荐 | customers + followups + products + gifts + activity_participants + opportunities + persons（PMC-11） | ai_recommendations（快照名取 Person，PMC-11） | customer_id/person_id | customers+persons | persons | AI Gateway | PMC-11 已部署待验收（ctx 基础字段取 Person；销售域不动；历史行不改写；返回 identity）；真实模型链路未实测（隔离验证） | evidence/PMC-11.md |
+| ai_referral | （固定入口） | admin.html 转介绍 | customers + followups + products + gifts + activity_participants + opportunities + persons（PMC-11） | — | customer_id/person_id | customers+persons | persons | AI Gateway | PMC-11 已部署待验收（ctx Person 化 + identity 回传，不写库）；**真实模型生产实测 PASS（1 条，虚构客户 788）** | evidence/PMC-11.md §6.3 |
+| ai_activity | analyze / prepare / decompose / recommendSpeakers / recommendTopics / participantReview / postReview / learning（PMC-01 登记名 activity_review 为泛称） | admin.html 活动复盘/筹备/讲者/主题/事实单/会后/学习 | activities + activity_participants + activity_speakers + persons + customers/recruit_candidates 回退（PMC-11） | —（postReview 等既有写语义不变） | activity_id / canonical_person_id / person_id | participants+persons | persons | AI Gateway + service_role (CRM_ACTIVITY_REVIEW_DB_API_KEY) | PMC-11 已部署待验收（参与者取名 Person 化，canonical 优先精确外键回退，姓名不作身份证据；独立候选人缺陷已修复；嘉宾名仍取嘉宾域；编造 ID 白名单清洗见 participantReview/postReview；analyze top3 缺白名单=G-PMC11-1 登记）；无虚构测试活动故真实模型未实测 | evidence/PMC-11.md §7/§11 |
 | ai_activity | meeting_prep | admin.html 会前准备 | persons + interactions | — | person_id | persons | persons | AI Gateway | 已核实无影响 | — |
 | ai_activity | person_basic | admin.html | persons | — | person_id | persons | persons | AI Gateway | 已核实无影响 | — |
 | ai_activity | quick_capture | admin.html | — | — | — | — | — | AI Gateway | 仅回归 | — |
-| ai_activity | recruit_coach | admin.html 招募教练 | recruit_candidates | — | candidate_id | recruit_candidates | persons | AI Gateway | 需修改 | — |
+| context-engine | recruit_coach 配方（经 skill-registry/assistant 调用；非 ai_activity index.js 分派 action） | Console/AI skill | recruit_candidates + customers→persons（经 PMC-11 person()） | — | candidate_id/customer_id | customers+persons | persons | AI Gateway | PMC-11 已部署待验收（配方 `person(customerId)` 经更新后 person()：legacy 客户→person_id→persons 输出 identity/person_profile；独立候选人 customer_id 为空时沿用既有 NOT_FOUND 行为，本包未改该契约） | evidence/PMC-11.md；context-engine.js L250-262 |
 | ai_activity | today_coach | admin.html | customers + followups + opportunities + recruit_candidates + activities + v_action_center | — | customer_id | customers | persons | AI Gateway | PMC-10 已切换（读取多表含 customers；展示名经 persons 覆盖） | evidence/PMC-10.md |
 | today_coach | candidates | admin.html Dashboard | customers + followups + opportunities + recruit_candidates + activities + v_action_center + persons | — | customer_id | customers | persons | service_role (CRM_TODAY_DB_API_KEY) | PMC-10 已切换（loadAll 展示名覆盖，统计字段不动） | evidence/PMC-10.md |
 | today_coach | generate | admin.html Dashboard | 同上 | — | customer_id | customers | persons | service_role | PMC-10 已切换（同上） | evidence/PMC-10.md |
@@ -444,3 +444,45 @@ persons.legacy_customer_id（自引用）
 | **不变项**：优先级/到期/日期分桶/销售阶段/招募阶段/去重/下一步行动规则 | 不修改（本包不新增推荐算法） | 行动中心/Tasks/漏斗/活动量 | PMC-10 | 不变 | evidence/PMC-10.md §7 |
 | `public.persons` 权限 | **新增（用户特批方案 A）**：GRANT SELECT TO anon + RLS 策略 `persons_anon_read`（USING deleted_at IS NULL，只读、只暴露未软删行） | rdb() 匿名角色（全部云函数 persons 直读 + security_invoker 视图 JOIN persons） | PMC-10 验收修复 | 已应用（2026-10-08） | evidence/PMC-10.md §9；migration/rollback `20261008231500_pmc10_*` |
 | 验收教训 | pg-readonly 管理通道验证不能代表 rdb() 匿名角色权限；权限类回归必须经浏览器真实通道验收 | 后续所有 PMC 包的验证方法 | PMC-10 验收 | 已登记 | evidence/PMC-10.md §9.2 |
+
+---
+
+## PMC-11：AI 上下文、搜索及结果保存适配 Person（2026-10-08 开发／2026-10-09 发布，待验收）
+
+### 11.1 字段来源分界
+
+| 来源 | 字段 | 适用 AI 入口 |
+| --- | --- | --- |
+| persons（经 person_id，未映射回退+禁猜测提示、冲突标注） | display_name、gender、birthday、phone、wechat、occupation、organization、education | 全部本包改造的模型/非模型入口 |
+| customers（客户业务域不动） | customer_stage、sales_priority、annual_income、hobbies、marital_status、children_info、properties_info、additional_info、source | ai_recommend/ai_referral/ai_followup(analyze_profile,parse)/policy_review_reports/recruit_* |
+| recruit_candidates / v_recruit_candidates（招募业务域不动） | stage/各 priority、annual_income、mbti、motivation、concerns、work_experience、family_situation、personality_tags、career_plan、雷达/赢家报告 | recruit_score/recruit_recommend/ai_followup(analyze_recruit_profile)/ai_activity 参与者 |
+| activity_speakers（嘉宾域不动） | name/organization/phone | ai_activity 讲者建议 |
+| 活动/参与域（不动） | stage/priority/additional_info、席位/出席事实 | ai_activity 全部 action |
+| 派生快照（新写入取 Person 当前名；历史不改写） | ai_recommendations.payload.customer_name、policy_review_reports 快照名 | create/generate 新行；listAll 双名搜索（Person 当前名 + 行内历史快照名） |
+
+### 11.2 变更与部署矩阵
+
+| 对象 | 变更类型 | 调用方/消费者 | 所属包 | 状态 | 证据 |
+| --- | --- | --- | --- | --- | --- |
+| `_shared/context-engine.js` | VERSION 1.1.0：FIELDS 扩列；person() 经 customers.person_id 读 persons 输出 person_profile+identity（unmapped/conflicts）；activity_review 身份解析 canonical/精确外键 | assistant skill-registry（person_basic/meeting_prep/recruit_coach/activity_review 配方） | PMC-11 | 已部署待验收 | evidence/PMC-11.md §3；SHA-256 `9650E7DF…F4013` |
+| `ai_activity/context-engine.js` | 母本同步副本（哈希一致）；postReviewV2 唯一现网消费者 | crm/js/modules/activity-review-v2.js | PMC-11 | 已部署（随 ai_activity）待验收 | 同上 |
+| `ai_activity/index.js` | 8 个 action 参与者取名 Person 化 + loadPersonNameMap/participantPersonId + loadRecruitPeople 修复独立候选人过滤 | admin.html 活动 AI（analyze/prepare/decompose/recommendSpeakers/recommendTopics/participantReview/postReview/learning） | PMC-11 | 已部署待验收（修复后二次部署） | evidence/PMC-11.md §3/§7 |
+| `ai_recommend/index.js` | identity helper；ctx 基础字段 Person 化；落库快照名取 Person；返回 identity | admin.html AI 推荐 | PMC-11 | 已部署待验收（真实模型未实测，隔离验证） | evidence/PMC-11.md §9 |
+| `ai_referral/index.js` | 同模式 ctx Person 化；不写库；返回 identity | admin.html 转介绍 | PMC-11 | 已部署待验收（**真实模型生产 PASS 1 条**） | evidence/PMC-11.md §6.3 |
+| `ai_followup/index.js` | 兼容 helper + 客户/候选人双措辞 notice；parse/analyze_profile/analyze_recruit_profile 接入；不写库 | admin.html 跟进解析/画像 | PMC-11 | 已部署待验收（真实模型未实测） | evidence/PMC-11.md §9 |
+| `policy_review_reports/index.js` | generate ctx Person 化；TEST_MARKER 判断改 ident.name；落库快照名取 Person | admin.html 保单检视 | PMC-11 | 已部署待验收（真实模型未实测） | evidence/PMC-11.md §9 |
+| `recruit_score/index.js` | buildScoringPrompt Person 化；potential_score 回写不变；返回 identity | admin.html 增员评分 | PMC-11 | 已部署待验收（回写有隔离断言） | evidence/PMC-11.md §6.2 |
+| `recruit_recommend/index.js` | buildUser facts 取 ident；不持久化；返回 identity | admin.html 增员推荐 | PMC-11 | 已部署待验收（真实模型未实测） | evidence/PMC-11.md §9 |
+| `ai_recommendations/index.js` | **非模型入口**：create 快照名取 Person（select 加 person_id）；listAll 双名搜索；历史行不改写；list/get/update/update_status 不变 | admin.html #/ai-suggestions、手工创建/列表/搜索 | PMC-11 | 已部署待验收（生产前端未实测，隔离验证） | evidence/PMC-11.md §9 |
+| `tests/pmc/pmc11-identity.test.cjs` | 19 离线用例（拦截 8 函数目录 db 副本 + 确定性模型桩；不触线上） | PMC 测试套件（独立，不入 release gate） | PMC-11 | 19/19 通过 | tests/security/.results/pmc11-isolated.tap.txt |
+| assistant / person_360 / ai_parse / _shared/ai.js(AI Gateway) / skill-registry / person-service.js | **不修改**：白名单+GUIDANCE 禁 SQL/禁姓名自选已合规；统一写服务已 Person 原生；模型配置无硬编码 | — | PMC-11 | 核实无影响 | evidence/PMC-11.md §10 |
+| ai_tasks/ai_runs/ai_results 与历史 ai_recommendations 行 | **不批量改写**（历史快照保持当时事实） | 审计/历史检索 | PMC-11 | 不变 | evidence/PMC-11.md §2/§12 |
+| admin.html / console.html / 全部静态文件 | 零改动 | — | PMC-11 | 不变 | sync-check admin.html SHA 不变 |
+| 数据库 | 无 migration/rollback；persons anon 只读复用 PMC-10 20261008231500 授权 | — | PMC-11 | 无变更 | — |
+| **G-PMC11-1**（既有缺陷登记） | ai_activity analyze top3/no_followup 仅 parseInt 未按真实参与者 ID 白名单过滤，编造 ID 透传；非本包引入 | analyze 输出消费方 | PMC-11 登记 | **未修**（修复须单独授权；隔离测试锁定现状） | evidence/PMC-11.md §11 |
+
+### 11.3 身份与搜索安全核实（静态 + 隔离）
+
+- assistant search-service.js：3 个固定模板、GUIDANCE 明确禁模型生成 SQL/禁按姓名自行选人、查询白名单 `public.crm_search_people_v1`、refs `{table:'persons', id}`、`businessDataWritten:false`——本轮未改，拒绝路径真实触发未实测（evidence §9 未验证项 4）。
+- 全部新增 persons 查询带 `deleted_at IS NULL`；ID 全程字符串/整数精确匹配，姓名从不作为身份证据（participantPersonId canonical 优先 → customers/recruit_candidates.person_id 精确回退）。
+- 映射基线：customers 779/782 已映射、姓名冲突 0；recruit_candidates 15/15 有 person_id（唯一差异为独立候选人 20，正常）。

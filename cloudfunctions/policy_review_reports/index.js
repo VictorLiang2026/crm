@@ -122,6 +122,53 @@ function buildSystem(operator) {
 
 const HISTORY_HINT = '以下是该客户的历史保单检视报告（按时间倒序）。请避免重复，体现递进：指出上一次缺口是否有填补、建议是否落实，未落实要说明原因并给出更务实的替代路径，同时新增本次发现的变化点：';
 
+// PMC-11：人物基础资料统一取 Person（经 customers.person_id）；无映射/软删回退客户档案并标 unmapped，双源不一致记 conflicts。
+async function loadPersonIdentity(rdb, customer) {
+  const fallback = {
+    name: customer.customer_name || null, gender: customer.gender || null,
+    birthday: customer.birthday || null, phone: customer.phone || null,
+    occupation: customer.occupation || null, organization: null, education: null,
+    wechat: customer.wx_account || null,
+  };
+  const identity = { source: 'customers_legacy', person_id: null, unmapped: true, conflicts: [] };
+  if (customer.person_id == null) return Object.assign({}, fallback, { identity: identity });
+  const r = await rdb.from('persons')
+    .select('id, display_name, phone, wechat, gender, birthday, occupation, organization, education')
+    .eq('id', customer.person_id).is('deleted_at', null).maybeSingle();
+  if (r.error) throw new Error(r.error);
+  const p = r.data;
+  if (!p) return Object.assign({}, fallback, { identity: identity });
+  identity.source = 'persons';
+  identity.person_id = String(p.id);
+  identity.unmapped = false;
+  const merged = {};
+  const pairs = [['display_name', 'name', customer.customer_name], ['gender', 'gender', customer.gender],
+    ['birthday', 'birthday', customer.birthday], ['phone', 'phone', customer.phone],
+    ['occupation', 'occupation', customer.occupation], ['wechat', 'wechat', customer.wx_account]];
+  pairs.forEach(function (pair) {
+    const pv = p[pair[0]] == null ? '' : String(p[pair[0]]).trim();
+    const lv = pair[2] == null ? '' : String(pair[2]).trim();
+    if (pv) {
+      merged[pair[1]] = p[pair[0]];
+      if (lv && pv !== lv) identity.conflicts.push({ field: pair[1], person: pv, legacy: lv });
+    } else merged[pair[1]] = pair[2] || null;
+  });
+  merged.organization = p.organization || null;
+  merged.education = p.education || null;
+  return Object.assign({}, fallback, merged, { identity: identity });
+}
+
+function identityNotice(identity) {
+  if (identity.unmapped) {
+    return '【人物身份】该客户尚未关联 Person 档案，基础资料暂取自客户档案；未提供的字段一律视为未知，禁止猜测补齐。';
+  }
+  if (identity.conflicts.length) {
+    return '【人物身份·资料冲突，一律以 Person 档案为准】' +
+      identity.conflicts.map(c => c.field + '：Person=' + c.person + ' / 客户档案=' + c.legacy).join('；');
+  }
+  return null;
+}
+
 async function generate(event) {
   const customerId = parseInt(event && event.customer_id, 10);
   if (!customerId) return { error: 'customer_id required' };
@@ -129,7 +176,9 @@ async function generate(event) {
   const c = assertOk(await rdb.from('customers').select().eq('Id', customerId).is('deleted_at', null).maybeSingle());
   if (!c.data) return { error: 'customer not found' };
   const customer = c.data;
-  const testCustomer = String(customer.customer_name || '').includes(TEST_MARKER);
+  // PMC-11：人物基础资料 Person 化（测试标记以 Person 权威名判断，已映射客户双源姓名一致）
+  const ident = await loadPersonIdentity(rdb, customer);
+  const testCustomer = String(ident.name || '').includes(TEST_MARKER);
   const today = new Date().toISOString().slice(0, 10);
   const testReportType = TEST_MARKER + '虚构保单检视';
   const existingTestReport = async () => {
@@ -198,14 +247,17 @@ async function generate(event) {
     today: today,
     operator: operator,
     customer: {
-      name: customer.customer_name, gender: customer.gender, birthday: customer.birthday,
+      // PMC-11：基础资料取 Person，保险/家庭业务字段仍取 customers
+      name: ident.name, gender: ident.gender, birthday: ident.birthday,
       stage: customer.customer_stage, priority: customer.sales_priority,
-      occupation: customer.occupation, income: customer.annual_income,
+      occupation: ident.occupation, organization: ident.organization, education: ident.education,
+      income: customer.annual_income,
       marital: customer.marital_status, children: customer.children_info,
-      house: customer.properties_info, phone: customer.phone,
+      house: customer.properties_info, phone: ident.phone,
       info: customer.additional_info,
       first_contact: customer.first_contact_date,
     },
+    identity: ident.identity,
     policies: products,
     recent_followups: folRows.map(function (f) {
       return { date: f.followup_date, notes: f.followup_notes, next_date: f.next_followup_date, next_goal: f.next_followup_goal };
@@ -221,7 +273,9 @@ async function generate(event) {
     }),
   };
 
+  const notice = identityNotice(ident.identity);
   let userContent = '客户与保单资料：\n' + JSON.stringify(ctx, null, 2);
+  if (notice) userContent = notice + '\n\n' + userContent;
   if (histRows.length) {
     userContent += '\n\n' + HISTORY_HINT + '\n' + JSON.stringify(ctx.history_reports, null, 2);
   }
@@ -235,7 +289,8 @@ async function generate(event) {
 
   const payload = normFields({
     customer_id: customerId,
-    customer_name: customer.customer_name,
+    // PMC-11：派生快照字段取 Person 权威名（历史报告行不批量改写）
+    customer_name: ident.name,
     report_date: today,
     report_type: '保单年度检视',
     summary: parsed.summary || null,
@@ -260,5 +315,5 @@ async function generate(event) {
   const r = assertOk(await rdb.from('policy_review_reports').insert(payload).select('id'));
   const id = r.data[0].id;
   const full = assertOk(await rdb.from('policy_review_reports').select().eq('id', id).maybeSingle());
-  return { id: id, report: full.data, raw: raw };
+  return { id: id, report: full.data, raw: raw, identity: ident.identity };
 }

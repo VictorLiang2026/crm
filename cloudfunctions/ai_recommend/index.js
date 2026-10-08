@@ -78,6 +78,55 @@ function inEnum(v, list) {
 const HISTORY_HINT =
   '以下是该客户的历史 AI 跟进建议（按时间倒序，仅作参考）。请结合这些历史建议避免重复、体现递进，生成一条新的、更深入的跟进建议：';
 
+// PMC-11：人物基础资料统一取 Person（经 customers.person_id）；客户档案业务字段不动。
+// 无 person_id / Person 已软删 → 回退客户档案并标 unmapped；双源同字段不一致 → 记 conflicts（以 Person 为准，不猜测）。
+async function loadPersonIdentity(rdb, customer) {
+  const fallback = {
+    name: customer.customer_name || null, gender: customer.gender || null,
+    birthday: customer.birthday || null, phone: customer.phone || null,
+    occupation: customer.occupation || null, organization: null, education: null,
+    wechat: customer.wx_account || null,
+  };
+  const identity = { source: 'customers_legacy', person_id: null, unmapped: true, conflicts: [] };
+  if (customer.person_id == null) return Object.assign({}, fallback, { identity: identity });
+  const r = await rdb.from('persons')
+    .select('id, display_name, phone, wechat, gender, birthday, occupation, organization, education')
+    .eq('id', customer.person_id).is('deleted_at', null).maybeSingle();
+  if (r.error) throw new Error(r.error);
+  const p = r.data;
+  if (!p) return Object.assign({}, fallback, { identity: identity });
+  identity.source = 'persons';
+  identity.person_id = String(p.id);
+  identity.unmapped = false;
+  const merged = {};
+  const pairs = [['display_name', 'name', customer.customer_name], ['gender', 'gender', customer.gender],
+    ['birthday', 'birthday', customer.birthday], ['phone', 'phone', customer.phone],
+    ['occupation', 'occupation', customer.occupation], ['wechat', 'wechat', customer.wx_account]];
+  pairs.forEach(function (pair) {
+    const pv = p[pair[0]] == null ? '' : String(p[pair[0]]).trim();
+    const lv = pair[2] == null ? '' : String(pair[2]).trim();
+    if (pv) {
+      merged[pair[1]] = p[pair[0]];
+      if (lv && pv !== lv) identity.conflicts.push({ field: pair[1], person: pv, legacy: lv });
+    } else merged[pair[1]] = pair[2] || null;
+  });
+  merged.organization = p.organization || null;
+  merged.education = p.education || null;
+  return Object.assign({}, fallback, merged, { identity: identity });
+}
+
+// 冲突/缺失给模型的显式标注（禁止模型自行猜测补齐）
+function identityNotice(identity) {
+  if (identity.unmapped) {
+    return '【人物身份】该客户尚未关联 Person 档案，基础资料暂取自客户档案；未提供的字段一律视为未知，禁止猜测补齐。';
+  }
+  if (identity.conflicts.length) {
+    return '【人物身份·资料冲突，一律以 Person 档案为准】' +
+      identity.conflicts.map(c => c.field + '：Person=' + c.person + ' / 客户档案=' + c.legacy).join('；');
+  }
+  return null;
+}
+
 exports.main = async (event, context) => {
   try {
     const customerId = parseInt(event && event.customer_id, 10);
@@ -87,6 +136,8 @@ exports.main = async (event, context) => {
     const c = assertOk(await rdb.from('customers').select().eq('Id', customerId).is('deleted_at', null).maybeSingle());
     if (!c.data) return { error: 'customer not found' };
     const customer = c.data;
+    // PMC-11：人物基础资料 Person 化（缺失回退、冲突标注）
+    const ident = await loadPersonIdentity(rdb, customer);
 
     const [fol, prod, gif, hist, photos, prr] = await Promise.all([
       rdb.from('followups').select().eq('customer_id', customerId)
@@ -144,15 +195,18 @@ exports.main = async (event, context) => {
       today: new Date().toISOString().slice(0, 10),
       operator: operator,
       customer: {
-        name: customer.customer_name, gender: customer.gender, birthday: customer.birthday,
+        // PMC-11：基础资料取 Person（回退客户档案），销售/家庭等业务域字段仍取 customers
+        name: ident.name, gender: ident.gender, birthday: ident.birthday,
         stage: customer.customer_stage, priority: customer.sales_priority,
         recruitment_priority: customer.recruitment_priority, referral_priority: customer.referral_priority,
-        occupation: customer.occupation, annual_income: customer.annual_income,
+        occupation: ident.occupation, organization: ident.organization, education: ident.education,
+        annual_income: customer.annual_income,
         household_income: customer.household_income, hobbies: customer.hobbies,
         marital: customer.marital_status, children: customer.children_info,
-        properties: customer.properties_info, phone: customer.phone,
+        properties: customer.properties_info, phone: ident.phone,
         info: customer.additional_info,
       },
+      identity: ident.identity,
       recent_followups: folRows.map(function (f) {
         return { date: f.followup_date, notes: f.followup_notes, next_date: f.next_followup_date, next_goal: f.next_followup_goal };
       }),
@@ -188,8 +242,10 @@ exports.main = async (event, context) => {
       }) : null,
     };
 
-    // 拼接 user 消息：客户资料 + 历史建议参考
+    // 拼接 user 消息：人物身份标注 + 客户资料 + 历史建议参考
+    const notice = identityNotice(ident.identity);
     let userContent = '客户资料：\n' + JSON.stringify(ctx, null, 2);
+    if (notice) userContent = notice + '\n\n' + userContent;
     if (histRows.length) {
       userContent += '\n\n' + HISTORY_HINT + '\n' + JSON.stringify(histRows.map(function (r) {
         return {
@@ -215,7 +271,8 @@ exports.main = async (event, context) => {
     const nba = aiStd.normNba(parsed.nba, { legacy: true });
     const payload = {
       customer_id: customerId,
-      customer_name: customer.customer_name,
+      // PMC-11：派生快照字段取 Person 权威名（历史行不批量改写）
+      customer_name: ident.name,
       recommendation_date: today,
       suggested_followup_date: parsed.suggested_followup_date || null,
       suggested_message: parsed.suggested_message || null,
@@ -226,7 +283,8 @@ exports.main = async (event, context) => {
     };
     const r = assertOk(await rdb.from('ai_recommendations').insert(payload).select('id'));
 
-    return { id: r.data[0].id, recommendation: Object.assign({}, parsed, { nba: nba }), raw: raw };
+    return { id: r.data[0].id, recommendation: Object.assign({}, parsed, { nba: nba }), raw: raw,
+      identity: ident.identity };
   } catch (e) {
     return { error: e.message };
   }

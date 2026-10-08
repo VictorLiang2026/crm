@@ -21,6 +21,53 @@ function clip(s, n) {
   return s.length > n ? s.slice(0, n) + '…' : s;
 }
 
+// PMC-11：人物基础资料统一取 Person（经 customers.person_id）；无映射/软删回退客户档案并标 unmapped，双源不一致记 conflicts。
+async function loadPersonIdentity(rdb, customer) {
+  const fallback = {
+    name: customer.customer_name || null, gender: customer.gender || null,
+    birthday: customer.birthday || null, phone: customer.phone || null,
+    occupation: customer.occupation || null, organization: null, education: null,
+    wechat: customer.wx_account || null,
+  };
+  const identity = { source: 'customers_legacy', person_id: null, unmapped: true, conflicts: [] };
+  if (customer.person_id == null) return Object.assign({}, fallback, { identity: identity });
+  const r = await rdb.from('persons')
+    .select('id, display_name, phone, wechat, gender, birthday, occupation, organization, education')
+    .eq('id', customer.person_id).is('deleted_at', null).maybeSingle();
+  if (r.error) throw new Error(r.error);
+  const p = r.data;
+  if (!p) return Object.assign({}, fallback, { identity: identity });
+  identity.source = 'persons';
+  identity.person_id = String(p.id);
+  identity.unmapped = false;
+  const merged = {};
+  const pairs = [['display_name', 'name', customer.customer_name], ['gender', 'gender', customer.gender],
+    ['birthday', 'birthday', customer.birthday], ['phone', 'phone', customer.phone],
+    ['occupation', 'occupation', customer.occupation], ['wechat', 'wechat', customer.wx_account]];
+  pairs.forEach(function (pair) {
+    const pv = p[pair[0]] == null ? '' : String(p[pair[0]]).trim();
+    const lv = pair[2] == null ? '' : String(pair[2]).trim();
+    if (pv) {
+      merged[pair[1]] = p[pair[0]];
+      if (lv && pv !== lv) identity.conflicts.push({ field: pair[1], person: pv, legacy: lv });
+    } else merged[pair[1]] = pair[2] || null;
+  });
+  merged.organization = p.organization || null;
+  merged.education = p.education || null;
+  return Object.assign({}, fallback, merged, { identity: identity });
+}
+
+function identityNotice(identity) {
+  if (identity.unmapped) {
+    return '【人物身份】该客户尚未关联 Person 档案，基础资料暂取自客户档案；未提供的字段一律视为未知，禁止猜测补齐。';
+  }
+  if (identity.conflicts.length) {
+    return '【人物身份·资料冲突，一律以 Person 档案为准】' +
+      identity.conflicts.map(c => c.field + '：Person=' + c.person + ' / 客户档案=' + c.legacy).join('；');
+  }
+  return null;
+}
+
 exports.main = async (event, context) => {
   try {
     const customerId = parseInt(event && event.customer_id, 10);
@@ -30,6 +77,8 @@ exports.main = async (event, context) => {
       .is('deleted_at', null).maybeSingle());
     if (!c.data) return { error: 'customer not found' };
     const customer = c.data;
+    // PMC-11：人物基础资料 Person 化
+    const ident = await loadPersonIdentity(rdb, customer);
 
     const [fol, prod, gif, parts, refOpp] = await Promise.all([
       rdb.from('followups').select('followup_date, followup_notes, next_followup_goal')
@@ -77,13 +126,16 @@ exports.main = async (event, context) => {
     const ctx = {
       today: new Date().toISOString().slice(0, 10),
       customer: {
-        name: customer.customer_name, gender: customer.gender, birthday: customer.birthday,
+        // PMC-11：基础资料取 Person，销售/家庭业务字段仍取 customers
+        name: ident.name, gender: ident.gender, birthday: ident.birthday,
         stage: customer.customer_stage, priority: customer.sales_priority,
         referral_priority: customer.referral_priority,
-        occupation: customer.occupation, hobbies: customer.hobbies,
+        occupation: ident.occupation, organization: ident.organization, education: ident.education,
+        hobbies: customer.hobbies,
         marital: customer.marital_status, children: customer.children_info,
         info: customer.additional_info,
       },
+      identity: ident.identity,
       recent_followups: folRows.map(function (f) {
         return { date: f.followup_date ? String(f.followup_date).slice(0, 10) : '', notes: clip(f.followup_notes, 200), goal: f.next_followup_goal || '' };
       }),
@@ -117,9 +169,10 @@ exports.main = async (event, context) => {
       '只输出 JSON，不要解释。',
     ].join('\n');
 
+    const notice = identityNotice(ident.identity);
     const { text: raw } = await generateText([
       { role: 'system', content: system },
-      { role: 'user', content: '客户资料：\n' + JSON.stringify(ctx, null, 2) },
+      { role: 'user', content: (notice ? notice + '\n\n' : '') + '客户资料：\n' + JSON.stringify(ctx, null, 2) },
     ], { timeout: 120000 });
 
     const parsed = extractJson(raw) || {};
@@ -161,7 +214,7 @@ exports.main = async (event, context) => {
       message: suitable ? clip(parsed.message, 300) : '',
       nba: nba,
     };
-    return { suggestion: suggestion, raw: raw };
+    return { suggestion: suggestion, raw: raw, identity: ident.identity };
   } catch (e) {
     return { error: e.message };
   }

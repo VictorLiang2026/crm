@@ -39,6 +39,72 @@ var STAGE_ENUM = ['新认识', '关系维护', '需求挖掘', '方案沟通', '
 // 机会类型词表（与 opportunities 表、前端常量一致）
 var OPP_ENUM = ['医疗保障', '重疾保障', '养老规划', '教育规划', '财富规划', '家庭保障', '转介绍'];
 
+// PMC-11：人物基础资料统一取 Person（customers / v_recruit_candidates 行均带 person_id，
+// 且姓名/性别/出生/电话/微信/职业列名一致）；销售/增员业务域字段仍取原表。
+// 无 person_id / Person 已软删 → 回退原行并标 unmapped；双源同字段不一致 → 记 conflicts（以 Person 为准，不猜测）。
+async function loadPersonIdentity(rdb, row) {
+  var fallback = {
+    name: row.customer_name || null, gender: row.gender || null,
+    birthday: row.birthday || null, phone: row.phone || null,
+    occupation: row.occupation || null, organization: null,
+    education: row.education || null, wechat: row.wx_account || null,
+  };
+  var identity = { source: 'customers_legacy', person_id: null, unmapped: true, conflicts: [] };
+  if (row.person_id == null) return Object.assign({}, fallback, { identity: identity });
+  var r = await rdb.from('persons')
+    .select('id, display_name, phone, wechat, gender, birthday, occupation, organization, education')
+    .eq('id', row.person_id).is('deleted_at', null).maybeSingle();
+  if (r.error) throw new Error(r.error);
+  var p = r.data;
+  if (!p) return Object.assign({}, fallback, { identity: identity });
+  identity.source = 'persons';
+  identity.person_id = String(p.id);
+  identity.unmapped = false;
+  var merged = {};
+  var pairs = [['display_name', 'name', row.customer_name], ['gender', 'gender', row.gender],
+    ['birthday', 'birthday', row.birthday], ['phone', 'phone', row.phone],
+    ['occupation', 'occupation', row.occupation], ['wechat', 'wechat', row.wx_account]];
+  pairs.forEach(function (pair) {
+    var pv = p[pair[0]] == null ? '' : String(p[pair[0]]).trim();
+    var lv = pair[2] == null ? '' : String(pair[2]).trim();
+    if (pv) {
+      merged[pair[1]] = p[pair[0]];
+      if (lv && pv !== lv) identity.conflicts.push({ field: pair[1], person: pv, legacy: lv });
+    } else merged[pair[1]] = pair[2] || null;
+  });
+  merged.organization = p.organization || null;
+  merged.education = p.education || null;
+  return Object.assign({}, fallback, merged, { identity: identity });
+}
+
+// 冲突/缺失给模型的显式标注（禁止模型自行猜测补齐）
+function identityNotice(identity) {
+  if (identity.unmapped) {
+    return '【人物身份】该客户尚未关联 Person 档案，基础资料暂取自客户档案；未提供的字段一律视为未知，禁止猜测补齐。';
+  }
+  if (identity.conflicts.length) {
+    return '【人物身份·资料冲突，一律以 Person 档案为准】' +
+      identity.conflicts.map(function (c) {
+        return c.field + '：Person=' + c.person + ' / 客户档案=' + c.legacy;
+      }).join('；');
+  }
+  return null;
+}
+
+// 增员候选人版措辞（unmapped 提示主体不同）
+function candidateIdentityNotice(identity) {
+  if (identity.unmapped) {
+    return '【人物身份】该候选人尚未关联 Person 档案，基础资料暂取自候选人档案；未提供的字段一律视为未知，禁止猜测补齐。';
+  }
+  if (identity.conflicts.length) {
+    return '【人物身份·资料冲突，一律以 Person 档案为准】' +
+      identity.conflicts.map(function (c) {
+        return c.field + '：Person=' + c.person + ' / 候选人档案=' + c.legacy;
+      }).join('；');
+  }
+  return null;
+}
+
 // 北京时间（与 today_coach 一致：UTC+8）
 function bjNow() { return new Date(Date.now() + 8 * 3600 * 1000); }
 function todayStr() { return bjNow().toISOString().slice(0, 10); }
@@ -70,6 +136,8 @@ async function analyzeProfile(event) {
     .is('deleted_at', null).maybeSingle());
   if (!c.data) return { error: 'customer not found' };
   var customer = c.data;
+  // PMC-11：人物基础资料 Person 化（缺失回退、冲突标注）
+  var ident = await loadPersonIdentity(rdb, customer);
 
   // 最近 50 条跟进（先按时间倒序取 50 条，再反转为正序供 AI 通读演变）
   var rows = assertOk(await rdb.from('followups')
@@ -96,8 +164,11 @@ async function analyzeProfile(event) {
     '4. 只输出 JSON，不要解释、不要 markdown 代码块。',
   ].join('\n');
 
-  var userContent = '客户：' + customer.customer_name +
-    (customer.occupation ? '\n职业：' + customer.occupation : '') +
+  // PMC-11：姓名/职业取 Person；兴趣/婚况等业务域字段仍取 customers；缺失/冲突前置标注
+  var notice = identityNotice(ident.identity);
+  var userContent = (notice ? notice + '\n\n' : '') +
+    '客户：' + ident.name +
+    (ident.occupation ? '\n职业：' + ident.occupation : '') +
     (customer.hobbies ? '\n兴趣爱好：' + customer.hobbies : '') +
     (customer.marital_status ? '\n婚姻状况：' + customer.marital_status : '') +
     '\n附加信息：' + (customer.additional_info || '（无）') +
@@ -119,6 +190,7 @@ async function analyzeProfile(event) {
   return {
     profile_updates: updates,
     based_on: { followups_count: folRows.length, has_additional_info: !!(customer.additional_info || '') },
+    identity: ident.identity,
     raw: gen.text,
   };
 }
@@ -188,6 +260,8 @@ async function analyzeRecruitProfile(event) {
     .select('*').eq('candidate_id', candidateId).maybeSingle());
   if (!c.data) return { error: 'candidate not found' };
   var cand = c.data;
+  // PMC-11：人物基础资料 Person 化（缺失回退、冲突标注）
+  var ident = await loadPersonIdentity(rdb, cand);
 
   // 最近 50 条增员跟进（正序供 AI 通读演变）
   var rows = assertOk(await rdb.from('recruit_followups')
@@ -220,10 +294,13 @@ async function analyzeRecruitProfile(event) {
     '4. 只输出 JSON，不要解释、不要 markdown 代码块。',
   ].join('\n');
 
-  var userContent = '候选人：' + (cand.customer_name || '') +
-    (cand.occupation ? '\n现职/行业：' + cand.occupation : '') +
+  // PMC-11：姓名/职业/学历取 Person；年收入/婚况/爱好等业务域字段仍取候选人视图
+  var rcNotice = candidateIdentityNotice(ident.identity);
+  var userContent = (rcNotice ? rcNotice + '\n\n' : '') +
+    '候选人：' + (ident.name || '') +
+    (ident.occupation ? '\n现职/行业：' + ident.occupation : '') +
     (cand.annual_income ? '\n年收入：' + cand.annual_income : '') +
-    (cand.education ? '\n学历：' + cand.education : '') +
+    (ident.education ? '\n学历：' + ident.education : '') +
     (cand.marital_status ? '\n婚况：' + cand.marital_status : '') +
     (cand.hobbies ? '\n爱好：' + cand.hobbies : '') +
     '\n已知增员资料（仅供参考，可补充纠正）：' +
@@ -255,6 +332,7 @@ async function analyzeRecruitProfile(event) {
   return {
     profile_updates: updates,
     based_on: { followups_count: folRows.length, has_candidate_info: !!(cand.motivation || cand.concerns || cand.work_experience || cand.family_situation || cand.career_plan) },
+    identity: ident.identity,
     raw: gen.text,
   };
 }
@@ -276,6 +354,8 @@ exports.main = async (event, context) => {
       .is('deleted_at', null).maybeSingle());
     if (!c.data) return { error: 'customer not found' };
     var customer = c.data;
+    // PMC-11：人物基础资料 Person 化（缺失回退、冲突标注）
+    var ident = await loadPersonIdentity(rdb, customer);
 
     // 最近 5 条跟进：仅作上下文（避免把旧事当新信息），不照抄
     var folRows = assertOk(await rdb.from('followups')
@@ -315,9 +395,12 @@ exports.main = async (event, context) => {
       '4. 只输出 JSON，不要解释、不要 markdown 代码块。',
     ].join('\n');
 
-    var userContent = '客户：' + customer.customer_name +
+    // PMC-11：姓名/职业取 Person，经营阶段仍取 customers；缺失/冲突前置标注
+    var parseNotice = identityNotice(ident.identity);
+    var userContent = (parseNotice ? parseNotice + '\n\n' : '') +
+      '客户：' + ident.name +
       '；当前经营阶段：' + (customer.customer_stage || '未分层') +
-      (customer.occupation ? '；职业：' + customer.occupation : '') +
+      (ident.occupation ? '；职业：' + ident.occupation : '') +
       '\n客户已知附加信息（旧事，勿重复记录）：' + (customer.additional_info || '（无）') +
       '\n最近跟进记录（仅供了解上下文，勿照抄）：\n' +
       (folRows.length
@@ -369,7 +452,7 @@ exports.main = async (event, context) => {
     if (!result.followup_notes) {
       return { error: 'AI 未能从描述中识别出沟通内容，请补充细节后重试' };
     }
-    return { parsed: result, today: today, raw: gen.text };
+    return { parsed: result, today: today, raw: gen.text, identity: ident.identity };
   } catch (e) {
     return { error: e.message };
   }

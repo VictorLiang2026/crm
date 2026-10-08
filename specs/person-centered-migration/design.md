@@ -35,6 +35,13 @@
 ### AI
 
 - 模型由 CloudBase AI Gateway / 环境配置选择（当前业务代码只声明 capability）；AI 写操作 Command → Plan → 服务端 Preview → 人工 Confirm → 有范围授权 Execute。
+- **PMC-11（2026-10-08 开发，待验收）AI 上下文身份设计**：
+  1. **基础资料统一取 Person**：各 AI 入口经 `customers.person_id` / `recruit_candidates.person_id` / `activity_participants.canonical_person_id` 从 persons 读取 8 个基础字段（display_name、gender、birthday、phone、wechat、occupation、organization、education）；查询均带 `deleted_at IS NULL`。
+  2. **业务上下文不搬家**：销售（customer_stage/sales_priority/annual_income/hobbies/marital_status/children/properties 等）、招募（各 priority/stage、mbti、motivation、concerns、work_experience、personality_tags、career_plan 等）、保险（products/policy_review_reports）、互动（followups/interactions）、活动（stage/席位/出席）继续各取所属业务表；嘉宾名取嘉宾域。
+  3. **缺失/冲突显式标注，禁止 AI 猜测**：统一 identity helper（loadPersonIdentity）输出 `{source, person_id, unmapped, conflicts[]}`；未映射或 Person 缺失时回退旧表值并在 user 消息最前面插入固定 unmapped 提示；双源非空不一致时列冲突项并指令以 Person 为准。
+  4. **搜索与候选引用**：服务端固定模板 + 白名单视图 `public.crm_search_people_v1`，refs 用 persons 准确 ID；模型不生成 SQL、不按姓名自选；context-engine 活动复盘身份解析 canonical_person_id 优先、外键精确回退，姓名永不是身份证据。
+  5. **派生数据身份与更新/失效策略**：AI 摘要、上下文快照、建议/报告均为派生于请求时点的派生数据——身份以当时引用的 person_id 为准，展示名随快照留存。策略：①历史 ai_recommendations 行、ai_tasks/ai_runs/ai_results 快照保持当时事实，不批量改写、不做失效重算（时点事实本就是审计要求）；②新请求一律实时经 person_id 构建上下文，天然失效、无需缓存作废动作；③检索索引层不重建，listAll 关键词在服务端同时匹配 Person 当前名与行内历史快照名（改名后仍可被当前名检索到，返回行保持历史内容）；④新写入建议/报告的快照名取 Person 当前名。
+  6. **非模型入口同权改造**：ai_recommendations 手工 create/listAll 不走 prompt，直接在服务端写/读路径做 Person 取名与双名搜索；模型配置方式、人工确认链、AI 自动写权限、Legacy Quick Capture 灰度均不变。
 
 ## 二、逐包设计
 
@@ -45,7 +52,9 @@
 | PMC-00 | 已完成 | 接管检查 + 档案建立，无业务变更；见 [evidence/PMC-00.md](evidence/PMC-00.md) |
 | PMC-01 | 已完成（纯只读盘点） | 全量影响盘点：无业务设计变更；产出为 [impact-matrix.md](impact-matrix.md) PMC-01 节（47 表/12 视图/33 函数实测、字段重复与一致性统计、66 FK 分类、视图依赖、28 函数 × action 矩阵、5 专项调用链核查、未知项 U1–U8）；见 [evidence/PMC-01.md](evidence/PMC-01.md) |
 | PMC-02 | **已验收（2026-10-07）** | 目标数据模型与接口契约：新建 [data-model.md](data-model.md)——persons 为主实体不重命名、ID 精度契约（int8 字符串传输 R-ID1~5）、逐表字段归属字典与争议字段裁决（收入/需求/性格/标签/来源/备注）、三层资料与快照不可变、角色基数（person_roles UNIQUE(person_id,role)）与软删除兼容、customers.person_id 关联设计与 legacy_customer_id 退出条件、受影响 action 新旧契约（C1–C9 + 适配类型 T1/T2/T3）、阶段权威来源（0–4）与切换/部署/回滚次序；**D1–D11 已获用户全部按建议 A 批准**（D5/D8 路径批准，退出动作届时单独授权）；见 [evidence/PMC-02.md](evidence/PMC-02.md) |
-| PMC-03～PMC-20 | 未收到指令 | 不预写；收到指令后逐包登记完整指令与验收范围 |
+| PMC-03～PMC-10 | 已实施（其中 PMC-03～09 已随各包验收，PMC-10 已验收） | 逐包设计落地于各包 evidence 与 impact-matrix 对应分节；本表不回溯扩写 |
+| PMC-11 | **已实施待验收（2026-10-08 开发/2026-10-09 发布）** | AI 上下文/搜索/结果保存适配 Person：8 个 AI 函数（ai_activity、ai_recommend、ai_referral、ai_followup、policy_review_reports、recruit_score、recruit_recommend、ai_recommendations）+ context-engine v1.1.0（两副本）；identity helper 模式（基础 8 字段取 Person、未映射回退+禁猜测、冲突标注）、业务域字段不动、非模型保存入口 create/listAll 改造、历史快照不改写；无 migration；隔离测试 19/19 + 真实模型 ai_referral 1 条 PASS；详见上文 §一「AI」第 2 组设计与 [evidence/PMC-11.md](evidence/PMC-11.md) |
+| PMC-12～PMC-20 | 未收到指令 | 不预写；收到指令后逐包登记完整指令与验收范围 |
 
 ## 三、迁移总体取向（已确认原则，非实施授权）
 

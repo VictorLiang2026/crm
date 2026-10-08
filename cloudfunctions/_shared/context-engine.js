@@ -1,13 +1,14 @@
 /** Bounded, read-only public-schema context for AI tasks. No model or business writes. */
 'use strict';
 
-const VERSION = '1.0.0';
+const VERSION = '1.1.0';
 const LIMITS = Object.freeze({ interactions: 5, interactionsMax: 10, opportunities: 5,
   products: 5, reports: 3, participants: 20, tasks: 20, actions: 20, goals: 5,
   activityInteractions: 20, activityPersons: 20, activityRelationships: 20 });
 const FIELDS = Object.freeze({
-  persons: ['id', 'display_name', 'occupation', 'organization', 'legacy_customer_id'],
-  customers: ['Id', 'customer_name', 'occupation', 'customer_stage', 'sales_priority', 'next_action', 'next_action_date'],
+  // PMC-11: persons.display_name is the identity authority; customers keeps domain state.
+  persons: ['id', 'display_name', 'phone', 'wechat', 'gender', 'birthday', 'occupation', 'organization', 'education', 'legacy_customer_id'],
+  customers: ['Id', 'person_id', 'customer_name', 'occupation', 'customer_stage', 'sales_priority', 'next_action', 'next_action_date'],
   followups: ['Id', 'customer_id', 'followup_date', 'interaction_summary', 'followup_notes', 'next_action', 'next_action_date', 'next_followup_date'],
   opportunities: ['id', 'customer_id', 'person_id', 'opportunity_type', 'status', 'last_progress', 'next_action', 'next_action_date'],
   products: ['id', 'customer_id', 'items', 'created_at'],
@@ -96,9 +97,34 @@ function createContextEngine({ rdb, now = () => new Date() } = {}) {
     return one ? (wrapped[0] || null) : wrapped;
   }
 
+  // PMC-11: identity profile comes from persons via customers.person_id;
+  // customer_name/customer_stage remain domain fields. Conflicts are surfaced
+  // explicitly (never silently guessed); unmapped legacy customers keep old values.
   async function person(id) {
     const result = await read('customers', { Id: id, deleted_at: null }, { one: true });
     if (!result) throw new ContextError('NOT_FOUND', 'Customer not found');
+    const identity = { source: 'customers_legacy', person_id: null, unmapped: true, conflicts: [] };
+    result.data.person_profile = null;
+    const personId = result.data.person_id;
+    if (personId != null) {
+      const p = await read('persons', { id: personId, deleted_at: null }, { one: true });
+      if (p) {
+        identity.source = 'persons';
+        identity.person_id = String(p.data.id);
+        identity.unmapped = false;
+        result.data.person_profile = p.data;
+        const pairs = [['display_name', result.data.customer_name, 'name'],
+          ['occupation', result.data.occupation, 'occupation']];
+        for (const triple of pairs) {
+          const pv = p.data[triple[0]] == null ? '' : String(p.data[triple[0]]).trim();
+          const lv = triple[1] == null ? '' : String(triple[1]).trim();
+          if (pv && lv && pv !== lv) {
+            identity.conflicts.push({ field: triple[2], person: pv, legacy: lv });
+          }
+        }
+      }
+    }
+    result.data.identity = identity;
     return result;
   }
 

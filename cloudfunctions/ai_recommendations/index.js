@@ -90,10 +90,16 @@ async function listAll(event) {
 
   // 筛选：三种互斥方式（前端保证互斥；后端按传入参数独立生效）
   // 1) 客户姓名模糊匹配（不区分大小写）
+  // PMC-11：同时匹配行内历史快照名与 Person 当前名；历史行不批量改写，按旧名仍可搜到
   const keyword = (event.keyword == null ? '' : String(event.keyword)).trim().toLowerCase();
   if (keyword) {
+    const custIds = [];
+    rows.forEach(function (a) { if (a.customer_id != null && custIds.indexOf(a.customer_id) < 0) custIds.push(a.customer_id); });
+    const currentNameMap = await loadCurrentNameMap(custIds);
     rows = rows.filter(function (a) {
-      return a.customer_name && String(a.customer_name).toLowerCase().indexOf(keyword) !== -1;
+      if (a.customer_name && String(a.customer_name).toLowerCase().indexOf(keyword) !== -1) return true;
+      const cur = currentNameMap[a.customer_id];
+      return !!cur && cur.toLowerCase().indexOf(keyword) !== -1;
     });
   }
   // 2/3) 日期区间：dateField=recommendation_date（给出建议日期）或 suggested_followup_date（建议跟进日期）
@@ -143,17 +149,45 @@ async function get(event) {
   return { recommendation: r.data };
 }
 
+// PMC-11：批量取 customer_id → 当前 Person 名（未关联/软删回退客户档案名），供列表搜索匹配当前名
+async function loadCurrentNameMap(customerIds) {
+  const map = {};
+  if (!customerIds.length) return map;
+  const cs = assertOk(await rdb.from('customers').select('Id, customer_name, person_id')
+    .in('Id', customerIds).is('deleted_at', null)).data || [];
+  const personIds = [];
+  cs.forEach(function (c) { if (c.person_id != null && personIds.indexOf(c.person_id) < 0) personIds.push(c.person_id); });
+  const pmap = {};
+  if (personIds.length) {
+    const ps = assertOk(await rdb.from('persons').select('id, display_name')
+      .in('id', personIds).is('deleted_at', null)).data || [];
+    ps.forEach(function (p) { pmap[String(p.id)] = p.display_name ? String(p.display_name) : ''; });
+  }
+  cs.forEach(function (c) { map[c.Id] = pmap[String(c.person_id)] || c.customer_name || ''; });
+  return map;
+}
+
+// PMC-11：建议记录的派生快照姓名取 Person 权威名（经 customers.person_id）；
+// 未关联/软删回退客户档案名。本入口只落建议记录，不写人物资料（人物写入统一走 customers 写服务）。
+async function resolveCurrentName(customerRow) {
+  if (customerRow.person_id == null) return customerRow.customer_name || '';
+  const pr = await rdb.from('persons').select('display_name')
+    .eq('id', customerRow.person_id).is('deleted_at', null).maybeSingle();
+  if (pr.error) throw new Error(pr.error);
+  return (pr.data && pr.data.display_name) ? String(pr.data.display_name) : (customerRow.customer_name || '');
+}
+
 // 用户确认后的建议落库（AI 只建议、必须用户确认才会调用）：直接写入前端提交的内容，不做 AI 生成
 async function create(event) {
   const data = Object.assign({}, event.data || {});
   const customerId = parseInt(data.customer_id, 10);
   if (!customerId) return { error: 'customer_id required' };
-  const c = assertOk(await rdb.from('customers').select('Id, customer_name').eq('Id', customerId)
+  const c = assertOk(await rdb.from('customers').select('Id, customer_name, person_id').eq('Id', customerId)
     .is('deleted_at', null).maybeSingle());
   if (!c.data) return { error: 'customer not found' };
   const payload = {
     customer_id: customerId,
-    customer_name: c.data.customer_name || '',
+    customer_name: await resolveCurrentName(c.data),
     recommendation_date: normDate(data.recommendation_date) || new Date().toISOString().slice(0, 10),
     suggested_followup_date: normDate(data.suggested_followup_date),
     suggested_message: data.suggested_message ? String(data.suggested_message).slice(0, 1000) : null,

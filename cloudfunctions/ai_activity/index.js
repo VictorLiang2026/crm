@@ -39,21 +39,50 @@ function bjNow() { return new Date(Date.now() + 8 * 3600 * 1000); }
 function todayStr() { return bjNow().toISOString().slice(0, 10); }
 function clip(v, n) { return typeof v === 'string' ? v.trim().slice(0, n) : ''; }
 
+// PMC-11：批量取 Person 当前展示名（persons.id → display_name），活动类 AI 上下文取名统一走此映射；
+// 未映射/Person 软删由调用方回退旧名。stage/priority/additional_info 等业务域字段仍取原表。
+async function loadPersonNameMap(ids) {
+  const uniq = [];
+  (ids || []).forEach(function (id) {
+    if (id != null && uniq.indexOf(id) < 0) uniq.push(id);
+  });
+  const map = {};
+  if (!uniq.length) return map;
+  const ps = assertOk(await rdb.from('persons')
+    .select('id, display_name').in('id', uniq).is('deleted_at', null)).data || [];
+  ps.forEach(function (p) { if (p.display_name) map[String(p.id)] = String(p.display_name); });
+  return map;
+}
+
+// 参与者 → Person id：新行用 canonical_person_id；旧行经 customers/recruit_candidates.person_id 精确回退。
+// 仅凭姓名不作为身份证据（与 Context Engine activity_review 同口径）。
+function participantPersonId(p, customerRow, recruitRow) {
+  if (p.canonical_person_id != null) return p.canonical_person_id;
+  if (p.person_type === 'customer') return customerRow ? customerRow.person_id : null;
+  if (p.person_type === 'recruit') return recruitRow ? recruitRow.person_id : null;
+  return null;
+}
+
 // 批量关联客户人物资料；对外保留 id/name/priority/occupation 的旧输入契约。
+// PMC-11：追加 person_id 供 Person 取名；name 仍保留旧名作为未映射回退。
 async function loadRecruitPeople(ids) {
   if (!ids.length) return [];
   const recruits = assertOk(await rdb.from('recruit_candidates')
-    .select('id, customer_id, stage').in('id', ids).is('deleted_at', null)).data || [];
+    .select('id, customer_id, person_id, stage').in('id', ids).is('deleted_at', null)).data || [];
   const customerIds = [...new Set(recruits.map(r => r.customer_id).filter(id => id != null))];
-  if (!customerIds.length) return [];
-  const customers = assertOk(await rdb.from('customers')
-    .select('Id, customer_name, recruitment_priority, occupation')
-    .in('Id', customerIds).is('deleted_at', null)).data || [];
-  const people = new Map(customers.map(c => [String(c.Id), c]));
-  return recruits.filter(r => people.has(String(r.customer_id))).map(r => {
-    const c = people.get(String(r.customer_id));
-    return { id: r.id, customer_id: r.customer_id, stage: r.stage,
-      name: c.customer_name, priority: c.recruitment_priority || '', occupation: c.occupation || '' };
+  const people = new Map();
+  if (customerIds.length) {
+    const customers = assertOk(await rdb.from('customers')
+      .select('Id, person_id, customer_name, recruitment_priority, occupation')
+      .in('Id', customerIds).is('deleted_at', null)).data || [];
+    customers.forEach(c => people.set(String(c.Id), c));
+  }
+  // PMC-11：独立候选人（customer_id 为空）也要返回——Person 取名走其 person_id，stage 取候选人行；
+  // 客户域字段（name/priority/occupation 回退值）对独立候选人为空，调用方取名以 Person 映射为准。
+  return recruits.map(r => {
+    const c = r.customer_id != null ? people.get(String(r.customer_id)) : null;
+    return { id: r.id, customer_id: r.customer_id, person_id: r.person_id, stage: r.stage,
+      name: c ? c.customer_name : '', priority: c ? (c.recruitment_priority || '') : '', occupation: c ? (c.occupation || '') : '' };
   });
 }
 
@@ -94,7 +123,7 @@ exports.main = async (event, context) => {
     var recruitMap = {};
 
     if (customerIds.length) {
-      var cs = assertOk(await rdb.from('customers').select('Id, customer_name, customer_stage, sales_priority, occupation, additional_info')
+      var cs = assertOk(await rdb.from('customers').select('Id, person_id, customer_name, customer_stage, sales_priority, occupation, additional_info')
         .in('Id', customerIds).is('deleted_at', null)).data || [];
       cs.forEach(function(c){ customerMap[c.Id] = c; });
     }
@@ -102,6 +131,14 @@ exports.main = async (event, context) => {
       var rs = await loadRecruitPeople(recruitIds);
       rs.forEach(function(r){ recruitMap[r.id] = r; });
     }
+
+    // PMC-11：参与者人物名统一取 Person（canonical_person_id 优先，旧行经映射 person_id 回退）
+    var partPersonIds = [];
+    parts.forEach(function (p) {
+      var pid = participantPersonId(p, customerMap[p.person_id], recruitMap[p.person_id]);
+      if (pid != null) partPersonIds.push(pid);
+    });
+    var personNameMap = await loadPersonNameMap(partPersonIds);
 
     // 客户"下次跟进日期"在 followups 表（最近一条有 next_followup_date 的记录）
     var nextFollowMap = {};
@@ -119,10 +156,15 @@ exports.main = async (event, context) => {
     var participantInfo = parts.map(function(p) {
       var linked = !!p.person_id;
       var info = linked ? (p.person_type === 'customer' ? customerMap[p.person_id] : recruitMap[p.person_id]) : null;
+      // PMC-11：Person 名优先；未映射/软删回退旧名/暂存名
+      var pidForName = linked ? participantPersonId(p,
+        p.person_type === 'customer' ? customerMap[p.person_id] : null,
+        p.person_type === 'recruit' ? recruitMap[p.person_id] : null) : null;
+      var personName = pidForName != null ? (personNameMap[String(pidForName)] || '') : '';
       return {
         person_type: p.person_type,
         person_id: linked ? p.person_id : 0,
-        name: info ? (info.customer_name || info.name) : (p.person_name || '未知（待关联）'),
+        name: personName || (info ? (info.customer_name || info.name) : (p.person_name || '未知（待关联）')),
         linked: linked,
         status: p.status,
         relationship_note: p.relationship_note || '',
@@ -251,7 +293,7 @@ async function loadActivityContext(activityId) {
   var speakerIds = parts.filter(function(p){ return p.person_type === 'speaker' && p.person_id; }).map(function(p){ return p.person_id; });
   var nameMap = {};
   if (customerIds.length) {
-    var cs = assertOk(await rdb.from('customers').select('Id, customer_name, customer_stage, sales_priority, occupation')
+    var cs = assertOk(await rdb.from('customers').select('Id, person_id, customer_name, customer_stage, sales_priority, occupation')
       .in('Id', customerIds).is('deleted_at', null)).data || [];
     cs.forEach(function(c){ nameMap['customer:' + c.Id] = c; });
   }
@@ -265,10 +307,26 @@ async function loadActivityContext(activityId) {
     sps.forEach(function(s){ nameMap['speaker:' + s.id] = s; });
   }
 
+  // PMC-11：参与者人物名统一取 Person（嘉宾属嘉宾域，不在此列）
+  var ctxPersonIds = [];
+  parts.forEach(function (p) {
+    if (!p.person_id) return;
+    var info = nameMap[p.person_type + ':' + p.person_id];
+    var pid = participantPersonId(p,
+      p.person_type === 'customer' ? info : null,
+      p.person_type === 'recruit' ? info : null);
+    if (pid != null) ctxPersonIds.push(pid);
+  });
+  var ctxPersonNameMap = await loadPersonNameMap(ctxPersonIds);
+
   var participants = parts.map(function(p) {
     var info = p.person_id ? nameMap[p.person_type + ':' + p.person_id] : null;
+    var pidForName = p.person_id ? participantPersonId(p,
+      p.person_type === 'customer' ? info : null,
+      p.person_type === 'recruit' ? info : null) : null;
+    var personName = pidForName != null ? (ctxPersonNameMap[String(pidForName)] || '') : '';
     return {
-      name: info ? (info.customer_name || info.name) : (p.person_name || '未知'),
+      name: personName || (info ? (info.customer_name || info.name) : (p.person_name || '未知')),
       person_type: p.person_type,
       linked: !!p.person_id,
       status: p.status,
@@ -583,7 +641,7 @@ async function postReview(event) {
     var customerMap = {}, recruitMap = {}, speakerMap = {};
     if (customerIds.length) {
       var cs = assertOk(await rdb.from('customers')
-        .select('Id, customer_name, customer_stage, sales_priority, occupation, additional_info')
+        .select('Id, person_id, customer_name, customer_stage, sales_priority, occupation, additional_info')
         .in('Id', customerIds).is('deleted_at', null)).data || [];
       cs.forEach(function (c) { customerMap[c.Id] = c; });
     }
@@ -596,6 +654,25 @@ async function postReview(event) {
         .select('id, name, organization, position, expertise, topic_summary, relationship_stage, cooperation_count, last_contact_date, next_contact_date')
         .in('id', speakerIds).is('deleted_at', null)).data || [];
       sps.forEach(function (s) { speakerMap[s.id] = s; });
+    }
+
+    // PMC-11：参与者人物名统一取 Person（嘉宾属嘉宾域，不经过 persons）
+    var prPersonIds = [];
+    pRes.forEach(function (p) {
+      if (!p.person_id) return;
+      var pid = participantPersonId(p, customerMap[p.person_id], recruitMap[p.person_id]);
+      if (pid != null) prPersonIds.push(pid);
+    });
+    var prNameMap = await loadPersonNameMap(prPersonIds);
+    function custPersonName(cid) {
+      var c = customerMap[cid];
+      if (!c) return '';
+      return (c.person_id != null ? (prNameMap[String(c.person_id)] || '') : '') || c.customer_name || '';
+    }
+    function recPersonName(rid) {
+      var r = recruitMap[rid];
+      if (!r) return '';
+      return (r.person_id != null ? (prNameMap[String(r.person_id)] || '') : '') || r.name || '';
     }
 
     // 3. 客户最近跟进（每客户最多3条，避免上下文膨胀）
@@ -668,7 +745,12 @@ async function postReview(event) {
         ? (p.person_type === 'customer' ? customerMap[p.person_id]
           : (p.person_type === 'recruit' ? recruitMap[p.person_id] : speakerMap[p.person_id]))
         : null;
-      var name = info ? (info.customer_name || info.name) : (p.person_name || '未知（待关联）');
+      // PMC-11：Person 名优先（嘉宾仍取嘉宾域 name），未映射回退旧名/暂存名
+      var resolvedPid = info ? participantPersonId(p,
+        p.person_type === 'customer' ? customerMap[p.person_id] : null,
+        p.person_type === 'recruit' ? recruitMap[p.person_id] : null) : null;
+      var personNm = resolvedPid != null ? (prNameMap[String(resolvedPid)] || '') : '';
+      var name = personNm || (info ? (info.customer_name || info.name) : (p.person_name || '未知（待关联）'));
       var role = p.participant_role ? (ROLE_LABEL[p.participant_role] || p.participant_role) : '参与者';
       var line = (i + 1) + '. [' + p.person_type + (linked ? ' #' + p.person_id : ' #0 待关联') + '] ' + name
         + '；角色：' + role + '；参加状态：' + p.status;
@@ -784,7 +866,7 @@ async function postReview(event) {
         if (!pid || !customerMap[pid]) return null;
         return {
           person_id: pid,
-          person_name: customerMap[pid].customer_name || '',
+          person_name: custPersonName(pid),
           priority: POSTREVIEW_PRIORITY_ENUM.indexOf(c.priority) >= 0 ? c.priority : 'medium',
           reason: clip(c.reason, 60) || '信息不足',
           suggested_action: clip(c.suggested_action, 60) || '信息不足',
@@ -800,7 +882,7 @@ async function postReview(event) {
         if (!pid || !recruitMap[pid]) return null;
         return {
           person_id: pid,
-          person_name: recruitMap[pid].name || '',
+          person_name: recPersonName(pid),
           priority: POSTREVIEW_PRIORITY_ENUM.indexOf(c.priority) >= 0 ? c.priority : 'medium',
           reason: clip(c.reason, 60) || '信息不足',
           suggested_action: clip(c.suggested_action, 60) || '信息不足',
@@ -844,7 +926,7 @@ async function postReview(event) {
         if (existing.indexOf(ot) >= 0) return null; // 去重：已有同类型进行中机会
         return {
           customer_id: cid,
-          customer_name: customerMap[cid].customer_name || '',
+          customer_name: custPersonName(cid),
           opportunity_type: ot,
           reason: clip(c.reason, 60) || '信息不足',
         };
@@ -924,7 +1006,7 @@ async function participantReview(event) {
     var recruitCustIds = [];
     if (recruitIds.length) {
       var rcs = assertOk(await rdb.from('recruit_candidates')
-        .select('id, customer_id, stage, potential_score, motivation')
+        .select('id, person_id, customer_id, stage, potential_score, motivation')
         .in('id', recruitIds).is('deleted_at', null)).data || [];
       rcs.forEach(function (r) { recruitMap[r.id] = r; if (r.customer_id) recruitCustIds.push(r.customer_id); });
     }
@@ -934,9 +1016,35 @@ async function participantReview(event) {
     var customerMap = {};
     if (allCustIds.length) {
       var cs = assertOk(await rdb.from('customers')
-        .select('Id, customer_name, customer_stage, sales_priority, occupation, additional_info')
+        .select('Id, person_id, customer_name, customer_stage, sales_priority, occupation, additional_info')
         .in('Id', allCustIds).is('deleted_at', null)).data || [];
       cs.forEach(function (c) { customerMap[c.Id] = c; });
+    }
+
+    // PMC-11：参与者人物名统一取 Person（canonical_person_id 优先，旧行经映射 person_id 回退）
+    var pr2PersonIds = [];
+    targets.forEach(function (p) {
+      var pid = participantPersonId(p, customerMap[p.person_id], recruitMap[p.person_id]);
+      if (pid != null) pr2PersonIds.push(pid);
+    });
+    // 增员背后客户若已映射 Person，也一并取名（输出/兜底用）
+    Object.keys(recruitMap).forEach(function (rid) {
+      var r = recruitMap[rid];
+      if (r.customer_id && customerMap[r.customer_id] && customerMap[r.customer_id].person_id != null) {
+        pr2PersonIds.push(customerMap[r.customer_id].person_id);
+      }
+    });
+    var pr2NameMap = await loadPersonNameMap(pr2PersonIds);
+    function pr2CustName(cid) {
+      var c = customerMap[cid];
+      if (!c) return '';
+      return (c.person_id != null ? (pr2NameMap[String(c.person_id)] || '') : '') || c.customer_name || '';
+    }
+    function pr2RecName(rid) {
+      var r = recruitMap[rid];
+      if (!r) return '';
+      if (r.person_id != null && pr2NameMap[String(r.person_id)]) return pr2NameMap[String(r.person_id)];
+      return r.customer_id ? pr2CustName(r.customer_id) : '';
     }
 
     // 5. 客户历史跟进（每人最近 3 条）
@@ -981,7 +1089,10 @@ async function participantReview(event) {
       var role = p.participant_role ? (ROLE_LABEL[p.participant_role] || p.participant_role) : '参与者';
       if (isCust) {
         var c = customerMap[pid];
-        name = c ? c.customer_name : (p.person_name || ('客户#' + pid));
+        // PMC-11：Person 名优先，未映射/软删回退客户档案名/暂存名
+        var custPid = participantPersonId(p, c, null);
+        var custNm = custPid != null ? (pr2NameMap[String(custPid)] || '') : '';
+        name = custNm || (c ? c.customer_name : (p.person_name || ('客户#' + pid)));
         line = (i + 1) + '. [customer #' + pid + '] ' + name + '；身份：客户；出席：' + attend + '；角色：' + role;
         if (c) {
           if (c.customer_stage) line += '；客户阶段：' + c.customer_stage;
@@ -1000,8 +1111,9 @@ async function participantReview(event) {
         }
       } else {
         var rc = recruitMap[pid];
-        var rcCust = rc && rc.customer_id ? customerMap[rc.customer_id] : null;
-        name = rcCust ? rcCust.customer_name : (p.person_name || ('增员#' + pid));
+        var rcPid = participantPersonId(p, null, rc);
+        var rcNm = rcPid != null ? (pr2NameMap[String(rcPid)] || '') : '';
+        name = rcNm || (rc && rc.customer_id ? pr2CustName(rc.customer_id) : (p.person_name || ('增员#' + pid)));
         line = (i + 1) + '. [recruit #' + pid + '] ' + name + '；身份：增员对象；出席：' + attend + '；角色：' + role;
         if (rc) {
           if (rc.stage) line += '；增员阶段：' + rc.stage;
@@ -1073,7 +1185,8 @@ async function participantReview(event) {
       var isCust = pt === 'customer';
       var rc = isCust ? null : recruitMap[pid];
       var cid = isCust ? pid : (rc ? rc.customer_id : null);
-      var cName = isCust ? (customerMap[pid] ? customerMap[pid].customer_name : '') : (rc && rc.customer_id && customerMap[rc.customer_id] ? customerMap[rc.customer_id].customer_name : '');
+      // PMC-11：输出人名取 Person 当前名（未映射回退旧名）
+      var cName = isCust ? pr2CustName(pid) : pr2RecName(pid);
       var ev = Array.isArray(it.evidence) ? it.evidence.map(function (e) { return clip(e, 60); }).filter(Boolean).slice(0, 4) : [];
       classifications.push({
         person_type: pt,
@@ -1099,7 +1212,8 @@ async function participantReview(event) {
       var isCust = p.person_type === 'customer';
       var rc = isCust ? null : recruitMap[p.person_id];
       var cid = isCust ? p.person_id : (rc ? rc.customer_id : null);
-      var cName = isCust ? (customerMap[p.person_id] ? customerMap[p.person_id].customer_name : '') : (rc && rc.customer_id && customerMap[rc.customer_id] ? customerMap[rc.customer_id].customer_name : '');
+      // PMC-11：兜底分类人名同样取 Person 当前名（未映射回退暂存名）
+      var cName = isCust ? pr2CustName(p.person_id) : pr2RecName(p.person_id);
       classifications.push({
         person_type: p.person_type,
         person_id: p.person_id,
@@ -1196,7 +1310,7 @@ async function learning(event) {
 
     // 2. 参与者 / 3. 任务（窗口内活动）
     var parts = assertOk(await rdb.from('activity_participants')
-      .select('activity_id, person_type, person_id, person_name, status, participant_role, followup_status')
+      .select('activity_id, person_type, person_id, canonical_person_id, person_name, status, participant_role, followup_status')
       .in('activity_id', actIds).is('deleted_at', null)).data || [];
     var tasks = assertOk(await rdb.from('activity_tasks')
       .select('activity_id, task_type, status, priority, due_date')
@@ -1222,7 +1336,7 @@ async function learning(event) {
 
     // 7. 客户（参与者客户 + 参与者增员的 customer_id）
     var recruits = assertOk(await rdb.from('recruit_candidates')
-      .select('id, customer_id, stage, stage_changed_at, potential_score')
+      .select('id, person_id, customer_id, stage, stage_changed_at, potential_score')
       .is('deleted_at', null)).data || [];
     var recruitMap = {};
     recruits.forEach(function (r) { recruitMap[r.id] = r; });
@@ -1233,15 +1347,33 @@ async function learning(event) {
     var customerMap = {};
     if (custIds.length) {
       var cs = assertOk(await rdb.from('customers')
-        .select('Id, customer_name, customer_stage, sales_priority')
+        .select('Id, person_id, customer_name, customer_stage, sales_priority')
         .in('Id', custIds).is('deleted_at', null)).data || [];
       cs.forEach(function (c) { customerMap[c.Id] = c; });
     }
+    // PMC-11：进入 AI 事实单的人名取 Person 当前名（canonical_person_id 优先；未映射回退旧名）
+    var learnPersonIds = [];
+    parts.forEach(function (p) {
+      if (p.canonical_person_id != null) learnPersonIds.push(p.canonical_person_id);
+      if (p.person_type === 'customer' && p.person_id && customerMap[p.person_id] && customerMap[p.person_id].person_id != null) {
+        learnPersonIds.push(customerMap[p.person_id].person_id);
+      }
+      if (p.person_type === 'recruit' && p.person_id && recruitMap[p.person_id] && recruitMap[p.person_id].person_id != null) {
+        learnPersonIds.push(recruitMap[p.person_id].person_id);
+      }
+    });
+    var learnNameMap = await loadPersonNameMap(learnPersonIds);
     function recruitName(rid) {
       var r = recruitMap[rid];
       if (!r) return '增员#' + rid;
+      if (r.person_id != null && learnNameMap[String(r.person_id)]) return learnNameMap[String(r.person_id)];
       var c = r.customer_id ? customerMap[r.customer_id] : null;
-      return (c && c.customer_name) || ('增员#' + rid);
+      if (c) {
+        var pn = c.person_id != null ? (learnNameMap[String(c.person_id)] || '') : '';
+        if (pn) return pn;
+        return c.customer_name || ('增员#' + rid);
+      }
+      return '增员#' + rid;
     }
 
     // 8. 机会（窗口内新建；仅同期统计，不做活动归因）
