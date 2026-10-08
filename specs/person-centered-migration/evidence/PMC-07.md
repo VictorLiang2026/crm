@@ -75,7 +75,7 @@
 
 ---
 
-## 5. 发布与三端核对（待回填）
+## 5. 发布与三端核对
 
 **发布命令**：
 
@@ -84,10 +84,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools/release.ps1 -Message "
 ```
 
 **回填项**：
-- 主提交 SHA：____
-- 发布标签（时间戳）：`release-____________-____`
+- 主提交 SHA：`1744975`
+- 发布标签（时间戳）：`release-20261008-2010`
 - 是否首提交（需 semver）：否
-- GitHub push 结果：____
-- 云端部署范围：3 个函数（person_360/customers/ocr_records）
-- sync-check.ps1 结果：____
-- 三端一致性：____
+- GitHub push 结果：成功（`1744975` + `release-20261008-2010` 已推送）
+- 云端部署范围：3 个函数（person_360/customers/ocr_records）已部署
+- sync-check.ps1 结果：WP01 gate PASS（blockers=[]）；56 份共享副本一致；50 个静态资源一致；28 个函数 170 个文件一致；云端 admin.html SHA-256 一致
+- 三端一致性：全绿 ✅

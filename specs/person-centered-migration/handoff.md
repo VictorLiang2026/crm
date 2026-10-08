@@ -6,11 +6,11 @@
 
 | 项 | 值 |
 | --- | --- |
-| 当前执行工具 | Trae（Kimi-K3 agent），2026-10-08 执行 PMC-06 |
-| 最后完成包 | **PMC-05（兼容性的数据库结构扩展）——已发布，待用户验收**：customers.person_id bigint NULLABLE+UNIQUE+FK RESTRICT+部分索引；4 步 migration 已应用（40ms）；旧约束完整 5 个、视图 12 个正常、数据 783 行 person_id 全 NULL；发布 `ac78bdd`/`release-20261008-1905`；三端 sync-check 全绿 |
-| 正在执行包 | **PMC-06（分批回填 Person 基础资料和业务关联）——B1 批次回填完成，待发布与用户验收**：customers.person_id 已回填 779 行（M1 已确认对）；孤立引用 0、一对一完整性 0；未处理 A1–A3/A5/D1/E1–E7 留待后续确认 |
-| 下一步唯一允许执行的动作 | 发布 PMC-06 产物（`tools/release.ps1`）→ 三端核对 `sync-check.ps1` → 回填 evidence/PMC-06.md §6 → 停止等待用户验收 |
-| 回滚条件 | 数据库回滚：执行 `UPDATE customers SET person_id = NULL WHERE person_id IS NOT NULL AND "Id" IN (SELECT legacy_customer_id FROM persons WHERE deleted_at IS NULL)`（需先备份）；当前已回填 779 行，回滚需用户确认；代码回滚：git revert 本包提交即可（无云函数部署、无视图重建） |
+| 当前执行工具 | Trae（Kimi-K3 agent），2026-10-08 执行 PMC-07 |
+| 最后完成包 | **PMC-06（分批回填 Person 基础资料和业务关联）——已发布，待用户验收**：B1 批次回填完成——`customers.person_id` 已回填 779 行（M1 已确认对）；孤立引用 0、一对一完整性 0；未处理 A1–A3/A5/D1/E1–E7 留待后续确认；发布 `3be6520`/`release-20261008-1945`；三端 sync-check 全绿 |
+| 正在执行包 | **PMC-07（建立 Person 统一写入服务及安全恢复机制）——已发布，待用户验收**：`person_360/index.js` 新增 `updatePerson`（乐观锁+字段映射）；`customers/index.js` `update` 增加 Person 字段映射（阶段 2 双写 T2）；`ocr_records/index.js` `remove` 返回 `personSnapshot`；三函数已部署 |
+| 下一步唯一允许执行的动作 | 运行 WP01 门槛测试 → 三端核对 `sync-check.ps1` → 回填 evidence/PMC-07.md §5 → 停止等待用户验收 |
+| 回滚条件 | 代码回滚：git revert 本包提交（`1744975`）→ 重新部署三函数旧版本；数据回滚：无需（本包未修改数据） |
 
 ## 2. 版本基线（2026-10-07 实测）
 
