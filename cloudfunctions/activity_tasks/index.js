@@ -63,9 +63,19 @@ async function enrichRelated(rows) {
   });
   const nameMap = {};
   if (customerIds.length) {
-    const cs = assertOk(await rdb.from('customers').select('Id, customer_name')
+    const cs = assertOk(await rdb.from('customers').select('Id, customer_name, person_id')
       .in('Id', customerIds).is('deleted_at', null)).data || [];
-    cs.forEach(function (c) { nameMap['customer:' + c.Id] = c.customer_name; });
+    // PMC-10：展示姓名用 Person（customer_name 仍作回退）
+    const personIds = cs.map(c => c.person_id).filter(Boolean);
+    const pMap = {};
+    if (personIds.length) {
+      const ps = assertOk(await rdb.from('persons').select('id, display_name')
+        .in('id', personIds).is('deleted_at', null)).data || [];
+      ps.forEach(function (p) { pMap[p.id] = p.display_name; });
+    }
+    cs.forEach(function (c) {
+      nameMap['customer:' + c.Id] = (c.person_id && pMap[c.person_id]) || c.customer_name;
+    });
   }
   if (recruitIds.length) {
     const rs = assertOk(await rdb.from('v_recruit_candidates').select('candidate_id, customer_name')

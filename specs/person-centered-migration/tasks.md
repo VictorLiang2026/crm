@@ -40,7 +40,9 @@
   - 结果：三项变更完成——`person_360/index.js` 新增 `updatePerson` action（修改已确认人物基础资料，乐观锁 `expectedUpdatedAt`，允许字段 display_name/phone/birthday/gender/occupation/organization/education/wechat/notes）；`customers/index.js` `update` action 增加 Person 字段映射（customer_name→display_name, wx_account→wechat 等，阶段 2 双写 T2 模式）；`ocr_records/index.js` `remove` 返回增加 `personSnapshot`（供恢复前比较当前值）。**三函数已部署**（customers/ocr_records/person_360）。证据见 [evidence/PMC-07.md](evidence/PMC-07.md)；发布标签见 §5。
 - [v] **PMC-08｜接管客户、Person 及跨模块基础信息写入口**　依赖：PMC-07（已验收）。开包日期：2026-10-08。
 - [v] **PMC-09｜客户列表、详情、搜索和表单读取 Person**　依赖：PMC-08（已发布）。开包日期：2026-10-08。
-- [ ] **PMC-10**　依赖：PMC-09。指令：未收到。
+- [v] **PMC-10｜Today、任务、漏斗和统计的身份来源统一**　依赖：PMC-09（已发布）。开包日期：2026-10-08。
+  - 指令登记（2026-10-08 用户下发，原文要点）：执行任务展示和经营统计的 Person 来源切换。核查 today_coach、funnel_insight、activity_reports、activity_tasks、assistant 相关读取及实际任务和机会入口，追踪 v_funnel_stats、行动中心和相关数据库函数。展示姓名、联系方式和人物跳转使用 Person；销售、招募、活动统计继续依据各自业务状态和业务记录，不以 person_roles 简单存在代替真实经营阶段。保持优先级、到期、日期分桶、销售阶段、招募阶段、去重和统计口径；不新增推荐算法，不改变"下一步行动"业务规则。比较切换前后相同条件的总数、分组、排序和代表性明细；检查同一人多角色是否重复计数；activity_topics 等无关函数给出无影响证据。验收：人物展示正确，业务统计差异为零或有逐项批准的解释。
+  - 结果：双管切换完成——① SQL 层 `v_action_center` CREATE OR REPLACE（5 个人物分支加 persons LEFT JOIN，person_name/title 改 COALESCE(display_name, customer_name)；列/过滤/排序/分桶不变；activity_task 分支不变）+ rollback SQL；② JS 层 today_coach（personNameMap 覆盖 7 个展示点）、activity_reports（custName 覆盖 + feed 6 处）、activity_tasks（enrichRelated 经 persons 取名）。三函数已部署，migration 已执行。**对比验证**：before/after 快照逐项相等（activity_task 3、customer 1、followup 156、opportunity 1、recruit 4、recruit_followup 1，合计 166，distinct_names 全同，null=0）→ 统计差异为零；dup_person_rows=0、cust_with_multi_candidates=0 → 无重复计数；已映射客户姓名差异=0（3 个 U1 未映射客户按设计回退）。无影响证据：funnel_insight/v_funnel_stats（纯计数无姓名）、activity_topics、assistant 均核实不改。证据见 [evidence/PMC-10.md](evidence/PMC-10.md)。
 - [ ] **PMC-11**　依赖：PMC-10。指令：未收到。
 - [ ] **PMC-12**　依赖：PMC-11。指令：未收到。
 - [ ] **PMC-13**　依赖：PMC-12。指令：未收到。

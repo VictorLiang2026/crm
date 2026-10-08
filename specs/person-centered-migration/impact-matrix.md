@@ -86,7 +86,7 @@ persons.legacy_customer_id（自引用）
 | v_recruit_candidates_person_only | persons | 仅 persons |
 | v_recruit_candidates_person_only_trash | persons | 仅 persons |
 | v_funnel_stats | customers + opportunities + recruit_candidates | 从 customers 读取 |
-| v_action_center | customers + followups + opportunities + recruit_candidates + recruit_followups + activity_tasks + activities | 从 customers 读取 |
+| v_action_center | customers + followups + opportunities + recruit_candidates + recruit_followups + activity_tasks + activities（5 个人物分支 LEFT JOIN persons，PMC-10） | persons.display_name COALESCE 回退 customer_name（展示名；过滤/排序/分桶不变） |
 | customers_view | customers | 直接映射 |
 | followups_view | followups JOIN customers | 从 customers 读取 |
 | gifts_view | gifts JOIN customers | 从 customers 读取 |
@@ -187,9 +187,9 @@ persons.legacy_customer_id（自引用）
 | activities | applyTopics | admin.html 活动详情 | activity_topics | activities.topic_ids | — | — | — | authenticated | 仅回归 | — |
 | activities | getActivityData | Console 活动页 | activities + activity_participants + activity_speakers | — | person_id | persons | persons | authenticated | 需修改 | 含参与者/嘉宾身份 |
 | activity_speakers | list/get/create/update/remove/search | admin.html 嘉宾管理 | activity_speakers + customers（create 时按姓名查）/ v_recruit_candidates | activity_speakers | customer_id/person_id | customers | persons | authenticated | 需修改 | create 自动建 customers；customer_id 无 FK |
-| activity_tasks | list/get/create/update/complete/skip/remove | admin.html 活动任务 | activity_tasks + activities + customers + v_recruit_candidates | activity_tasks | related_id | — | — | authenticated | 仅回归 | related_type=customer 时需适配 |
+| activity_tasks | list/get/create/update/complete/skip/remove | admin.html 活动任务 | activity_tasks + activities + customers + persons + v_recruit_candidates | activity_tasks | related_id | — | — | authenticated | PMC-10 已切换（related_type=customer 的 related_name 经 persons 取名，customer_name 回退） | evidence/PMC-10.md |
 | activity_topics | list/get/create/update/remove/search | admin.html 活动主题 | activity_topics | activity_topics | — | — | — | authenticated | 仅回归 | 无身份字段 |
-| activity_reports | customer/recruit | admin.html 活动报告 | 多表（customers/followups/gifts/photos/products/policy_review_reports/ai_recommendations/recruit_candidates/recruit_followups/recruit_milestones/ocr_records） | — | customer_id | customers | persons | authenticated | 需修改 | 读取客户域全量子表 |
+| activity_reports | customer/recruit | admin.html 活动报告 | 多表（customers/followups/gifts/photos/products/policy_review_reports/ai_recommendations/recruit_candidates/recruit_followups/recruit_milestones/ocr_records）+ persons | — | customer_id | customers | persons | authenticated | PMC-10 已切换（展示名经 persons 覆盖；totals/daily 统计字段不动） | evidence/PMC-10.md |
 
 #### 6.4 招募域
 
@@ -243,13 +243,13 @@ persons.legacy_customer_id（自引用）
 | ai_activity | person_basic | admin.html | persons | — | person_id | persons | persons | AI Gateway | 已核实无影响 | — |
 | ai_activity | quick_capture | admin.html | — | — | — | — | — | AI Gateway | 仅回归 | — |
 | ai_activity | recruit_coach | admin.html 招募教练 | recruit_candidates | — | candidate_id | recruit_candidates | persons | AI Gateway | 需修改 | — |
-| ai_activity | today_coach | admin.html | customers + followups + opportunities + recruit_candidates + activities + v_action_center | — | customer_id | customers | persons | AI Gateway | 需修改 | 读取多表含 customers |
-| today_coach | candidates | admin.html Dashboard | customers + followups + opportunities + recruit_candidates + activities + v_action_center | — | customer_id | customers | persons | service_role (CRM_TODAY_DB_API_KEY) | 需修改 | 读取 customers |
-| today_coach | generate | admin.html Dashboard | 同上 | — | customer_id | customers | persons | service_role | 需修改 | — |
-| today_coach | daily_review | admin.html 复盘 | 同上 | — | customer_id | customers | persons | service_role | 需修改 | — |
-| today_coach | cockpit | admin.html 驾驶舱 | 同上 | — | customer_id | customers | persons | service_role | 需修改 | — |
-| funnel_insight | stats | admin.html 漏斗 | v_funnel_stats | — | — | customers | persons | authenticated | 需修改 | 视图依赖 customers |
-| funnel_insight | explain | admin.html 漏斗 | v_funnel_stats | — | — | customers | persons | authenticated | 需修改 | 同上 |
+| ai_activity | today_coach | admin.html | customers + followups + opportunities + recruit_candidates + activities + v_action_center | — | customer_id | customers | persons | AI Gateway | PMC-10 已切换（读取多表含 customers；展示名经 persons 覆盖） | evidence/PMC-10.md |
+| today_coach | candidates | admin.html Dashboard | customers + followups + opportunities + recruit_candidates + activities + v_action_center + persons | — | customer_id | customers | persons | service_role (CRM_TODAY_DB_API_KEY) | PMC-10 已切换（loadAll 展示名覆盖，统计字段不动） | evidence/PMC-10.md |
+| today_coach | generate | admin.html Dashboard | 同上 | — | customer_id | customers | persons | service_role | PMC-10 已切换（同上） | evidence/PMC-10.md |
+| today_coach | daily_review | admin.html 复盘 | 同上 | — | customer_id | customers | persons | service_role | PMC-10 已切换（同上） | evidence/PMC-10.md |
+| today_coach | cockpit | admin.html 驾驶舱 | 同上 | — | customer_id | customers | persons | service_role | PMC-10 已切换（同上） | evidence/PMC-10.md |
+| funnel_insight | stats | admin.html 漏斗 | v_funnel_stats | — | — | customers | persons | authenticated | PMC-10 核实无影响（纯计数视图，无姓名列，不修改） | evidence/PMC-10.md §6 |
+| funnel_insight | explain | admin.html 漏斗 | v_funnel_stats | — | — | customers | persons | authenticated | PMC-10 核实无影响（同上） | evidence/PMC-10.md §6 |
 
 ### 七、专项调用链核查结果
 
@@ -277,7 +277,9 @@ persons.legacy_customer_id（自引用）
 
 - `v_funnel_stats` 定义：`cloudbase/migrations/20260910120000_funnel_stats_view.sql`
 - `v_recruit_candidates` 定义：`cloudbase/migrations/20260905130000_recruit_view_files.sql` L32-L34
-- 状态：**需修改**——视图需改为从 persons 读取身份字段
+- 状态（PMC-10 更新）：
+  - `v_funnel_stats`：**核实无影响，不修改**——纯计数视图（funnel/stage/current_count 等），无姓名列，漏斗统计口径不依赖身份展示字段
+  - `v_action_center`：**PMC-10 已切换**——5 个人物分支 LEFT JOIN persons，展示名 COALESCE(display_name, customer_name)；`v_recruit_candidates` 视图切换留待招募域包（PMC 后续）
 
 #### 7.4 Quick Capture、新旧 Person 服务和后台维护写入
 
@@ -423,3 +425,20 @@ persons.legacy_customer_id（自引用）
 | **未处理项**：A5（person 787 身份核实） | 跳过（留待后续确认） | — | PMC-06 | 跳过 | evidence/PMC-06.md §5 |
 | **未处理项**：D1（occupation 单边差异） | 跳过（留待后续确认） | — | PMC-06 | 跳过 | evidence/PMC-06.md §5 |
 | **未处理项**：E1–E7（7 组同名不同人） | 跳过（基础资料全空，需人工核实） | — | PMC-06 | 跳过 | evidence/PMC-06.md §5 |
+
+---
+
+## PMC-10：Today、任务、漏斗和统计的身份来源统一（2026-10-08）
+
+| 对象 | 变更类型 | 调用方/消费者 | 所属包 | 状态 | 证据 |
+| --- | --- | --- | --- | --- | --- |
+| `public.v_action_center` | CREATE OR REPLACE（5 个人物分支 JOIN persons，展示名 COALESCE；列/过滤/排序/分桶不变） | admin.html 行动中心 + today_coach + assistant | PMC-10 | 已应用 | evidence/PMC-10.md §3 |
+| `cloudbase/rollbacks/20261008223000_pmc10_action_center_person_names_rollback.sql` | 新增：回滚（恢复原视图定义） | 数据库 | PMC-10 | 已落盘（未执行） | evidence/PMC-10.md §3 |
+| `cloudfunctions/today_coach/index.js` | 修改：loadAll 加 persons 查询 + personNameMap 展示名覆盖（统计字段不动） | admin.html Dashboard/复盘/驾驶舱 | PMC-10 | 已部署 | evidence/PMC-10.md §4 |
+| `cloudfunctions/activity_reports/index.js` | 修改：custName 经 persons 覆盖 + feed 6 处展示名（totals/daily 不动） | admin.html 活动报告 | PMC-10 | 已部署 | evidence/PMC-10.md §4 |
+| `cloudfunctions/activity_tasks/index.js` | 修改：enrichRelated customer 分支经 persons 取 related_name | admin.html 活动任务 | PMC-10 | 已部署 | evidence/PMC-10.md §4 |
+| `funnel_insight` / `v_funnel_stats` | **不修改**（纯计数，无姓名列） | admin.html 漏斗 | PMC-10 | 核实无影响 | evidence/PMC-10.md §6 |
+| `activity_topics` / `assistant` | **不修改**（grep 核实无 customer_name/persons 读取） | admin.html 活动主题 / AI | PMC-10 | 核实无影响 | evidence/PMC-10.md §6 |
+| before/after 快照（166 行、6 类计数、distinct_names、null=0） | 统计差异=**零** | 验收证据 | PMC-10 | 已核对 | tests/security/.results/pmc10-before/after-snapshot.json |
+| 一致性核查（dup_person_rows=0、cust_with_multi_candidates=0、已映射姓名差异=0） | 无重复计数、展示内容零变化 | 验收证据 | PMC-10 | 已核对 | tests/security/.results/pmc10-consistency-check.json、pmc10-mismatch-breakdown.json |
+| **不变项**：优先级/到期/日期分桶/销售阶段/招募阶段/去重/下一步行动规则 | 不修改（本包不新增推荐算法） | 行动中心/Tasks/漏斗/活动量 | PMC-10 | 不变 | evidence/PMC-10.md §7 |

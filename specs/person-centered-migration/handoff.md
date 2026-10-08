@@ -6,11 +6,11 @@
 
 | 项 | 值 |
 | --- | --- |
-| 当前执行工具 | Trae，2026-10-08 执行 PMC-08 |
-| 最后完成包 | **PMC-07（建立 Person 统一写入服务及安全恢复机制）——已验收**：`person_360/index.js` 新增 `updatePerson`；`customers/index.js` `update` 增加 Person 字段映射；`ocr_records/index.js` `remove` 返回 `personSnapshot`；三函数已部署 |
-| 正在执行包 | **PMC-08（接管客户、Person 及跨模块基础信息写入口）——已发布，待用户验收**：customers.create 接管（建/关联 Person）、customers.update 移除双重同步+OCR 恢复保护、activity_speakers.create 接管；customers/activity_speakers 已部署；线上 invoke 未测试（tcb Cam auth 失败） |
-| 下一步唯一允许执行的动作 | 等待用户验收 PMC-08；验收通过后进入 PMC-09（指令已收到） |
-| 回滚条件 | 代码回滚：git revert 本包提交 → 重新部署 customers/activity_speakers 旧版本；数据回滚：无需（本包未修改数据） |
+| 当前执行工具 | Trae，2026-10-08 执行 PMC-10 |
+| 最后完成包 | **PMC-09（客户列表、详情、搜索和表单读取 Person）——已验收**：`crm_customers_page_v1` 基础字段经 person_id JOIN persons 读取（COALESCE 回退 customers）；`customers.get` 同步切换；migration + rollback 已执行 |
+| 正在执行包 | **PMC-10（Today、任务、漏斗和统计的身份来源统一）——已发布，待用户验收**：`v_action_center` 5 个人物分支经 persons COALESCE 取名（列/过滤/排序/分桶不变）；today_coach/activity_reports/activity_tasks JS 层展示名覆盖（统计字段不动）；三函数已部署；before/after 快照统计差异为零（166 行逐项相等）、无重复计数、已映射姓名差异=0；线上 invoke 未测试（tcb Cam auth 失败，既有限制） |
+| 下一步唯一允许执行的动作 | 等待用户验收 PMC-10；验收通过后进入 PMC-11（指令未收到） |
+| 回滚条件 | 代码回滚：git revert 本包提交 → 重新部署 today_coach/activity_reports/activity_tasks 旧版本；结构回滚：执行 `cloudbase/rollbacks/20261008223000_pmc10_action_center_person_names_rollback.sql`（恢复原 v_action_center 定义）；数据回滚：无需（本包未修改业务数据） |
 
 ## 2. 版本基线（2026-10-07 实测）
 

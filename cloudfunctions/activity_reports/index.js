@@ -1,4 +1,4 @@
-/**
+﻿/**
  * activity_reports — 活动量日报（事件云函数，rdb() 版，纯读聚合）
  *
  * 入参 event: { action, mode, startDate?, endDate? }
@@ -72,8 +72,8 @@ async function customerReport(event) {
   const { start, end, days } = range;
   const today = beijingToday();
 
-  const [customersR, followupsR, giftsR, photosR, ocrR, aiRecR, reviewsR, productsR] = await Promise.all([
-    rdb.from('customers').select('Id, customer_name, created_at, first_contact_date, deleted_at'),
+  const [customersR, followupsR, giftsR, photosR, ocrR, aiRecR, reviewsR, productsR, personsR] = await Promise.all([
+    rdb.from('customers').select('Id, customer_name, created_at, first_contact_date, deleted_at, person_id'),
     rdb.from('followups').select('Id, customer_id, customer_name, followup_notes, followup_date, next_followup_date, created_at, deleted_at'),
     rdb.from('gifts').select('Id, customer_id, customer_name, gift_name, quantity, given_date, deleted_at'),
     rdb.from('photos').select('id, customer_id, customer_name, file_name, created_at, deleted_at'),
@@ -81,6 +81,8 @@ async function customerReport(event) {
     rdb.from('ai_recommendations').select('id, customer_id, customer_name, recommendation_date, suggested_followup_goal, created_at'),
     rdb.from('policy_review_reports').select('id, customer_id, customer_name, report_date, report_type, created_at, deleted_at'),
     rdb.from('products').select('*'),
+    // PMC-10：Person 基础资料（展示姓名权威来源；统计计数不依赖此表）
+    rdb.from('persons').select('id, display_name').is('deleted_at', null),
   ]);
 
   const customers = (assertOk(customersR).data || []).filter(active);
@@ -93,7 +95,14 @@ async function customerReport(event) {
   const products = (assertOk(productsR).data || []).filter(active);
 
   const custName = {};
-  customers.forEach(c => { custName[c.Id] = c.customer_name; });
+  // PMC-10：展示姓名用 Person（person_id 存在且 Person 未软删时覆盖；客户总数/分桶统计仍基于 customers）
+  const personNameMap = {};
+  for (const p of (assertOk(personsR).data || [])) personNameMap[p.id] = p.display_name;
+  customers.forEach(c => {
+    const personName = c.person_id ? personNameMap[c.person_id] : null;
+    custName[c.Id] = personName || c.customer_name;
+    if (personName) c.customer_name = personName; // 新增客户 feed 用
+  });
 
   const totals = blankCustomerTotals();
   const dailyMap = {};
@@ -136,7 +145,7 @@ async function customerReport(event) {
       dailyMap[day]._touched.add(f.customer_id);
       dailyMap[day].customersTouched = dailyMap[day]._touched.size;
       donePairs.add(f.customer_id + '|' + day);
-      pushFeed(f.created_at, day, '跟进', f.customer_name || custName[f.customer_id], trunc(f.followup_notes, 60));
+      pushFeed(f.created_at, day, '跟进', custName[f.customer_id] || f.customer_name, trunc(f.followup_notes, 60));
     }
     const nd = toDayKey(f.next_followup_date);
     if (nd) planPairs.add(f.customer_id + '|' + nd);
@@ -171,7 +180,7 @@ async function customerReport(event) {
       totals.giftItems += parseInt(g.quantity, 10) || 1;
       if (!dailyMap[day]) dailyMap[day] = blankCustomerDaily();
       dailyMap[day].gifts++;
-      pushFeed(g.created_at || g.given_date, day, '伴手礼', g.customer_name || custName[g.customer_id],
+      pushFeed(g.created_at || g.given_date, day, '伴手礼', custName[g.customer_id] || g.customer_name,
         (g.gift_name || '礼品') + ' ×' + (g.quantity || 1));
     }
   });
@@ -183,7 +192,7 @@ async function customerReport(event) {
       totals.photos++;
       if (!dailyMap[day]) dailyMap[day] = blankCustomerDaily();
       dailyMap[day].photos++;
-      pushFeed(p.created_at, day, '资料上传', p.customer_name || custName[p.customer_id], p.file_name || '');
+      pushFeed(p.created_at, day, '资料上传', custName[p.customer_id] || p.customer_name, p.file_name || '');
     }
   });
 
@@ -205,7 +214,7 @@ async function customerReport(event) {
       totals.aiSuggestions++;
       if (!dailyMap[day]) dailyMap[day] = blankCustomerDaily();
       dailyMap[day].aiSuggestions++;
-      pushFeed(a.created_at || a.recommendation_date, day, 'AI建议', a.customer_name || custName[a.customer_id], trunc(a.suggested_followup_goal, 60));
+      pushFeed(a.created_at || a.recommendation_date, day, 'AI建议', custName[a.customer_id] || a.customer_name, trunc(a.suggested_followup_goal, 60));
     }
   });
 
@@ -216,7 +225,7 @@ async function customerReport(event) {
       totals.policyReviews++;
       if (!dailyMap[day]) dailyMap[day] = blankCustomerDaily();
       dailyMap[day].policyReviews++;
-      pushFeed(r.created_at || r.report_date, day, '保单检视', r.customer_name || custName[r.customer_id], r.report_type || '检视报告');
+      pushFeed(r.created_at || r.report_date, day, '保单检视', custName[r.customer_id] || r.customer_name, r.report_type || '检视报告');
     }
   });
 
@@ -228,7 +237,7 @@ async function customerReport(event) {
       totals.productUpdates++;
       if (!dailyMap[day]) dailyMap[day] = blankCustomerDaily();
       dailyMap[day].productUpdates++;
-      pushFeed(p.updated_at, day, '额度更新', p.customer_name || custName[p.customer_id], '产品额度维护');
+      pushFeed(p.updated_at, day, '额度更新', custName[p.customer_id] || p.customer_name, '产品额度维护');
     }
   });
 
