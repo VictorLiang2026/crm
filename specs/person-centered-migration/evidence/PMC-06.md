@@ -88,7 +88,7 @@ WHERE person_id IS NULL AND deleted_at IS NULL
 
 ---
 
-## 6. 发布与三端核对（待回填）
+## 6. 发布与三端核对
 
 **发布命令**：
 
@@ -97,10 +97,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools/release.ps1 -Message "
 ```
 
 **回填项**：
-- 主提交 SHA：____
-- 发布标签（时间戳）：`release-____________-____`
+- 主提交 SHA：`3be6520`
+- 发布标签（时间戳）：`release-20261008-1945`
 - 是否首提交（需 semver）：否
-- GitHub push 结果：____
-- 云端部署范围：____
-- sync-check.ps1 结果：____
-- 三端一致性：____
+- GitHub push 结果：成功（`3be6520` + `release-20261008-1945` 已推送）
+- 云端部署范围：无业务产物部署（纯数据回填 + 文档/工具；数据已通过 tcb db execute 直接更新到数据库）
+- sync-check.ps1 结果：WP01 gate PASS；56 份共享副本一致；50 个静态资源一致；28 个函数 170 个文件一致；云端 admin.html SHA-256 一致
+- 三端一致性：全绿 ✅
