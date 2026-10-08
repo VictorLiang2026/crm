@@ -8,8 +8,8 @@
 | --- | --- |
 | 当前执行工具 | Trae，2026-10-09 完成 PMC-11 开发与发布，等待验收 |
 | 最后验收通过包 | **PMC-10（Today、任务、漏斗和统计的身份来源统一）——已验收**：v_action_center 展示名经 persons COALESCE；today_coach/activity_reports/activity_tasks JS 层覆盖；验收中发现 persons 匿名读权限缺口并经用户特批修复（migration 20261008231500：GRANT SELECT anon + RLS 策略 deleted_at IS NULL），复测通过 |
-| 正在执行包 | **PMC-11（AI 上下文、搜索及结果保存适配 Person）——验收执行完成，PASS_WITH_EXCEPTIONS，待用户最终确认**：8 个 AI 函数 Person 化已部署 + context-engine v1.1.0 两副本；隔离测试 19/19；2026-10-09 受控浏览器验收：AI 建议列表搜索 PASS、转介绍弹层 PASS（前轮同部署证据）、增员话术环境受限未达（376px 窄视口 tab 点击不重渲染，控制台零报错，已知非故障项） |
-| 下一步唯一允许执行的动作 | 等待用户对 PMC-11 验收结论（PASS_WITH_EXCEPTIONS）做最终确认；用户可在 iPad 真机点开候选人 20 → AI 增员话术 tab → 生成话术做最后人工确认（约 30 秒）；确认前不得进入 PMC-12；G-PMC11-1 修复须单独授权 |
+| 正在执行包 | **PMC-11（AI 上下文、搜索及结果保存适配 Person）——验收执行完成，PASS_WITH_EXCEPTIONS，待用户最终确认**：8 个 AI 函数 Person 化已部署 + context-engine v1.1.0 两副本；隔离测试 19/19；2026-10-09 受控浏览器验收：AI 建议列表搜索 PASS、转介绍弹层 PASS（前轮同部署证据）、增员话术真实链路已触达（候选人 20 被既有缺陷 G-PMC11-2 拦截，候选人 19 生成项留 iPad）；验收中浏览器代理误点删除确认框，经只读核查**零数据影响**（候选人 19/20、客户 788/791/792、Person 783-786 全部完好，证据 tests/security/.results/pmc11-*-state.json） |
+| 下一步唯一允许执行的动作 | 等待用户对 PMC-11 验收结论（PASS_WITH_EXCEPTIONS）做最终确认；用户可在 iPad 真机打开**候选人 19**（不要用候选人 20，被 G-PMC11-2 拦截）→ AI 增员话术 tab → 生成话术做最后人工确认（约 30 秒）；确认前不得进入 PMC-12；G-PMC11-1、G-PMC11-2 修复均须单独授权 |
 | 回滚条件 | PMC-11 代码回滚：git revert → 重新部署上述 8 函数（context-engine 副本随 ai_activity 回滚）；无结构/数据回滚（本包无 migration、无业务数据写入） |
 
 ## 2. 版本基线（2026-10-09 PMC-11 发布时更新）
@@ -57,6 +57,7 @@
 | G3 | cloudbase-mcp 未注册为 Trae 会话可调用工具 | **已修复**：新增 `tools/pg-readonly.cjs`——Trae/Codex 共用，经本机 cloudbase-mcp 执行单条 SELECT/WITH 只读查询；客户端拒绝 DDL/DML/多语句；已验证正常查询与三类拒绝路径。IDE 内 MCP 注册仍为可选项 |
 | G4 | 称静态爬虫不覆盖 console.html 模块链 | **核实为过时记录，已更正**：`tests/wp01/static.cjs` 的 PAGES 早已含 `console.html`（WP2 加入）；50 个受检资产 = 2 HTML + 48 个 console 模块链 JS/CSS；两次 sync-check 实测全绿。无需改代码 |
 | G-PMC11-1 | `ai_activity` analyze action 的 top3/no_followup 清洗只做 parseInt，未按真实参与者 ID 白名单过滤，模型编造 ID 会透传（participantReview/postReview 已有白名单） | **已登记未修（2026-10-09）**：既有缺陷、非 PMC-11 引入；隔离测试锁定现状。修复（同款白名单清洗）须单独授权。见 evidence/PMC-11.md §11 |
+| G-PMC11-2 | 独立候选人（customer_id 为空）被 `v_recruit_candidates` 视图 INNER JOIN customers 过滤，recruit_recommend/recruit_score 对其返回「candidate not found」（git 证据：cbad9aa 已存在，非 PMC-11 回归） | **已登记未修（2026-10-09，验收中发现）**：修复涉视图 LEFT JOIN 或函数回退直查，属结构变更需 migration + 单独授权。见 evidence/PMC-11.md §11 |
 
 ## 6. 失败与未验证项
 
