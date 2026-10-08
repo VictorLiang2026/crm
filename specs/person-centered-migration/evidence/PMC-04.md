@@ -1,6 +1,6 @@
 # PMC-04 证据（evidence/PMC-04）
 
-状态：**待回填发布标签**。基线：`a2c07f4` / `release-20261008-1830`；实测日期 2026-10-08。
+状态：**待用户验收**。基线：`313e23c` / `release-20261008-115430`；实测日期 2026-10-08。
 
 ---
 
@@ -92,7 +92,7 @@ node tools/pg-readonly.cjs --file tools/conflict-check-detail.sql --snapshot --o
 
 ---
 
-## 7. 发布与三端核对（待回填）
+## 7. 发布与三端核对
 
 **发布命令**：
 
@@ -100,11 +100,12 @@ node tools/pg-readonly.cjs --file tools/conflict-check-detail.sql --snapshot --o
 powershell -NoProfile -ExecutionPolicy Bypass -File tools/release.ps1 -Message "PMC-04 人物身份及数据冲突确认：两轮只读冲突检测SQL+脱敏清单+五分类确认清单；纯文档/工具包，不自动合并、不批量改写真实人物、不执行生产数据修复、云端业务产物未改变"
 ```
 
-**回填项**：
-- 主提交 SHA：____
-- 发布标签（时间戳）：`release-____________-____`
-- 是否首提交（需 semver）：否
-- GitHub push 结果：____
-- 云端部署范围：无业务产物部署（纯文档/工具包）
-- sync-check.ps1 结果：____
-- 三端一致性：____
+**回填项**（2026-10-08 实测）：
+- 主提交 SHA：`313e23c3c82a12b204a7b962370ac256b1c24ee8`（`313e23c`）
+- 发布标签（时间戳）：`release-20261008-115430`
+- 是否首提交（需 semver）：否（当前基线 v2.1.0 已设于 WP2，本包不递进 semver）
+- GitHub push 结果：`a2c07f4..313e23c HEAD -> master`；`[new tag] release-20261008-115430`
+- 云端部署范围：**无业务产物部署**（纯文档/工具包；sync-check 仅做源码核对，未触发 tcb fn code update 或 hosting deploy）
+- sync-check.ps1 结果：全绿——56 份共享副本（db.js `124c6ac6…` / ai.js `6fa94a41…`）一致；50 个静态资源（2 HTML + 48 console 模块链）一致；28 个函数 170 个源/配置文件一致；GitHub master 与 release tags 一致 HEAD `313e23c`；云端 admin.html HTTP 200 + SHA-256 一致
+- 三端一致性（本地/GitHub/云端 admin.html）：**全部一致**
+- WP01 门槛：`releaseGate=PASS_WITH_LIMITATIONS`（107 PASS/0 FAIL/5 SKIP，blockers=[]，open 项=login/service-runtime/live-writes/mobile 均为非阻断 UNVERIFIED/MANUAL_LOGIN）；发布前刷新 catalog.sql/audit.sql 快照（pg-readonly --snapshot）；第一次沙箱内运行 account.logout/account.password 间歇性 FAIL（puppeteer DOM 加载，非 PMC-04 引入），禁用沙箱重跑后 107/0/5 通过
