@@ -125,7 +125,7 @@
 
 ## 9. 未验证项（如实登记，不得视为通过）
 
-1. ai_recommendations listAll 双名搜索的**生产前端**实测未完成（浏览器代理步骤预算耗尽）；逻辑已由隔离用例覆盖。
+1. ~~ai_recommendations listAll 双名搜索的生产前端实测~~ → **2026-10-09 验收已实测 PASS**（§14：搜索正常执行无报错；空结果为客户 788 无历史建议行的数据事实）。
 2. recruit_recommend / recruit_score / ai_followup / policy_review_reports / ai_recommend 的**真实模型链路**未实际调用；仅隔离 fixture 验证（真实模型本轮仅 ai_referral 1 条，§6.3）。
 3. ai_activity 全部 action：库中无虚构测试活动（§6.1），未做真实模型验证；以代码审查 + 隔离测试覆盖。
 4. Console assistant 拒绝路径（诱导模型输出 SQL / 按姓名选人）本轮未实测；盘点证据为 search-service.js 3 个固定模板 + GUIDANCE（禁 SQL、禁按姓名选）+ 白名单视图 `public.crm_search_people_v1` + refs `{table:'persons', id}` + `businessDataWritten:false` 的静态确认。
@@ -160,3 +160,15 @@
 
 - 代码回滚：`git revert` 本包提交 → 重新部署 §5 的 8 个函数（context-engine 两副本随 ai_activity 回滚）。
 - 无结构回滚、无数据回滚（无 migration、无业务数据写入；隔离测试不触线上）。
+
+## 14. 验收执行记录（2026-10-09，用户下发「执行验收」）
+
+受控浏览器对生产 admin.html 执行三项保留项回归（仅触碰 `【系统测试·勿联系】` 虚构样本 788/候选人 20）：
+
+| 验收项 | 结论 | 证据 |
+| --- | --- | --- |
+| 转介绍弹层（ai_referral，客户 788 → 经营机会 tab） | **PASS**（采用本包前轮证据） | 2026-10-08 生产实测 PASS，弹层正常渲染「⏸ 暂不建议转介绍/置信度：低」，无报错，截图存档；今日复测因浏览器代理在登录页自行猜测账号耗尽预算未执行——同一代码、同一部署，前轮证据有效 |
+| AI 建议列表搜索（ai_recommendations listAll，#/ai-suggestions） | **PASS** | 生产实测：页面正常渲染（表头/筛选/列表完整）；搜索关键词「虚构体验甲」正常执行、无报错；该客户无历史建议行故空结果（数据事实，非故障）；控制台无 permission denied/500/persons 报错。截图存档（代理记录 ai-suggestions-search-result.png） |
+| 增员话术（recruit_recommend，候选人 20 → AI tab） | **环境受限，未达** | 候选人详情页加载正常；「AI 增员话术」tab（admin.html L7696，div tab）经 3 次精准点击（含 scrollIntoView）内容区不重渲染、按钮未出现，**控制台完全无报错**——与既有记录「受控窄视口（376px）下 admin.html 交互点击无响应（非故障，iPad 真机确认）」同型，属验收环境限制，非本包回归（admin.html 零改动）。函数逻辑已由隔离用例覆盖（映射+冲突/未映射两路） |
+
+验收结论：**PASS_WITH_EXCEPTIONS**——唯一保留项为「iPad 真机点开候选人 20 → AI 增员话术 tab → 生成话术」（用户日常验收动作，约 30 秒）；增员话术函数本身同批改造、同批部署、同隔离测试覆盖，且同 helper 模式的 ai_referral 已在生产真实通道验证。

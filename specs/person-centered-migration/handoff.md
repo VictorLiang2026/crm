@@ -8,8 +8,8 @@
 | --- | --- |
 | 当前执行工具 | Trae，2026-10-09 完成 PMC-11 开发与发布，等待验收 |
 | 最后验收通过包 | **PMC-10（Today、任务、漏斗和统计的身份来源统一）——已验收**：v_action_center 展示名经 persons COALESCE；today_coach/activity_reports/activity_tasks JS 层覆盖；验收中发现 persons 匿名读权限缺口并经用户特批修复（migration 20261008231500：GRANT SELECT anon + RLS 策略 deleted_at IS NULL），复测通过 |
-| 正在执行包 | **PMC-11（AI 上下文、搜索及结果保存适配 Person）——开发完成，待用户验收**：8 个 AI 函数 Person 化已部署（ai_activity/ai_recommend/ai_referral/ai_followup/policy_review_reports/recruit_score/recruit_recommend/ai_recommendations）+ context-engine v1.1.0 两副本；隔离测试 19/19；真实模型仅 ai_referral 1 条生产实测 PASS；G-PMC11-1 既有缺陷登记未修；未验证项见 evidence §9 |
-| 下一步唯一允许执行的动作 | 等待用户验收 PMC-11（iPad/浏览器 AI 弹层人工回归：转介绍、增员话术、AI 建议列表搜索；未验证项见 evidence/PMC-11.md §9）；验收前不得进入 PMC-12；G-PMC11-1 修复须单独授权 |
+| 正在执行包 | **PMC-11（AI 上下文、搜索及结果保存适配 Person）——验收执行完成，PASS_WITH_EXCEPTIONS，待用户最终确认**：8 个 AI 函数 Person 化已部署 + context-engine v1.1.0 两副本；隔离测试 19/19；2026-10-09 受控浏览器验收：AI 建议列表搜索 PASS、转介绍弹层 PASS（前轮同部署证据）、增员话术环境受限未达（376px 窄视口 tab 点击不重渲染，控制台零报错，已知非故障项） |
+| 下一步唯一允许执行的动作 | 等待用户对 PMC-11 验收结论（PASS_WITH_EXCEPTIONS）做最终确认；用户可在 iPad 真机点开候选人 20 → AI 增员话术 tab → 生成话术做最后人工确认（约 30 秒）；确认前不得进入 PMC-12；G-PMC11-1 修复须单独授权 |
 | 回滚条件 | PMC-11 代码回滚：git revert → 重新部署上述 8 函数（context-engine 副本随 ai_activity 回滚）；无结构/数据回滚（本包无 migration、无业务数据写入） |
 
 ## 2. 版本基线（2026-10-09 PMC-11 发布时更新）
