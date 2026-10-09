@@ -5,7 +5,7 @@
 - 包名：PMC-11｜AI 上下文、搜索及结果保存适配 Person
 - 前置：PMC-10 已验收（2026-10-08）
 - 执行日期：2026-10-08
-- 状态：开发完成，待用户验收
+- 状态：**已验收（2026-10-09 用户最终确认通过）**；验收记录见 §14
 
 ## 2. 影响说明（编码前已向用户说明并确认）
 
@@ -179,4 +179,6 @@
 | AI 建议列表搜索（ai_recommendations listAll，#/ai-suggestions） | **PASS** | 生产实测：页面正常渲染（表头/筛选/列表完整）；搜索关键词「虚构体验甲」正常执行、无报错；该客户无历史建议行故空结果（数据事实，非故障）；控制台无 permission denied/500/persons 报错。截图存档（代理记录 ai-suggestions-search-result.png） |
 | 增员话术（recruit_recommend，候选人详情 → AI 增员话术 tab） | **PASS（G-PMC11-2 修复后生产实测）** | 受控浏览器多轮：① tab 在 15 秒充分等待下**可正常切换**（早前「不重渲染」系等待不足+窄视口），按钮出现、点击成功，真实请求到达 recruit_recommend；② 候选人 20 返回「candidate not found」——根因 G-PMC11-2（v_recruit_candidates 视图 INNER JOIN 过滤独立候选人，**既有缺陷非本包回归**，git 证据：cbad9aa 同查询同文案；视图 14 行全部有 customer_id，recruit_candidates 15 行，候选人 20 为唯一独立候选人）；③ 换视图内虚构候选人 19 重测时，浏览器代理在窄视口**误点「删除」及确认框**——立即只读核查：候选人 19/20、客户 788/791/792、Person 783-786 全部 `deleted_at=null`、updated_at 为历史时间，**删除未生效、零数据影响**（证据 tests/security/.results/pmc11-cand19-state.json、pmc11-cust-test-state.json、pmc11-persons-test-state.json）；④ **G-PMC11-2 经用户批准修复后复测**：候选人 20 详情页 → AI 增员话术 tab → 生成 → **「话术生成成功」**，内容含 Person 名「【系统测试·勿联系】虚构快速记录乙 · Person 360」，全程无报错（截图 d:\Temp\trae\screenshots\candidate_20_ai_result.png），详见 §11 |
 
-验收结论：**PASS_WITH_EXCEPTIONS（初验）→ 增员话术保留项已关闭（2026-10-09 G-PMC11-2 修复后浏览器真实链路 PASS，用此前被拦截的候选人 20 完成，iPad 人工回归不再阻塞）**；G-PMC11-2 已修复并验证（§11）；其余未验证项见 §9。待用户对 PMC-11 做最终确认。
+验收结论：**PASS_WITH_EXCEPTIONS（初验）→ 增员话术保留项已关闭（2026-10-09 G-PMC11-2 修复后浏览器真实链路 PASS，用此前被拦截的候选人 20 完成，iPad 人工回归不再阻塞）**；G-PMC11-2 已修复并验证（§11）；其余未验证项见 §9。
+
+**最终验收确认（2026-10-09 用户下发「执行最终验收确认」）：PMC-11 正式验收通过。** 依据汇总：8 函数 Person 化 + context-engine v1.1.0 已部署且 sync-check 全绿；隔离测试 19/19；真实模型 ai_referral 1 条生产 PASS；受控浏览器三项保留项全部 PASS（含 G-PMC11-2 修复后候选人 20 增员话术真实生成成功）；G-PMC11-2 已修复验证（migration/rollback `20261009070000`，标签 `release-20261009-0808`）。§9 中未真实调用的模型链路（recruit_score/ai_followup/policy_review_reports/ai_recommend 等）与拒绝路径实测作为**已知覆盖限制**保留，非阻塞；G-PMC11-1 登记未修（非本包引入，修复须单独授权）。验收登记标签 `release-20261009-0823`。

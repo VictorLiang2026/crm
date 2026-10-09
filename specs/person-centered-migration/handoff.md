@@ -1,28 +1,28 @@
 # Handoff（接管状态）
 
-更新时间：2026-10-09（PMC-11 开发完成 + 验收执行完成；G-PMC11-2 视图缺陷经用户批准后修复并验证，等待用户对 PMC-11 最终确认）。任何工具接手前先读本文件与 execution-contract。
+更新时间：2026-10-09（**PMC-11 已获用户最终验收通过**；G-PMC11-2 已修复；当前等待 PMC-12 指令）。任何工具接手前先读本文件与 execution-contract。
 
 ## 1. 执行状态
 
 | 项 | 值 |
 | --- | --- |
-| 当前执行工具 | Trae，2026-10-09 完成 PMC-11 开发与发布，等待验收 |
-| 最后验收通过包 | **PMC-10（Today、任务、漏斗和统计的身份来源统一）——已验收**：v_action_center 展示名经 persons COALESCE；today_coach/activity_reports/activity_tasks JS 层覆盖；验收中发现 persons 匿名读权限缺口并经用户特批修复（migration 20261008231500：GRANT SELECT anon + RLS 策略 deleted_at IS NULL），复测通过 |
-| 正在执行包 | **PMC-11（AI 上下文、搜索及结果保存适配 Person）——验收执行完成，PASS_WITH_EXCEPTIONS，保留项已关闭，待用户最终确认**：8 个 AI 函数 Person 化已部署 + context-engine v1.1.0 两副本；隔离测试 19/19；2026-10-09 受控浏览器验收：AI 建议列表搜索 PASS、转介绍弹层 PASS（前轮同部署证据）；验收中发现既有缺陷 G-PMC11-2（v_recruit_candidates 视图 INNER JOIN 过滤独立候选人，cbad9aa 已存在），**经用户批准后同日修复**（migration `20261009070000_fix_v_recruit_candidates_left_join.sql` + rollback，两视图 LEFT JOIN + persons 兜底姓名，列契约不变）——修复后复测：主视图 14→15 行零差异、trash 3 行一致、**增员话术真实链路 PASS**（候选人 20 生成成功，iPad 保留项关闭）、隔离测试复跑 19/19；验收中浏览器代理误点删除确认框，经只读核查**零数据影响**（候选人 19/20、客户 788/791/792、Person 783-786 全部完好，证据 tests/security/.results/pmc11-*-state.json） |
-| 下一步唯一允许执行的动作 | 等待用户对 PMC-11 验收结论（PASS_WITH_EXCEPTIONS，保留项已全部关闭）做最终确认；确认前不得进入 PMC-12；G-PMC11-1 修复须单独授权 |
+| 当前执行工具 | Trae，无正在执行的包；等待用户下发 PMC-12 指令 |
+| 最后验收通过包 | **PMC-11（AI 上下文、搜索及结果保存适配 Person）——2026-10-09 用户最终验收通过**：8 个 AI 函数 Person 化 + context-engine v1.1.0 两副本；隔离测试 19/19；真实模型 ai_referral 生产 PASS；受控浏览器三项保留项（转介绍、AI 建议列表搜索、增员话术）全部 PASS；验收中发现的既有缺陷 G-PMC11-2（v_recruit_candidates 视图 INNER JOIN 过滤独立候选人）经用户批准同日修复（migration `20261009070000` + rollback，两视图 LEFT JOIN，列契约不变）并验证（14→15 行零差异、trash 3 行一致、候选人 20 增员话术真实生成 PASS、隔离测试 19/19）。遗留登记项 G-PMC11-1（非本包引入、非阻塞）修复须单独授权 |
+| 正在执行包 | 无——PMC-11 已验收关闭，PMC-12 指令未收到 |
+| 下一步唯一允许执行的动作 | **等待用户下发 PMC-12 指令**；不得自行开包 PMC-12；G-PMC11-1 修复须单独授权 |
 | 回滚条件 | PMC-11 代码回滚：git revert → 重新部署上述 8 函数（context-engine 副本随 ai_activity 回滚）；本包函数代码部分无结构/数据回滚。G-PMC11-2 结构回滚：`cloudbase/rollbacks/20261009070000_fix_v_recruit_candidates_left_join.sql`（两视图恢复 INNER JOIN 原始定义，纯视图切换无数据影响，回滚后独立候选人重新不可见） |
 
-## 2. 版本基线（2026-10-09 PMC-11 发布时更新）
+## 2. 版本基线（2026-10-09 PMC-11 验收时更新）
 
 | 端 | 值 |
 | --- | --- |
 | PMC-11 前基线 | `master` @ `cbad9aa`（PMC-10 验收提交，标签 `release-20261008-2311`），工作树干净 |
-| PMC-11 发布 | 标签 `release-20261009-0105`（时间戳）+ `v2.1.2`（2026-10-09 首提交 semver，patch：AI 适配向后兼容）；G-PMC11-2 修复标签 `release-20261009-0808`；提交与三端一致性以发布后 sync-check 记录为准 |
+| PMC-11 发布 | 标签 `release-20261009-0105`（时间戳）+ `v2.1.2`（2026-10-09 首提交 semver，patch：AI 适配向后兼容）；G-PMC11-2 修复标签 `release-20261009-0808`；**最终验收登记标签 `release-20261009-0823`**；提交与三端一致性以发布后 sync-check 记录为准 |
 | 云端 | 本包部署 8 个 AI 函数（ai_activity/ai_recommend/ai_referral/ai_followup/policy_review_reports/recruit_score/recruit_recommend/ai_recommendations）；静态文件零改动（admin.html SHA 不变）；G-PMC11-2 修复 migration `20261009070000` 已应用（两视图 CREATE OR REPLACE，无函数再部署） |
 | 数据库迁移 | G-PMC11-2 修复：`20261009070000_fix_v_recruit_candidates_left_join.sql`（+ 同名 rollback，已应用并验证）；persons anon 只读依赖 PMC-10 `20261008231500`，在效。本地 `cloudbase/migrations/` 基线 83 份（含本次新增 1 份） |
 | 数据规模抽查（PMC-11 只读） | customers 未软删 782 行，779 行已映射 person_id；persons 未软删 781 行；已映射双源姓名冲突 0；recruit_candidates 15/15 有 person_id（candidate 20 为独立候选人，正常） |
 
-历史基线链：PMC-00（`release-20261007-1153`/`-1209` `4a700a1`）→ G1–G4 处置（`-125802` 等）→ PMC-01（`release-20261007-193230` `42787ff`）→ PMC-02~09 → PMC-10（`release-20261008-2311` `cbad9aa`）→ PMC-11（`release-20261009-0105` + `v2.1.2`）→ PMC-11 验收（`release-20261009-0612`/`0654`）→ G-PMC11-2 修复（`release-20261009-0808`）。
+历史基线链：PMC-00（`release-20261007-1153`/`-1209` `4a700a1`）→ G1–G4 处置（`-125802` 等）→ PMC-01（`release-20261007-193230` `42787ff`）→ PMC-02~09 → PMC-10（`release-20261008-2311` `cbad9aa`）→ PMC-11（`release-20261009-0105` + `v2.1.2`）→ PMC-11 验收（`release-20261009-0612`/`0654`）→ G-PMC11-2 修复（`release-20261009-0808`）→ **PMC-11 最终验收通过（`release-20261009-0823`）**。
 
 ## 3. 各模块读写权威来源与兼容方向
 
@@ -44,8 +44,8 @@
 - 已批准（持续授权）：PMC-00 文档建立与文档发布；常规 Git 提交/推送/标签；针对性部署受影响产物。
 - 已批准（2026-10-07）：**PMC-02 数据模型与接口契约设计，D1–D11 全部按建议方案**（D5/D8 为路径批准，约束解除/列退出动作仍须届时单独授权）——见 [data-model.md](data-model.md) §8 与 decisions.md。
 - 已批准（2026-10-08）：PMC-11 指令及编码前影响方案（AI 基础资料取 Person、业务域不动、缺失/冲突标注、非模型保存入口改造、历史快照不改写、不扩大自动写权限与 Quick Capture 灰度）；PMC-10 验收修复方案 A（persons anon 只读 GRANT/RLS）。
-- 已批准（2026-10-09）：**G-PMC11-2 修复——方案 A 视图 LEFT JOIN 修复 + 回收站视图一并修复**（migration + rollback，已应用并验证）。
-- 未批准：PMC-12～PMC-20 全部实施包（指令未收到）；PMC-11 验收本身（待用户确认）；G-PMC11-1 修复；一切删除/重命名已有对象（含 D5 姓名唯一约束解除、D8 customer_id 列/复合 FK 退出——须独立包单独批准）；`pr`/`pr_*` 相关一切；Legacy Quick Capture 流程变更；所有数据库变更（需 migration/rollback + 针对性确认）。
+- 已批准（2026-10-09）：**G-PMC11-2 修复——方案 A 视图 LEFT JOIN 修复 + 回收站视图一并修复**（migration + rollback，已应用并验证）；**PMC-11 最终验收通过**（用户下发「执行最终验收确认」）。
+- 未批准：PMC-12～PMC-20 全部实施包（指令未收到）；G-PMC11-1 修复；一切删除/重命名已有对象（含 D5 姓名唯一约束解除、D8 customer_id 列/复合 FK 退出——须独立包单独批准）；`pr`/`pr_*` 相关一切；Legacy Quick Capture 流程变更；所有数据库变更（需 migration/rollback + 针对性确认）。
 
 ## 5. 已登记缺口（观察项，非阻塞；修复须另获授权）
 
