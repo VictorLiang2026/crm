@@ -90,13 +90,24 @@ async function get(event) {
 }
 
 // 老记录 person_name 为空但已关联 person_id 时，批量从客户/增员/嘉宾表回填姓名
+// PMC-14：有 canonical_person_id 的行新增返回 canonicalPersonId（字符串，R-ID1），
+// 展示名 Person 优先（persons.display_name；Person 已软删时回退快照/回填名）。
+// 覆盖仅作用于返回值，不写库——快照列 person_name 保持不可变（D6）。
 async function enrichParticipants(parts) {
   const needByType = { customer: [], recruit: [], speaker: [] };
+  const canonicalIds = [];
   parts.forEach(function (it) {
+    if (it.canonical_person_id) canonicalIds.push(it.canonical_person_id);
     if (it.person_id && !it.person_name && needByType[it.person_type]) {
       needByType[it.person_type].push(it.person_id);
     }
   });
+  const personMap = {};
+  if (canonicalIds.length) {
+    const psRes = assertOk(await rdb.from('persons').select('id, display_name')
+      .in('id', canonicalIds).is('deleted_at', null));
+    (psRes.data || []).forEach(function (p) { personMap[p.id] = p.display_name; });
+  }
   const nameMap = {};
   for (const pt of PT_ENUM) {
     const ids = needByType[pt];
@@ -106,15 +117,20 @@ async function enrichParticipants(parts) {
       .in(cfg.idCol, ids);
     (q.data || []).forEach(function (row) { nameMap[pt + ':' + row[cfg.idCol]] = row[cfg.nameCol]; });
   }
-  if (Object.keys(nameMap).length) {
-    // 查询只补齐返回姓名；持久化由显式新增/关联参与者操作负责。
-    parts.forEach(function (it) {
-      const nm = nameMap[it.person_type + ':' + it.person_id];
-      if (nm) {
-        it.person_name = nm;
-      }
-    });
-  }
+  // 查询只补齐返回姓名；持久化由显式新增/关联参与者操作负责。
+  parts.forEach(function (it) {
+    const nm = nameMap[it.person_type + ':' + it.person_id];
+    if (nm) {
+      it.person_name = nm;
+    }
+  });
+  // canonical 展示名最后生效（Person 优先）；canonicalPersonId 一律字符串输出
+  parts.forEach(function (it) {
+    if (!it.canonical_person_id) return;
+    it.canonicalPersonId = String(it.canonical_person_id);
+    const pn = personMap[it.canonical_person_id];
+    if (pn) it.person_name = pn;
+  });
   return parts;
 }
 

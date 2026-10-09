@@ -177,15 +177,16 @@ persons.legacy_customer_id（自引用）
 | 函数 | action | 入口 | 读取表 | 写入表 | 身份 ID 类型 | 当前权威来源 | 目标来源 | 权限上下文 | 状态 | 证据 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | activities | list/get/create/update/remove/updateStatus | admin.html #/activity | activities | activities | activity_id | — | — | authenticated | 仅回归 | 无身份字段 |
-| activities | addParticipant | admin.html 活动详情 | activity_participants | activity_participants | person_id/person_type | persons | persons | authenticated | 需修改 | person_id 无 FK |
-| activities | linkParticipant | admin.html 活动详情 | activity_participants | activity_participants.canonical_person_id | canonical_person_id | persons | persons | authenticated | 需修改 | canonical_person_id 有 FK |
-| activities | updateParticipant | admin.html 活动详情 | activity_participants | activity_participants | person_id | persons | persons | authenticated | 需修改 | — |
-| activities | removeParticipant | admin.html 活动详情 | activity_participants | activity_participants.deleted_at | person_id | persons | persons | authenticated | 需修改 | — |
+| activities | addParticipant | admin.html 活动详情 | activity_participants + customers/v_recruit_candidates/activity_speakers（按 person_type 回填名） | activity_participants（person_id=业务表主键+person_name 快照；**不写 canonical**，guard 服务端独占） | person_id（业务表主键：customer→customers."Id"、recruit→candidates.id、speaker→activity_speakers.id）+person_type | persons（canonical 层） | persons | authenticated | PMC-14 已核实语义+回归（person_id 业务表语义不变；暂存行 person_id=null 快照名落库） | evidence/PMC-14.md |
+| activities | linkParticipant | admin.html 活动详情 | activity_participants + 按类型业务表（回填名） | activity_participants.person_id/person_name（**不动 canonical**，guard 拦截非 service_role 写） | person_id（业务表主键） | persons（canonical 层） | persons | authenticated | PMC-14 已核实+回归（同活动同类型同人去重保留） | evidence/PMC-14.md |
+| activities | updateParticipant | admin.html 活动详情 | activity_participants | activity_participants | participant_id | persons（canonical 层） | persons | authenticated | 仅回归（PMC-14：状态留参与记录，语义不变） | — |
+| activities | removeParticipant | admin.html 活动详情 | activity_participants | activity_participants.deleted_at | participant_id | persons（canonical 层） | persons | authenticated | 仅回归（软删语义不变） | — |
 | activities | searchPerson | admin.html 活动详情 | persons | — | person_id | persons | persons | authenticated | 已核实无影响 | Person 原生搜索 |
-| activities | listByPerson | Console 活动页 | activity_participants | — | person_id | persons | persons | authenticated | 需修改 | — |
+| activities | listByPerson | Console 活动页 | activity_participants | — | canonical_person_id | persons | persons | authenticated | 已核实无影响（按 canonical 读，PMC-14 复核） | — |
 | activities | getSummary | admin.html 活动详情 | activities + activity_participants | — | — | — | — | authenticated | 仅回归 | — |
+| activities | get（enrichParticipants） | admin.html 活动详情 | activity_participants + persons + 按类型业务表 | —（仅返回值，不写库） | canonical_person_id（输出字符串 R-ID1） | persons（展示名 Person 优先，软删回退业务表回填名/快照名；D6 快照不可变） | persons | authenticated | PMC-14 已实施（待用户验收）（canonicalPersonId 新增返回+展示名 Person 优先） | evidence/PMC-14.md |
 | activities | applyTopics | admin.html 活动详情 | activity_topics | activities.topic_ids | — | — | — | authenticated | 仅回归 | — |
-| activities | getActivityData | Console 活动页 | activities + activity_participants + activity_speakers | — | person_id | persons | persons | authenticated | 需修改 | 含参与者/嘉宾身份 |
+| activities | getActivityData | Console 活动页 | 委托 person_360 listActivityData | — | canonical_person_id | persons | persons | authenticated | 已核实无影响（PMC-14 复核读取方语义） | — |
 | activity_speakers | list/get/create/update/remove/search | admin.html 嘉宾管理 | activity_speakers + persons（PMC-13 enrichIdentity Person 优先读）+ customers/v_recruit_candidates（回退） | activity_speakers | customer_id/person_id | persons（PMC-13） | persons | authenticated | PMC-13 已实施（待用户验收）（enrichIdentity Person 优先读 name/phone/wechat/organization+linked_person 字段；create 去掉自动建 Person+customers 分支，嘉宾身份不自动代表销售客户） | evidence/PMC-13.md |
 | activity_tasks | list/get/create/update/complete/skip/remove | admin.html 活动任务 | activity_tasks + activities + customers + persons + v_recruit_candidates | activity_tasks | related_id | — | — | authenticated | PMC-10 已切换（related_type=customer 的 related_name 经 persons 取名，customer_name 回退） | evidence/PMC-10.md |
 | activity_topics | list/get/create/update/remove/search | admin.html 活动主题 | activity_topics | activity_topics | — | — | — | authenticated | 仅回归 | 无身份字段 |

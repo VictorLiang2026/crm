@@ -16,6 +16,9 @@
 | 2026-10-08 | PMC-03 范围限定为测试/只读核对/恢复准备工具，不切换业务行为、不迁移真实数据；新测试不接入 release gate（不改门槛跳过）；恢复能力未演练前不声称"可安全回滚" | 用户 PMC-03 指令明确指定 | 产物：pmc-03-verification.md、tools/migration-check.{sql,cjs}、tests/pmc/、evidence/PMC-03.md。R11 发现 sync-shared.cjs 不追踪 person-service.js（列为缺口，扩展属 PMC-04+） |
 | 2026-10-08 | PMC-04 范围限定为只读冲突检测+脱敏清单+五分类确认，不自动合并、不批量改写真实人物、不执行生产数据修复；待确认项不计入迁移成功率；E1–E7 阻断 D5 但不阻断 person_id 回填 | 用户 PMC-04 指令明确指定 | 产物：pmc-04-confirmation.md、tools/conflict-check{,-detail}.sql、evidence/PMC-04.md。待确认项（A1–A3/A5/D1/E1–E7）留待 PMC-06 |
 | 2026-10-08 | PMC-05 范围限定为兼容性结构扩展（加列+索引+约束），不强制 NOT NULL（PMC-04 有 3 个 customer 无 Person 待 PMC-06）、不移除旧约束（D5/D8 退出条件未满足）、不重建视图（阶段 3）、不修改 RLS/云函数、不回填数据 | 用户 PMC-05 指令明确指定+授权执行 migration 部署 | 产物：pmc-05-implementation.md、cloudbase/migrations/rollbacks/20261008120000_*.sql、tools/migration-apply.cjs、evidence/PMC-05.md。Migration 已应用（4 步 40ms）；旧约束 5 个完整、12 视图正常、数据 783 行 person_id 全 NULL |
+| 2026-10-09 | PMC-14 裁决①：7 行软删 customer 参与记录**回填含软删行**（canonical_person_id 经 legacy_customer_id 桥唯一命中回填） | AskUserQuestion 答复："回填含软删行（推荐）" | 覆盖 20260929084000 迁移当时仅回填活跃行的范围缺口；4 行无 person_id 暂存行 + 1 行 speaker 软删行保持"身份待确认"，不造 Person |
+| 2026-10-09 | PMC-14 裁决②：活动参与者展示名 **Person 优先+快照保留**（persons.display_name 覆盖返回值；Person 软删回退业务表回填名/快照名；person_name 快照列不可变 D6） | AskUserQuestion 答复："Person 优先+快照保留（推荐）" | 落地于 activities enrichParticipants；仅作用返回值，不写库 |
+| 2026-10-09 | PMC-14 生产 UPDATE 专项批准：对 7 行软删 customer 参与行回填 canonical_person_id（id 1,2→person 1；id 3,5,7,9,11→person 89），逐行唯一桥命中、断言块预检通过、回滚按精确 id+预期值备好 | AskUserQuestion 答复："确认执行（推荐）"（安全层拦截后完整披露映射/影响/回滚再确认） | 实际执行 AffectedRows=7；执行后核对 grp1_ok=2、grp89_ok=5、still_pending=5、活跃行 4/0/1 不变 |
 
 ## 历史批准的继承关系
 
