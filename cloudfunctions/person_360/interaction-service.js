@@ -5,6 +5,9 @@ const { LegacyInteractionAdapter } = require('./legacy-interaction-adapter');
 
 const MAX_LIMIT = 50;
 const DEFAULT_LIMIT = 20;
+// PMC-16: legacy source types the adapter projects virtually; a stored ledger row of the
+// same source must not resurrect a deleted legacy record (parity with timeline filter).
+const LEGACY_SOURCES = new Set(['followups', 'recruit_followups', 'activity_participants']);
 
 function idOf(value) {
   const id = String(value ?? '');
@@ -54,13 +57,23 @@ class InteractionService {
     });
     const rows = stored.map(item => ({ ...item, virtual: false }));
     const adapter = new LegacyInteractionAdapter({ request: this.request });
+    const legacyRows = [];
     if (person.legacy_customer_id != null) {
-      rows.push(...await adapter.listForCustomer(person.legacy_customer_id, person.id));
+      legacyRows.push(...await adapter.listForCustomer(person.legacy_customer_id, person.id));
     }
-    rows.push(...await adapter.listCanonicalAttended(person.id));
+    legacyRows.push(...await adapter.listCanonicalAttended(person.id));
+    // PMC-16: drop stored ledger copies of legacy sources that no longer exist, so a
+    // deleted legacy row can never resurrect through listInteractions (same rule as
+    // PersonInsightsService.timeline). Live legacy rows remain deduped below with the
+    // ledger row preferred.
+    const activeLegacy = new Set(legacyRows.map(row =>
+      row.source_id == null ? `manual:${row.id}` : `${row.source_type}:${row.source_id}`));
+    rows.push(...legacyRows);
+    const filtered = rows.filter(row => row.virtual ||
+      !LEGACY_SOURCES.has(row.source_type) || activeLegacy.has(`${row.source_type}:${row.source_id}`));
     // A future import may materialize a legacy source. Show it once, preferring the ledger row.
     const seen = new Set();
-    const unique = rows.filter(row => {
+    const unique = filtered.filter(row => {
       const key = row.source_id == null ? `manual:${row.id}` : `${row.source_type}:${row.source_id}`;
       if (seen.has(key)) return false;
       seen.add(key);

@@ -545,3 +545,32 @@ persons.legacy_customer_id（自引用）
 - 角色删除影响：业务角色随业务行有效状态派生，删业务角色（软删业务行）只清派生角色行；relationships/households/人工角色零影响（生产事务回归 s11 验证）。
 - 删除恢复：业务行恢复→触发器重建派生角色；relationships 软删释放部分唯一槽，同边可重建。
 - 角色缓存/目录/筛选：角色无独立缓存表；crm_search_people_v1 实时 JOIN；person_360 实时读；前端 badge 随返回值，无本地角色副本。
+
+## PMC-16：互动、跟进及其他业务引用与历史记录收口（2026-10-10，已发布，待用户验收）
+
+### 16.1 业务引用图（归属裁决终表，11 表全盘点孤儿=0）
+
+| 表 | 行数 | 业务真实主体 / 锚定 | 快照列（历史证据，不改写） |
+| --- | --- | --- | --- |
+| interactions | 9（全 manual） | 人物事实；person_id NOT NULL FK | raw_note |
+| actions / commitments | 4 / 2 | 人物事实；person_id FK + uid 确认链 | — |
+| followups | 250（软删 1） | 客户业务；customer_id FK 保留 | customer_name（5 行漂移=历史证据） |
+| opportunities | 9（customer 7 / person-only 2） | 双轨保留（U5 退出另批） | referred_name/referred_relation |
+| products / policy_review_reports / gifts / photos / ocr_records / ai_recommendations | 1 / 2 / 189 / 8 / 6 / 26 | 客户业务；customer_id FK 保留 | 各表 customer_name、ocr_records.customer_snapshot、ai_recommendations.nba（生命周期走 nba.status：open 25/skipped 1） |
+
+**无任何 customer_id→person_id 替换；不加 person_id 列；零结构变更（无 migration）。**
+
+### 16.2 函数与前端变更
+
+| 对象 | 变更类型 | 调用方/消费者 | 状态 | 证据 |
+| --- | --- | --- | --- | --- |
+| `cloudfunctions/_shared/interaction-service.js` + person_360 副本 | listForPerson 增 activeLegacy 防护（物化 legacy 副本源行已删→不复活；活跃物化行账本优先单条呈现，与 timeline 规则对齐）；现网 0 行物化 legacy 副本，零行为变化 | person_360.listInteractions（Console 互动页签） | 已部署（sync-shared 56 副本一致） | evidence/PMC-16.md §3 |
+| `admin.html` OCR 删除分支（L3378-3414） | 恢复闭环修复：检查 customers.update 响应；OCR_SNAPSHOT_RESTORE_CONFLICT→展示「当前值(personSnapshot) vs 快照值」diff→人工确认 forceRestore:true 重试；假成功消除 | admin.html 客户详情 OCR 页签 | 已部署（50 在线资产 SHA 一致） | evidence/PMC-16.md §2.3/§3 |
+| customers.update 服务端 / ocr_records.remove | 不修改（PMC-07/08 已有 personSnapshot 返回与冲突门，本包锁定其语义） | — | 核实不变 | 测试 A/C 组 |
+| 其余 9 个业务函数（followups/gifts/photos/products/prr/ocr/ai_recommendations/opportunities/actions-commitments 经 person_360） | 只读核查无修改 | — | 核实无影响 | evidence/PMC-16.md §2 |
+
+### 16.3 规则落点
+
+- 时间线双轨：同一跟进=一条业务事实；Legacy 表权威、interactions 物化行仅未来导入产物；去重 key=source_type:source_id；来源标识 `public.表#id` 输出至 Console。
+- OCR 恢复安全：跨角色修改后快照恢复受服务端冲突门+前端 diff 双重保护；冲突/失败不销毁恢复依据（冲突清单披露后才允许人工覆盖）；老快照 JSON 文本解析容错保持。
+- 历史保护：历史作者（created_by/confirmed_by uid）、发生时姓名、合同/报告快照、AI 历史输出（ai_recommendations 行与 nba）均不改写。

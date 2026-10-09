@@ -3379,9 +3379,33 @@ function renderOcrItem(cid, rec, photosMap){
           if(confirm('已删除解析记录。\n\n本次解析时保存了客户信息快照（解析前的版本）。\n\n是否将客户信息恢复到解析前的版本？\n（取消则保持当前客户信息不变）')){
             var restoreData = {};
             CUSTOMER_FIELDS.forEach(function(f){ if(snap[f.name] != null) restoreData[f.name] = snap[f.name]; });
-            await callFn('customers', {action:'update', id:cid, data:restoreData});
-            toast('客户信息已恢复到解析前版本');
-            invalidateCustomers();
+            // PMC-16：恢复闭环——冲突时展示快照值 vs 当前值，人工确认后才带 forceRestore 覆盖；仅 ok:true 才报成功
+            var upd = await callFn('customers', {action:'update', id:cid, data:restoreData});
+            if(upd && upd.error === 'OCR_SNAPSHOT_RESTORE_CONFLICT'){
+              var fieldNames = {customer_name:'姓名', phone:'电话', wx_account:'微信', gender:'性别', birthday:'生日', occupation:'职业', education:'学历'};
+              var curSnap = (r.personSnapshot && typeof r.personSnapshot === 'object') ? r.personSnapshot : {};
+              var personKeyMap = {customer_name:'display_name', wx_account:'wechat'};
+              var lines = (upd.conflicts || []).map(function(f){
+                var pk = personKeyMap[f] || f;
+                var curVal = curSnap[pk] != null ? curSnap[pk] : restoreData[f];
+                return '· ' + (fieldNames[f] || f) + '：当前「' + (curVal==null?'':curVal) + '」→ 快照「' + (snap[f.name]==null?'':snap[f.name]) + '」';
+              });
+              if(confirm('以下基础资料在解析后被其他模块更新过：\n\n' + lines.join('\n') + '\n\n确定用快照覆盖这些当前值吗？\n（取消则保持当前客户信息不变）')){
+                upd = await callFn('customers', {action:'update', id:cid, data:restoreData, forceRestore:true});
+                if(upd && upd.error){ toast('恢复失败：'+upd.error,'err'); }
+                else if(upd && upd.ok === false){ toast('恢复未生效，请重试','err'); }
+                else { toast('客户信息已按快照覆盖恢复'); invalidateCustomers(); }
+              } else {
+                toast('已删除解析记录，客户信息保持当前版本');
+              }
+            } else if(upd && upd.error){
+              toast('恢复失败：'+upd.error,'err');
+            } else if(upd && upd.ok === false){
+              toast('恢复未生效，请重试','err');
+            } else {
+              toast('客户信息已恢复到解析前版本');
+              invalidateCustomers();
+            }
           } else {
             toast('已删除解析记录，客户信息保持不变');
           }
