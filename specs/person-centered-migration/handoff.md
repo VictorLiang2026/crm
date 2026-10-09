@@ -1,29 +1,30 @@
 # Handoff（接管状态）
 
-更新时间：2026-10-09（**PMC-12 已获用户验收通过**；G-PMC11-2 已修复；当前等待 PMC-13 指令）。任何工具接手前先读本文件与 execution-contract。
+更新时间：2026-10-09（**PMC-13 已实施完成并发布，待用户验收**；PMC-12 已验收通过）。任何工具接手前先读本文件与 execution-contract。
 
 ## 1. 执行状态
 
 | 项 | 值 |
 | --- | --- |
-| 当前执行工具 | Trae；PMC-12 已验收通过，等待 PMC-13 指令 |
-| 最后验收通过包 | **PMC-12（招募模块完成 Person 与招募资料分离）——2026-10-09 用户验收通过（PASS_WITH_LIMITATIONS）**：四项裁决全部落地（①视图 7 列 COALESCE Person 优先+customers 回退；②AI 复盘 B 类采纳改预览确认；③旧增员表单保持先匹配客户；④死列 education/mbti 留置登记）；migration `20261009091200`（+rollback）+3 函数（recruit_candidates/recruit_score/recruit_recommend）+admin.html 静态已部署；隔离测试 9/9；视图 before/after 快照零差异（SHA-256 F939A239…611955）；受控浏览器回归 S1/S2/S3/S4/S6/S7 PASS；regression 107/107；WP01 门槛 PASS_WITH_LIMITATIONS。限制项 L1-L4 均非阻塞（S5 待 B 类样本实测、删除/恢复线上演练未做 RPC 零改动 T4/T5 覆盖、G-PMC12-1/G-PMC11-1 登记未修）。详见 evidence/PMC-12.md §14。前置 PMC-11 已验收通过（8 AI 函数 + context-engine v1.1.0；G-PMC11-2 修复 LEFT JOIN；G-PMC11-1 登记未修） |
-| 正在执行包 | 无（PMC-12 已验收通过，等待 PMC-13 指令） |
-| 下一步唯一允许执行的动作 | **等待用户下发 PMC-13 指令**（PMC-12 已验收，evidence/PMC-12.md §14 已登记）；G-PMC11-1 修复、G-PMC12-1 处置须单独授权 |
-| 回滚条件 | PMC-11 代码回滚：git revert → 重新部署上述 8 函数（context-engine 副本随 ai_activity 回滚）；本包函数代码部分无结构/数据回滚。G-PMC11-2 结构回滚：`cloudbase/rollbacks/20261009070000_fix_v_recruit_candidates_left_join.sql`（两视图恢复 INNER JOIN 原始定义，纯视图切换无数据影响，回滚后独立候选人重新不可见）。PMC-12 结构回滚：`cloudbase/rollbacks/20261009091200_pmc12_recruit_view_person_read.sql`（两视图恢复 customers 优先定义，无数据影响）；代码回滚：git revert 本包提交 → 重部署 recruit_candidates/recruit_score/recruit_recommend 三函数 + admin.html |
+| 当前执行工具 | Trae；PMC-13 已实施完成并发布，待用户验收 |
+| 最后验收通过包 | **PMC-12（招募模块完成 Person 与招募资料分离）——2026-10-09 用户验收通过（PASS_WITH_LIMITATIONS）**。前置 PMC-11 已验收通过 |
+| 正在执行包 | **PMC-13（嘉宾模块完成 Person 与合作资料分离）——2026-10-09 实施完成并发布，待用户验收**：四项裁决全部落地（①enrichIdentity Person 优先读 name/phone/wechat/organization+customers 回退+linked_person 字段；②create 去掉自动建 Person+customers 分支，嘉宾身份不自动代表销售客户；③ai_activity 嘉宾 name Person 优先读；④admin.html ensurePersonCustomer 死函数保留不动）；activity_speakers/index.js + ai_activity/index.js 两函数已部署；隔离测试 9/9；WP04 speakers 4/4 mapped；regression 107/107；WP01 门槛 PASS（blockers=[]）。无 migration/rollback；无 admin.html 改动。详见 evidence/PMC-13.md |
+| 下一步唯一允许执行的动作 | **等待用户验收 PMC-13**（已发布标签 `release-20261009-151917`，提交 `9eb03e4`）；验收通过后等待 PMC-14 指令；G-PMC11-1 修复、G-PMC12-1 处置须单独授权 |
+| 回滚条件 | PMC-13 代码回滚：`git revert 9eb03e4` → 重新部署 activity_speakers/ai_activity 两函数；无结构/数据回滚（本包无 migration）。PMC-12 结构回滚：`cloudbase/rollbacks/20261009091200_pmc12_recruit_view_person_read.sql`；代码回滚：git revert → 重部署 recruit_candidates/recruit_score/recruit_recommend + admin.html。G-PMC11-2 结构回滚：`cloudbase/rollbacks/20261009070000_fix_v_recruit_candidates_left_join.sql` |
 
-## 2. 版本基线（2026-10-09 PMC-12 验收时更新）
+## 2. 版本基线（2026-10-09 PMC-13 发布时更新）
 
 | 端 | 值 |
 | --- | --- |
 | PMC-11 前基线 | `master` @ `cbad9aa`（PMC-10 验收提交，标签 `release-20261008-2311`），工作树干净 |
-| PMC-11 发布 | 标签 `release-20261009-0105`（时间戳）+ `v2.1.2`（2026-10-09 首提交 semver，patch：AI 适配向后兼容）；G-PMC11-2 修复标签 `release-20261009-0808`；**最终验收登记标签 `release-20261009-0823`**；提交与三端一致性以发布后 sync-check 记录为准 |
-| PMC-12 发布 | 提交 `522fbca`（20 files, +797/-52）；标签 `release-20261009-141318`；部署 recruit_candidates/recruit_score/recruit_recommend 三函数 + admin.html 静态（md5 c9b3011adb8ffd5b92c496ddbce4a6ff）+ migration `20261009091200`（+rollback）；sync-check 三端全绿 |
-| 云端 | 本包部署 8 个 AI 函数（ai_activity/ai_recommend/ai_referral/ai_followup/policy_review_reports/recruit_score/recruit_recommend/ai_recommendations）；静态文件零改动（admin.html SHA 不变）；G-PMC11-2 修复 migration `20261009070000` 已应用（两视图 CREATE OR REPLACE，无函数再部署） |
-| 数据库迁移 | G-PMC11-2 修复：`20261009070000_fix_v_recruit_candidates_left_join.sql`（+ 同名 rollback，已应用并验证）；persons anon 只读依赖 PMC-10 `20261008231500`，在效。本地 `cloudbase/migrations/` 基线 83 份（含本次新增 1 份） |
-| 数据规模抽查（PMC-11 只读） | customers 未软删 782 行，779 行已映射 person_id；persons 未软删 781 行；已映射双源姓名冲突 0；recruit_candidates 15/15 有 person_id（candidate 20 为独立候选人，正常） |
+| PMC-11 发布 | 标签 `release-20261009-0105`（时间戳）+ `v2.1.2`（2026-10-09 首提交 semver，patch：AI 适配向后兼容）；G-PMC11-2 修复标签 `release-20261009-0808`；**最终验收登记标签 `release-20261009-0823`** |
+| PMC-12 发布 | 提交 `522fbca`（20 files, +797/-52）；标签 `release-20261009-141318`；部署 recruit_candidates/recruit_score/recruit_recommend 三函数 + admin.html 静态 + migration `20261009091200`（+rollback） |
+| PMC-13 发布 | 提交 `9eb03e4`（3 files, +307/-63）；标签 `release-20261009-151917`；部署 activity_speakers/ai_activity 两函数；无 migration；无 admin.html 改动；sync-check 三端全绿 |
+| 云端 | PMC-13 部署 2 个函数（activity_speakers/ai_activity）；静态文件零改动；PMC-12 部署 3 函数+admin.html；PMC-11 部署 8 AI 函数 |
+| 数据库迁移 | PMC-13 无 migration；G-PMC11-2 修复 `20261009070000`（已应用）；persons anon 只读依赖 PMC-10 `20261008231500`，在效 |
+| 数据规模抽查（PMC-13 只读） | activity_speakers 4 活跃嘉宾全部有 person_id（WP04 speakers 4/4 mapped） |
 
-历史基线链：PMC-00（`release-20261007-1153`/`-1209` `4a700a1`）→ G1–G4 处置（`-125802` 等）→ PMC-01（`release-20261007-193230` `42787ff`）→ PMC-02~09 → PMC-10（`release-20261008-2311` `cbad9aa`）→ PMC-11（`release-20261009-0105` + `v2.1.2`）→ PMC-11 验收（`release-20261009-0612`/`0654`）→ G-PMC11-2 修复（`release-20261009-0808`）→ **PMC-11 最终验收通过（`release-20261009-0823`）**。 → **PMC-12（招募域迁移，已验收，`release-20261009-141318`）**。
+历史基线链：PMC-00 → …→ PMC-11 最终验收通过（`release-20261009-0823`）→ PMC-12（已验收，`release-20261009-141318`）→ **PMC-13（嘉宾域迁移，待验收，`release-20261009-151917`）**。
 
 ## 3. 各模块读写权威来源与兼容方向
 

@@ -186,7 +186,7 @@ persons.legacy_customer_id（自引用）
 | activities | getSummary | admin.html 活动详情 | activities + activity_participants | — | — | — | — | authenticated | 仅回归 | — |
 | activities | applyTopics | admin.html 活动详情 | activity_topics | activities.topic_ids | — | — | — | authenticated | 仅回归 | — |
 | activities | getActivityData | Console 活动页 | activities + activity_participants + activity_speakers | — | person_id | persons | persons | authenticated | 需修改 | 含参与者/嘉宾身份 |
-| activity_speakers | list/get/create/update/remove/search | admin.html 嘉宾管理 | activity_speakers + customers（create 时按姓名查）/ v_recruit_candidates | activity_speakers | customer_id/person_id | customers | persons | authenticated | 需修改 | create 自动建 customers；customer_id 无 FK |
+| activity_speakers | list/get/create/update/remove/search | admin.html 嘉宾管理 | activity_speakers + persons（PMC-13 enrichIdentity Person 优先读）+ customers/v_recruit_candidates（回退） | activity_speakers | customer_id/person_id | persons（PMC-13） | persons | authenticated | PMC-13 已实施（待用户验收）（enrichIdentity Person 优先读 name/phone/wechat/organization+linked_person 字段；create 去掉自动建 Person+customers 分支，嘉宾身份不自动代表销售客户） | evidence/PMC-13.md |
 | activity_tasks | list/get/create/update/complete/skip/remove | admin.html 活动任务 | activity_tasks + activities + customers + persons + v_recruit_candidates | activity_tasks | related_id | — | — | authenticated | PMC-10 已切换（related_type=customer 的 related_name 经 persons 取名，customer_name 回退） | evidence/PMC-10.md |
 | activity_topics | list/get/create/update/remove/search | admin.html 活动主题 | activity_topics | activity_topics | — | — | — | authenticated | 仅回归 | 无身份字段 |
 | activity_reports | customer/recruit | admin.html 活动报告 | 多表（customers/followups/gifts/photos/products/policy_review_reports/ai_recommendations/recruit_candidates/recruit_followups/recruit_milestones/ocr_records）+ persons | — | customer_id | customers | persons | authenticated | PMC-10 已切换（展示名经 persons 覆盖；totals/daily 统计字段不动） | evidence/PMC-10.md |
@@ -255,11 +255,11 @@ persons.legacy_customer_id（自引用）
 
 #### 7.1 嘉宾创建过程中直接查询或创建 customers
 
-**已核实**：`activity_speakers` 云函数 `create` action 在未传 `customer_id` 时，按姓名查询 `customers` 表，无匹配则自动 `insert` 建档，并将 `customer_id` 写入 `activity_speakers`。
+**PMC-13 已修复**：`activity_speakers` 云函数 `create` action 原在未传 `customer_id` 时按姓名查询 `customers` 表无匹配则自动 insert 建档（PMC-01 impact-matrix §7.1 登记）；PMC-13 裁决②已去掉自动建 Person+customers 分支，新行为仅创建 activity_speakers 行，不关联客户。
 
-- 文件：`cloudfunctions/activity_speakers/index.js` L119-L148
-- 状态：**需修改**——嘉宾建档应先走 `PersonService.resolveName()`，人工确认后再创建 Person，不自动建 customers
-- 影响：admin.html 嘉宾管理页
+- 文件：`cloudfunctions/activity_speakers/index.js` L136-148（PMC-13 改造后）
+- 状态：**已修改（PMC-13，待用户验收）**——嘉宾身份不自动代表销售客户，不强制创建客户档案；person_id 由 service_role 写入（走 person_360 identity 入口）
+- 影响：admin.html 嘉宾管理页（已走 person_360 identity 入口，L6011/L6015→previewIdentity/executeIdentity）
 
 #### 7.2 OCR 删除后由前端取快照再次调用 customers.update
 
@@ -487,3 +487,28 @@ persons.legacy_customer_id（自引用）
 - assistant search-service.js：3 个固定模板、GUIDANCE 明确禁模型生成 SQL/禁按姓名自行选人、查询白名单 `public.crm_search_people_v1`、refs `{table:'persons', id}`、`businessDataWritten:false`——本轮未改，拒绝路径真实触发未实测（evidence §9 未验证项 4）。
 - 全部新增 persons 查询带 `deleted_at IS NULL`；ID 全程字符串/整数精确匹配，姓名从不作为身份证据（participantPersonId canonical 优先 → customers/recruit_candidates.person_id 精确回退）。
 - 映射基线：customers 779/782 已映射、姓名冲突 0；recruit_candidates 15/15 有 person_id（候选人 20 为独立候选人、customer_id 为空，修复前被视图 INNER JOIN 过滤，**G-PMC11-2 修复后可见**）。
+
+---
+
+## PMC-13：嘉宾模块完成 Person 与合作资料分离（2026-10-09，待用户验收）
+
+### 13.1 字段来源分界
+
+| 来源 | 字段 | 适用入口 |
+| --- | --- | --- |
+| persons（经 activity_speakers.person_id，Person 优先读+原值回退） | display_name（→name 覆盖）、phone、wechat、organization | activity_speakers list/get（enrichIdentity）、ai_activity 嘉宾参与者 name、recommendTopics 嘉宾池 name |
+| activity_speakers（嘉宾业务域，不动） | relationship_stage、expertise、topic_summary、source、cooperation_count、preferred_format、status、notes、customer_id、recruit_candidate_id | activity_speakers 全 action |
+| persons 写入 | 本包零写入；person_id 由 person_360 identity command 写入 | — |
+
+### 13.2 变更与部署矩阵
+
+| 对象 | 变更类型 | 调用方/消费者 | 所属包 | 状态 | 证据 |
+| --- | --- | --- | --- | --- | --- |
+| `activity_speakers/index.js` enrichIdentity（L72-115） | Person 优先读 name/phone/wechat/organization+linked_person 字段+customers/v_recruit_candidates 回退 | admin.html 嘉宾管理（list/get） | PMC-13 | 已部署（待用户验收） | evidence/PMC-13.md §3 |
+| `activity_speakers/index.js` create（L136-148） | 去掉自动建 Person+customers 分支（裁决②）；仅创建 activity_speakers 行 | admin.html 嘉宾管理 | PMC-13 | 已部署（待用户验收） | evidence/PMC-13.md §3 |
+| `ai_activity/index.js`（L304-321, L467-481） | 嘉宾参与者 name + recommendTopics 嘉宾池 name Person 优先读（裁决③） | admin.html 活动 AI | PMC-13 | 已部署（待用户验收） | evidence/PMC-13.md §3 |
+| `tests/pmc/pmc13-speaker.test.cjs` | 9 离线用例（拦截 db 副本+内存 RDB fixture；不触线上） | PMC 测试套件（独立，不入 release gate） | PMC-13 | 9/9 通过 | — |
+| admin.html | **不修改**（裁决④：ensurePersonCustomer 死函数保留不动；嘉宾入口已走 person_360 identity） | — | PMC-13 | 不变 | evidence/PMC-13.md §10 |
+| 数据库 | 无 migration/rollback | — | PMC-13 | 无变更 | — |
+| activities / activity_tasks / activity_reports / person_360 | **不修改**（activity_tasks/activity_reports PMC-10 已切换；person_360 linkSpeakerPerson/createSpeakerProfile 已 Person 原生） | — | PMC-13 | 核实无影响 | evidence/PMC-13.md §10 |
+| customers / persons 数据 | 零修改 | — | PMC-13 | 不变 | — |
