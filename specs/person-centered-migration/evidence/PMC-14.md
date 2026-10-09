@@ -139,11 +139,46 @@
 
 ## 14. 验收记录
 
-- **状态**：待用户验收（受控浏览器生产深度回归留待用户 iPad 人工验收；验收结论在此登记）。
+- **验收日期**：2026-10-09
+- **验收人**：用户 iPad 人工验收确认「都OK」
+- **验收结论**：**PASS（通过）**
 
-### 14.1 发布记录
+### 14.1 验收依据
 
-- 发布提交 `d081a64`（24 files, +880/-26，含本档案与全部档案文档）；标签 `release-20261009-203048`；GitHub master 推送成功（`5fca6c1..d081a64`）。
-- 三端核对：`[PASS] Local / GitHub / cloud sources match`（28 函数 170 文件一致；线上 admin.html SHA 一致；50 资产一致）。
-- 部署范围：activities 1 个云函数（发布前经 deploy-function.ps1 部署，sync-shared 56 副本一致 + WP01 门 PASS）+ migration 20261009180000（已应用）；静态文件零改动。
-- 档案补录提交（登记本发布记录）：见发布后报告（release.ps1 二次产出，云端产物未改变）。
+| 证据 | 结果 |
+| --- | --- |
+| 隔离测试 | 11/11 全绿（`tests/pmc/pmc14-participants.test.cjs`） |
+| migration 执行 | AffectedRows=7（step1 断言块 PASS → step2 UPDATE） |
+| 生产后核对 | q10-final 全符合预期（grp1_ok=2、grp89_ok=5、still_pending=5、alive 4/0/1 不变、softdel_customer_canonical=9） |
+| 全量测试复跑 | 62 项 59 PASS + 3 失败=G-PMC14-1（PMC-12 遗留，登记不修） |
+| regression | 94 项 PASS |
+| WP04 身份审计 | PASS_WITH_EXCEPTIONS（failures=[]） |
+| WP01 门槛 | PASS（blockers=[]） |
+| 受控浏览器生产深度回归 | 用户 iPad 实测全 OK（活动参与流程、活动统计、互动对象、人物时间线） |
+| 三端一致性 | 两次发布均 `[PASS] Local / GitHub / cloud sources match` |
+
+### 14.2 两项裁决落地确认
+
+| # | 裁决 | 落地状态 |
+| --- | --- | --- |
+| ① | 回填含软删行：7 行软删 customer 参与行回填 canonical | ✅ migration 已应用 AffectedRows=7；q10-final 核对符合预期 |
+| ② | Person 优先+快照保留：展示名经 canonical 取 persons.display_name；person_name 快照不可变 | ✅ enrichParticipants 已部署（canonicalPersonId 字符串输出+Person 优先展示+D6 快照保留） |
+
+### 14.3 发布记录
+
+- 主发布：提交 `d081a64`（24 files, +880/-26，代码+档案合一）；标签 `release-20261009-203048`；GitHub master 推送成功（`5fca6c1..d081a64`）。
+- 档案补录：提交 `f639b88`（2 files，登记发布记录与回滚哈希；云端产物未改变）；标签 `release-20261009-205135`。
+- 两次发布均三端一致 PASS（28 函数 170 文件一致、线上 admin.html SHA 一致、50 资产一致）。
+- 部署范围：activities 1 个云函数（sync-shared 56 副本一致 + WP01 门 PASS 后上传）+ migration 20261009180000（已应用）；静态文件零改动。
+
+### 14.4 验收限制项（非阻塞）
+
+| # | 限制 | 处置 |
+| --- | --- | --- |
+| L1 | 受控浏览器生产深度回归由用户 iPad 人工验收（非受控通道） | 用户确认全 OK，关闭未验证项第 1 条 |
+| L2 | G-PMC14-1（pmc11 fixture 3 用例失败）登记未修 | PMC-12 遗留 fixture 漂移，修复须单独授权 |
+| L3 | 5 行软删参与行保持"身份待确认" | 批准方案的设计行为，非缺陷 |
+
+### 14.5 结论
+
+**PMC-14 验收通过（PASS）**。参与者身份归一落地完成：三层身份模型（person_type+业务表主键 person_id／canonical_person_id／person_name 快照）经盘点证实；7 行软删 customer 参与行经专项批准回填 canonical；activities enrichParticipants Person 优先展示生效；未识别邀请对象按批准方案保留"身份待确认"；邀请不自动算作实际出席；多来源加入核实为不同人物无实际重复。G-PMC14-1 登记未修（非阻塞）。按约定发布后停止，等待 PMC-15 指令。

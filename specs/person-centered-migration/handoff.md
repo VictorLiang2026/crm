@@ -1,15 +1,15 @@
 # Handoff（接管状态）
 
-更新时间：2026-10-09（**PMC-14 实施完成、待用户验收**）。任何工具接手前先读本文件与 execution-contract。
+更新时间：2026-10-09（**PMC-14 已验收（PASS），等待 PMC-15 指令**）。任何工具接手前先读本文件与 execution-contract。
 
 ## 1. 执行状态
 
 | 项 | 值 |
 | --- | --- |
-| 当前执行工具 | Trae；PMC-14 实施完成，等待用户验收 |
-| 最后验收通过包 | **PMC-13（嘉宾模块完成 Person 与合作资料分离）——2026-10-09 用户验收通过（PASS）**：四项裁决全部落地（①enrichIdentity Person 优先读 name/phone/wechat/organization+customers 回退+linked_person 字段；②create 去掉自动建 Person+customers 分支，嘉宾身份不自动代表销售客户；③ai_activity 嘉宾 name Person 优先读；④admin.html ensurePersonCustomer 死函数保留不动）；activity_speakers/ai_activity 两函数已部署；隔离测试 9/9（复跑 297ms）；受控浏览器生产回归 S1–S7 全 PASS（S2 嘉宾列表 4 卡渲染、S3 杨杰微信来自 Person 主数据、S7 零写库）；WP04 speakers 4/4 mapped；regression 107/107；WP01 门槛 PASS。限制项 L1–L3 均非阻塞（create 生产写路径 T5-T7+sync-check 覆盖、ai_activity 真实模型 T8/T9 覆盖、picker 标记搜索为安全行为）。详见 evidence/PMC-13.md §14 |
-| 正在执行包 | **PMC-14（互动参与者和活动参与者统一人物身份）——实施完成待验收**：只读盘点 9 组 SQL 证实参与者三层身份模型（person_type+业务表主键 person_id／canonical_person_id／person_name 快照），7 行软删 customer 参与行经用户专项批准回填 canonical（AffectedRows=7，q10-final 核对全符合预期）；activities enrichParticipants 增强（canonicalPersonId 字符串输出+展示名 Person 优先+D6 快照不可变）；隔离测试 11/11；WP04 PASS_WITH_EXCEPTIONS；迁移双备份 SHA-256 一致 |
-| 下一步唯一允许执行的动作 | **等待用户验收 PMC-14**（受控浏览器生产深度回归需登录，按 PMC-13 先例留待用户 iPad 人工验收）；G-PMC11-1 修复、G-PMC12-1 处置、G-PMC14-1 修复须单独授权 |
+| 当前执行工具 | Trae；PMC-14 已验收（PASS），等待 PMC-15 指令 |
+| 最后验收通过包 | **PMC-14（互动参与者和活动参与者统一人物身份）——2026-10-09 用户 iPad 人工验收确认「都OK」（PASS）**：两项裁决全部落地（①回填含软删行：migration AffectedRows=7，7 行软删 customer 参与行经专项批准回填 canonical；②Person 优先+快照保留：activities enrichParticipants canonicalPersonId 字符串输出+展示名 Person 优先+D6 快照不可变）；activities 函数已部署；隔离测试 11/11；migration q10-final 核对全符合预期；regression 94 项 PASS；WP04 PASS_WITH_EXCEPTIONS；WP01 门 PASS；受控浏览器生产深度回归（活动参与流程、活动统计、互动对象、人物时间线）用户 iPad 实测全 OK。限制项 L1–L3 均非阻塞（L1 已关闭=用户 iPad 验收 OK、L2 G-PMC14-1 登记未修、L3 5 行身份待确认为设计行为）。详见 evidence/PMC-14.md §14 |
+| 正在执行包 | 无（PMC-14 已验收，PMC-15 指令未收到） |
+| 下一步唯一允许执行的动作 | **等待 PMC-15 指令**；G-PMC11-1 修复、G-PMC12-1 处置、G-PMC14-1 修复须单独授权 |
 | 回滚条件 | PMC-14 数据回滚：`cloudbase/rollbacks/20261009180000_pmc14_participant_canonical_backfill.sql`（按精确 id+预期值清 canonical，不动既有 2 行人工确认值）；代码回滚：`git revert d081a64`（本包提交）→ 重新部署 activities 函数。PMC-13 代码回滚：`git revert 9eb03e4` → 重新部署 activity_speakers/ai_activity 两函数；无结构/数据回滚（本包无 migration）。PMC-12 结构回滚：`cloudbase/rollbacks/20261009091200_pmc12_recruit_view_person_read.sql`；G-PMC11-2 结构回滚：`cloudbase/rollbacks/20261009070000_fix_v_recruit_candidates_left_join.sql` |
 
 ## 2. 版本基线（2026-10-09 PMC-13 发布时更新）
