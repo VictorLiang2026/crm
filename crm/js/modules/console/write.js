@@ -141,7 +141,25 @@ export function openWorkItemDone(ctx, { row, onDone }) {
             try {
               await p360(ctx, 'executeWorkItem', { previewId: res.previewId });
               sheet.overlay.remove();
-              ctx.toast(kind === 'action' ? t('action_completed') : t('commitment_fulfilled'), 'ok');
+              // 撤销：重新打开该行动/承诺（服务端 work-item-service 支持 reopen）
+              const undoId = row.id;
+              const undoKind = kind;
+              const undoPersonId = row.person_id;
+              ctx.toast(undoKind === 'action' ? t('action_completed') : t('commitment_fulfilled'), {
+                type: 'ok',
+                undoLabel: t('btn_undo'),
+                onUndo: async () => {
+                  try {
+                    const pv = await p360(ctx, 'previewWorkItem', { data: {
+                      idempotencyKey: uuid(), kind: undoKind, operation: 'reopen',
+                      personId: String(undoPersonId), itemId: String(undoId), draft: {},
+                    } });
+                    await p360(ctx, 'executeWorkItem', { previewId: pv.previewId });
+                    ctx.toast(undoKind === 'action' ? t('action_reopened') : t('commitment_reopened'), 'ok');
+                    if (onDone) onDone();
+                  } catch (e) { ctx.toast(String(e.message || t('undo_failed')), 'err'); }
+                },
+              });
               if (onDone) onDone();
             } catch (err) { busy(btn, false, t('confirm_complete')); sheet.showErr(err.message); }
           },

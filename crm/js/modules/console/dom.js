@@ -20,8 +20,28 @@ export function h(tag, attrs, children) {
   return node;
 }
 
-export function toast(msg, type) {
-  const t = h('div', { class: 'toast ' + (type || 'ok') }, msg);
+// toast(msg, opts) — opts 可为字符串（type）或对象 { type, onUndo, undoLabel, duration }
+// onUndo 存在时显示「撤销」按钮，点击后不自动消失（由调用方决定后续）。
+export function toast(msg, opts) {
+  const cfg = typeof opts === 'string' ? { type: opts } : (opts || {});
+  const type = cfg.type || 'ok';
+  const duration = cfg.duration || (cfg.onUndo ? 5000 : 2600);
+  const t = h('div', { class: 'toast toast-' + type }, [
+    h('span', { class: 'toast-msg' }, msg),
+    cfg.onUndo ? h('button', {
+      class: 'toast-undo', type: 'button',
+      onclick: () => { try { cfg.onUndo(); } finally { t.remove(); } },
+    }, cfg.undoLabel || '撤销') : null,
+  ]);
   document.getElementById('toast-root').appendChild(t);
-  setTimeout(() => t.remove(), 2600);
+  if (!cfg.onUndo) setTimeout(() => t.remove(), duration);
+  else {
+    // 带撤销的 toast 到点后只移除撤销按钮，消息继续显示短暂时间
+    const timer = setTimeout(() => {
+      const undo = t.querySelector('.toast-undo');
+      if (undo) undo.remove();
+      setTimeout(() => t.remove(), 800);
+    }, duration);
+    t._undoTimer = timer;
+  }
 }
