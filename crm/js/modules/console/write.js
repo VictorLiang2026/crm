@@ -9,7 +9,7 @@
 import { h } from './dom.js';
 import { ic } from './icons.js';
 import { bdg, fmtDate, dueLabel, textOf } from './ui.js';
-import { t } from './i18n.js';
+import { t, translateEnum } from './i18n.js';
 
 // ---------- 调用与错误归一 ----------
 async function p360(ctx, action, extra) {
