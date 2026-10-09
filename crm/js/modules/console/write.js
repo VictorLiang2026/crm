@@ -644,3 +644,174 @@ export function openQuickCapture(ctx, { personId, onDone } = {}) {
     return wrap;
   }
 }
+
+// ---------- 人物：新建（resolveIdentity 服务端同名解析 → 人工确认 → previewIdentity → executeIdentity） ----------
+export function openPersonNew(ctx, { onDone } = {}) {
+  const nameInput = h('input', { class: 'sheet-input', maxlength: '160', placeholder: t('new_person_name_ph') });
+  const checkBtn = h('button', { class: 'btn btn-primary', type: 'button', onclick: (e) => doResolve(e.currentTarget) }, t('btn_check_name'));
+  const sheet = openSheet({
+    title: t('new_person_title'), sub: t('new_person_sub'),
+    body: h('div', {}, [
+      fieldRow(t('new_person_name'), nameInput),
+      h('div', { class: 'sheet-actions' }, [checkBtn]),
+    ]),
+  });
+  document.body.appendChild(sheet.overlay);
+
+  async function doResolve(btn) {
+    const name = nameInput.value.trim();
+    if (!name) { sheet.showErr(t('enter_new_person_name')); return; }
+    busy(btn, true, t('new_person_checking'));
+    try {
+      const res = await p360(ctx, 'resolveIdentity', { name });
+      busy(btn, false, t('btn_check_name'));
+      render(res, name);
+    } catch (err) {
+      busy(btn, false, t('btn_check_name'));
+      sheet.showErr(err.message);
+    }
+  }
+
+  function render(res, name) {
+    const candidates = res.candidates || [];
+    // 服务端契约（previewIdentity 同口径）：仅在 无同名过多 & 无回收站同名 & 状态可建 时允许新建
+    const canCreate = !res.hasMore && !res.deletedIdentity &&
+      ['available', 'confirm_new_qualified'].includes(res.status);
+    const rows = [];
+    if (candidates.length) {
+      rows.push(h('p', { class: 'sheet-note', style: 'margin:0 0 8px' },
+        `${t('identity_pick_existing')} ${t('identity_qualifier_hint')}`));
+      candidates.forEach((c) => rows.push(h('a', {
+        class: 'cand', href: `#/person/${c.id}`,
+        onclick: () => sheet.overlay.remove(),
+      }, `${c.displayName || c.display_name}（${c.occupation || t('occupation_empty')} · ${c.organization || t('organization_empty')}）#${c.id}`)));
+    } else if (res.hasMore) {
+      rows.push(h('div', { class: 'sheet-err' }, t('identity_has_more')));
+    } else if (res.deletedIdentity) {
+      rows.push(h('div', { class: 'sheet-err' }, t('identity_deleted_note')));
+    } else {
+      rows.push(h('p', { class: 'sheet-note', style: 'margin:0 0 8px' },
+        res.status === 'available' ? t('identity_available') : t('identity_confirm_new')));
+    }
+    if (canCreate) {
+      rows.push(h('div', { class: 'sheet-actions' }, [
+        h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => sheet.overlay.remove() }, t('cancel')),
+        h('button', { class: 'btn btn-primary', type: 'button', onclick: (e) => previewCreate(e.currentTarget, name) }, t('btn_create')),
+      ]));
+    }
+    sheet.swap(h('div', {}, [
+      fieldRow(t('new_person_name'), nameInput),
+      h('div', { style: 'margin-top:8px' }, rows),
+    ]));
+    nameInput.readOnly = true;
+  }
+
+  async function previewCreate(btn, name) {
+    busy(btn, true, t('creating'));
+    try {
+      const pv = await p360(ctx, 'previewIdentity', { data: {
+        kind: 'person', idempotencyKey: uuid(), displayName: name,
+      } });
+      busy(btn, false, t('btn_create'));
+      sheet.swap(h('div', {}, [
+        previewBlock([
+          kvRow(t('new_person_name'), name),
+          h('div', { class: 'sheet-note', style: 'margin-top:8px' }, t('new_person_preview_note')),
+        ]),
+        h('div', { class: 'sheet-actions' }, [
+          h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => sheet.overlay.remove() }, t('cancel')),
+          h('button', { class: 'btn btn-primary', type: 'button', onclick: (e) => doCreate(e.currentTarget, pv) }, t('btn_confirm')),
+        ]),
+      ]));
+    } catch (err) { busy(btn, false, t('btn_create')); sheet.showErr(err.message); }
+  }
+
+  async function doCreate(btn, pv) {
+    busy(btn, true, t('creating'));
+    try {
+      const created = await p360(ctx, 'executeIdentity', { data: { previewId: pv.previewId } });
+      if (!created || !created.personId) throw new Error(t('create_failed'));
+      sheet.overlay.remove();
+      ctx.toast(`${t('person_created')} #${created.personId} · ${t('new_person_profile_note')}`, 'ok');
+      if (onDone) onDone(created.personId);
+    } catch (err) { busy(btn, false, t('btn_confirm')); sheet.showErr(err.message); }
+  }
+}
+
+// ---------- 人物：编辑基础资料（updatePerson，乐观锁；客户档案字段不在本表单范围） ----------
+export function openPersonEdit(ctx, { personId, onDone } = {}) {
+  const sheet = openSheet({
+    title: t('edit_person_title'), sub: t('edit_scope_note'),
+    body: h('div', { class: 'muted' }, t('edit_loading')),
+  });
+  document.body.appendChild(sheet.overlay);
+  (async () => {
+    let profile;
+    try { profile = await p360(ctx, 'getCustomerProfile', { personId: String(personId) }); }
+    catch (err) { sheet.showErr(err.message); return; }
+    if (profile && profile.error) { sheet.showErr(String(profile.error)); return; }
+    const f = profile.fields || {};
+    const linked = profile.status === 'linked';
+    const nameInput = h('input', { class: 'sheet-input', maxlength: '120', value: f.customer_name || '' });
+    const phoneInput = h('input', { class: 'sheet-input', maxlength: '40', value: f.phone || '' });
+    const birthdayInput = h('input', { class: 'sheet-input', type: 'date', value: String(f.birthday || '').slice(0, 10) });
+    const genderSel = sel([['', '—'], ['男', t('gender_male')], ['女', t('gender_female')], ['未知', t('gender_unknown')]], f.gender || '');
+    const occupationInput = h('input', { class: 'sheet-input', maxlength: '120', value: f.occupation || '' });
+    const organizationInput = h('input', { class: 'sheet-input', maxlength: '120', value: f.organization || '' });
+    const educationInput = h('input', { class: 'sheet-input', maxlength: '120', value: f.education || '' });
+    const wechatInput = h('input', { class: 'sheet-input', maxlength: '80', value: f.wx_account || '' });
+    const notesTa = h('textarea', { class: 'sheet-textarea', style: 'min-height:64px', maxlength: '2000' }, f.additional_info || '');
+    if (linked) notesTa.disabled = true;
+    const body = h('div', {}, [
+      fieldRow(t('field_name'), nameInput),
+      h('div', { style: 'display:flex;gap:10px' }, [
+        h('div', { class: 'sheet-field', style: 'flex:1' }, [h('label', {}, t('field_phone')), phoneInput]),
+        h('div', { class: 'sheet-field', style: 'width:170px' }, [h('label', {}, t('field_birthday')), birthdayInput]),
+      ]),
+      h('div', { style: 'display:flex;gap:10px' }, [
+        h('div', { class: 'sheet-field', style: 'flex:1' }, [h('label', {}, t('field_gender')), genderSel]),
+        h('div', { class: 'sheet-field', style: 'flex:1' }, [h('label', {}, t('field_wechat')), wechatInput]),
+      ]),
+      h('div', { style: 'display:flex;gap:10px' }, [
+        h('div', { class: 'sheet-field', style: 'flex:1' }, [h('label', {}, t('field_occupation')), occupationInput]),
+        h('div', { class: 'sheet-field', style: 'flex:1' }, [h('label', {}, t('field_organization')), organizationInput]),
+        h('div', { class: 'sheet-field', style: 'flex:1' }, [h('label', {}, t('field_education')), educationInput]),
+      ]),
+      linked
+        ? fieldRow(t('field_notes_customer'), notesTa, t('edit_notes_linked_note'))
+        : fieldRow(t('field_notes'), notesTa),
+      h('div', { class: 'sheet-actions' }, [
+        h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => sheet.overlay.remove() }, t('cancel')),
+        h('button', { class: 'btn btn-primary', type: 'button', onclick: (e) => doSave(e.currentTarget) }, t('btn_save')),
+      ]),
+    ]);
+    sheet.swap(body);
+
+    async function doSave(btn) {
+      const data = { personId: String(personId), expectedUpdatedAt: f.updated_at };
+      const changed = {};
+      const put = (key, val, orig) => { if (String(val ?? '') !== String(orig ?? '')) changed[key] = val; };
+      put('displayName', nameInput.value.trim(), f.customer_name);
+      put('phone', phoneInput.value.trim(), f.phone);
+      put('birthday', birthdayInput.value, String(f.birthday || '').slice(0, 10));
+      put('gender', genderSel.value, f.gender || '');
+      put('occupation', occupationInput.value.trim(), f.occupation);
+      put('organization', organizationInput.value.trim(), f.organization);
+      put('education', educationInput.value.trim(), f.education);
+      put('wechat', wechatInput.value.trim(), f.wx_account);
+      if (!linked) put('notes', notesTa.value.trim(), f.additional_info);
+      if (!Object.keys(changed).length) { sheet.showErr(t('edit_no_changes')); return; }
+      Object.assign(data, changed);
+      if (changed.displayName === '') { sheet.showErr(t('new_person_name')); return; }
+      busy(btn, true, t('saving'));
+      try {
+        const res = await p360(ctx, 'updatePerson', { data });
+        if (res && res.conflict) { busy(btn, false, t('btn_save')); sheet.showErr(t('edit_conflict')); return; }
+        if (!res || res.ok === false) throw new Error((res && res.message) || t('save_failed'));
+        sheet.overlay.remove();
+        ctx.toast(t('person_saved'), 'ok');
+        if (onDone) onDone();
+      } catch (err) { busy(btn, false, t('btn_save')); sheet.showErr(err.message); }
+    }
+  })();
+}

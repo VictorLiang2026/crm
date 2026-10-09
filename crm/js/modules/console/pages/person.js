@@ -5,7 +5,7 @@
 import { h } from '../dom.js';
 import { ic } from '../icons.js';
 import { data } from '../data.js';
-import { openWorkItemDone, openOpportunityAdvance, openQuickCapture } from '../write.js';
+import { openWorkItemDone, openOpportunityAdvance, openQuickCapture, openPersonEdit } from '../write.js';
 import {
   wpTag, pageHead, emptyNote, loadInto, bdg, kvGrid, sectionTitle,
   fmtDate, weekdayCN, dueLabel, toneByDue, textOf,
@@ -42,7 +42,8 @@ function overviewNode(ctx, id, setName) {
     const infoPairs = [
       [t('field_phone'), f.phone], [t('field_gender'), translateEnum('gender', f.gender)], [t('field_birthday'), f.birthday],
       [t('field_occupation'), f.occupation], [t('field_organization'), f.organization], [t('field_education'), f.education],
-      [t('field_source'), f.source], [t('field_customer_stage'), translateEnum('customer_stage', f.customer_stage)], [t('field_sales_priority'), translateEnum('sales_priority', f.sales_priority)],
+      [t('field_wechat'), f.wx_account], [t('field_source'), translateEnum('person_source', f.source)],
+      [t('field_customer_stage'), translateEnum('customer_stage', f.customer_stage)], [t('field_sales_priority'), translateEnum('sales_priority', f.sales_priority)],
       [t('field_marital'), translateEnum('marital_status', f.marital_status)], [t('field_income'), f.annual_income], [t('field_updated'), fmtDate(f.updated_at)],
     ];
     const activeWorks = (works.rows || []).filter((r) =>
@@ -136,7 +137,7 @@ function factsNode(ctx, id) {
       blocks.push(h('div', {}, rows.slice(0, 15).map((r) => h('div', { class: 'list-row' }, [
         h('div', { style: 'flex:1;min-width:0' }, [
           h('div', { class: 'row-title' }, [
-            r.category ? bdg(r.category, 'ink') : null,
+            r.category ? bdg(translateEnum('fact_category', r.category), 'ink') : null,
             h('span', { style: 'margin-left:8px' }, r.content),
           ]),
           h('div', { class: 'row-sub' }, r.origin
@@ -221,7 +222,7 @@ function insuranceNode(ctx, id) {
       blocks.push(sectionTitle(t('sec_open_opps_insurance')));
       blocks.push(h('div', {}, opps.slice(0, 8).map((r) => provenanceRow(
         `${r.type || t('opp_default')} · ${r.progress || ''}`,
-        `${r.status || ''} · ${t('label_updated_short')} ${fmtDate(r.observedAt)}`, bdg(r.status || '', 'gold')))));
+        `${oppStatusLabel(r.status) || r.status || ''} · ${t('label_updated_short')} ${fmtDate(r.observedAt)}`, bdg(oppStatusLabel(r.status) || r.status || '', 'gold')))));
     }
     const acts = d.nextActions || [];
     if (acts.length) {
@@ -265,7 +266,7 @@ function opportunitiesNode(ctx, id) {
         rowsBlock(activeWorks, (r) => h('div', { class: 'list-row' }, [
           h('div', { style: 'flex:1;min-width:0' }, [
             h('div', { class: 'row-title' }, r.kind === 'action' ? (r.title || t('unnamed_action')) : (r.content || t('unnamed_commitment'))),
-            h('div', { class: 'row-sub' }, `${r.status} · ${dueLabel(String(r.due_at || '').slice(0, 10))}`),
+            h('div', { class: 'row-sub' }, `${translateEnum('work_status', r.status)} · ${dueLabel(String(r.due_at || '').slice(0, 10))}`),
           ]),
           bdg(r.kind === 'action' ? t('label_action') : t('label_commitment'), r.kind === 'action' ? 'ink' : 'gold'),
           h('button', {
@@ -537,6 +538,10 @@ export function renderPerson(ctx, id) {
         h('button', {
           class: 'btn btn-soft', type: 'button', onclick: openPlaybook,
         }, [ic('chat'), t('btn_playbook')]),
+        h('button', {
+          class: 'btn btn-soft', type: 'button',
+          onclick: () => openPersonEdit(wctx, { personId: String(id), onDone: wctx.onWriteDone }),
+        }, [ic('gear'), t('btn_edit_profile')]),
         h('button', {
           class: 'btn btn-soft', type: 'button',
           onclick: () => openQuickCapture(wctx, { personId: String(id), onDone: wctx.onWriteDone }),

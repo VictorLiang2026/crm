@@ -2,6 +2,7 @@
 import { h } from '../dom.js';
 import { ic } from '../icons.js';
 import { data } from '../data.js';
+import { openPersonNew } from '../write.js';
 import { wpTag, pageHead, emptyNote, loadInto, bdg, textOf } from '../ui.js';
 import { t, translateEnum } from '../i18n.js';
 
@@ -117,6 +118,10 @@ export function renderPeople(ctx) {
         ic('search'), input,
         h('button', { class: 'btn btn-primary btn-sm', type: 'button', onclick: doSearch }, t('btn_search')),
       ]),
+      h('button', {
+        class: 'btn btn-soft btn-sm', type: 'button', style: 'margin-left:auto',
+        onclick: () => openPersonNew(ctx, { onDone: (newId) => { if (newId) location.hash = `#/person/${newId}`; else runQuery(); } }),
+      }, [ic('plus'), t('btn_new_person')]),
     ]),
     h('section', { class: 'card' }, [
       listEl,

@@ -55,6 +55,8 @@ const DICT = {
   'btn_generate': { 'zh-CN': '生成', 'en': 'Generate' },
   'btn_regenerate': { 'zh-CN': '重新生成', 'en': 'Regenerate' },
   'btn_reload': { 'zh-CN': '重新加载', 'en': 'Reload' },
+  'btn_create': { 'zh-CN': '创建', 'en': 'Create' },
+  'creating': { 'zh-CN': '创建中…', 'en': 'Creating…' },
 
   'empty_no_data': { 'zh-CN': '暂无数据', 'en': 'No data' },
   'empty_no_info': { 'zh-CN': '暂无资料', 'en': 'No info' },
@@ -491,6 +493,8 @@ const DICT = {
   'field_phone': { 'zh-CN': '手机', 'en': 'Phone' },
   'field_gender': { 'zh-CN': '性别', 'en': 'Gender' },
   'field_birthday': { 'zh-CN': '生日', 'en': 'Birthday' },
+  'field_name': { 'zh-CN': '姓名', 'en': 'Name' },
+  'save_failed': { 'zh-CN': '保存失败', 'en': 'Save failed' },
   'field_occupation': { 'zh-CN': '职业', 'en': 'Occupation' },
   'field_organization': { 'zh-CN': '机构', 'en': 'Org' },
   'field_organization_full': { 'zh-CN': '机构', 'en': 'Organization' },
@@ -757,6 +761,45 @@ const DICT = {
 
   'opp_type_other': { 'zh-CN': '其他', 'en': 'Other' },
 
+  // person source / fact category
+  'source_quick_capture': { 'zh-CN': '快速记录', 'en': 'Quick Capture' },
+  'source_manual': { 'zh-CN': '人工新增', 'en': 'Manual Entry' },
+  'fact_cat_quick_capture': { 'zh-CN': '快速记录', 'en': 'Quick Capture' },
+  'fact_cat_manual': { 'zh-CN': '人工', 'en': 'Manual' },
+  'status_cancelled': { 'zh-CN': '已取消', 'en': 'Cancelled' },
+
+  // 新建人物（服务端同名解析 + 人工确认）
+  'btn_new_person': { 'zh-CN': '新建人物', 'en': 'New Person' },
+  'new_person_title': { 'zh-CN': '新建人物', 'en': 'New Person' },
+  'new_person_sub': { 'zh-CN': '服务端同名解析，人工确认后建档；不凭姓名自动写入。', 'en': 'Server-side duplicate check; create only after your confirm.' },
+  'new_person_name': { 'zh-CN': '姓名', 'en': 'Name' },
+  'new_person_name_ph': { 'zh-CN': '输入完整姓名，可带限定词（如「张三（律师）」）', 'en': 'Full name; qualifier allowed, e.g. "Zhang San (Lawyer)"' },
+  'btn_check_name': { 'zh-CN': '检查同名', 'en': 'Check Name' },
+  'new_person_checking': { 'zh-CN': '解析中…', 'en': 'Checking…' },
+  'identity_available': { 'zh-CN': '无同名人物，可新建。', 'en': 'No duplicates; safe to create.' },
+  'identity_confirm_new': { 'zh-CN': '有近似姓名，请确认后新建。', 'en': 'Similar names exist; confirm before creating.' },
+  'identity_pick_existing': { 'zh-CN': '同名人物已存在，请前往对应人物。', 'en': 'Person(s) with this name already exist.' },
+  'identity_qualifier_hint': { 'zh-CN': '确要新建？请在姓名后加限定词（如「张三（律师）」）后重新检查。', 'en': 'To create anyway, add a qualifier (e.g. "Name (role)") and re-check.' },
+  'identity_has_more': { 'zh-CN': '同名记录过多，请到旧系统处理或修改姓名。', 'en': 'Too many matches; use legacy admin or change the name.' },
+  'identity_deleted_note': { 'zh-CN': '同名人物存在于回收站，请先恢复或改名。', 'en': 'A person with this name is in the trash; restore or rename first.' },
+  'go_to_person': { 'zh-CN': '前往', 'en': 'Open' },
+  'new_person_preview_note': { 'zh-CN': '确认后服务端将创建新人物，并在「人工新增」来源下记录。', 'en': 'Server creates the person after your confirm, sourced as Manual Entry.' },
+  'person_created': { 'zh-CN': '人物已创建', 'en': 'Person created' },
+  'new_person_profile_note': { 'zh-CN': '建档后可在 Person 360「编辑资料」补充职业、单位等信息。', 'en': 'After creation, use Edit Profile to add details.' },
+
+  // 编辑人物资料（updatePerson，乐观锁）
+  'btn_edit_profile': { 'zh-CN': '编辑资料', 'en': 'Edit Profile' },
+  'edit_person_title': { 'zh-CN': '编辑人物资料', 'en': 'Edit Person Profile' },
+  'edit_scope_note': { 'zh-CN': '仅修改 Person 基础资料；客户档案字段（阶段/优先级/婚姻/收入）请用旧系统维护。', 'en': 'Edits Person basic info only; customer fields (stage/priority/marital/income) via legacy admin.' },
+  'field_wechat': { 'zh-CN': '微信', 'en': 'WeChat' },
+  'field_notes': { 'zh-CN': '备注', 'en': 'Notes' },
+  'field_notes_customer': { 'zh-CN': '备注（客户档案）', 'en': 'Notes (Customer)' },
+  'edit_notes_linked_note': { 'zh-CN': '已关联客户档案，备注请用旧系统维护。', 'en': 'Linked to a customer; maintain notes via legacy admin.' },
+  'edit_no_changes': { 'zh-CN': '没有修改', 'en': 'No changes' },
+  'edit_conflict': { 'zh-CN': '资料已被其他设备修改，请刷新后重试。', 'en': 'Changed on another device; refresh and retry.' },
+  'person_saved': { 'zh-CN': '资料已保存', 'en': 'Profile saved' },
+  'edit_loading': { 'zh-CN': '正在载入资料…', 'en': 'Loading profile…' },
+
   'close_aria': { 'zh-CN': '关闭', 'en': 'Close' },
   'delete_aria': { 'zh-CN': '删除', 'en': 'Delete' },
 };
@@ -813,6 +856,19 @@ export const ENUM_I18N = {
   channel: {
     '微信': 'channel_wechat', '电话': 'channel_phone', '面谈': 'channel_meeting',
     '面对面': 'channel_face2face', '活动': 'channel_activity',
+  },
+  // 行动/承诺状态（数据库值为英文）
+  work_status: {
+    'open': 'status_pending', 'in_progress': 'status_in_progress', 'completed': 'status_completed',
+    'skipped': 'status_skipped', 'cancelled': 'status_cancelled',
+  },
+  // 人物来源（persons.source；关联客户的 legacy 来源值不在其中，原样显示）
+  person_source: {
+    '快速记录': 'source_quick_capture', '人工新增': 'source_manual',
+  },
+  // 事实类别（context_items.category，系统英文 key）
+  fact_category: {
+    'quick_capture': 'fact_cat_quick_capture', 'manual': 'fact_cat_manual',
   },
   // write.js opportunity advance options (superset of opportunity_status)
   opportunity_stage: {
