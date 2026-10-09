@@ -94,3 +94,20 @@ PMC-16 完成"其余业务引用和历史兼容"收口：11 张业务表的 ID �
 - iPad 生产浏览器深度回归（OCR 删除→冲突 diff→覆盖/保持 的人工路径）留用户验收；服务端冲突门与前端逻辑由隔离测试 A/C 组覆盖。
 - followups 软删无 batch 1 行、ai_recommendations 无 deleted_at：观察项登记，修复须单独授权。
 - G-PMC11-1 / G-PMC12-1 / G-PMC14-1 维持登记未修（均须单独授权）。
+
+## 7. 验收记录
+
+**2026-10-10 用户下发「执行最终验收确认」：PMC-16 验收通过（PASS）。**
+
+依据：
+
+- 隔离测试复跑 7/7 全绿（266ms）。
+- 发布标签 `release-20261010-050207`（提交 `23c4a47`）三端核对一致：GitHub master/标签=HEAD；28 函数 170 源码/配置文件一致；56 共享副本一致；线上 admin.html HTTP 200 SHA 一致；50 静态资产 SHA 一致。
+- 生产只读复核（q3 重跑，28 项指标）：与开包盘点完全一致零漂移——11 表孤儿引用全部=0；interactions 9 行（0 行 legacy 物化副本）；followups 250（软删 1、姓名漂移 5=历史快照保留）；opportunities 9（customer 7/person-only 2）；ai_recommendations 26；ocr_records 6（快照 2）。
+- WP01 门 blockers=[]。
+
+五项指令对照：①11 表逐项归属裁决（业务引用 vs 人物基础信息重复），孤儿引用全 0（§2.1）；②customer_id 保留、零全局替换、历史作者/发生时姓名/合同与报告快照按历史证据保留不改写；③双轨时间线来源标识（`source: public.表#id`）+ `source_type:source_id` 去重 + 账本优先 + 删除不复活，listInteractions 与 timeline 规则对齐，同一跟进单条呈现不重复统计（B1 锁定）；④OCR 快照恢复跨角色修改后不覆盖人物字段（服务端冲突门 + 前端 diff 人工确认 forceRestore 闭环），失败/冲突不销毁恢复依据（双快照保留、冲突清单展示），老快照 JSON 解析容错保持（A1–A4/C1/C2）；⑤软删/恢复/附件权限/审计链体检全绿，未重写任何历史 AI 输出、报告、原始附件或已确认互动（§2.4）。
+
+限制项处置：①iPad 生产浏览器 OCR 冲突 diff 人工路径深度回归——由用户本次最终验收确认关闭；②followups 软删无 batch 1 行、ai_recommendations 无 deleted_at——维持观察项登记，修复须单独授权；③G-PMC11-1/G-PMC12-1/G-PMC14-1——保持登记，修复须单独授权。
+
+PMC-17 指令未收到，不自行开包。

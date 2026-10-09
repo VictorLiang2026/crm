@@ -1,15 +1,15 @@
 # Handoff（接管状态）
 
-更新时间：2026-10-10（**PMC-16 已发布，等待用户验收**）。任何工具接手前先读本文件与 execution-contract。
+更新时间：2026-10-10（**PMC-16 已验收（PASS），等待 PMC-17 指令**）。任何工具接手前先读本文件与 execution-contract。
 
 ## 1. 执行状态
 
 | 项 | 值 |
 | --- | --- |
-| 当前执行工具 | Trae；PMC-16 已发布，等待用户验收 |
-| 最后验收通过包 | **PMC-15（角色、人与人关系和家庭关系归位）——2026-10-10 用户下发「执行最终验收确认」（PASS）**：五项指令全部落地（①person_roles=业务派生+人工标记组合，crm_person_roles_derive_v1+5 AFTER 触发器实时重算，origin=derived；②人物端点全部 person_id 锚定；③relationships 治理列+类型词表+确认 CHECK，家庭/投保角色不混入；④旧线索/AI 建议只能 pending，AI/搜索/会前只读 confirmed；⑤删业务角色不误删关系/家庭/人工角色，s11 事务回归实证）。migration `20261009220000`（+守卫 rollback 双备份）已应用；对账删 stale 703/792、补 person 777 customer+recruit；部署 ai_activity/person_360 两函数+4 静态模块（50 在线资产 SHA 一致，admin.html 未改）；隔离测试复跑 12/12；全量 165/168（3 为既有 G-PMC14-1）；postcheck 漂移=0；WP01 blockers=[]；发布标签 `release-20261009-231926`（提交 `792daf2`）。限制项均非阻塞（iPad 深度回归由用户验收关闭、relationships 写入路径属后续包、G-PMC14-1 登记未修）。详见 evidence/PMC-15.md §14 |
-| 正在执行包 | **PMC-16（互动、跟进及其他业务引用与历史记录收口）——已发布，等待用户验收**：11 表归属逐项裁决（现网已正确，零 customer_id→person_id 替换，零结构变更）；InteractionService.listForPerson 补 activeLegacy 防复活过滤与 timeline 对齐；admin.html OCR 恢复闭环修复（冲突 diff+人工确认 forceRestore，消除假成功）；隔离测试 7/7；全量 172/175（3 为既有 G-PMC14-1）；WP01 blockers=[]；部署 person_360 函数+admin.html 静态；发布标签 `release-20261010-050207`。详见 evidence/PMC-16.md |
-| 下一步唯一允许执行的动作 | **等待 PMC-16 验收 / PMC-17 指令**；relationships pending 候选写入路径、G-PMC11-1/G-PMC12-1/G-PMC14-1 修复须单独授权 |
+| 当前执行工具 | Trae；PMC-16 已验收（PASS），等待 PMC-17 指令 |
+| 最后验收通过包 | **PMC-16（互动、跟进及其他业务引用与历史记录收口）——2026-10-10 用户下发「执行最终验收确认」（PASS）**：五项指令全部落地（①11 表归属逐项裁决：interactions/actions/commitments 已 person_id 锚定、客户业务表保留 customer_id+发生时快照，孤儿引用全 0；②零 customer_id→person_id 全局替换、历史快照不改写；③双轨时间线来源标识+`source_type:source_id` 去重+账本优先+删除不复活，listInteractions 与 timeline 规则对齐；④OCR 恢复闭环：冲突 diff+人工确认 forceRestore、消除假成功，双快照依据不销毁；⑤软删/附件/审计链体检全绿）。**零数据库结构变更**；部署 person_360 函数+admin.html 静态；隔离测试复跑 7/7；全量 172/175（3 为既有 G-PMC14-1）；生产只读复核 28 项指标零漂移；WP01 blockers=[]；发布标签 `release-20261010-050207`（提交 `23c4a47`）。限制项均非阻塞（iPad OCR 冲突 diff 人工路径由用户验收关闭、followups 软删无 batch 1 行与 ai_recommendations 无 deleted_at 维持登记、G-PMC14-1 登记未修）。详见 evidence/PMC-16.md §7 |
+| 正在执行包 | 无（PMC-16 已验收，PMC-17 指令未收到） |
+| 下一步唯一允许执行的动作 | **等待 PMC-17 指令**；relationships pending 候选写入路径、G-PMC11-1/G-PMC12-1/G-PMC14-1 修复须单独授权 |
 | 回滚条件 | PMC-16（无 DB 变更）：`git revert` 本包发布提交 → 重新部署 person_360 函数与 admin.html 静态。PMC-15：`cloudbase/rollbacks/20261009220000_pmc15_role_derivation_relationship_governance.rollback.sql`（守卫式：逆对账恢复 703/792、删 777 补入行→DROP 5 触发器/2 函数/4 列→复原 origin CHECK）；代码用上一发布标签重新部署 ai_activity/person_360 与 4 静态模块。PMC-14 数据回滚：`cloudbase/rollbacks/20261009180000_pmc14_participant_canonical_backfill.sql`（按精确 id+预期值清 canonical，不动既有 2 行人工确认值）；代码回滚：`git revert d081a64`（本包提交）→ 重新部署 activities 函数。PMC-13 代码回滚：`git revert 9eb03e4` → 重新部署 activity_speakers/ai_activity 两函数；无结构/数据回滚（本包无 migration）。PMC-12 结构回滚：`cloudbase/rollbacks/20261009091200_pmc12_recruit_view_person_read.sql`；G-PMC11-2 结构回滚：`cloudbase/rollbacks/20261009070000_fix_v_recruit_candidates_left_join.sql` |
 
 ## 2. 版本基线（2026-10-09 PMC-13 发布时更新）
@@ -27,7 +27,7 @@
 | 数据库迁移 | PMC-15 `20261009220000_pmc15_role_derivation_relationship_governance`（已应用：person_roles origin/role CHECK、relationships 4 治理列+2 CHECK、2 SECURITY DEFINER 函数+5 触发器、重建 crm_search_people_v1、对账删 2 补 2）；PMC-14 `20261009180000_pmc14_participant_canonical_backfill`（已应用，数据回填 7 行软删行 canonical，无结构变更）；G-PMC11-2 修复 `20261009070000`（已应用）；persons anon 只读依赖 PMC-10 `20261008231500`，在效 |
 | 数据规模抽查（PMC-16 盘点） | interactions 9 行（全 manual，0 legacy 物化副本）；followups 250（软删 1，5 行姓名漂移=历史快照保留）；opportunities 9（customer 7/person-only 2）；actions 4、commitments 2；products 1、policy_review_reports 2、gifts 189、photos 8、ocr_records 6（含快照 2）；ai_recommendations 26（nba open 25/skipped 1）；11 表孤儿引用全部=0 |
 
-历史基线链：PMC-00 → …→ PMC-11 最终验收通过（`release-20261009-0823`）→ PMC-12（已验收，`release-20261009-141318`）→ PMC-13（已验收，`release-20261009-151917`）→ PMC-14（已验收，`release-20261009-203048`）→ PMC-15（已验收，`release-20261009-231926`）→ **PMC-16（已发布待验收，`release-20261010-050207`）**。
+历史基线链：PMC-00 → …→ PMC-11 最终验收通过（`release-20261009-0823`）→ PMC-12（已验收，`release-20261009-141318`）→ PMC-13（已验收，`release-20261009-151917`）→ PMC-14（已验收，`release-20261009-203048`）→ PMC-15（已验收，`release-20261009-231926`）→ **PMC-16（已验收，`release-20261010-050207`）**。
 
 ## 3. 各模块读写权威来源与兼容方向
 
@@ -76,7 +76,7 @@
 
 ## 6. 失败与未验证项
 
-- PMC-16 无失败项；限制（evidence/PMC-16.md §9）：①iPad 生产浏览器 OCR 冲突 diff 人工路径深度回归留用户验收（服务端冲突门由 A1-A4 隔离测试+静态契约 C1/C2 覆盖）；②followups 软删无 batch 1 行与 ai_recommendations 无 deleted_at 维持登记（不修）；③G-PMC14-1 保持登记（全量 175 中 3 项既有失败，基线同）。
+- PMC-16 无失败项；限制（evidence/PMC-16.md §6/§7）：①iPad 生产浏览器 OCR 冲突 diff 人工路径深度回归已由用户验收关闭；②followups 软删无 batch 1 行与 ai_recommendations 无 deleted_at 维持登记（不修）；③G-PMC14-1 保持登记（全量 175 中 3 项既有失败，基线同）。
 - PMC-15 无失败项；限制（evidence/PMC-15.md §9）：①iPad 生产浏览器深度回归（角色 badge、多角色筛选）已由用户验收关闭；②relationships 无写入路径，pending 候选生产与确认 UI 属后续工作包；③G-PMC14-1 保持登记（全量 168 中 3 项既有失败，基线同）。
 - PMC-14 无失败项；限制（evidence/PMC-14.md §9）：①受控浏览器生产深度回归未做（需登录，按 PMC-13 先例留待用户 iPad 验收；隔离面已覆盖：PMC-14 11/11+regression 94 项+WP04）；②G-PMC14-1（pmc11 fixture 3 用例失败）登记未修；③1 行软删 speaker 参与行与 4 行无 person_id 暂存行保持"身份待确认"（设计行为，非缺陷）。
 - PMC-12 无失败项；限制（evidence/PMC-12.md §9）：S5 AI 复盘 B 类采纳预览浏览器实测 BLOCKED（库内无 B 类建议行+IDE 超时，代码契约 T9 覆盖）、招募删除/恢复线上演练未做（RPC recruit 分支零改动+T4/T5 覆盖）。
