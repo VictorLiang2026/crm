@@ -480,9 +480,10 @@ persons.legacy_customer_id（自引用）
 | admin.html / console.html / 全部静态文件 | 零改动 | — | PMC-11 | 不变 | sync-check admin.html SHA 不变 |
 | 数据库 | 无 migration/rollback；persons anon 只读复用 PMC-10 20261008231500 授权 | — | PMC-11 | 无变更 | — |
 | **G-PMC11-1**（既有缺陷登记） | ai_activity analyze top3/no_followup 仅 parseInt 未按真实参与者 ID 白名单过滤，编造 ID 透传；非本包引入 | analyze 输出消费方 | PMC-11 登记 | **未修**（修复须单独授权；隔离测试锁定现状） | evidence/PMC-11.md §11 |
+| **G-PMC11-2**（既有缺陷修复） | `v_recruit_candidates` / `v_recruit_candidates_trash` 视图 INNER JOIN customers 过滤独立候选人（customer_id 为空），recruit_recommend/recruit_score/工作台对其返回「candidate not found」；cbad9aa 已存在，非本包引入 | recruit_recommend / recruit_score / recruit_candidates / ai_activity / ai_parse 等所有读取该视图的入口 | PMC-11 修复（用户单独批准） | **已修复（2026-10-09）**：两视图改 LEFT JOIN customers + LEFT JOIN persons，customer_name 改 `COALESCE(c.customer_name, p.display_name)`，列名/列序/类型/security_invoker/GRANT 不变；验证：14→15 行零差异、trash 3 行一致、浏览器真实链路 PASS、隔离测试复跑 19/19 | evidence/PMC-11.md §11 |
 
 ### 11.3 身份与搜索安全核实（静态 + 隔离）
 
 - assistant search-service.js：3 个固定模板、GUIDANCE 明确禁模型生成 SQL/禁按姓名自行选人、查询白名单 `public.crm_search_people_v1`、refs `{table:'persons', id}`、`businessDataWritten:false`——本轮未改，拒绝路径真实触发未实测（evidence §9 未验证项 4）。
 - 全部新增 persons 查询带 `deleted_at IS NULL`；ID 全程字符串/整数精确匹配，姓名从不作为身份证据（participantPersonId canonical 优先 → customers/recruit_candidates.person_id 精确回退）。
-- 映射基线：customers 779/782 已映射、姓名冲突 0；recruit_candidates 15/15 有 person_id（唯一差异为独立候选人 20，正常）。
+- 映射基线：customers 779/782 已映射、姓名冲突 0；recruit_candidates 15/15 有 person_id（候选人 20 为独立候选人、customer_id 为空，修复前被视图 INNER JOIN 过滤，**G-PMC11-2 修复后可见**）。

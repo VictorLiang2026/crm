@@ -148,7 +148,12 @@
 
 **G-PMC11-1**：`ai_activity` analyze action 的 top3/no_followup 清洗（index.js 约 L238-258）只做 `parseInt(p.person_id,10)||0`，**不像 participantReview/postReview 那样按真实参与者 ID 白名单过滤**——模型若返回编造 ID（fixture 中 999）会透传到输出。该缺陷为既有实现、非本包引入；隔离测试已锁定现状（期望 `[701,20,999]`）并在用例名与注释中引用本登记。修复属独立授权范围（建议方案：与 participantReview 同款真实参与者 ID 白名单清洗）。
 
-**G-PMC11-2**（2026-10-09 验收中发现）：**独立候选人（customer_id 为空）对 recruit_recommend / recruit_score 不可见**。两函数均从 `v_recruit_candidates` 视图取数（recruit_recommend/index.js L144、recruit_score/index.js L107），该视图为 `recruit_candidates rc JOIN customers c ON c."Id" = rc.customer_id` **INNER JOIN**（视图定义证据 tests/security/.results/pmc11-vrecruit-viewdef.json），独立候选人被过滤 → 生成返回「candidate not found」。git 证据：该查询与报错文案在 PMC-11 前基线 cbad9aa 已存在，**既有设计、非本包回归**。生产实测：候选人 20（唯一独立候选人）生成话术返回 candidate not found；视图 14 行全部有 customer_id，recruit_candidates 15 行。修复属独立授权范围（需评估视图改 LEFT JOIN 或函数回退直查 recruit_candidates+persons 的口径影响，涉及结构变更需 migration）。
+**G-PMC11-2**（2026-10-09 验收中发现，**同日经用户批准后已修复**）：**独立候选人（customer_id 为空）对 recruit_recommend / recruit_score / 招募工作台 list/get / 活动姓名回填 / ai_parse / ai_followup 不可见**。根因：`v_recruit_candidates` 与 `v_recruit_candidates_trash` 视图为 `recruit_candidates rc JOIN customers c ON c."Id" = rc.customer_id` **INNER JOIN**，过滤独立候选人 → AI 函数返回「candidate not found」，工作台详情页只剩空壳。git 证据：cbad9aa 已存在，既有缺陷非本包回归。
+
+**修复（migration `20261009070000_fix_v_recruit_candidates_left_join.sql`，rollback 同名文件于 cloudbase/rollbacks/）**：两视图改 `LEFT JOIN customers`（主视图 c.deleted_at 条件移入 JOIN）+ `LEFT JOIN persons p ON p.id = rc.person_id AND p.deleted_at IS NULL`，仅 customer_name 改 `COALESCE(c.customer_name, p.display_name)`（两侧均 text，类型不变），列名/列序/其余 38 列原样，security_invoker 与既有 GRANT 不变，无新授权。验证：
+- 主视图 14→15 行，新增恰为候选人 20（customer_name 取 Person 786 显示名），既有 14 行 × 39 列逐字段 diff **零差异**（tests/security/.results/pmc11-fix-vrecruit-before.json / after-full.json + D:\Temp\pmc11-diff-view.cjs 比对输出）；trash 视图 3 行修复前后完全一致；
+- 真实模型链路（受控浏览器，生产）：招募工作台列表 15 行含候选人 20；候选人 20 详情页显示真实数据；「AI 增员话术」tab → 生成 → **「话术生成成功」**，内容含候选人 Person 名「【系统测试·勿联系】虚构快速记录乙 · Person 360」，无报错（截图 d:\Temp\trae\screenshots\candidate_20_ai_result.png、1-recruit-list.png）；回收站 3 条 Alex 记录正常；全程控制台无 permission denied/500/persons 报错；
+- 隔离测试复跑 19/19（视图修复不改变函数代码路径，fixture 直注 rdb）。
 
 ## 12. 不变项与红线核对
 
@@ -156,12 +161,13 @@
 - 人工确认与命令执行授权链不变；本包未新增任何 AI 写入路径（ai_referral/ai_followup/recruit_recommend 不写库；ai_recommend/policy_review_reports/recruit_score 既有写入语义不变）。
 - 历史 ai_recommendations 行与 ai_tasks 上下文快照保持当时事实，不批量改写；listAll 仅扩展检索匹配，不改返回行内容。
 - 不拿真实客户做测试（仅 `【系统测试·勿联系】` 虚构样本 788/791/792 与候选人 20）；真实模型仅 1 次代表调用。
-- 无 migration/rollback（本包无数据库变更）。
+- 本包函数代码部分无 migration/rollback（无数据库变更）；G-PMC11-2 修复（用户单独批准）引入 1 份 migration + rollback（`20261009070000_fix_v_recruit_candidates_left_join.sql`，两视图 CREATE OR REPLACE，列契约不变、无数据变更、无新授权）。
 
 ## 13. 回滚条件
 
 - 代码回滚：`git revert` 本包提交 → 重新部署 §5 的 8 个函数（context-engine 两副本随 ai_activity 回滚）。
-- 无结构回滚、无数据回滚（无 migration、无业务数据写入；隔离测试不触线上）。
+- 本包函数代码部分无结构回滚、无数据回滚（隔离测试不触线上）。
+- G-PMC11-2 结构回滚：执行 `cloudbase/rollbacks/20261009070000_fix_v_recruit_candidates_left_join.sql`，两视图恢复 INNER JOIN 原始定义（修复前 pg_get_viewdef 快照）；纯视图定义切换，无数据影响。回滚后独立候选人（20）重新对 recruit_recommend/recruit_score/工作台不可见（即修复前缺陷行为）。
 
 ## 14. 验收执行记录（2026-10-09，用户下发「执行验收」）
 
@@ -171,6 +177,6 @@
 | --- | --- | --- |
 | 转介绍弹层（ai_referral，客户 788 → 经营机会 tab） | **PASS**（采用本包前轮证据） | 2026-10-08 生产实测 PASS，弹层正常渲染「⏸ 暂不建议转介绍/置信度：低」，无报错，截图存档；今日复测因浏览器代理在登录页自行猜测账号耗尽预算未执行——同一代码、同一部署，前轮证据有效 |
 | AI 建议列表搜索（ai_recommendations listAll，#/ai-suggestions） | **PASS** | 生产实测：页面正常渲染（表头/筛选/列表完整）；搜索关键词「虚构体验甲」正常执行、无报错；该客户无历史建议行故空结果（数据事实，非故障）；控制台无 permission denied/500/persons 报错。截图存档（代理记录 ai-suggestions-search-result.png） |
-| 增员话术（recruit_recommend，候选人详情 → AI 增员话术 tab） | **真实链路已触达；候选人 20 拦截系既有缺陷 G-PMC11-2；生成成功项留 iPad（用候选人 19）** | 受控浏览器多轮：① tab 在 15 秒充分等待下**可正常切换**（早前「不重渲染」系等待不足+窄视口），按钮出现、点击成功，真实请求到达 recruit_recommend；② 候选人 20 返回「candidate not found」——根因 G-PMC11-2（v_recruit_candidates 视图 INNER JOIN 过滤独立候选人，**既有缺陷非本包回归**，git 证据：cbad9aa 同查询同文案；视图 14 行全部有 customer_id，recruit_candidates 15 行，候选人 20 为唯一独立候选人）；③ 换视图内虚构候选人 19 重测时，浏览器代理在窄视口**误点「删除」及确认框**——立即只读核查：候选人 19/20、客户 788/791/792、Person 783-786 全部 `deleted_at=null`、updated_at 为历史时间，**删除未生效、零数据影响**（证据 tests/security/.results/pmc11-cand19-state.json、pmc11-cust-test-state.json、pmc11-persons-test-state.json）；鉴于浏览器代理连续行为不稳定，停止继续用受控浏览器触发生成 |
+| 增员话术（recruit_recommend，候选人详情 → AI 增员话术 tab） | **PASS（G-PMC11-2 修复后生产实测）** | 受控浏览器多轮：① tab 在 15 秒充分等待下**可正常切换**（早前「不重渲染」系等待不足+窄视口），按钮出现、点击成功，真实请求到达 recruit_recommend；② 候选人 20 返回「candidate not found」——根因 G-PMC11-2（v_recruit_candidates 视图 INNER JOIN 过滤独立候选人，**既有缺陷非本包回归**，git 证据：cbad9aa 同查询同文案；视图 14 行全部有 customer_id，recruit_candidates 15 行，候选人 20 为唯一独立候选人）；③ 换视图内虚构候选人 19 重测时，浏览器代理在窄视口**误点「删除」及确认框**——立即只读核查：候选人 19/20、客户 788/791/792、Person 783-786 全部 `deleted_at=null`、updated_at 为历史时间，**删除未生效、零数据影响**（证据 tests/security/.results/pmc11-cand19-state.json、pmc11-cust-test-state.json、pmc11-persons-test-state.json）；④ **G-PMC11-2 经用户批准修复后复测**：候选人 20 详情页 → AI 增员话术 tab → 生成 → **「话术生成成功」**，内容含 Person 名「【系统测试·勿联系】虚构快速记录乙 · Person 360」，全程无报错（截图 d:\Temp\trae\screenshots\candidate_20_ai_result.png），详见 §11 |
 
-验收结论：**PASS_WITH_EXCEPTIONS**——保留项为「iPad 真机打开 **候选人 19**（虚构独立增员甲，视图内）→ AI 增员话术 tab → 生成话术」（约 30 秒；注意不要用候选人 20，其被既有缺陷 G-PMC11-2 拦截）；增员话术函数本身同批改造、同批部署、同隔离测试覆盖，且同 helper 模式的 ai_referral 已在生产真实通道验证。另见 §11 G-PMC11-2 登记。
+验收结论：**PASS_WITH_EXCEPTIONS（初验）→ 增员话术保留项已关闭（2026-10-09 G-PMC11-2 修复后浏览器真实链路 PASS，用此前被拦截的候选人 20 完成，iPad 人工回归不再阻塞）**；G-PMC11-2 已修复并验证（§11）；其余未验证项见 §9。待用户对 PMC-11 做最终确认。
