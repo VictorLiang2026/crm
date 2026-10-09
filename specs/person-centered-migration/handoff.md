@@ -1,15 +1,15 @@
 # Handoff（接管状态）
 
-更新时间：2026-10-09（**PMC-15 已实施并发布，等待用户验收；PMC-16 指令未收到**）。任何工具接手前先读本文件与 execution-contract。
+更新时间：2026-10-10（**PMC-15 已验收（PASS），等待 PMC-16 指令**）。任何工具接手前先读本文件与 execution-contract。
 
 ## 1. 执行状态
 
 | 项 | 值 |
 | --- | --- |
-| 当前执行工具 | Trae；PMC-15 已发布待验收，等待用户验收/PMC-16 指令 |
-| 最后验收通过包 | **PMC-14（互动参与者和活动参与者统一人物身份）——2026-10-09 用户 iPad 人工验收确认「都OK」（PASS）**：两项裁决全部落地（①回填含软删行：migration AffectedRows=7，7 行软删 customer 参与行经专项批准回填 canonical；②Person 优先+快照保留：activities enrichParticipants canonicalPersonId 字符串输出+展示名 Person 优先+D6 快照不可变）；activities 函数已部署；隔离测试 11/11；migration q10-final 核对全符合预期；regression 94 项 PASS；WP04 PASS_WITH_EXCEPTIONS；WP01 门 PASS；受控浏览器生产深度回归（活动参与流程、活动统计、互动对象、人物时间线）用户 iPad 实测全 OK。限制项 L1–L3 均非阻塞（L1 已关闭=用户 iPad 验收 OK、L2 G-PMC14-1 登记未修、L3 5 行身份待确认为设计行为）。详见 evidence/PMC-14.md §14 |
-| 正在执行包 | 无（PMC-15 已发布 `release-20261009-231926`，待用户验收；PMC-16 指令未收到） |
-| 下一步唯一允许执行的动作 | **等待用户对 PMC-15 的验收或 PMC-16 指令**；relationships pending 候选写入路径、G-PMC11-1/G-PMC12-1/G-PMC14-1 修复须单独授权 |
+| 当前执行工具 | Trae；PMC-15 已验收（PASS），等待 PMC-16 指令 |
+| 最后验收通过包 | **PMC-15（角色、人与人关系和家庭关系归位）——2026-10-10 用户下发「执行最终验收确认」（PASS）**：五项指令全部落地（①person_roles=业务派生+人工标记组合，crm_person_roles_derive_v1+5 AFTER 触发器实时重算，origin=derived；②人物端点全部 person_id 锚定；③relationships 治理列+类型词表+确认 CHECK，家庭/投保角色不混入；④旧线索/AI 建议只能 pending，AI/搜索/会前只读 confirmed；⑤删业务角色不误删关系/家庭/人工角色，s11 事务回归实证）。migration `20261009220000`（+守卫 rollback 双备份）已应用；对账删 stale 703/792、补 person 777 customer+recruit；部署 ai_activity/person_360 两函数+4 静态模块（50 在线资产 SHA 一致，admin.html 未改）；隔离测试复跑 12/12；全量 165/168（3 为既有 G-PMC14-1）；postcheck 漂移=0；WP01 blockers=[]；发布标签 `release-20261009-231926`（提交 `792daf2`）。限制项均非阻塞（iPad 深度回归由用户验收关闭、relationships 写入路径属后续包、G-PMC14-1 登记未修）。详见 evidence/PMC-15.md §14 |
+| 正在执行包 | 无（PMC-15 已验收，PMC-16 指令未收到） |
+| 下一步唯一允许执行的动作 | **等待 PMC-16 指令**；relationships pending 候选写入路径、G-PMC11-1/G-PMC12-1/G-PMC14-1 修复须单独授权 |
 | 回滚条件 | PMC-15：`cloudbase/rollbacks/20261009220000_pmc15_role_derivation_relationship_governance.rollback.sql`（守卫式：逆对账恢复 703/792、删 777 补入行→DROP 5 触发器/2 函数/4 列→复原 origin CHECK）；代码用上一发布标签重新部署 ai_activity/person_360 与 4 静态模块。PMC-14 数据回滚：`cloudbase/rollbacks/20261009180000_pmc14_participant_canonical_backfill.sql`（按精确 id+预期值清 canonical，不动既有 2 行人工确认值）；代码回滚：`git revert d081a64`（本包提交）→ 重新部署 activities 函数。PMC-13 代码回滚：`git revert 9eb03e4` → 重新部署 activity_speakers/ai_activity 两函数；无结构/数据回滚（本包无 migration）。PMC-12 结构回滚：`cloudbase/rollbacks/20261009091200_pmc12_recruit_view_person_read.sql`；G-PMC11-2 结构回滚：`cloudbase/rollbacks/20261009070000_fix_v_recruit_candidates_left_join.sql` |
 
 ## 2. 版本基线（2026-10-09 PMC-13 发布时更新）
@@ -26,7 +26,7 @@
 | 数据库迁移 | PMC-15 `20261009220000_pmc15_role_derivation_relationship_governance`（已应用：person_roles origin/role CHECK、relationships 4 治理列+2 CHECK、2 SECURITY DEFINER 函数+5 触发器、重建 crm_search_people_v1、对账删 2 补 2）；PMC-14 `20261009180000_pmc14_participant_canonical_backfill`（已应用，数据回填 7 行软删行 canonical，无结构变更）；G-PMC11-2 修复 `20261009070000`（已应用）；persons anon 只读依赖 PMC-10 `20261008231500`，在效 |
 | 数据规模抽查（PMC-15 实施后） | person_roles 799 行（派生漂移 stale/missing/软删人物挂派生 =0；5 触发器在）；relationships 0 行、4 治理列齐备；households/household_members 结构未变 |
 
-历史基线链：PMC-00 → …→ PMC-11 最终验收通过（`release-20261009-0823`）→ PMC-12（已验收，`release-20261009-141318`）→ PMC-13（已验收，`release-20261009-151917`）→ PMC-14（已验收，`release-20261009-203048`）→ **PMC-15（角色及关系治理，已发布待验收，`release-20261009-231926`）**。
+历史基线链：PMC-00 → …→ PMC-11 最终验收通过（`release-20261009-0823`）→ PMC-12（已验收，`release-20261009-141318`）→ PMC-13（已验收，`release-20261009-151917`）→ PMC-14（已验收，`release-20261009-203048`）→ **PMC-15（已验收，`release-20261009-231926`；验收登记发布标签以本档案提交的发布时间戳为准）**。
 
 ## 3. 各模块读写权威来源与兼容方向
 
