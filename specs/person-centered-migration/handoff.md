@@ -10,7 +10,7 @@
 | 最后验收通过包 | **PMC-13（嘉宾模块完成 Person 与合作资料分离）——2026-10-09 用户验收通过（PASS）**：四项裁决全部落地（①enrichIdentity Person 优先读 name/phone/wechat/organization+customers 回退+linked_person 字段；②create 去掉自动建 Person+customers 分支，嘉宾身份不自动代表销售客户；③ai_activity 嘉宾 name Person 优先读；④admin.html ensurePersonCustomer 死函数保留不动）；activity_speakers/ai_activity 两函数已部署；隔离测试 9/9（复跑 297ms）；受控浏览器生产回归 S1–S7 全 PASS（S2 嘉宾列表 4 卡渲染、S3 杨杰微信来自 Person 主数据、S7 零写库）；WP04 speakers 4/4 mapped；regression 107/107；WP01 门槛 PASS。限制项 L1–L3 均非阻塞（create 生产写路径 T5-T7+sync-check 覆盖、ai_activity 真实模型 T8/T9 覆盖、picker 标记搜索为安全行为）。详见 evidence/PMC-13.md §14 |
 | 正在执行包 | **PMC-14（互动参与者和活动参与者统一人物身份）——实施完成待验收**：只读盘点 9 组 SQL 证实参与者三层身份模型（person_type+业务表主键 person_id／canonical_person_id／person_name 快照），7 行软删 customer 参与行经用户专项批准回填 canonical（AffectedRows=7，q10-final 核对全符合预期）；activities enrichParticipants 增强（canonicalPersonId 字符串输出+展示名 Person 优先+D6 快照不可变）；隔离测试 11/11；WP04 PASS_WITH_EXCEPTIONS；迁移双备份 SHA-256 一致 |
 | 下一步唯一允许执行的动作 | **等待用户验收 PMC-14**（受控浏览器生产深度回归需登录，按 PMC-13 先例留待用户 iPad 人工验收）；G-PMC11-1 修复、G-PMC12-1 处置、G-PMC14-1 修复须单独授权 |
-| 回滚条件 | PMC-14 数据回滚：`cloudbase/rollbacks/20261009180000_pmc14_participant_canonical_backfill.sql`（按精确 id+预期值清 canonical，不动既有 2 行人工确认值）；代码回滚：`git revert`（本包提交）→ 重新部署 activities 函数。PMC-13 代码回滚：`git revert 9eb03e4` → 重新部署 activity_speakers/ai_activity 两函数；无结构/数据回滚（本包无 migration）。PMC-12 结构回滚：`cloudbase/rollbacks/20261009091200_pmc12_recruit_view_person_read.sql`；G-PMC11-2 结构回滚：`cloudbase/rollbacks/20261009070000_fix_v_recruit_candidates_left_join.sql` |
+| 回滚条件 | PMC-14 数据回滚：`cloudbase/rollbacks/20261009180000_pmc14_participant_canonical_backfill.sql`（按精确 id+预期值清 canonical，不动既有 2 行人工确认值）；代码回滚：`git revert d081a64`（本包提交）→ 重新部署 activities 函数。PMC-13 代码回滚：`git revert 9eb03e4` → 重新部署 activity_speakers/ai_activity 两函数；无结构/数据回滚（本包无 migration）。PMC-12 结构回滚：`cloudbase/rollbacks/20261009091200_pmc12_recruit_view_person_read.sql`；G-PMC11-2 结构回滚：`cloudbase/rollbacks/20261009070000_fix_v_recruit_candidates_left_join.sql` |
 
 ## 2. 版本基线（2026-10-09 PMC-13 发布时更新）
 
@@ -20,7 +20,7 @@
 | PMC-11 发布 | 标签 `release-20261009-0105`（时间戳）+ `v2.1.2`（2026-10-09 首提交 semver，patch：AI 适配向后兼容）；G-PMC11-2 修复标签 `release-20261009-0808`；**最终验收登记标签 `release-20261009-0823`** |
 | PMC-12 发布 | 提交 `522fbca`（20 files, +797/-52）；标签 `release-20261009-141318`；部署 recruit_candidates/recruit_score/recruit_recommend 三函数 + admin.html 静态 + migration `20261009091200`（+rollback） |
 | PMC-13 发布 | 提交 `9eb03e4`（3 files, +307/-63）；标签 `release-20261009-151917`；部署 activity_speakers/ai_activity 两函数；无 migration；无 admin.html 改动；sync-check 三端全绿。档案发布提交 `50f06d6` 标签 `release-20261009-153902`（云端产物未改变）；**验收登记发布标签以本档案提交的发布时间戳为准** |
-| PMC-14 发布 | activities 函数部署（sync-shared 56 副本一致 + WP01 门 PASS）；migration `20261009180000`（+rollback）已应用（AffectedRows=7）+ 双备份 SHA-256 一致；提交/标签以本档案发布时 `tools/release.ps1` 产出为准 |
+| PMC-14 发布 | 提交 `d081a64`（24 files, +880/-26，代码+档案合一）；标签 `release-20261009-203048`；三端一致 PASS（28 函数 170 文件一致）。activities 函数部署（sync-shared 56 副本一致 + WP01 门 PASS）；migration `20261009180000`（+rollback）已应用（AffectedRows=7）+ 双备份 SHA-256 一致；静态文件零改动 |
 | 云端 | PMC-14 部署 1 个函数（activities）；静态文件零改动；PMC-13 部署 2 个函数（activity_speakers/ai_activity）；PMC-12 部署 3 函数+admin.html；PMC-11 部署 8 AI 函数 |
 | 数据库迁移 | PMC-14 `20261009180000_pmc14_participant_canonical_backfill`（已应用，数据回填 7 行软删行 canonical，无结构变更）；G-PMC11-2 修复 `20261009070000`（已应用）；persons anon 只读依赖 PMC-10 `20261008231500`，在效 |
 | 数据规模抽查（PMC-14 只读） | activity_participants 19 行：活跃 4（canonical 全就位、0 缺失）、软删 15（canonical 9：2 既有人工确认+7 本包回填；5 保持"身份待确认"） |

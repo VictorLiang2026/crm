@@ -143,5 +143,7 @@
 
 ### 14.1 发布记录
 
-- 提交/标签：以 `tools/release.ps1` 产出为准（发布后补录）。
-- 部署范围：activities 1 个云函数 + migration 20261009180000（已应用）；静态文件零改动。
+- 发布提交 `d081a64`（24 files, +880/-26，含本档案与全部档案文档）；标签 `release-20261009-203048`；GitHub master 推送成功（`5fca6c1..d081a64`）。
+- 三端核对：`[PASS] Local / GitHub / cloud sources match`（28 函数 170 文件一致；线上 admin.html SHA 一致；50 资产一致）。
+- 部署范围：activities 1 个云函数（发布前经 deploy-function.ps1 部署，sync-shared 56 副本一致 + WP01 门 PASS）+ migration 20261009180000（已应用）；静态文件零改动。
+- 档案补录提交（登记本发布记录）：见发布后报告（release.ps1 二次产出，云端产物未改变）。
