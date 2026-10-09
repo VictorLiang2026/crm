@@ -72,7 +72,7 @@ function createReadOnlyDb(data) {
     let filters = [], sorts = [], start = 0, end = Infinity, single = false, columns, count;
     const query = {
       select(value, options) { columns = value; count = options?.count; return query; },
-      eq(key, value) { filters.push(row => row[key] === value); return query; },
+      eq(key, value) { filters.push(row => row[key] == value); return query; },
       is(key, value) { filters.push(row => value === null ? row[key] == null : row[key] === value); return query; },
       not(key, op, value) { if (op !== 'is' || value !== null) throw new Error('Unsupported not'); filters.push(row => row[key] != null); return query; },
       in(key, values) { filters.push(row => values.includes(row[key])); return query; },

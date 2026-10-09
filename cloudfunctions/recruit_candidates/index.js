@@ -22,6 +22,13 @@ const testData = require('./test-data');
 
 const { rdb, nowIso, normFields, assertOk } = require('./db');
 
+// PMC-12：bigint ID 字符串精确处理（R-ID2，替代 parseInt 精度模式）
+function candidateIdOf(value) {
+  const s = String(value ?? '');
+  if (!/^[1-9]\d*$/.test(s) || !Number.isSafeInteger(Number(s))) throw new Error('Invalid candidate ID');
+  return s;
+}
+
 // recruit_candidates 表只保留增员专属字段（基础信息在 customers 表）
 const FIELDS = [
   'customer_id', 'recommender_id', 'stage', 'stage_changed_at',
@@ -90,8 +97,7 @@ async function list(event) {
 
 // get 走视图获取候选人完整信息 + 里程碑
 async function get(event) {
-  const id = parseInt(event.id, 10);
-  if (!id) return { error: 'id required' };
+  const id = candidateIdOf(event.id);
 
   // 从视图查（含 customers 基础信息）
   const c = assertOk(await rdb.from('v_recruit_candidates')
@@ -117,18 +123,21 @@ async function create(event) {
   payload.updated_at = ts;
   if (!payload.stage) payload.stage = '新增人才';
   payload.stage_changed_at = ts;
-  const r = assertOk(await rdb.from('recruit_candidates').insert(payload).select('id').single());
+  const r = assertOk(await rdb.from('recruit_candidates').insert(payload).select('id, person_id').single());
   // 记录首个里程碑
   assertOk(await rdb.from('recruit_milestones').insert({
     candidate_id: r.data.id, from_stage: null, to_stage: payload.stage,
     note: '创建候选人', operator: payload.operator || null,
   }));
-  return { id: r.data.id };
+  // PMC-12 / R-ID1：返回 ID 字符串化；personId 为新增字段（触发器经 customer 映射或 Person-only 直填）
+  return {
+    id: String(r.data.id),
+    personId: r.data.person_id == null ? null : String(r.data.person_id),
+  };
 }
 
 async function update(event) {
-  const id = parseInt(event.id, 10);
-  if (!id) return { error: 'id required' };
+  const id = candidateIdOf(event.id);
   const data = event.data || {};
   const payload = normFields(data, FIELDS);
   payload.updated_at = nowIso();
@@ -152,8 +161,7 @@ async function update(event) {
 }
 
 async function remove(event) {
-  const id = parseInt(event.id, 10);
-  if (!id) return { error: 'id required' };
+  const id = candidateIdOf(event.id);
   return rpcResult(await rdb.rpc('crm_delete_batch', {
     p_kind: 'recruit', p_action: 'remove', p_ids: [id],
   }));
@@ -221,8 +229,8 @@ async function trashList(event) {
 // 恢复候选人本次删除批次的跟进；历史无批次记录只恢复候选人本身。
 async function restore(event) {
   const ids = Array.isArray(event.ids)
-    ? event.ids.map(x => parseInt(x, 10)).filter(Boolean)
-    : (event.id ? [parseInt(event.id, 10)] : []);
+    ? event.ids.map(candidateIdOf)
+    : (event.id != null ? [candidateIdOf(event.id)] : []);
   if (!ids.length) return { error: 'ids required' };
   return rpcResult(await rdb.rpc('crm_delete_batch', {
     p_kind: 'recruit', p_action: 'restore', p_ids: ids,

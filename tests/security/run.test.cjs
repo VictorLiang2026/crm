@@ -21,7 +21,7 @@ test('RLS, invoker, grants, and policy drift each fail', () => {
     ['policy_review_reports', snapshot => { object(snapshot, 'policy_review_reports').detail.rls = false; }, /RLS disabled/],
     ['customers_view', snapshot => { object(snapshot, 'customers_view').detail.security_invoker = false; }, /View bypasses/],
     ['customers', snapshot => { object(snapshot, 'customers').detail.privileges.authenticated = ['SELECT']; }, /Authenticated table/],
-    ['persons', snapshot => { object(snapshot, 'persons').detail.privileges.anon = ['SELECT']; }, /Server-only table exposed/],
+    ['interactions', snapshot => { object(snapshot, 'interactions').detail.privileges.anon = ['SELECT']; }, /Server-only table exposed/],
     ['opportunities', snapshot => { object(snapshot, 'opportunities').detail.policies[0].using_hash = 'changed'; }, /policy drift/]
   ];
   for (const [name, change, pattern] of cases) {

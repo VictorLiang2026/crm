@@ -6639,7 +6639,33 @@ function renderParticipantReview(activityId, result){
   box.appendChild(card);
 }
 
-// 确认 → 写下一步行动：客户→followups；增员→recruit_followups；客户被归 B 时先建/找 recruit_candidates 再写增员跟进
+// 确认 → 写下一步行动：客户→followups；增员→recruit_followups；客户被归 B 时先预览确认、经确认后建/找 recruit_candidates 再写增员跟进
+// PMC-12：增员转化预览确认 —— AI 复盘对 B 类客户采纳时，创建候选人前必须人工确认（不再静默建档）
+function confirmRecruitConversion(item){
+  return new Promise(function(resolve){
+    var overlay = el('div', {class:'modal-overlay'});
+    var box = el('div', {class:'modal', style:'max-width:480px'});
+    box.appendChild(el('h3', {}, '确认创建增员候选人'));
+    box.appendChild(el('div', {style:'font-size:13px;line-height:1.8;margin-bottom:12px'}, [
+      el('div', {}, 'AI 复盘将客户「' + esc(item.name || ('#' + item.person_id)) + '」判定为值得增员。'),
+      el('div', {style:'color:#6b7280'}, '判断依据：' + esc(item.reason || '未提供')),
+      el('div', {}, '确认后将在增员列表创建该候选人（初始阶段：新增人才）并写入增员跟进；取消则不做任何写入。'),
+    ]));
+    var btnRow = el('div', {style:'display:flex;gap:8px;justify-content:flex-end'});
+    var cancelBtn = el('button', {class:'btn'}, '取消');
+    var okBtn = el('button', {class:'btn btn-primary'}, '确认创建');
+    btnRow.appendChild(cancelBtn);
+    btnRow.appendChild(okBtn);
+    box.appendChild(btnRow);
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+    function close(v){ overlay.remove(); resolve(v); }
+    cancelBtn.onclick = function(){ close(false); };
+    okBtn.onclick = function(){ close(true); };
+    overlay.onclick = function(e){ if(e.target === overlay) close(false); };
+  });
+}
+
 async function adoptParticipantAction(activityId, item, row, result){
   if(item.__adopted) return;
   var slot = row.querySelector('.pr-slot');
@@ -6664,15 +6690,28 @@ async function adoptParticipantAction(activityId, item, row, result){
         next_followup_goal: (item.classification === 'B') ? '推进招募' : '建立联系',
       }});
     } else if(item.classification === 'B'){
-      // 客户被判值得增员：先确保有增员对象（幂等，已存在则返回已有），再写增员跟进
+      // PMC-12：客户被判值得增员 → 先弹预览、人工确认后才创建候选人（不再静默建增员对象）
+      var confirmed = await confirmRecruitConversion(item);
+      if(!confirmed){
+        if(btn){ btn.style.pointerEvents='auto'; btn.style.opacity='1'; }
+        if(slot) slot.innerHTML = '<span style="font-size:12px;color:#6b7280">已取消：未创建增员对象</span>';
+        return;
+      }
       var rc = await callFn('recruit_candidates', {action:'create', data:{ customer_id: item.person_id }});
-      if(rc && rc.error) throw new Error('创建增员对象失败：' + rc.error);
-      if(rc && rc.id){
+      var newCandidateId = null;
+      if(rc && rc.error && rc.existing_id){
+        newCandidateId = rc.existing_id; // 幂等：该客户已有未删除候选人，沿用既有记录写增员跟进
+      } else if(rc && rc.error){
+        throw new Error('创建增员对象失败：' + rc.error);
+      } else if(rc && rc.id){
+        newCandidateId = rc.id;
+      }
+      if(newCandidateId){
         resp = await callFn('recruit_followups', {action:'create', data:{
-          candidate_id: rc.id,
+          candidate_id: newCandidateId,
           followup_date: contactDate,
           contact_method: item.channel || '微信',
-          followup_notes: summary + '（由客户转入增员跟进）',
+          followup_notes: summary + (rc && rc.existing_id ? '（该客户已在增员列表，写入既有候选人）' : '（由客户转入增员跟进）'),
           interaction_summary: summary,
           next_action: item.next_action || '',
           next_action_date: item.suggested_date || null,

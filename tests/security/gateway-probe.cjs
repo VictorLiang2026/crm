@@ -27,6 +27,13 @@ async function probe() {
   const key = fs.readFileSync(keyFile, 'utf8').trim();
   if (!key || /\s/.test(key)) throw new Error('Invalid anonymous key file');
   const objects = baseline.objects.filter(item => item.kind === 'relation');
+  // PMC-10 已批准：persons 授予 anon SELECT + RLS (deleted_at IS NULL)，
+  // 云函数 rdb() 走 anon 角色直读 persons 未软删行（identity helper 等）。
+  // 安全限制：anon 仅能读到未软删行（display_name 等基础字段），敏感写入仍需 service_role。
+  // 待 PMC 后续包将 identity helper 改走 service_role/person_360 委托后可移除此例外。
+  const anonSelectExceptions = {
+    persons: 'PMC-10 approved: anon reads non-deleted persons rows via rdb() gateway'
+  };
   const results = [];
   for (const item of objects) {
     const expectsSelect = item.detail.privileges.anon.includes('SELECT');
@@ -48,9 +55,10 @@ async function probe() {
       continue;
     }
     const range = response.headers.get('content-range');
+    const exception = anonSelectExceptions[item.name];
     results.push({ object: item.name, status: response.status, empty: range === '*/0',
-      expected: expectsSelect ? 'authorized, zero visible rows' : 'denied',
-      pass: classify(response.status, range, expectsSelect) });
+      expected: exception || (expectsSelect ? 'authorized, zero visible rows' : 'denied'),
+      pass: exception ? (response.status === 200 || response.status === 206) : classify(response.status, range, expectsSelect) });
   }
   const failures = results.filter(result => !result.pass);
   return { environment: envId, checked: results.length, passed: results.length - failures.length,

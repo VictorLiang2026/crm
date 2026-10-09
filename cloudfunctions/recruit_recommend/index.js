@@ -138,8 +138,11 @@ function buildUser(c, ident, notice) {
 
 exports.main = async (event, context) => {
   try {
-    const candidateId = parseInt(event && event.candidate_id, 10);
-    if (!candidateId) return { error: 'candidate_id required' };
+    // PMC-12：bigint ID 字符串精确处理（R-ID2）；缺失时保留原错误信息
+    if (!event || event.candidate_id == null || event.candidate_id === '') return { error: 'candidate_id required' };
+    const s = String(event.candidate_id);
+    if (!/^[1-9]\d*$/.test(s) || !Number.isSafeInteger(Number(s))) return { error: 'Invalid candidate ID' };
+    const candidateId = s;
 
     const c = assertOk(await rdb.from('v_recruit_candidates')
       .select('*').eq('candidate_id', candidateId).maybeSingle());

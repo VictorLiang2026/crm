@@ -81,8 +81,8 @@ persons.legacy_customer_id（自引用）
 
 | 视图 | 数据来源 | 身份字段来源 |
 | --- | --- | --- |
-| v_recruit_candidates | recruit_candidates JOIN customers | 从 customers 读取 customer_name/phone/occupation 等 |
-| v_recruit_candidates_trash | recruit_candidates JOIN customers | 同上 |
+| v_recruit_candidates | recruit_candidates LEFT JOIN customers + LEFT JOIN persons（G-PMC11-2 结构；PMC-12 读切换） | 人物基础 7 列 Person 优先、customers 回退：customer_name=COALESCE(p.display_name, c.customer_name)，gender/birthday/phone/occupation/education=COALESCE(p.x, c.x)，wx_account=COALESCE(p.wechat, c.wx_account)；annual_income/mbti/source/marital_status/hobbies/additional_info 保持 customers（客户域权威） |
+| v_recruit_candidates_trash | 同上（LEFT JOIN 结构） | customer_name/phone/occupation 同规则 Person 优先切换（PMC-12）；customer_deleted_at 保留「随客户删除」标识 |
 | v_recruit_candidates_person_only | persons | 仅 persons |
 | v_recruit_candidates_person_only_trash | persons | 仅 persons |
 | v_funnel_stats | customers + opportunities + recruit_candidates | 从 customers 读取 |
@@ -195,19 +195,19 @@ persons.legacy_customer_id（自引用）
 
 | 函数 | action | 入口 | 读取表 | 写入表 | 身份 ID 类型 | 当前权威来源 | 目标来源 | 权限上下文 | 状态 | 证据 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| recruit_candidates | list | admin.html #/recruit | v_recruit_candidates（JOIN customers） | — | customer_id | customers | persons | authenticated | 需修改 | 视图依赖 customers |
-| recruit_candidates | get | admin.html #/recruit/:id | v_recruit_candidates | — | customer_id | customers | persons | authenticated | 需修改 | — |
-| recruit_candidates | create | admin.html | — | recruit_candidates + persons（触发器自动建） | customer_id/person_id | customers | persons | authenticated | 需修改 | 触发器 recruit_candidate_person_sync |
-| recruit_candidates | update | admin.html | — | recruit_candidates | customer_id | customers | persons | authenticated | 需修改 | — |
-| recruit_candidates | remove | admin.html 回收站 | — | recruit_candidates.deleted_at | customer_id | customers | persons | authenticated | 需修改 | RPC crm_delete_batch |
-| recruit_candidates | trashList | admin.html 回收站 | v_recruit_candidates_trash | — | customer_id | customers | persons | authenticated | 需修改 | — |
-| recruit_candidates | restore | admin.html 回收站 | — | recruit_candidates.deleted_at=NULL | customer_id | customers | persons | authenticated | 需修改 | RPC crm_delete_batch |
-| recruit_candidates | funnel | admin.html 漏斗 | recruit_candidates | — | — | — | — | authenticated | 仅回归 | 聚合统计 |
-| recruit_candidates | rcMap | admin.html 雷达图 | recruit_candidates | — | customer_id | customers | persons | authenticated | 需修改 | — |
-| recruit_followups | list/create/update/remove | admin.html 招募跟进 | recruit_followups | recruit_followups | candidate_id | recruit_candidates | persons | authenticated | 需修改 | 通过 candidate_id 间接关联 |
-| recruit_goals | listGoals/saveGoals/getProgress/listBenchmarks/saveBenchmarks | admin.html 招募目标 | recruit_goals + recruit_goal_benchmarks + recruit_milestones | recruit_goals + recruit_goal_benchmarks | — | — | — | authenticated | 仅回归 | RPC crm_recruit_goals_save_v1 |
-| recruit_score | （固定入口） | admin.html 增员评分 | v_recruit_candidates + persons（PMC-11） | recruit_candidates.potential_score/potential_reason | customer_id/person_id | customers+persons | persons | authenticated | PMC-11 已验收（2026-10-09 用户最终确认）（评分 prompt 姓名/性别/出生/职业/学历取 Person；年收入/MBTI/动机/顾虑仍取候选人域；分数回写路径不变） | evidence/PMC-11.md |
-| recruit_recommend | （固定入口） | admin.html 增员推荐 | v_recruit_candidates + persons（PMC-11） | — | customer_id/person_id | customers+persons | persons | authenticated | PMC-11 已验收（2026-10-09 用户最终确认）（facts 基础字段取 Person + identity 回传；不持久化；业务字段仍取视图） | evidence/PMC-11.md |
+| recruit_candidates | list | admin.html #/recruit | v_recruit_candidates | — | candidate_id（字符串） | 视图（PMC-12：Person 优先+customers 回退） | persons | authenticated | PMC-12 已实施（待用户验收） | evidence/PMC-12.md |
+| recruit_candidates | get | admin.html #/recruit/:id | v_recruit_candidates | — | candidate_id（字符串，candidateIdOf 校验非法拒绝） | 视图（PMC-12 读切换） | persons | authenticated | PMC-12 已实施（待用户验收） | evidence/PMC-12.md |
+| recruit_candidates | create | admin.html | — | recruit_candidates + persons（触发器自动建） | customer_id/person_id（返回字符串化 id/person_id） | customers | persons | authenticated | PMC-12 已实施（待用户验收）（仍强制 customer_id=R-ID1、裁决③；existing_id 幂等；AI 复盘 B 类采纳改 confirmRecruitConversion 预览人工确认，裁决②） | evidence/PMC-12.md |
+| recruit_candidates | update | admin.html | — | recruit_candidates | candidate_id（字符串） | customers（业务列） | persons | authenticated | PMC-12 已实施（待用户验收）（字符串 ID 精确命中+非法拒绝；业务列写语义不变） | evidence/PMC-12.md |
+| recruit_candidates | remove | admin.html 回收站 | — | recruit_candidates.deleted_at | candidate_id（字符串） | customers | persons | authenticated | PMC-12 已实施（待用户验收）（RPC recruit 分支零改动，不动 customers/persons） | evidence/PMC-12.md |
+| recruit_candidates | trashList | admin.html 回收站 | v_recruit_candidates_trash | — | candidate_id（字符串） | 视图（PMC-12：3 列 Person 优先切换） | persons | authenticated | PMC-12 已实施（待用户验收） | evidence/PMC-12.md |
+| recruit_candidates | restore | admin.html 回收站 | — | recruit_candidates.deleted_at=NULL | candidate_id（字符串） | customers | persons | authenticated | PMC-12 已实施（待用户验收）（恢复不动 customers/persons 其他角色） | evidence/PMC-12.md |
+| recruit_candidates | funnel | admin.html 漏斗 | recruit_candidates | — | — | — | — | authenticated | 仅回归 | 聚合统计；PMC-12 随 S2 浏览器回归 PASS |
+| recruit_candidates | rcMap | admin.html 雷达图 | recruit_candidates | — | customer_id | customers | persons | authenticated | PMC-12 核实不涉及（雷达图业务列，无人物基础字段读写） | — |
+| recruit_followups | list/create/update/remove | admin.html 招募跟进 | recruit_followups | recruit_followups | candidate_id | recruit_candidates | persons | authenticated | PMC-12 核实不涉及（无人物基础字段读写） | 通过 candidate_id 间接关联 |
+| recruit_goals | listGoals/saveGoals/getProgress/listBenchmarks/saveBenchmarks | admin.html 招募目标 | recruit_goals + recruit_goal_benchmarks + recruit_milestones | recruit_goals + recruit_goal_benchmarks | — | — | — | authenticated | 仅回归 | RPC crm_recruit_goals_save_v1；PMC-12 核实不涉及 |
+| recruit_score | （固定入口） | admin.html 增员评分 | v_recruit_candidates + persons（PMC-11） | recruit_candidates.potential_score/potential_reason | customer_id/person_id | customers+persons | persons | authenticated | PMC-11 已验收（2026-10-09 用户最终确认）（评分 prompt 姓名/性别/出生/职业/学历取 Person；年收入/MBTI/动机/顾虑仍取候选人域；分数回写路径不变）；PMC-12 增量：candidate_id 字符串透传（R-ID2），回写仍仅 potential_score/potential_reason/updated_at | evidence/PMC-11.md；evidence/PMC-12.md |
+| recruit_recommend | （固定入口） | admin.html 增员推荐 | v_recruit_candidates + persons（PMC-11） | — | customer_id/person_id | customers+persons | persons | authenticated | PMC-11 已验收（2026-10-09 用户最终确认）（facts 基础字段取 Person + identity 回传；不持久化；业务字段仍取视图）；PMC-12 增量：candidate_id 字符串透传（R-ID2） | evidence/PMC-11.md；evidence/PMC-12.md |
 
 #### 6.5 机会域
 

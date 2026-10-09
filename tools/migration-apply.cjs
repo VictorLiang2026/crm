@@ -82,7 +82,8 @@ function runMigration(cli, sql) {
     const send = (o) => p.stdin.write(JSON.stringify(o) + '\n');
     send({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'crm-migration-apply', version: '1.0' } } });
     send({ jsonrpc: '2.0', method: 'notifications/initialized' });
-    setTimeout(() => send({ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'queryPgDatabase', arguments: { action: 'sql', sql, limit: 1 } } }), 800);
+    // 2026-10-09 MCP 通道收紧：queryPgDatabase 仅接受只读 SQL；DDL/DML 须走 managePgDatabase(action=execute, confirm=true)
+    setTimeout(() => send({ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'managePgDatabase', arguments: { action: 'execute', sql, confirm: true } } }), 800);
   });
 }
 

@@ -1281,6 +1281,16 @@
         "type": "r",
         "policies": [
           {
+            "name": "persons_anon_read",
+            "roles": [
+              "anon"
+            ],
+            "command": "r",
+            "check_hash": "d41d8cd98f00b204e9800998ecf8427e",
+            "permissive": true,
+            "using_hash": "0fb44fae81f75a534a24fe3b0316f8d6"
+          },
+          {
             "name": "persons_service_only",
             "roles": [
               "service_role"
@@ -1293,7 +1303,9 @@
         ],
         "force_rls": false,
         "privileges": {
-          "anon": [],
+          "anon": [
+            "SELECT"
+          ],
           "service_role": [
             "DELETE",
             "INSERT",

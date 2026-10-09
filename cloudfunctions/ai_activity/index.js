@@ -164,7 +164,7 @@ exports.main = async (event, context) => {
       return {
         person_type: p.person_type,
         person_id: linked ? p.person_id : 0,
-        name: personName || (info ? (info.customer_name || info.name) : (p.person_name || '未知（待关联）')),
+        name: personName || (info ? (info.customer_name || info.name || p.person_name) : (p.person_name || '未知（待关联）')),
         linked: linked,
         status: p.status,
         relationship_note: p.relationship_note || '',
@@ -326,7 +326,7 @@ async function loadActivityContext(activityId) {
       p.person_type === 'recruit' ? info : null) : null;
     var personName = pidForName != null ? (ctxPersonNameMap[String(pidForName)] || '') : '';
     return {
-      name: personName || (info ? (info.customer_name || info.name) : (p.person_name || '未知')),
+      name: personName || (info ? (info.customer_name || info.name || p.person_name) : (p.person_name || '未知')),
       person_type: p.person_type,
       linked: !!p.person_id,
       status: p.status,

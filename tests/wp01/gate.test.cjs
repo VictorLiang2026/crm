@@ -32,7 +32,7 @@ test('fresh catalog detects expanded grants, view bypass and policy drift withou
   assert.deepEqual(catalog(actual,now).result.failures,[]);
   for(const change of [
     x => { x.roles.find(r=>r.name==='authenticated').bypass_rls=true; },
-    x => { x.objects.find(o=>o.name==='persons').detail.privileges.anon=['SELECT']; },
+    x => { x.objects.find(o=>o.name==='interactions').detail.privileges.anon=['SELECT']; },
     x => { x.objects.find(o=>o.name==='customers_view').detail.security_invoker=false; },
     x => { x.objects.find(o=>o.name==='customers').detail.policies[0].using_hash='changed'; }
   ]) {const bad=structuredClone(actual);change(bad);assert.ok(catalog(bad,now).result.failures.length);}
