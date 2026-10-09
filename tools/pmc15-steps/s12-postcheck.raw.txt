@@ -1,0 +1,18 @@
+﻿- 正在执行 SQL...
+{
+  "data": {
+    "RequestId": "4fd6a876-ab1d-4ceb-a26a-f0f46de87710",
+    "Columns": [
+      "postcheck"
+    ],
+    "ColumnTypes": [
+      "jsonb"
+    ],
+    "Rows": [
+      "[\"{\\\"total\\\": 799, \\\"role_dist\\\": {\\\"recruit\\\": 15, \\\"speaker\\\": 4, \\\"customer\\\": 779, \\\"participant\\\": 1}, \\\"origin_dist\\\": {\\\"manual\\\": 7, \\\"derived\\\": 2, \\\"legacy_backfill\\\": 790}, \\\"stale_roles\\\": 0, \\\"missing_roles\\\": 0, \\\"sync_triggers\\\": 5, \\\"governance_cols\\\": 4, \\\"relationships_total\\\": 0, \\\"test_person_residue\\\": 0, \\\"roles_on_deleted_persons\\\": 0}\"]"
+    ],
+    "AffectedRows": 0,
+    "ExecutionTimeMs": 85
+  }
+}
+

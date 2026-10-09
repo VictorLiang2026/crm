@@ -107,7 +107,7 @@ export function renderPeople({ root, callFn }) {
         cell(node('span', '', person.id));
         cell(link(person.display_name || `人物 #${person.id}`, `#/person/${person.id}`, 'phase14-row-title'));
         const roles = Array.isArray(person.roles) ? person.roles : [];
-        cell(node('span', '', roles.map(role => ({ customer: '客户', recruit: '增员', speaker: '嘉宾', participant: '参与者' })[role] || role).join(' · ') || '尚无角色'));
+        cell(node('span', '', roles.map(role => ({ customer: '客户', recruit: '增员', speaker: '嘉宾', participant: '参与者', partner: '合作伙伴', referrer: '推荐人', alumni: '校友', other: '其他' })[role] || role).join(' · ') || '尚无角色'));
         cell(node('span', '', [person.occupation, person.organization].filter(Boolean).join('／') || '—'));
         cell(node('span', '', person.updated_at ? new Date(person.updated_at).toLocaleDateString('zh-CN') : '—'));
         const customerId = person.customer_id;

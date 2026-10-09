@@ -19,7 +19,7 @@ const FIELDS = Object.freeze({
   activity_tasks: ['id', 'activity_id', 'task_title', 'status', 'priority', 'due_date', 'completed_at'],
   interactions: ['id', 'person_id', 'activity_id', 'interaction_type', 'interaction_at', 'channel', 'summary', 'importance', 'source_type', 'source_id'],
   actions: ['id', 'person_id', 'activity_id', 'opportunity_id', 'interaction_id', 'action_type', 'title', 'due_at', 'priority', 'status', 'source'],
-  relationships: ['id', 'from_person_id', 'to_person_id', 'relationship_type', 'relationship_stage', 'strength', 'trust_level', 'trend', 'last_meaningful_interaction_at'],
+  relationships: ['id', 'from_person_id', 'to_person_id', 'relationship_type', 'relationship_stage', 'strength', 'trust_level', 'trend', 'last_meaningful_interaction_at', 'status', 'source'],
   recruit_candidates: ['id', 'person_id', 'customer_id', 'stage', 'motivation', 'concerns', 'potential_score', 'next_action', 'next_action_date'],
   recruit_followups: ['id', 'candidate_id', 'followup_date', 'interaction_summary', 'followup_notes', 'next_action', 'next_action_date'],
 });
@@ -234,7 +234,8 @@ function createContextEngine({ rdb, now = () => new Date() } = {}) {
           read('interactions', { person_id: personIds }, { order: 'interaction_at', limit: LIMITS.activityInteractions }),
           read('actions', { person_id: personIds, status: ['open', 'in_progress'] }, { order: 'created_at', limit: LIMITS.actions }),
           read('opportunities', { person_id: personIds, deleted_at: null }, { order: 'updated_at', limit: LIMITS.opportunities }),
-          read('relationships', { from_person_id: personIds, deleted_at: null }, { order: 'updated_at', limit: LIMITS.activityRelationships }),
+          // PMC-15: only human-confirmed edges feed AI context; pending candidates never leak.
+          read('relationships', { from_person_id: personIds, deleted_at: null, status: 'confirmed' }, { order: 'updated_at', limit: LIMITS.activityRelationships }),
         ]);
         const activeIds = new Set(persons.map(row => String(row.data.id)));
         const forActivePerson = row => activeIds.has(String(row.data.person_id));

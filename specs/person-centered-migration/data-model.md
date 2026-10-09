@@ -131,10 +131,13 @@
 | canonical_person_id（bigint，FK→persons） | 参与记录的"确认身份" | 已存在；不变 |
 | participant_role / status / followup_status / relationship_note / ai_followup_suggestion | 活动参与事实 | 不迁 |
 
-### 2.6 关系域与互动（relationships 14 列 / interactions 13 列）
+### 2.6 关系域与互动（relationships 18 列 / interactions 13 列）
 
 - relationships：from/to/introduced_by_person_id（三个 bigint FK）+ relationship_type/stage/strength/trust_level/trend/context(jsonb) —— 全部关系域权威，不迁。
-- interactions：person_id NOT NULL（bigint）+ interaction_type/at/channel/summary/raw_note/source_type/source_id/importance —— **互动事实实体**，不迁；summary/raw_note 为互动内容，不是"人物备注"。
+- **PMC-15 治理列（2026-10-09 起生效）**：`source ∈ {manual, ai_suggested, legacy_note}`（默认 manual）、`status ∈ {pending, confirmed}`（**默认 pending**）、`confirmed_at`、`confirmed_by_uid`，一致性 CHECK：pending 必须无确认元数据；confirmed 必须二者齐全。`relationship_type` 受控词表 CHECK ∈ {family, friend, colleague, business, referral, other}。方向保持 from→to 有向边；反向边是独立行；禁自关系；部分唯一索引 `(from,to,type) WHERE deleted_at IS NULL` 保留；软删后可重建同边（删除恢复语义）。
+- **角色不混用**：家庭成员词（spouse/child/parent/sibling）只属于 household_members.relationship_to_anchor；投保人/被保人属于保单/products 域；二者不得写入 relationships 类型。
+- **确认门**：AI 建议与旧字段/备注线索只能产生 pending 候选，永不自动升级；仅人工确认写 confirmed。AI/搜索/会前上下文只读取 confirmed 边（context-engine 两副本、meeting-prep-context、crm_search_people_v1 均已收紧）。当前系统无 relationships 写入路径（无应用层 insert/update/delete），候选生产机制待后续工作包接入。
+- interactions：person_id（bigint NOT NULL）+ interaction_type/at/channel/summary/raw_note/source_type/source_id/importance —— **互动事实实体**，不迁；summary/raw_note 为互动内容，不是"人物备注"。
 
 ### 2.7 争议字段逐项澄清（同名不机械合并）
 
@@ -193,7 +196,14 @@
 | participant | 0..1 角色标记 | activity_participants 行：0..n（每场活动一条） | 参与事实天然多条 |
 | 其他（household 等） | 不在本轮范围 | — | |
 
-- **角色登记为派生数据**：person_roles 无 deleted_at，其存续跟随业务记录（customers/recruit_candidates/activity_speakers/activity_participants）的有效状态派生维护；不单独软删角色行。实施包以"重算"而非"逐行增删"实现，避免漂移。
+- **角色登记为派生数据**：person_roles 无 deleted_at，其存续跟随业务记录（customers/recruit_candidates/activity_speakers/activity_participants）的有效状态派生维护；不单独软删角色行。以"重算"而非"逐行增删"实现，避免漂移。
+
+**PMC-15 已落地（2026-10-09，D15-1）——组合目录模型**：
+
+- **派生角色**：customer/recruit/speaker/participant 的唯一真相是有效业务记录。`crm_person_roles_derive_v1(person_id)`（SECURITY DEFINER，service_role only）按人重算：证据要求业务行 `deleted_at IS NULL`；customer 证据支持 `customers.person_id` 直链与 `persons.legacy_customer_id` 桥双路径；participant 以 `canonical_person_id` 为准；软删 Person 不持任何派生角色。5 个 AFTER 触发器（customers/recruit_candidates/activity_speakers/activity_participants/persons）在身份列/deleted_at 变更时自动重算；补入统一 `origin='derived'`，既有 manual/legacy_backfill 行来源保留（ON CONFLICT DO NOTHING）。
+- **人工标记角色**：partner/referrer/alumni/other 只能人工维护，派生函数永不触碰；Person 软删/业务角色增删时人工标签保留（已由生产事务回归验证）。
+- **业务阶段与有效状态一律读业务表**（customer_stage 等），person_roles 只回答"这个人当前有哪些有效业务身份"。
+- 落地后实测分布（2026-10-09，共 799 行）：customer 779、recruit 15、speaker 4、participant 1；origin：legacy_backfill 790 / manual 7 / derived 2；漂移（stale/missing/软删人物持派生角色）全部为 0。一次性对账删除快照残留 703（软删 Person 768 的 customer）、792（Person 773 的 participant），为 Person 777 补 customer/recruit。
 
 ### 4.2 软删除语义现状（实测）
 

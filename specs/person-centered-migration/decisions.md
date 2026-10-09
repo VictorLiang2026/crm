@@ -19,6 +19,8 @@
 | 2026-10-09 | PMC-14 裁决①：7 行软删 customer 参与记录**回填含软删行**（canonical_person_id 经 legacy_customer_id 桥唯一命中回填） | AskUserQuestion 答复："回填含软删行（推荐）" | 覆盖 20260929084000 迁移当时仅回填活跃行的范围缺口；4 行无 person_id 暂存行 + 1 行 speaker 软删行保持"身份待确认"，不造 Person |
 | 2026-10-09 | PMC-14 裁决②：活动参与者展示名 **Person 优先+快照保留**（persons.display_name 覆盖返回值；Person 软删回退业务表回填名/快照名；person_name 快照列不可变 D6） | AskUserQuestion 答复："Person 优先+快照保留（推荐）" | 落地于 activities enrichParticipants；仅作用返回值，不写库 |
 | 2026-10-09 | PMC-14 生产 UPDATE 专项批准：对 7 行软删 customer 参与行回填 canonical_person_id（id 1,2→person 1；id 3,5,7,9,11→person 89），逐行唯一桥命中、断言块预检通过、回滚按精确 id+预期值备好 | AskUserQuestion 答复："确认执行（推荐）"（安全层拦截后完整披露映射/影响/回滚再确认） | 实际执行 AffectedRows=7；执行后核对 grp1_ok=2、grp89_ok=5、still_pending=5、活跃行 4/0/1 不变 |
+| 2026-10-09 | PMC-15 五项推荐裁决按用户预授权直接采纳（用户："有需要确认的，有'推荐'二字的，直接选择推荐，不需要人再确认"）：①person_roles=有明确来源的组合（4 类业务角色派生+4 类人工标记，派生重算 SECURITY DEFINER+5 AFTER 触发器，origin 增 derived）；②relationships 加 source/status/confirmed_at/by_uid 治理列+类型词表+一致性 CHECK（默认 pending，confirmed 才进 AI/搜索上下文）；③households 行为不变仅补边界注释；④读取方收紧（context-engine 两副本/meeting-prep/crm_search_people_v1 只认 confirmed）；⑤一次性精确对账（删 703/792、补 777 customer+recruit，断言块保护） | 用户 PMC-15 指令预授权推荐项 | 生产对账 DO 断言 74ms 通过后执行；postcheck 漂移=0；生产 UPDATE/DELETE 范围在影响说明与证据中披露 |
+| 2026-10-09 | PMC-15 生产 DDL/DML：经 cloudbase_postgres（表 owner）角色应用迁移（service_role 无 owner 权限）；DDL 含 person_roles origin CHECK 替换、relationships 加列加约束、新增 2 函数 5 触发器、重建 1 RPC；DML 为删 2 行/插 2 行角色 | 用户持续发布授权+推荐项预授权；高风险生产写已在影响说明披露 | rollback 成对备份至 cloudbase/rollbacks 与外部 CloudBase 迁移目录；功能回归用单 DO 块断言后整体 RAISE 回滚，零残留 |
 
 ## 历史批准的继承关系
 

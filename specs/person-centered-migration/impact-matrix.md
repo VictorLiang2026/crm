@@ -513,3 +513,35 @@ persons.legacy_customer_id（自引用）
 | 数据库 | 无 migration/rollback | — | PMC-13 | 无变更 | — |
 | activities / activity_tasks / activity_reports / person_360 | **不修改**（activity_tasks/activity_reports PMC-10 已切换；person_360 linkSpeakerPerson/createSpeakerProfile 已 Person 原生） | — | PMC-13 | 核实无影响 | evidence/PMC-13.md §10 |
 | customers / persons 数据 | 零修改 | — | PMC-13 | 不变 | — |
+
+## PMC-15：角色及关系数据治理（2026-10-09，已发布，待用户验收）
+
+### 15.1 数据库对象变更
+
+| 对象 | 变更类型 | 消费者 | 状态 | 证据 |
+| --- | --- | --- | --- | --- |
+| `person_roles` | origin CHECK 增 `derived`；新增 role CHECK 含 partner/referrer/alumni/other；行对账删 2（id 703/792 快照残留）补 2（person 777 customer/recruit） | 角色目录、筛选、badge | 已部署（生产漂移=0） | evidence/PMC-15.md §4 |
+| `crm_person_roles_derive_v1(bigint)` | 新增 SECURITY DEFINER（service_role only）：按人重算 4 类派生角色（customer 直链+legacy 桥双路径、recruit、speaker、participant canonical），永不触碰人工角色 | 5 触发器 | 已部署；WP01 基线登记（anon/auth=false） | evidence/PMC-15.md §3 |
+| `crm_person_role_sync_v1()` | 新增触发器函数（SECURITY DEFINER）：按 TG_TABLE_NAME 分支收集受影响 person 去重后调 derive | customers/recruit_candidates/activity_speakers/activity_participants/persons 5 个 AFTER 触发器 | 已部署；WP01 基线登记 | evidence/PMC-15.md §3 |
+| `relationships` | 加 source/status/confirmed_at/confirmed_by_uid 4 列 + 类型词表 CHECK + 确认一致性 CHECK（默认 pending/manual；无写入路径，存量 0 行） | person_360、ai_activity、assistant、crm_search_people_v1 | 已部署 | evidence/PMC-15.md §3 |
+| `crm_search_people_v1(text,jsonb)` | CREATE OR REPLACE 收紧：relationships 只认 status=confirmed（含模板 3 recent_declining_relationships） | assistant、person_360 搜索 | 已部署；RPC 冒烟 3 模板正常 | evidence/PMC-15.md §6 |
+| `households` / `household_members` | 零结构变更，仅补 COMMENT（confirmed_at/by_uid 机制沿用；家庭关系词不与 relationships 混用） | 家庭页 | 已部署（行为不变） | evidence/PMC-15.md §2 |
+
+### 15.2 函数与前端变更
+
+| 对象 | 变更类型 | 调用方/消费者 | 状态 | 证据 |
+| --- | --- | --- | --- | --- |
+| `cloudfunctions/_shared/context-engine.js`（ai_activity 副本同步） | FIELDS.relationships 增 status,source；activity_review 关系读取加 `status='confirmed'` | ai_activity | 已部署（两副本 SHA-256 一致） | evidence/PMC-15.md §5 |
+| `cloudfunctions/person_360/meeting-prep-context.js` | 双向 relationships 读取加 status eq.confirmed，select 增 status,source | person_360 | 已部署 | evidence/PMC-15.md §5 |
+| `crm/js/modules/person-profile.js` | ROLES 扩 8 角色（含 4 人工标记）、ORIGINS 增 derived、说明文案区分自动派生/人工标记 | 人物详情 | 已部署（在线 SHA 一致） | evidence/PMC-15.md §5 |
+| `crm/js/modules/console/i18n.js` | 增 participant/role_partner/role_referrer/role_alumni/role_other 中英 key | Console | 已部署 | evidence/PMC-15.md §5 |
+| `crm/js/modules/console/pages/people.js` | ROLE_BADGE 扩 8 角色配色；筛选/目录读 RPC（confirmed/派生行为随服务端） | 人物目录 | 已部署 | evidence/PMC-15.md §5 |
+| `crm/js/modules/phase14-hubs.js` | 角色映射扩 8 角色 | Hub | 已部署 | evidence/PMC-15.md §5 |
+| 其他 26 个云函数（assistant/ai_referral/customers/recruit_* 等） | 只读核查无修改：人物端点均以 person_id 引用；无姓名/客户身份依赖 | — | 核实无影响 | evidence/PMC-15.md §2 |
+| admin.html | 不修改 | — | 不变（线上 SHA 一致） | evidence/PMC-15.md §5 |
+
+### 15.3 规则落点
+
+- 角色删除影响：业务角色随业务行有效状态派生，删业务角色（软删业务行）只清派生角色行；relationships/households/人工角色零影响（生产事务回归 s11 验证）。
+- 删除恢复：业务行恢复→触发器重建派生角色；relationships 软删释放部分唯一槽，同边可重建。
+- 角色缓存/目录/筛选：角色无独立缓存表；crm_search_people_v1 实时 JOIN；person_360 实时读；前端 badge 随返回值，无本地角色副本。

@@ -7,8 +7,9 @@ const CORE = [['customer_name','姓名'],['phone','电话'],['wx_account','微�
 const MORE = [['marital_status','婚况'],['tags','标签'],['annual_income','年收入'],
   ['household_income','家庭收入'],['properties_info','房产信息'],['first_contact_date','首次接触日期'],
   ['education','学历'],['mbti','MBTI'],['additional_info','附加信息']];
-const ROLES = { customer:'客户', recruit:'候选人', speaker:'嘉宾', participant:'参与者' };
-const ORIGINS = { legacy_backfill:'旧记录映射', manual:'已登记' };
+const ROLES = { customer:'客户', recruit:'候选人', speaker:'嘉宾', participant:'参与者',
+  partner:'合作伙伴', referrer:'推荐人', alumni:'校友', other:'其他' };
+const ORIGINS = { legacy_backfill:'旧记录映射', manual:'人工标记', derived:'业务派生' };
 function node(tag, cls, text) {
   const el = document.createElement(tag);
   if (cls) el.className = cls;
@@ -30,7 +31,7 @@ export async function renderPersonProfile({ root, personId, callFn, openLegacyTa
     for (const role of model.roles) roles.append(node('span', 'badge',
       `${ROLES[role.role] || role.role} · ${ORIGINS[role.origin] || role.origin}`));
     if (!model.roles.length) roles.append(node('span', 'person360-muted', '暂无已登记角色'));
-    root.append(roles, node('p', 'person360-muted', '角色来自身份登记；不代表当前业务阶段，不在此自动变更。'));
+    root.append(roles, node('p', 'person360-muted', '客户/候选人/嘉宾/参与者随有效业务记录自动派生；合作伙伴等为人工标记。业务阶段以客户、招募等业务页为准，不在此变更。'));
     if (model.status === 'customer_unavailable') {
       root.append(node('p', 'person360-error', '关联客户不存在或已移入回收站；未使用历史人物资料代替。请从原客户入口核对。'));
       return;

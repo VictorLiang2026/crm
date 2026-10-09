@@ -48,7 +48,7 @@ const sample = {
     summary: '活动后深入沟通', importance: 4 }],
   actions: [{ id: 17, person_id: 7, activity_id: 11, title: '后续联系', status: 'open' }],
   relationships: [{ id: 18, from_person_id: 7, to_person_id: 8,
-    trend: 'improving', deleted_at: null }],
+    trend: 'improving', status: 'confirmed', source: 'manual', deleted_at: null }],
   recruit_candidates: [{ id: 14, customer_id: 7, stage: 'new', deleted_at: null }],
   recruit_followups: [{ id: 15, candidate_id: 14, followup_notes: 'hello', deleted_at: null }],
 };

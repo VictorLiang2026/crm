@@ -74,6 +74,11 @@ const DICT = {
   'customer': { 'zh-CN': '客户', 'en': 'Customer' },
   'recruit': { 'zh-CN': '增员', 'en': 'Recruit' },
   'speaker': { 'zh-CN': '嘉宾', 'en': 'Speaker' },
+  'participant': { 'zh-CN': '参与者', 'en': 'Participant' },
+  'role_partner': { 'zh-CN': '合作伙伴', 'en': 'Partner' },
+  'role_referrer': { 'zh-CN': '推荐人', 'en': 'Referrer' },
+  'role_alumni': { 'zh-CN': '校友', 'en': 'Alumni' },
+  'role_other': { 'zh-CN': '其他', 'en': 'Other' },
 
   'interaction_invitation': { 'zh-CN': '邀约', 'en': 'Invitation' },
   'interaction_conversation': { 'zh-CN': '实质沟通', 'en': 'Conversation' },

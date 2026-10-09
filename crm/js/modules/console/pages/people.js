@@ -10,6 +10,11 @@ const ROLE_BADGE = () => ({
   customer: [t('customer'), 'ink'],
   recruit: [t('recruit'), 'gold'],
   speaker: [t('speaker'), 'jade'],
+  participant: [t('participant'), 'blue'],
+  partner: [t('role_partner'), 'purple'],
+  referrer: [t('role_referrer'), 'teal'],
+  alumni: [t('role_alumni'), 'gray'],
+  other: [t('role_other'), 'gray'],
 });
 
 const SORT_COLUMNS = () => ([
