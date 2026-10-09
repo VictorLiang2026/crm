@@ -302,12 +302,25 @@ async function loadActivityContext(activityId) {
     rs.forEach(function(rc){ nameMap['recruit:' + rc.id] = rc; });
   }
   if (speakerIds.length) {
-    var sps = assertOk(await rdb.from('activity_speakers').select('id, name, organization, position, expertise, topic_summary, relationship_stage, cooperation_count')
+    var sps = assertOk(await rdb.from('activity_speakers').select('id, name, organization, position, expertise, topic_summary, relationship_stage, cooperation_count, person_id')
       .in('id', speakerIds).is('deleted_at', null)).data || [];
-    sps.forEach(function(s){ nameMap['speaker:' + s.id] = s; });
+    // PMC-13：嘉宾 name 改为 Person 优先读（裁决③），organization/position 保持嘉宾域
+    var spPids = sps.filter(function(s){ return s.person_id; }).map(function(s){ return s.person_id; });
+    var spPmap = {};
+    if (spPids.length) {
+      try {
+        var spPersons = assertOk(await rdb.from('persons').select('id, display_name')
+          .in('id', spPids).is('deleted_at', null)).data || [];
+        spPersons.forEach(function(p){ spPmap[p.id] = p.display_name; });
+      } catch (e) { /* Person 取名失败不阻塞，回退 speaker.name */ }
+    }
+    sps.forEach(function(s){
+      if (s.person_id && spPmap[s.person_id]) s.name = spPmap[s.person_id];
+      nameMap['speaker:' + s.id] = s;
+    });
   }
 
-  // PMC-11：参与者人物名统一取 Person（嘉宾属嘉宾域，不在此列）
+  // PMC-11/13：参与者人物名统一取 Person；嘉宾 name 已取 Person（裁决③），但 participantPersonId 不处理 speaker 类型（参与者 person_id 存的是 speaker 表 ID，留待 PMC-14 归一）
   var ctxPersonIds = [];
   parts.forEach(function (p) {
     if (!p.person_id) return;
@@ -451,10 +464,21 @@ async function recommendTopics(event) {
     .map(function (h) { return (h.activity_date ? String(h.activity_date).slice(0, 10) : '日期未定') + '《' + h.name + '》(' + (h.activity_type || '') + ')'; })
     .join('、') || '暂无';
 
-  // 嘉宾池（供 suggested_speaker 给真实姓名）
-  var speakers = assertOk(await rdb.from('activity_speakers').select('name')
+  // 嘉宾池（供 suggested_speaker 给真实姓名）—— PMC-13：name 从 Person 优先读（裁决③）
+  var speakers = assertOk(await rdb.from('activity_speakers').select('id, name, person_id')
     .eq('status', 'active').is('deleted_at', null).limit(50)).data || [];
-  var speakerNames = speakers.map(function (s) { return s.name; });
+  var spPoolPids = speakers.filter(function(s){ return s.person_id; }).map(function(s){ return s.person_id; });
+  var spPoolPmap = {};
+  if (spPoolPids.length) {
+    try {
+      var spPoolPersons = assertOk(await rdb.from('persons').select('id, display_name')
+        .in('id', spPoolPids).is('deleted_at', null)).data || [];
+      spPoolPersons.forEach(function(p){ spPoolPmap[p.id] = p.display_name; });
+    } catch (e) { /* Person 取名失败不阻塞 */ }
+  }
+  var speakerNames = speakers.map(function (s) {
+    return (s.person_id && spPoolPmap[s.person_id]) ? spPoolPmap[s.person_id] : s.name;
+  });
 
   var poolDesc = candidates.map(function (t, i) {
     return (i + 1) + '. #' + t.id + ' ' + t.topic_name

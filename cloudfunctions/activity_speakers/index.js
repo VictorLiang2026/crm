@@ -68,29 +68,46 @@ function kwOrCond(kw) {
     .map(function (c) { return c + '.ilike.%' + s + '%'; }).join(',');
 }
 
-// 身份合并（方案B对齐：customers 为 person 中心；弱关联只读展示，失败不阻塞主流程）
+// 身份合并（PMC-13：Person 优先读基础信息，customers 回退；弱关联只读展示，失败不阻塞主流程）
 async function enrichIdentity(rows) {
   if (!rows || !rows.length) return rows;
-  const cids = [], rids = [];
+  var pids = [], cids = [], rids = [];
   rows.forEach(function (r) {
+    if (r.person_id != null) pids.push(r.person_id);
     if (r.customer_id != null) cids.push(r.customer_id);
     if (r.recruit_candidate_id != null) rids.push(r.recruit_candidate_id);
   });
-  const cmap = {}, rmap = {};
+  var pmap = {}, cmap = {}, rmap = {};
+  // Person 优先读基础信息（裁决①）
+  if (pids.length) {
+    try {
+      var pr = assertOk(await rdb.from('persons')
+        .select('id, display_name, phone, wechat, organization, occupation')
+        .in('id', pids).is('deleted_at', null));
+      (pr.data || []).forEach(function (p) { pmap[p.id] = p; });
+    } catch (e) { /* Person 合并失败不阻塞 */ }
+  }
   if (cids.length) {
     try {
-      const r = assertOk(await rdb.from('customers').select('Id, customer_name').in('Id', cids).is('deleted_at', null));
-      (r.data || []).forEach(function (c) { cmap[c.Id] = { id: c.Id, name: c.customer_name }; });
+      var cr = assertOk(await rdb.from('customers').select('Id, customer_name').in('Id', cids).is('deleted_at', null));
+      (cr.data || []).forEach(function (c) { cmap[c.Id] = { id: c.Id, name: c.customer_name }; });
     } catch (e) { /* 客户身份合并失败不阻塞 */ }
   }
   if (rids.length) {
     try {
-      const r = assertOk(await rdb.from('v_recruit_candidates').select('candidate_id, customer_id, customer_name').in('candidate_id', rids));
-      (r.data || []).forEach(function (c) { rmap[c.candidate_id] = { id: c.candidate_id, name: c.customer_name, customer_id: c.customer_id }; });
+      var rr = assertOk(await rdb.from('v_recruit_candidates').select('candidate_id, customer_id, customer_name').in('candidate_id', rids));
+      (rr.data || []).forEach(function (c) { rmap[c.candidate_id] = { id: c.candidate_id, name: c.customer_name, customer_id: c.customer_id }; });
     } catch (e) { /* 增员视图不可用时降级 */ }
   }
   return rows.map(function (r) {
+    var person = r.person_id != null ? (pmap[r.person_id] || null) : null;
     return Object.assign({}, r, {
+      // Person 优先读基础信息（裁决①），原值回退
+      name: person && person.display_name ? person.display_name : r.name,
+      phone: person && person.phone ? person.phone : (r.phone || null),
+      wechat: person && person.wechat ? person.wechat : (r.wechat || null),
+      organization: person && person.organization ? person.organization : (r.organization || null),
+      linked_person: person ? { id: r.person_id, name: person.display_name } : null,
       linked_customer: r.customer_id != null ? (cmap[r.customer_id] || null) : null,
       linked_recruit: r.recruit_candidate_id != null ? (rmap[r.recruit_candidate_id] || null) : null,
     });
@@ -121,56 +138,8 @@ async function create(event) {
   if (n.error) return n;
   const d = n.data;
   if (!d.name || !String(d.name).trim()) return { error: 'name required' };
-  // 强关联兜底（v1.8.10.6：customers 为唯一 person 主表，嘉宾必须有客户档案）
-  // 未传 customer_id：精确同名唯一→直接关联；无同名→自动建客户；多个同名→报错交界面人工确认
-  if (d.customer_id == null) {
-    const exactName = String(d.name).trim();
-    const dup = assertOk(await rdb.from('customers').select('Id, customer_name')
-      .eq('customer_name', exactName).is('deleted_at', null).limit(50));
-    const dups = dup.data || [];
-    if (dups.length === 1) {
-      d.customer_id = dups[0].Id;
-    } else if (dups.length === 0) {
-      // PMC-08: 经统一写入口创建客户+Person（不直接 INSERT customers 绕过 Person 接管）
-      const customerPayload = {
-        customer_name: exactName,
-        phone: d.phone || null,
-        source: d.source ? ('嘉宾：' + d.source) : '嘉宾（自动建档）',
-      };
-      // 复用 customers.create 的接管逻辑：建 Person + 设置 person_id/legacy_customer_id
-      const nameKey = exactName.toLowerCase().replace(/\s+/g, ' ');
-      const personMatch = assertOk(await rdb.from('persons')
-        .select('id, display_name')
-        .eq('display_name', exactName)
-        .is('deleted_at', null)
-        .limit(2));
-      const pMatches = personMatch.data || [];
-      let personId;
-      if (pMatches.length === 1) {
-        personId = pMatches[0].id;
-      } else if (pMatches.length > 1) {
-        return { error: '存在多个同名人物，请通过 Person 身份解析确认后关联' };
-      } else {
-        const pr = assertOk(await rdb.from('persons').insert({
-          display_name: exactName, name_key: nameKey, source: '嘉宾建档',
-        }).select('id'));
-        personId = pr.data[0].id;
-      }
-      const cr = assertOk(await rdb.from('customers').insert({
-        customer_name: exactName,
-        phone: d.phone || null,
-        source: d.source ? ('嘉宾：' + d.source) : '嘉宾（自动建档）',
-        person_id: personId,
-        created_at: nowIso(), updated_at: nowIso(),
-      }).select('Id'));
-      d.customer_id = cr.data[0].Id;
-      assertOk(await rdb.from('persons')
-        .update({ legacy_customer_id: d.customer_id, updated_at: nowIso() })
-        .eq('id', personId));
-    } else {
-      return { error: '存在 ' + dups.length + ' 个同名客户，请在界面确认要关联的客户后重试', dup_customers: dups };
-    }
-  }
+  // PMC-13：嘉宾身份不自动代表销售客户，不强制创建客户档案（裁决②）
+  // 未传 customer_id 时不自动建客户；person_id 由 service_role 写入（走 person_360 入口）
   d.created_at = nowIso();
   d.updated_at = nowIso();
   const payload = normFields(d, SP_FIELDS.concat(['created_at', 'updated_at']));
