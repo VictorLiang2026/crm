@@ -148,31 +148,58 @@
 ## 14. 验收记录
 
 - **验收日期**：2026-10-09
-- **状态**：实施完成，待用户验收
+- **验收人**：用户确认（"好的，执行最终验收确认"）
+- **验收结论**：**PASS（通过）**
 
 ### 14.1 验收依据
 
 | 证据 | 结果 |
 | --- | --- |
-| 隔离测试 | 9/9 全绿（T1-T9） |
+| 隔离测试复跑（验收时） | 9/9 全绿（duration 297ms；T1–T9 全 PASS） |
+| 受控浏览器生产回归 | S1–S7 共 7 项全 PASS（§14.2；截图存档 `d:\Temp\trae\screenshots\`） |
 | WP04 身份审计 | speakers 4/4 mapped, 0 exceptions |
 | regression | 107/107 PASS（5 SKIP） |
-| WP01 门槛 | PASS_WITH_LIMITATIONS（blockers=[]） |
+| WP01 门槛 | PASS（blockers=[]，发布前 assert-release 通过） |
 | 部署 | activity_speakers + ai_activity 两函数部署成功（COS 上传） |
 | sync-check | 三端全绿（28 函数 170 文件一致；admin.html SHA 不变） |
 
-### 14.2 四项裁决落地确认
+### 14.2 受控浏览器生产回归（admin.html 真实通道，只读干跑零写库）
+
+| 场景 | 结果 |
+| --- | --- |
+| S1 登录 | PASS（进入认证后的嘉宾资源池页面） |
+| S2 嘉宾资源列表 | PASS：「嘉宾资源」标题正常，4 张嘉宾卡片渲染无「加载失败」（enrichIdentity Person 优先读生产读路径正常） |
+| S3 Person 主数据展示 | PASS：卡片姓名正常（赵福祥/沈高山/杨杰等），杨杰卡片微信 fmfrlystar 来自 Person 主数据（Person 优先读生效） |
+| S4 工具栏按钮 | PASS：「+ 从 Person 新增嘉宾」「+ 新增嘉宾并核对 Person」「返回活动列表」三按钮齐全 |
+| S5 搜索/筛选控件 | PASS：搜索框+全部状态/全部阶段筛选正常 |
+| S6 创建流程干跑 | PASS：「选择嘉宾对应的 Person」弹窗打开、搜索（无完整标记的测试名返回「未找到 Person」，符合服务端标记要求的安全行为）、确认按钮正确禁用 |
+| S7 取消无写库 | PASS：弹窗取消关闭，零保存零提交（全程无业务写入） |
+
+工作纪律：全程未点击删除按钮、未提交任何表单；原生确认框一律取消。
+
+### 14.3 四项裁决落地确认
 
 | # | 裁决 | 落地状态 |
 | --- | --- | --- |
-| ① | enrichIdentity Person 优先读基础信息 | ✅ activity_speakers enrichIdentity（L72-115）Person 优先读+原值回退+linked_person 字段 |
-| ② | create 去掉自动建 Person+customers 分支 | ✅ activity_speakers create（L136-148）仅创建 activity_speakers 行 |
-| ③ | ai_activity 嘉宾 name Person 优先读 | ✅ ai_activity L304-321 参与者 name + L467-481 recommendTopics 嘉宾池 name |
-| ④ | admin.html ensurePersonCustomer（死函数）保留不动 | ✅ 不改 admin.html |
+| ① | enrichIdentity Person 优先读基础信息 | ✅ enrichIdentity（L72-115）Person 优先读+原值回退+linked_person 字段；生产浏览器 S2/S3 实测 PASS |
+| ② | create 去掉自动建 Person+customers 分支 | ✅ create（L136-148）仅创建 activity_speakers 行（T5-T7 覆盖；UI 已全部走 person_360 identity，legacy 入口仅 list/update/remove） |
+| ③ | ai_activity 嘉宾 name Person 优先读 | ✅ ai_activity L304-321 参与者 name + L467-481 recommendTopics 嘉宾池 name（T8/T9 覆盖） |
+| ④ | admin.html ensurePersonCustomer（死函数）保留不动 | ✅ 不改 admin.html（sync-check SHA 不变证实） |
 
-### 14.3 发布记录
+### 14.4 验收限制项（非阻塞）
 
-- 提交：`9eb03e4`（3 files changed, 307 insertions(+), 63 deletions(-)）
-- 标签：`release-20261009-151917`
-- 部署范围：activity_speakers + ai_activity 两云函数（无静态文件、无 migration）
-- sync-check：三端全绿
+| # | 限制 | 处置 |
+| --- | --- | --- |
+| L1 | create action 生产写路径未实测（隔离 T5-T7+sync-check SHA 一致覆盖） | 受控浏览器只读纪律，不向生产写测试数据；UI 已不经 create 直连路径（全部走 person_360 identity） |
+| L2 | ai_activity 真实模型链路未实测（无虚构测试活动；T8/T9 静态契约覆盖） | 与 PMC-11 同口径沿用登记 |
+| L3 | S6 搜索「虚构独立增员甲」未返回候选 | 测试 Person 全名为「【系统测试·勿联系】虚构独立增员甲」，服务端要求完整标记方可匹配（安全行为，非缺陷） |
+
+### 14.5 发布记录
+
+- 代码发布：提交 `9eb03e4`（3 files, +307/-63）；标签 `release-20261009-151917`；部署 activity_speakers + ai_activity 两云函数（无静态文件、无 migration）
+- 档案发布：提交 `50f06d6`；标签 `release-20261009-153902`（云端产物未改变）
+- 两次发布 sync-check 三端全绿
+
+### 14.6 结论
+
+**PMC-13 验收通过**（PASS）。限制项均为非阻塞登记项，不阻断 PMC-14 开包。

@@ -1,15 +1,15 @@
 # Handoff（接管状态）
 
-更新时间：2026-10-09（**PMC-13 已实施完成并发布，待用户验收**；PMC-12 已验收通过）。任何工具接手前先读本文件与 execution-contract。
+更新时间：2026-10-09（**PMC-13 已获用户验收通过**；当前等待 PMC-14 指令）。任何工具接手前先读本文件与 execution-contract。
 
 ## 1. 执行状态
 
 | 项 | 值 |
 | --- | --- |
-| 当前执行工具 | Trae；PMC-13 已实施完成并发布，待用户验收 |
-| 最后验收通过包 | **PMC-12（招募模块完成 Person 与招募资料分离）——2026-10-09 用户验收通过（PASS_WITH_LIMITATIONS）**。前置 PMC-11 已验收通过 |
-| 正在执行包 | **PMC-13（嘉宾模块完成 Person 与合作资料分离）——2026-10-09 实施完成并发布，待用户验收**：四项裁决全部落地（①enrichIdentity Person 优先读 name/phone/wechat/organization+customers 回退+linked_person 字段；②create 去掉自动建 Person+customers 分支，嘉宾身份不自动代表销售客户；③ai_activity 嘉宾 name Person 优先读；④admin.html ensurePersonCustomer 死函数保留不动）；activity_speakers/index.js + ai_activity/index.js 两函数已部署；隔离测试 9/9；WP04 speakers 4/4 mapped；regression 107/107；WP01 门槛 PASS（blockers=[]）。无 migration/rollback；无 admin.html 改动。详见 evidence/PMC-13.md |
-| 下一步唯一允许执行的动作 | **等待用户验收 PMC-13**（已发布标签 `release-20261009-151917`，提交 `9eb03e4`）；验收通过后等待 PMC-14 指令；G-PMC11-1 修复、G-PMC12-1 处置须单独授权 |
+| 当前执行工具 | Trae；PMC-13 已验收通过，等待 PMC-14 指令 |
+| 最后验收通过包 | **PMC-13（嘉宾模块完成 Person 与合作资料分离）——2026-10-09 用户验收通过（PASS）**：四项裁决全部落地（①enrichIdentity Person 优先读 name/phone/wechat/organization+customers 回退+linked_person 字段；②create 去掉自动建 Person+customers 分支，嘉宾身份不自动代表销售客户；③ai_activity 嘉宾 name Person 优先读；④admin.html ensurePersonCustomer 死函数保留不动）；activity_speakers/ai_activity 两函数已部署；隔离测试 9/9（复跑 297ms）；受控浏览器生产回归 S1–S7 全 PASS（S2 嘉宾列表 4 卡渲染、S3 杨杰微信来自 Person 主数据、S7 零写库）；WP04 speakers 4/4 mapped；regression 107/107；WP01 门槛 PASS。限制项 L1–L3 均非阻塞（create 生产写路径 T5-T7+sync-check 覆盖、ai_activity 真实模型 T8/T9 覆盖、picker 标记搜索为安全行为）。详见 evidence/PMC-13.md §14 |
+| 正在执行包 | 无（PMC-13 已验收通过，等待 PMC-14 指令） |
+| 下一步唯一允许执行的动作 | **等待用户下发 PMC-14 指令**（PMC-13 已验收，evidence/PMC-13.md §14 已登记）；G-PMC11-1 修复、G-PMC12-1 处置须单独授权 |
 | 回滚条件 | PMC-13 代码回滚：`git revert 9eb03e4` → 重新部署 activity_speakers/ai_activity 两函数；无结构/数据回滚（本包无 migration）。PMC-12 结构回滚：`cloudbase/rollbacks/20261009091200_pmc12_recruit_view_person_read.sql`；代码回滚：git revert → 重部署 recruit_candidates/recruit_score/recruit_recommend + admin.html。G-PMC11-2 结构回滚：`cloudbase/rollbacks/20261009070000_fix_v_recruit_candidates_left_join.sql` |
 
 ## 2. 版本基线（2026-10-09 PMC-13 发布时更新）
@@ -19,7 +19,7 @@
 | PMC-11 前基线 | `master` @ `cbad9aa`（PMC-10 验收提交，标签 `release-20261008-2311`），工作树干净 |
 | PMC-11 发布 | 标签 `release-20261009-0105`（时间戳）+ `v2.1.2`（2026-10-09 首提交 semver，patch：AI 适配向后兼容）；G-PMC11-2 修复标签 `release-20261009-0808`；**最终验收登记标签 `release-20261009-0823`** |
 | PMC-12 发布 | 提交 `522fbca`（20 files, +797/-52）；标签 `release-20261009-141318`；部署 recruit_candidates/recruit_score/recruit_recommend 三函数 + admin.html 静态 + migration `20261009091200`（+rollback） |
-| PMC-13 发布 | 提交 `9eb03e4`（3 files, +307/-63）；标签 `release-20261009-151917`；部署 activity_speakers/ai_activity 两函数；无 migration；无 admin.html 改动；sync-check 三端全绿 |
+| PMC-13 发布 | 提交 `9eb03e4`（3 files, +307/-63）；标签 `release-20261009-151917`；部署 activity_speakers/ai_activity 两函数；无 migration；无 admin.html 改动；sync-check 三端全绿。档案发布提交 `50f06d6` 标签 `release-20261009-153902`（云端产物未改变）；**验收登记发布标签以本档案提交的发布时间戳为准** |
 | 云端 | PMC-13 部署 2 个函数（activity_speakers/ai_activity）；静态文件零改动；PMC-12 部署 3 函数+admin.html；PMC-11 部署 8 AI 函数 |
 | 数据库迁移 | PMC-13 无 migration；G-PMC11-2 修复 `20261009070000`（已应用）；persons anon 只读依赖 PMC-10 `20261008231500`，在效 |
 | 数据规模抽查（PMC-13 只读） | activity_speakers 4 活跃嘉宾全部有 person_id（WP04 speakers 4/4 mapped） |
@@ -48,7 +48,8 @@
 - 已批准（2026-10-08）：PMC-11 指令及编码前影响方案（AI 基础资料取 Person、业务域不动、缺失/冲突标注、非模型保存入口改造、历史快照不改写、不扩大自动写权限与 Quick Capture 灰度）；PMC-10 验收修复方案 A（persons anon 只读 GRANT/RLS）。
 - 已批准（2026-10-09）：**G-PMC11-2 修复——方案 A 视图 LEFT JOIN 修复 + 回收站视图一并修复**（migration + rollback，已应用并验证）；**PMC-11 最终验收通过**（用户下发「执行最终验收确认」）。
 - 已批准（2026-10-09）：**PMC-12 指令与四项裁决**（①视图读切换 Person 优先+customers 回退；②AI 复盘 B 类采纳改预览确认；③旧增员表单保持先匹配客户；④死列 education/mbti 留置登记）；**PMC-12 验收通过**（PASS_WITH_LIMITATIONS，用户下发「执行验收」）。
-- 未批准：PMC-13～PMC-20 全部实施包（指令未收到）；G-PMC11-1 修复、G-PMC12-1 处置；一切删除/重命名已有对象（含 D5 姓名唯一约束解除、D8 customer_id 列/复合 FK 退出——须独立包单独批准）；`pr`/`pr_*` 相关一切；Legacy Quick Capture 流程变更；所有数据库变更（需 migration/rollback + 针对性确认）。
+- 已批准（2026-10-09）：**PMC-13 指令与四项裁决**（①enrichIdentity Person 优先读+customers 回退；②create 去掉自动建 Person+customers 分支；③ai_activity 嘉宾 name Person 优先读；④ensurePersonCustomer 死函数保留不动）；**PMC-13 验收通过**（PASS，用户下发「执行最终验收确认」）。
+- 未批准：PMC-14～PMC-20 全部实施包（指令未收到）；G-PMC11-1 修复、G-PMC12-1 处置；一切删除/重命名已有对象（含 D5 姓名唯一约束解除、D8 customer_id 列/复合 FK 退出——须独立包单独批准）；`pr`/`pr_*` 相关一切；Legacy Quick Capture 流程变更；所有数据库变更（需 migration/rollback + 针对性确认）。
 
 ## 5. 已登记缺口（观察项，非阻塞；修复须另获授权）
 
