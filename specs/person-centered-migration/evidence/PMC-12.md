@@ -141,4 +141,44 @@
 
 ## 14. 验收记录
 
-（待用户验收后登记）
+- **验收日期**：2026-10-09
+- **验收人**：用户确认（"好的，执行验收"）
+- **验收结论**：**PASS_WITH_LIMITATIONS（通过，有限制项）**
+
+### 14.1 验收依据
+
+| 证据 | 结果 |
+| --- | --- |
+| 隔离测试复跑（本日） | 9/9 全绿稳定（duration 833ms；T1–T9 全 PASS） |
+| 视图 before/after 快照零差异 | SHA-256 `F939A239…611955`（§6.1，已归档 `tests/security/.results/pmc12-view-*.json`） |
+| 受控浏览器生产回归 | S1 登录 / S2 招募列表(15 行) / S3 增员评分 / S4 独立候选人 20 话术 / S6 客户列表(16 行) / S7 招募回收站(3 行) 全 PASS（§6.3） |
+| regression 107/107 | 全绿（WP01 门槛） |
+| WP01 门槛 | PASS_WITH_LIMITATIONS（catalog/guard-tests/regression/anonymous 全 PASS；login=MANUAL_LOGIN 非阻断） |
+
+### 14.2 限制项（非阻塞，留待后续）
+
+| # | 限制 | 处置 |
+| --- | --- | --- |
+| L1 | S5 AI 复盘 B 类采纳预览确认（confirmRecruitConversion）浏览器实测 BLOCKED | 库内当前无 B 类 AI 复盘建议行（数据事实）+ IDE 超时；代码契约由隔离测试 T9 覆盖（先 confirm 后 create、取消不建、existing_id 幂等）。留待有 B 类样本时实测 / iPad 人工回归 |
+| L2 | 招募软删除/恢复线上演练未做 | 受控浏览器禁点删除按钮（工作纪律）；RPC crm_delete_batch recruit 分支本包零改动（盘点核实不动 customers/persons），隔离测试 T4/T5 覆盖字符串 ID 命中与拒绝路径 |
+| L3 | G-PMC12-1 死列 education/mbti 留置 | 裁决④留置，待 D5/D8 约束解除包统一处理，须单独授权 |
+| L4 | G-PMC11-1 沿用登记未修 | 既有缺陷、非本包引入；修复须单独授权 |
+
+### 14.3 四项裁决落地确认
+
+| # | 裁决 | 落地状态 |
+| --- | --- | --- |
+| ① | 视图读切换 = Person 优先 + customers 回退 | ✅ migration `20261009091200` 已应用，7 列 COALESCE，快照零差异 |
+| ② | AI 复盘 B 类采纳改预览确认 | ✅ admin.html confirmRecruitConversion 弹窗 + B 分支先 confirm 后 create（T9 覆盖，L1 待实测） |
+| ③ | 旧增员表单保持「必须先匹配客户」 | ✅ create 仍强制 customer_id（R-ID1，T6） |
+| ④ | 死列 education/mbti 留置+登记 | ✅ education 读 COALESCE(p.x, c.x)、mbti 保持 customers；G-PMC12-1 已登记 |
+
+### 14.4 验收口径
+
+- 同一人物基础资料跨客户/招募一致：视图 7 列 Person 优先读，COALESCE 回退保证兼容；快照零差异证实当前数据一致。
+- 招募阶段、目标进度、评分、附件、删除恢复：recruit_candidates/recruit_score/recruit_recommend 业务域字段语义全部保留（T4/T7/T8）；RPC recruit 分支零改动，软删除/恢复不误伤 Person 其他角色。
+- Person-only 流程：person_360 identity command（kind=recruit，需 Selected Person）不变；独立候选人 20 经 G-PMC11-2 LEFT JOIN 修复后话术生成 PASS。
+
+### 14.5 结论
+
+**PMC-12 验收通过**（PASS_WITH_LIMITATIONS）。限制项均为非阻塞登记项，不阻断 PMC-13 开包。发布标签见 handoff.md §2。
