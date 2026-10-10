@@ -480,13 +480,24 @@ body:has(.login) { padding-top: env(safe-area-inset-top); }
   .page-title { font-size: 19px; }
   .page-sub { font-size: 13px; }
   .stat-row { grid-template-columns: 1fr 1fr; }
-  .stat b { font-size: 20px; }
   .ai-grid { grid-template-columns: 1fr; }
   .tile-grid { grid-template-columns: 1fr 1fr; }
   .kcol { min-width: 200px; }
-  .card-body { padding: 12px 14px; font-size: 14.5px; }
+  .card-body { padding: 12px 14px; font-size: 14px; }
   .card-head { padding: 10px 14px; font-size: 14px; }
   .list-row { font-size: 14px; }
+  /* —— iPhone 排版统一：Today 与其他页签同一套字号/密度 —— */
+  .stat b { font-size: 18px; }
+  .brief-head { padding: 12px 14px; font-size: 14px; }
+  .brief-body { padding: 12px 14px; }
+  .brief-row { padding: 10px 12px; }
+  .brief-foot { padding: 10px 14px; }
+  /* 能换行的尽可能换行：解除单行截断，避免文字被压缩省略 */
+  .row-title { flex-wrap: wrap; }
+  .row-title > span:last-child, .row-sub, .kcard-name, .kcard-note, .reminder-text,
+  .brief-headline, .brief-guidance {
+    white-space: normal; overflow: visible; text-overflow: clip; word-break: break-word;
+  }
   /* 人物列表：iPhone 转为卡片式堆叠，避免 640px 宽表横向滚动 */
   .people-table { min-width: 0; }
   .people-table thead { display: none; }
