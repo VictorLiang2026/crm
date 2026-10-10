@@ -184,3 +184,73 @@ attnum 3–9, 14, 20 = `........pg.dropped.N........`（8 个已删除列空洞�
 ## 9. 发布标签
 
 发布标签 `release-20261010-161100`（提交 `44b5539`）；7 files +1014/-12；本地/远端/标签三端一致；云端产物未改变（仅文档包）。
+
+---
+
+## 10. CL-05/CL-06/CL-01 执行（用户批准 B1+CL-01）
+
+状态：**已执行（2026-10-10，用户批准 B1+CL-01 全部）**。
+
+用户原话"好的，执行吧"，AskUserQuestion 选择"B1+CL-01 全部（推荐）"=CL-05+CL-06+CL-01 共 3 项。
+
+### 10.1 Migration 文件
+
+| 项 | migration 文件 | rollback 文件 |
+| --- | --- | --- |
+| CL-05 | `20261010163000_pmc19_cl05_drop_recruit_education.sql` | `...rollback.sql` |
+| CL-06 | `20261010163100_pmc19_cl06_drop_recruit_mbti.sql` | `...rollback.sql` |
+| CL-01 | `20261010163200_pmc19_cl01_drop_customer_name_unique.sql` | `...rollback.sql` |
+
+双备份：`cloudbase/migrations/` + `C:\Users\victor\cloudbase\migrations\` 各 6 份。
+
+### 10.2 Pre-migration 基线（tcb-exec service_role，2026-10-10）
+
+| 指标 | 值 | 满足条件 |
+| --- | --- | --- |
+| education 列存在 | 1 | ✅ 可删 |
+| mbti 列存在 | 1 | ✅ 可删 |
+| 客户列表_姓名_key 约束存在 | 1 | ✅ 可删 |
+| 重复活跃客户名 | 0 | ✅ rollback 安全 |
+| education 非空 | 0 | ✅ 死列 |
+| mbti 非空 | 0 | ✅ 死列 |
+| customers 总行 | 783 | 数据完整 |
+| recruit_candidates 总行 | 18 | 数据完整 |
+
+### 10.3 Migration 执行（tcb-exec --role cloudbase_postgres）
+
+| 项 | SQL | 耗时 | 结果 |
+| --- | --- | --- | --- |
+| CL-05 | `ALTER TABLE public.recruit_candidates DROP COLUMN IF EXISTS education;` | 8ms | ✅ AffectedRows=0 |
+| CL-06 | `ALTER TABLE public.recruit_candidates DROP COLUMN IF EXISTS mbti;` | 11ms | ✅ AffectedRows=0 |
+| CL-01 | `ALTER TABLE public.customers DROP CONSTRAINT IF EXISTS "客户列表_姓名_key";` | 16ms | ✅ AffectedRows=0 |
+
+### 10.4 Post-migration 核对（tcb-exec service_role）
+
+| 指标 | 期望 | 实测 | 结果 |
+| --- | --- | --- | --- |
+| education 列存在 | 0 | 0 | ✅ 已删 |
+| mbti 列存在 | 0 | 0 | ✅ 已删 |
+| 客户列表_姓名_key 约束存在 | 0 | 0 | ✅ 已删 |
+| customers 总行 | 783 | 783 | ✅ 数据完整 |
+| recruit_candidates 总行 | 18 | 18 | ✅ 数据完整 |
+| customers_view 行数 | 783 | 783 | ✅ 视图正常 |
+| v_recruit_candidates 行数 | 15 | 15 | ✅ 视图正常（活跃） |
+| v_recruit_candidates_trash 行数 | 3 | 3 | 回收站视图正常（软删） |
+| v_recruit_candidates 仍返回 education/mbti 列 | 是 | 是（text, null） | ✅ 列来自 persons/customers 非 rc |
+
+### 10.5 代码回归
+
+| 检查项 | 方法 | 结果 |
+| --- | --- | --- |
+| recruit_candidates 函数引用 education/mbti | grep `education\|mbti` cloudfunctions/recruit_candidates/ | 0 命中 ✅ |
+| customers 函数引用 customer_name 唯一约束 | grep `customer_name.*unique\|客户列表_姓名` cloudfunctions/customers/ | 0 命中 ✅ |
+| recruit_candidates FIELDS 包含 education/mbti | 读 index.js FIELDS 数组 | 不含 ✅（create/update 不写死列） |
+| recruit_candidates 函数读来源 | 读 index.js list/get | `rdb.from('v_recruit_candidates').select('*')` 读视图 ✅ |
+| 云函数调用回归 | tcb fn invoke | ❌ Cam 认证不可用（无 ~/.cloudbase 登录），无法调用；但函数代码未变且读取已验证视图，风险极低 |
+
+### 10.6 回归结论
+
+- **DB 级回归全部通过**：3 项 DDL 成功应用，列/约束已删，数据完整，视图正常。
+- **代码级回归通过**：0 代码消费者，FIELDS 不含死列，函数读视图（已验证正常）。
+- **功能调用受限**：tcb fn invoke 需 Cam 登录，当前环境无 `~/.cloudbase` 目录；本包为纯 DB 变更（无代码改动），函数未变且读取已验证视图，风险极低。
+- **限制声明**：CL-01 功能验证（创建同名客户不报约束冲突）未做，因 Cam 认证不可用；约束已在 DB 级核实删除（constraint_exists=0）。
