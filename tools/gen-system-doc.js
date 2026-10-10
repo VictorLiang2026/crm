@@ -3,9 +3,9 @@
  * 输出: docs/system-documentation.docx （不带版本号，始终代表最新；封面标注当前版本）
  * 系统变更后更新本脚本并重新生成。
  */
-const DOC_VERSION = 'v2.0.0';
-const DOC_DATE = '2026-10-05';
-const DOC_SUFFIX = 'AI-native Person 360 目标 CRM（WP01–WP13 基线）';
+const DOC_VERSION = 'v2.2.0';
+const DOC_DATE = '2026-10-11';
+const DOC_SUFFIX = 'AI-native Person 中心目标 CRM（WP01–WP13 + PMC-00～PMC-20 迁移收官基线）';
 const fs = require('fs');
 const path = require('path');
 const {
@@ -63,18 +63,18 @@ sections.push(pageBreak());
 sections.push(h1('1. 系统概述'));
 sections.push(h2('1.1 项目简介'));
 sections.push(p("Victor's CRM 是一套基于腾讯云开发（CloudBase）的轻量级保险行业客户关系管理与 AI 经营辅助系统，面向保险代理人提供客户经营、活动经营、组织发展（增员）、机会管理与 AI 教练等一体化能力。"));
-sections.push(p('系统采用 Serverless 架构：前端为单文件 HTML 应用加按需加载的 ES 模块（无构建工具），后端为 28 个云函数，数据库为 CloudBase PostgreSQL，所有数据访问通过云函数中转，前端不直连数据库。'));
-sections.push(p('2026 年 9 月起，系统在原有 Legacy CRM（客户/活动/增员三模块）之上，以增量方式建成了 AI-native 的 Person 中心新架构（WP01–WP13 工作包）：以 persons 为统一人物身份，以 interactions（互动）、context_items（事实/信号/推断）、actions（行动）、commitments（承诺）、outcomes（结果）为经营闭环账本，所有 AI 关键写入均经“服务端预览 → 人工确认 → 事务执行”。旧功能完整保留并收入“更多”入口，两套体系并行互通。'));
+sections.push(p('系统采用 Serverless 架构：前端为双入口——单文件应用 admin.html（Legacy 全功能）与模块化新控制台 console.html（原生 ES 模块，无构建工具）；后端为 29 个云函数，数据库为 CloudBase PostgreSQL，所有数据访问通过云函数中转，前端不直连数据库。'));
+sections.push(p('2026 年 9 月起，系统在原有 Legacy CRM（客户/活动/增员三模块）之上，以增量方式建成了 AI-native 的 Person 中心新架构（WP01–WP13 工作包）：以 persons 为统一人物身份，以 interactions（互动）、context_items（事实/信号/推断）、actions（行动）、commitments（承诺）、outcomes（结果）为经营闭环账本，所有 AI 关键写入均经“服务端预览 → 人工确认 → 事务执行”。2026-10-07 至 10-11 又完成 Person 中心化迁移（PMC-00～PMC-20）：人物基础信息全部归位 persons，customers 副本列、legacy_customer_id、姓名唯一约束、桥接/同步触发器等历史冗余全部经批准清理，12 个视图重建改读 persons；旧功能完整保留并收入“更多”入口，两套体系并行互通。'));
 sections.push(spacer());
 
 sections.push(h2('1.2 技术栈'));
 sections.push(tbl(
   ['层次', '技术', '说明'],
   [
-    ['前端主体', '原生 HTML + JS + CSS', 'admin.html 单文件（约 497KB / 8400+ 行），hash 路由，callFn 调云函数'],
-    ['前端模块', '原生 ES Modules', 'crm/js/core 核心层 + crm/js/modules 16 个业务模块 + crm/css 9 个样式，按需 import'],
-    ['后端', 'Node.js 云函数（28 个）', 'Nodejs18.15 / Nodejs20.19 双运行时，rdb 链式 API 与服务端 PG RPC'],
-    ['数据库', 'PostgreSQL (CloudBase)', '47 张表 + 10 个业务视图，全部新表强制 RLS、仅 service_role 可访问'],
+    ['前端主体', '原生 HTML + JS + CSS', 'admin.html 单文件（约 500KB / 8400+ 行）+ console.html 新控制台入口，hash 路由，callFn 调云函数'],
+    ['前端模块', '原生 ES Modules', 'crm/js/core 核心层 + crm/js/modules 16 个业务模块 + console 控制台模块组（11 个框架文件 + 8 个页面模块）+ crm/css 10 个样式，按需 import；全界面中英双语 i18n'],
+    ['后端', 'Node.js 云函数（29 个）', 'Nodejs18.15 / Nodejs20.19 双运行时，rdb 链式 API 与服务端 PG RPC；含 1 个 PMC-18 定时观察函数'],
+    ['数据库', 'PostgreSQL (CloudBase)', '48 张表 + 12 个业务视图 + 34 个数据库函数，全部新表强制 RLS、仅 service_role 可访问'],
     ['AI 体系', 'CloudBase AI Gateway', 'provider 中立网关，模型由环境配置选择；AI 任务/运行/结果三表审计'],
     ['AI 文本', '混元等内置模型（套餐积分）', 'generateText 结构化 JSON；保险经营话术、候选生成、复盘、简报'],
     ['AI 视觉', 'glm-5v-turbo', '多模态图片 OCR 与客户资料提取'],
@@ -100,7 +100,7 @@ sections.push(bullet('测试数据隔离：虚构测试样本必须登记批次�
 sections.push(spacer());
 
 sections.push(h2('1.4 顶部主导航（Phase 14）'));
-sections.push(p('主导航七个顶级入口加一个常驻快速记录按钮，按代理人一天的工作流组织：'));
+sections.push(p('主导航八个顶级入口加一个常驻快速记录按钮，按代理人一天的工作流组织：'));
 sections.push(tbl(
   ['导航', '路由', '说明'],
   [
@@ -110,8 +110,9 @@ sections.push(tbl(
     ['机会', '#/opportunities', '机会目录：正式机会与待审核候选分区'],
     ['活动', '#/activities, #/activity/:id', '活动列表/详情、参与者、嘉宾、AI 复盘 V2'],
     ['招募', '#/recruit, #/recruit/:id, #/recruit/goals', '增员工作台、候选人、月度目标'],
-    ['更多', '#/more', '旧版功能入口（客户列表、回收站、漏斗、讲师/主题、活动量日报、账号维护等）'],
-    ['＋ 快速记录', '全局常驻', 'Quick Capture 自然语言速记（Legacy V1 与 Person V2 双模式）'],
+    ['更多', '#/more', '旧版功能入口（客户列表、回收站、漏斗、讲师/主题、活动量日报、账号维护等 17 项跨页入口）'],
+    ['设置', '#/settings', '语言切换（简体中/English）、账号维护等'],
+    ['＋ 快速记录', '全局常驻 FAB', 'Quick Capture 自然语言速记（Legacy V1 与 Person V2 双模式）'],
   ],
   [16, 34, 50]
 ));
@@ -148,14 +149,15 @@ sections.push(pageBreak());
 
 // ===== 3. 数据库设计 =====
 sections.push(h1('3. 数据库设计'));
-sections.push(p('CloudBase PostgreSQL 共享集群 public schema，截至 2026-10-05 共 47 张表、10 个业务视图。旧业务表以 RLS fn_only 保护；2026-09-25 后新建的 28 张表全部强制 RLS 且仅 service_role 拥有受限权限（多为 SELECT/INSERT/UPDATE，无 DELETE）。所有变更经版本化迁移（cloudbase/migrations，70+ 个 SQL）与成对回滚脚本管理。'));
+sections.push(p('CloudBase PostgreSQL 共享集群 public schema，截至 2026-10-11 共 48 张表、12 个业务视图、34 个数据库函数。旧业务表以 RLS fn_only 保护；2026-09-25 后新建的所有表全部强制 RLS 且仅 service_role 拥有受限权限（多为 SELECT/INSERT/UPDATE，无 DELETE）。所有变更经版本化迁移（cloudbase/migrations，132 个 SQL）与成对回滚脚本（cloudbase/rollbacks，47 个）管理，并在外部目录保持双备份。'));
+sections.push(p('PMC-00～PMC-20 Person 中心化迁移收官后：人物基础信息权威来源统一为 persons；customers 的 7 个副本列、persons.legacy_customer_id、customers 姓名 UNIQUE 约束、复合外键、桥接/招募同步触发器等历史冗余已逐项批准清理（PMC-19 CL-01～CL-09）；12 个视图全部重建为改读 persons 的 security_invoker 视图；customers.person_id 为 NOT NULL UNIQUE FK。'));
 sections.push(spacer());
 
 sections.push(h2('3.1 Legacy 客户域 — 10 张表'));
 sections.push(tbl(
   ['表', '关键字段', '用途'],
   [
-    ['customers', 'Id, customer_name, customer_stage, profile(jsonb), sales_priority, delete_batch_id', '客户主档，profile 8 维度画像；软删除并带删除批次'],
+    ['customers', 'Id, person_id(NOT NULL UNIQUE FK→persons), customer_stage, profile(jsonb), sales_priority, delete_batch_id', '客户主档，profile 8 维度画像；人物基础字段已归位 persons（PMC-19 删除 7 副本列），姓名唯一约束已退出（CL-01）；软删除并带删除批次'],
     ['followups', 'Id, customer_id, followup_notes, next_followup_goal(TEXT)', '跟进记录（goal 为自由文本）'],
     ['gifts', 'Id, customer_id, gift_name, given_date', '礼品记录'],
     ['photos', 'Id, customer_id, photo_url, thumbnail_url', '客户照片'],
@@ -247,22 +249,24 @@ sections.push(tbl(
     ['crm_activity_review_commands', '活动复盘 V2 的逐项审核/结果记录命令台账'],
     ['crm_activity_review_source_claims', '活动复盘逐来源认领与防重（同一实质来源不可重复接受）'],
     ['crm_test_batches / crm_test_records / crm_test_previews', '测试批次登记、衍生测试样本逐 ID 登记、测试场景预览（真实链路隔离）'],
+    ['pmc18_observations', 'PMC-18 观察期健康指标：每日 02:00 定时采集身份遗漏/字段漂移/旧写入/孤立引用/权限异常等，90 天观察周期'],
   ],
   [42, 58]
 ));
 sections.push(spacer());
 
-sections.push(h2('3.7 视图层 — 10 个业务视图'));
-sections.push(p('旧列表/详情查询走 *_view 与 v_* 聚合视图；Person 架构落地后，v_action_center、v_funnel_stats、v_recruit_candidates 等全部重建为 security_invoker 视图并纳入 Person 关联。视图缺列是静默故障：表结构变更后必须 DROP + CREATE 重建并重新 GRANT。'));
+sections.push(h2('3.7 视图层 — 12 个业务视图'));
+sections.push(p('旧列表/详情查询走 *_view 与 v_* 聚合视图；Person 架构落地后，全部视图在 PMC-19 CL-02 重建为改读 persons，并于 2026-10-11 统一恢复 security_invoker=true。视图缺列是静默故障：表结构变更后必须 DROP + CREATE 重建并重新 GRANT（DROP COLUMN 前必须先做函数体文本扫描，PMC-19 教训）。'));
 sections.push(tbl(
   ['视图', '用途'],
   [
-    ['customers_view', '客户列表/详情（43 列，聚合礼品/跟进/AI建议/照片）'],
+    ['customers_view', '客户列表/详情（聚合礼品/跟进/AI建议/照片，人物字段读 persons）'],
     ['followups_view / gifts_view / photos_view / products_view', '跟进/礼品/照片/产品列表'],
     ['ai_recommendations_view', 'AI 建议列表'],
-    ['v_action_center', '跨域今日行动池（14 列，纳入统一 Action）'],
+    ['v_action_center', '跨域今日行动池（14 列，纳入统一 Action；人物分支 JOIN persons）'],
     ['v_funnel_stats', '三漏斗统计（当前数/阶段变化/超期/停留）'],
-    ['v_recruit_candidates / v_recruit_candidates_trash', '增员候选人列表（38 列，含 Person/目标/基准）与回收站'],
+    ['v_recruit_candidates / v_recruit_candidates_trash', '增员候选人列表（含 Person/目标/基准）与回收站；LEFT JOIN customers + persons，独立候选人不过滤'],
+    ['v_recruit_candidates_person_only / _trash', 'Person-only 招募人物（无客户角色）列表与回收站'],
   ],
   [40, 60]
 ));
@@ -270,7 +274,7 @@ sections.push(pageBreak());
 
 // ===== 4. 云函数架构 =====
 sections.push(h1('4. 云函数架构'));
-sections.push(p('共 28 个云函数，分三类：Legacy 业务 CRUD（14 个）、Legacy AI 智能（10 个）、Person 中心新函数（4 个：person_360、assistant、activity_reports 等独立函数，及拆出的资源函数）。共享源码位于 cloudfunctions/_shared（11 个模块），部署时复制为各函数目录内副本并做哈希一致性校验。'));
+sections.push(p('共 29 个云函数，分四类：Legacy 业务 CRUD（15 个）、Legacy AI 智能（11 个）、Person 中心新函数（person_360、assistant 2 个）、迁移观察函数（pmc18_observer 1 个）。共享源码位于 cloudfunctions/_shared（11 个模块），部署时复制为各函数目录内副本并做哈希一致性校验（npm run check:shared）。'));
 sections.push(spacer());
 
 sections.push(h2('4.1 Legacy 业务函数'));
@@ -283,8 +287,8 @@ sections.push(tbl(
     ['activities / activity_tasks', '活动 CRUD、参与者、待办'],
     ['activity_speakers / activity_topics', '嘉宾资源池、主题资源池独立管理'],
     ['activity_reports', '活动量统计报表（客户/增员活动量日报）'],
-    ['recruit_candidates', 'list/get/create/update/remove/restore（Person 关联，仅 Person 招募可删的守卫）'],
-    ['recruit_followups / recruit_milestones / recruit_goals', '增员跟进、里程碑、月度目标（原子保存）'],
+    ['recruit_candidates', 'list/get/create/update/remove/restore（Person 关联，仅 Person 招募可删的守卫）；阶段推进同事务写 recruit_milestones 里程碑'],
+    ['recruit_followups / recruit_goals', '增员跟进、月度目标（原子保存）'],
     ['ocr_records', 'OCR 记录独立函数'],
   ],
   [30, 70]
@@ -330,6 +334,10 @@ sections.push(bullet('action=search：AI CRM Search，模型只选固定模板�
 sections.push(bullet('action=command：变更命令安全契约，四操作 create/update/close/delete 必须走 plan→preview→confirm→execute；当前已启用资源：统一行动（actions）创建、机会候选、工作项、机会、活动复盘，各自独立执行器与授权'));
 sections.push(bullet('quickCaptureV2、opportunityCandidate、testSamples 等专用 action 分流到对应服务'));
 sections.push(spacer());
+sections.push(h3('4.3.3 pmc18_observer（迁移观察定时函数）'));
+sections.push(bullet('PMC-18 观察期（90 天，至 2027-01-08）配套：由 pmc18_daily_0200 定时触发器每日 02:00 调用，采集身份新增遗漏、字段漂移、旧字段写入、旧接口调用、同步失败、重复人物、孤立引用、权限拒绝异常、查询性能、统计差异、OCR 恢复与跨角色编辑等指标'));
+sections.push(bullet('指标落 pmc18_observations 表（仅 service_role 可访问）；仅采集必要元数据，不记录完整个人资料；异常按修复包流程处理'));
+sections.push(spacer());
 
 sections.push(h2('4.4 共享模块（cloudfunctions/_shared）'));
 sections.push(tbl(
@@ -354,19 +362,21 @@ sections.push(pageBreak());
 // ===== 5. 前端架构 =====
 sections.push(h1('5. 前端架构'));
 sections.push(h2('5.1 单文件主体 + 模块化扩展'));
-sections.push(p('admin.html 保留全部 Legacy 页面（约 497KB、8400+ 行），含 no-store 缓存头；2026-09-26 起新增功能以 crm/js 下的原生 ES Module 实现，路由命中时动态 import，不改动旧页面包。'));
+sections.push(p('系统为双前端入口：admin.html 保留全部 Legacy 页面（约 500KB、8400+ 行），含 no-store 缓存头；console.html 为 2026-10 新建的模块化控制台入口（crm/js/modules/console/），两入口共享同一 CloudBase 登录会话语义（5 分钟无操作重新登录）。2026-09-26 起新增功能以 crm/js 下的原生 ES Module 实现，路由命中时动态 import，不改动旧页面包。'));
 sections.push(tbl(
   ['目录', '内容'],
   [
     ['crm/js/core', 'api.js（callFn 封装）、feature-flags.js（功能开关，quick_capture_v2 默认关）、state.js、router-extension.js'],
     ['crm/js/modules', '16 个业务模块：person-360、person-profile、person-insights、work-items、opportunity-candidates、opportunity-workflow、morning-brief、quick-capture-v2、activity-review-v2、ai-crm-search、assistant-action-create、phase14-hubs、account-settings、test-scenario、test-data-notice 等'],
-    ['crm/css', '9 个模块样式：person-360、work-items、morning-brief、quick-capture-v2、activity-review-v2、ai-crm-search、assistant-action-create、ai-native、phase14-navigation'],
+    ['crm/js/modules/console', '新控制台：app/router/shell/login/dom/ui/icons/data/write/i18n/views 11 个框架文件 + pages/ 下 today、people、person、opportunities、activities、recruit、misc（AI/更多）、settings 8 个页面模块；i18n.js 中英双语字典（t(key)，默认简体中文）'],
+    ['crm/css', '10 个模块样式：console、person-360、work-items、morning-brief、quick-capture-v2、activity-review-v2、ai-crm-search、assistant-action-create、ai-native、phase14-navigation'],
   ],
   [24, 76]
 ));
 sections.push(spacer());
 
 sections.push(h2('5.2 主要路由'));
+sections.push(p('console.html 控制台主导航：今日（#/today）、人（#/people）、机会（#/opportunities）、活动（#/activities）、招募（#/recruit）、AI（#/ai）、更多（#/more，聚合 17 项旧版功能跨页入口，随 console 原生等价功能上线逐项移除）、设置（#/settings），另有常驻“＋快速记录”FAB。admin.html 保留全部 Legacy 路由（客户列表/详情、回收站、漏斗、日报、AI 建议历史等）。系统主要路由一览：'));
 sections.push(tbl(
   ['Hash', '页面', '架构归属'],
   [
@@ -501,7 +511,7 @@ sections.push(pageBreak());
 sections.push(h1('8. 安全设计'));
 sections.push(h2('8.1 数据库权限三层'));
 sections.push(bullet('Legacy 表：ROW LEVEL SECURITY + fn_only 策略，仅云函数匿名上下文（sub IS NULL AND role=anon）放行，阻止前端直连'));
-sections.push(bullet('新架构 28 张表：强制 RLS，仅 service_role 拥有 SELECT/INSERT/UPDATE（多数无 DELETE），anon/authenticated 显式 REVOKE；CloudBase 默认授权过宽时通过补充迁移回收'));
+sections.push(bullet('新架构各表（Person/账本/AI 运行时/命令台账/测试治理等）：强制 RLS，仅 service_role 拥有 SELECT/INSERT/UPDATE（多数无 DELETE），anon/authenticated 显式 REVOKE；CloudBase 默认授权过宽时通过补充迁移回收'));
 sections.push(bullet('业务 RPC：SECURITY INVOKER、仅 service_role EXECUTE，固定表/列白名单，错误回显不含密钥与环境信息'));
 sections.push(spacer());
 
@@ -538,10 +548,10 @@ sections.push(tbl(
   ['项', '值'],
   [
     ['环境 ID', 'crm-d1gkae8ddc930d151（ap-shanghai）'],
-    ['云函数', '28 个（Nodejs18.15 / Nodejs20.19，256MB，超时 3–150 秒按函数配置）'],
+    ['云函数', '29 个（Nodejs18.15 / Nodejs20.19，256MB，超时 3–150 秒按函数配置）'],
     ['静态托管', 'https://crm-d1gkae8ddc930d151-1434199662.tcloudbaseapp.com/crm/'],
-    ['前端入口', '/crm/admin.html（no-store）+ /crm/js、/crm/css 模块'],
-    ['数据库', 'CloudBase PostgreSQL，public schema，47 表 / 10 视图'],
+    ['前端入口', '/crm/console.html（新控制台）+ /crm/admin.html（Legacy 全功能，no-store）+ /crm/js、/crm/css 模块'],
+    ['数据库', 'CloudBase PostgreSQL，public schema，48 表 / 12 视图 / 34 数据库函数；132 个版本化迁移 + 47 个成对回滚（本地+外部双备份）'],
     ['GitHub', 'https://github.com/VictorLiang2026/crm'],
     ['文档三件套', 'docs/system-documentation.docx、docs/db-schema.svg、docs/data-dictionary.html'],
   ],
@@ -556,7 +566,7 @@ sections.push(bullet('② 部署云端：tcb fn code update 逐函数部署；ho
 sections.push(bullet('③ 数据库：版本化迁移先 dry-run/plan，经 CloudBase 迁移历史应用；成对准备 rollback'));
 sections.push(bullet('④ 提交推送：git add 具体文件 → commit → 代理推送（http.proxy=127.0.0.1:7897，sslBackend=schannel）'));
 sections.push(bullet('⑤ 打标签：每次提交 release-YYYYMMDD-HHMM；当天首次提交加 semver 标签；推送并 GitHub API 复核'));
-sections.push(bullet('⑥ 复核：tools/sync-check.ps1 校验工作区干净、本地=GitHub、admin.html MD5 一致、标签一致'));
+sections.push(bullet('⑥ 复核：tools/sync-check.ps1 校验工作区干净、本地=GitHub、cloudbaserc 清单与本地函数目录一致、全部云函数本地与云端逐文件哈希一致、admin.html MD5 一致、标签一致'));
 sections.push(spacer());
 
 sections.push(h2('9.3 验证体系'));
@@ -589,6 +599,8 @@ sections.push(tbl(
     ['v1.8.9', 'AI 能力统一：共享 NBA 标准模块与 8 条护栏，零前端零 DDL'],
     ['v1.8.10.x', 'ENUM→TEXT 自由文本迁移；快速录入嘉宾身份；嘉宾域方案 B 对齐，所有人以 customers 为 person 中心'],
     ['v2.0.0（2026-09-16）', '项目更名 crm：本地目录、云端 /crm/ 托管目录、GitHub 仓库统一；新架构基线起点'],
+    ['v2.1.0–v2.1.2（2026-10-06–09）', 'console.html 新控制台工作包（WP1–WP3.x）：独立入口骨架、主导航与页面、晨间简报接入、人物摘要、对话策略；PMC-10/11 AI 函数 Person 化'],
+    ['v2.2.0（2026-10-10）', 'Person 中心化迁移 PMC-12～PMC-20 推进与收官（见 10.3）'],
   ],
   [24, 76]
 ));
@@ -617,7 +629,30 @@ sections.push(tbl(
   [22, 78]
 ));
 sections.push(spacer());
-sections.push(p('截至 2026-10-05 最新发布标签：release-20261005-162209。每个工作包均按“迁移成对回滚、隔离测试、真实登录只读探针、三端哈希核对、发布标签”流程交付，生产库初始虚构种子 10 行且全部登记可追踪。'));
+
+sections.push(h2('10.3 Person 中心化迁移（PMC-00～PMC-20，2026-10-07 至 10-11，已收官）'));
+sections.push(p('为解决“同一个人在客户/增员/嘉宾/参与者多处重复建档、姓名漂移”的根本问题，系统用 21 个工作包把人物基础信息从各业务表收编到 persons 主实体，全部经“设计批准 → migration+rollback → 小批执行 → 逐项验收”推进，生产零数据事故：'));
+sections.push(tbl(
+  ['阶段', '交付'],
+  [
+    ['PMC-00～03', '执行契约与档案体系；全量影响盘点（客户/招募/嘉宾/参与者/AI/视图/RPC）；数据模型与接口契约设计（D1–D11 批准）；迁移核验工具与风险用例库'],
+    ['PMC-04～09', '身份确认服务与命令台账；customers 1:1 Person 回填与核验；招募/嘉宾/参与者域盘点与兼容方案'],
+    ['PMC-10', 'v_action_center 等 5 处人物分支 JOIN persons（COALESCE 回退）；persons anon 只读授权（未软删行）'],
+    ['PMC-11', '8 个 AI 函数 Person 化：基础 8 字段经 person_id 取 persons，未映射回退+禁猜测提示，历史快照不改写；context-engine v1.1.0'],
+    ['PMC-12～14', '招募域迁移（视图 Person 优先+customers 回退）；嘉宾域迁移（enrichIdentity 读 Person 主数据，创建嘉宾不再自动建客户）；参与者身份归一（canonical_person_id 回填含软删行）'],
+    ['PMC-15', '角色归位：person_roles 业务角色 5 触发器实时派生（origin=derived）；relationships 治理列与 confirmed-only 消费；家庭域独立'],
+    ['PMC-16', '11 张业务表归属逐项裁决（零 customer_id→person_id 盲换）；互动时间线双轨对齐与去重；OCR 恢复闭环（冲突 diff+人工确认）'],
+    ['PMC-17', 'customers.person_id 三重约束落地（NOT NULL UNIQUE FK）；3 个无 Person 客户补建关联；Legacy 写路径统一经 PersonService 受控边界'],
+    ['PMC-18', '90 天观察期基建：pmc18_observations 表 + 每日 02:00 定时采集函数 pmc18_observer（观察中，至 2027-01-08）'],
+    ['PMC-19', '清理提案 CL-01～CL-09 逐项批准并执行：DROP customers 7 副本列、persons.legacy_customer_id、姓名 UNIQUE 约束、复合 FK、桥接/招募同步触发器；11 视图重建改读 persons；25 个 JS 改道'],
+    ['PMC-20', '清理后终态复核；修复 3 个 DB 函数运行时坏引用（函数体文本扫描补查教训）；12 云函数小批部署；全领域最终回归；Codex 终态交接文档'],
+  ],
+  [22, 78]
+));
+sections.push(spacer());
+sections.push(p('迁移终态（2026-10-11 核对）：persons 787（活跃 784）、customers 783（person_id 0 缺失 0 重复）、recruit 15、speakers 4；人物基础信息权威=persons，业务表仅留领域字段与批准保留的历史快照（参与行姓名快照、嘉宾职务快照、OCR customer_snapshot 等）。'));
+sections.push(spacer());
+sections.push(p('截至 2026-10-11 最新发布标签：release-20261011-005211（semver v2.2.0）。每个工作包均按“迁移成对回滚、隔离测试、真实登录只读探针、三端哈希核对、发布标签”流程交付，生产库初始虚构种子 10 行且全部登记可追踪。'));
 sections.push(pageBreak());
 
 // ===== 11. 附录 =====
@@ -647,17 +682,19 @@ sections.push(h2('11.2 主要目录结构'));
 sections.push(tbl(
   ['路径', '说明'],
   [
-    ['admin.html', '前端单文件主体（约 497KB，含全部 Legacy 页面与登录）'],
+    ['admin.html', '前端单文件主体（约 500KB，含全部 Legacy 页面与登录）'],
+    ['console.html + crm/js/modules/console/', '新控制台独立入口（今日/人/机会/活动/招募/AI/更多/设置 + 快速记录 FAB，中英双语）'],
     ['crm/js/core、crm/js/modules、crm/css', '新一代 ES 模块与样式（按需加载）'],
-    ['cloudfunctions/<fn>/', '28 个云函数（index.js + 共享模块副本 + package.json）'],
-    ['cloudfunctions/_shared/', '11 个共享源码模块（db/ai/ai-gateway/context-engine 等）'],
-    ['cloudbase/migrations/、cloudbase/rollbacks/', '版本化迁移（70+）与成对回滚'],
+    ['cloudfunctions/<fn>/', '29 个云函数（index.js + 共享模块副本 + package.json）'],
+    ['cloudfunctions/_shared/', '11 个共享源码模块（db/ai/ai-gateway/context-engine/person-service 等）'],
+    ['cloudbase/migrations/、cloudbase/rollbacks/', '版本化迁移（132 个）与成对回滚（47 个），外部目录双备份'],
     ['cloudbaserc.json', '环境、函数清单、运行时与超时配置'],
     ['docs/work-packages/', 'WP01–WP13 工作包范围、验收与发布记录'],
+    ['specs/person-centered-migration/', 'PMC-00～PMC-20 迁移档案：契约/设计/决策/任务/证据/交接'],
     ['docs/architecture/', 'AI Runtime、上下文引擎、人物关系等架构说明'],
     ['docs/baseline/', '只读基线盘点'],
     ['tests/', '只读核验 SQL、事务验证、node --test 与浏览器回归夹具'],
-    ['tools/', 'gen-system-doc.js、gen-schema-svg.js、release.ps1、sync-check.ps1'],
+    ['tools/', 'gen-system-doc.js、gen-schema-svg.js、release.ps1、sync-check.ps1、pg-readonly.cjs、migration-check.cjs'],
   ],
   [38, 62]
 ));
