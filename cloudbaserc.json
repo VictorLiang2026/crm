@@ -198,6 +198,13 @@
       "runtime": "Nodejs18.15",
       "handler": "index.main",
       "memorySize": 256
+    },
+    {
+      "name": "pmc18_observer",
+      "timeout": 30,
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "memorySize": 256
     }
   ]
 }

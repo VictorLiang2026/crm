@@ -17,7 +17,7 @@ test('browser loads an explicit CloudBase SDK version', () => {
 test('all deployed CRM functions pin the installed CloudBase Node SDK', () => {
   const config = readJson(path.join(root, 'cloudbaserc.json'));
   const functions = config.functions.map(item => item.name);
-  assert.equal(functions.length, 28);
+  assert.equal(functions.length, 29);
   for (const name of functions) {
     assert.match(name, /^(?!pr_)[a-z][a-z0-9_]*$/);
     const dir = path.join(root, 'cloudfunctions', name);

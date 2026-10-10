@@ -73,50 +73,69 @@
 
 无性能退化（均在 ±20% 阈值内或更优）。
 
-## 3. 定时自动监测方案（待用户确认）
+## 3. 定时自动监测方案（已实施，用户 2026-10-10 确认）
 
-用户选择「定时自动监测+通知」。方案如下，需确认后实施：
+用户选择：方案 A（写入表+查询）、加审计触发器、每天 02:00。
 
-### 3.1 新增对象
+### 3.1 新增对象（已部署）
 
-| 对象 | 类型 | 说明 |
+| 对象 | 类型 | 状态 |
 | --- | --- | --- |
-| `pmc18_observations` 表 | 新增表 | 仅存元数据：observed_at, metric, value, level(info/warning/critical), detail。无 PII |
-| `pmc18_observer` 云函数 | 新增函数 | 只读：复用 migration-check.sql + 补充查询逻辑，采集计数并写入 pmc18_observations |
-| 定时触发器 | 新增触发器 | 每天 02:00 调用 pmc18_observer |
+| `pmc18_observations` 表 | 新增表 | ✅ 已创建（migration 20261010115000） |
+| `pmc18_collect_metrics()` 函数 | 新增 DB 函数 | ✅ 已创建，验证返回正确 |
+| `pmc18_customers_basics_audit` 触发器 | 新增触发器 | ✅ 已创建（AFTER UPDATE OF 7 字段） |
+| `pmc18_observer` 云函数 | 新增云函数 | ✅ 已部署（collect + listRecent） |
+| `pmc18_daily_0200` 定时触发器 | 新增触发器 | ✅ 已创建（cron `0 0 2 * * * *`） |
 
 ### 3.2 采集指标（仅元数据，不含个人资料）
 
-- 身份映射率（customers/recruit/speakers/participants 的 mapped/active）
-- 孤儿引用计数（各业务表 person_id 孤儿）
+- 身份映射率（customers/recruit 的 mapped/active）
+- 孤儿引用计数（各业务表 person_id/customer_id 孤儿）
 - 字段漂移行数（customers 基础 7 字段 vs persons）
 - 重复人物组数（同名+同手机号）
-- 性能中位（4 入口）
 - 软删跨表不一致计数
+- 角色重复行数
+- 无角色 Person 数（排除【系统测试】）
 
-### 3.3 通知方式（待选择）
+### 3.3 审计触发器逻辑
 
-- **方案 A（推荐）**：异常项写入 pmc18_observations 表 + 提供只读 action `listRecentObservations` 供 Console/Legacy 查看；无主动推送
-- **方案 B**：方案 A + 企业微信 webhook 主动推送（需用户提供 webhook URL）
+`AFTER UPDATE OF customer_name, phone, wx_account, gender, birthday, occupation, education ON customers`
+- `pg_trigger_depth() > 1` → 经 PersonService 桥投影（info）
+- `pg_trigger_depth() = 1` → 直接裸写（warning）
+- 记录：customer_id、changed_fields、trigger_depth（不记录字段值）
 
-### 3.4 影响与约束
+### 3.4 通知方式
+
+方案 A：异常项写入 pmc18_observations 表 + `pmc18_observer` 的 `listRecent` action 供查询。无主动推送。
+
+### 3.5 影响与约束
 
 - 不改任何现有业务逻辑、不删除任何字段、不修改现有表结构
 - 新增表和云函数均为只读观测用途
 - 定时触发器每天 02:00 执行，不影响业务高峰
-- 失败回滚：DROP TABLE pmc18_observations + 删除云函数 + 删除触发器
+- 回滚：`cloudbase/rollbacks/20261010115000_pmc18_observation_table.rollback.sql` + 删除云函数 + 删除触发器
 
-### 3.5 人工执行方法（未授权自动化时的备选）
+### 3.6 人工执行方法
 
 ```bash
-# 基线核对
+# 基线核对（tcb-exec 通道）
 node tools/tcb-exec.cjs --file tools/migration-check.sql
 node tools/tcb-exec.cjs --file D:\Temp\pmc18-t0-extra.sql
 # 性能探针
 node D:\Temp\pmc17-perf-run.cjs
 # 身份审计
-node D:\Temp\pmc17-wp01-capture.cjs && node -e "require('./tests/wp04/audit.cjs').evaluate(...)"
+node D:\Temp\pmc17-wp01-capture.cjs
+# 查询观测记录
+node tools/tcb-exec.cjs --file D:\Temp\pmc18-select.sql
 ```
+
+### 3.7 验证结果
+
+- pmc18_collect_metrics() 返回正确：mappings/field_drift/orphans/no_role 全绿
+- pmc18_observations 表 INSERT/SELECT 正常（测试行已清理）
+- 审计触发器定义正确（pg_get_triggerdef 确认）
+- 定时触发器配置：cron `0 0 2 * * * *`
+- 云函数 collect 逻辑：调 DB 函数 → 解析 → 写入观测表；listRecent：查询最近 N 条
 
 ## 4. 异常记录
 

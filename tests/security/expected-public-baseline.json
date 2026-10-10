@@ -2880,6 +2880,86 @@
         "security_definer": false,
         "authenticated_execute": false
       }
+    },
+    {
+      "kind": "relation",
+      "name": "pmc18_observations",
+      "detail": {
+        "rls": true,
+        "type": "r",
+        "policies": [
+          {
+            "name": "pmc18_obs_read",
+            "roles": [
+              "anon",
+              "authenticated"
+            ],
+            "command": "r",
+            "check_hash": "d41d8cd98f00b204e9800998ecf8427e",
+            "permissive": true,
+            "using_hash": "b326b5062b2f0e69046810717534cb09"
+          },
+          {
+            "name": "pmc18_obs_service_all",
+            "roles": [
+              "service_role"
+            ],
+            "command": "*",
+            "check_hash": "b326b5062b2f0e69046810717534cb09",
+            "permissive": true,
+            "using_hash": "b326b5062b2f0e69046810717534cb09"
+          }
+        ],
+        "force_rls": false,
+        "privileges": {
+          "anon": [
+            "SELECT"
+          ],
+          "service_role": [
+            "DELETE",
+            "INSERT",
+            "MAINTAIN",
+            "REFERENCES",
+            "SELECT",
+            "TRIGGER",
+            "TRUNCATE",
+            "UPDATE"
+          ],
+          "authenticated": []
+        },
+        "security_invoker": false
+      }
+    },
+    {
+      "kind": "routine",
+      "name": "pmc18_collect_metrics()",
+      "detail": {
+        "anon_execute": false,
+        "service_execute": true,
+        "security_definer": true,
+        "authenticated_execute": false
+      }
+    },
+    {
+      "kind": "routine",
+      "name": "pmc18_customers_basics_audit_fn()",
+      "detail": {
+        "anon_execute": true,
+        "service_execute": true,
+        "security_definer": true,
+        "authenticated_execute": true
+      }
+    },
+    {
+      "kind": "sequence",
+      "name": "pmc18_observations_id_seq",
+      "detail": {
+        "anon_read": true,
+        "anon_usage": true,
+        "service_usage": true,
+        "authenticated_read": true,
+        "authenticated_usage": true
+      }
     }
   ]
 }
