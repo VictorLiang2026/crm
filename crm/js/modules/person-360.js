@@ -42,9 +42,9 @@ export async function renderPerson360({ root, personId, callFn, openLegacyTab })
   const back = node('a', '', '← 返回人物');
   back.href = '#/people';
   top.append(back);
-  if (model.person.legacy_customer_id) {
+  if (model.customerId) {
     const legacy = node('a', '', '查看传统客户详情');
-    legacy.href = `#/customer/${model.person.legacy_customer_id}`;
+    legacy.href = `#/customer/${model.customerId}`;
     top.append(legacy);
   }
   wrap.append(top, node('h2', '', `${model.person.display_name} · Person 360`));
@@ -52,7 +52,7 @@ export async function renderPerson360({ root, personId, callFn, openLegacyTab })
   wrap.append(profile);
   void renderPersonProfile({ root: profile, personId, callFn, openLegacyTab,
     isCurrent: () => location.hash === hash });
-  renderPersonInsights({ root: wrap, personId, customerId: model.person.legacy_customer_id,
+  renderPersonInsights({ root: wrap, personId, customerId: model.customerId,
     callFn, openLegacyTab, isCurrent: () => location.hash === hash });
   const workItems = node('section', 'card person360-card person360-work-items');
   wrap.append(workItems);

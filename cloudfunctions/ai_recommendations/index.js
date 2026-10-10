@@ -149,11 +149,12 @@ async function get(event) {
   return { recommendation: r.data };
 }
 
-// PMC-11：批量取 customer_id → 当前 Person 名（未关联/软删回退客户档案名），供列表搜索匹配当前名
+// PMC-11：批量取 customer_id → 当前 Person 名（未关联/软删为空），供列表搜索匹配当前名
+// PMC-20：customers.customer_name 已退出（CL-02），未映射客户不再有旧名回退
 async function loadCurrentNameMap(customerIds) {
   const map = {};
   if (!customerIds.length) return map;
-  const cs = assertOk(await rdb.from('customers').select('Id, customer_name, person_id')
+  const cs = assertOk(await rdb.from('customers').select('Id, person_id')
     .in('Id', customerIds).is('deleted_at', null)).data || [];
   const personIds = [];
   cs.forEach(function (c) { if (c.person_id != null && personIds.indexOf(c.person_id) < 0) personIds.push(c.person_id); });
@@ -163,18 +164,19 @@ async function loadCurrentNameMap(customerIds) {
       .in('id', personIds).is('deleted_at', null)).data || [];
     ps.forEach(function (p) { pmap[String(p.id)] = p.display_name ? String(p.display_name) : ''; });
   }
-  cs.forEach(function (c) { map[c.Id] = pmap[String(c.person_id)] || c.customer_name || ''; });
+  cs.forEach(function (c) { map[c.Id] = (c.person_id != null ? (pmap[String(c.person_id)] || '') : ''); });
   return map;
 }
 
-// PMC-11：建议记录的派生快照姓名取 Person 权威名（经 customers.person_id）；
-// 未关联/软删回退客户档案名。本入口只落建议记录，不写人物资料（人物写入统一走 customers 写服务）。
+// PMC-11：建议记录的派生快照姓名取 Person 权威名（经 customers.person_id）。
+// PMC-20：customers.customer_name 已退出（CL-02），无 Person 时返回空串。
+// 本入口只落建议记录，不写人物资料（人物写入统一走 customers 写服务）。
 async function resolveCurrentName(customerRow) {
-  if (customerRow.person_id == null) return customerRow.customer_name || '';
+  if (customerRow.person_id == null) return '';
   const pr = await rdb.from('persons').select('display_name')
     .eq('id', customerRow.person_id).is('deleted_at', null).maybeSingle();
   if (pr.error) throw new Error(pr.error);
-  return (pr.data && pr.data.display_name) ? String(pr.data.display_name) : (customerRow.customer_name || '');
+  return (pr.data && pr.data.display_name) ? String(pr.data.display_name) : '';
 }
 
 // 用户确认后的建议落库（AI 只建议、必须用户确认才会调用）：直接写入前端提交的内容，不做 AI 生成
@@ -182,7 +184,7 @@ async function create(event) {
   const data = Object.assign({}, event.data || {});
   const customerId = parseInt(data.customer_id, 10);
   if (!customerId) return { error: 'customer_id required' };
-  const c = assertOk(await rdb.from('customers').select('Id, customer_name, person_id').eq('Id', customerId)
+  const c = assertOk(await rdb.from('customers').select('Id, person_id').eq('Id', customerId)
     .is('deleted_at', null).maybeSingle());
   if (!c.data) return { error: 'customer not found' };
   const payload = {

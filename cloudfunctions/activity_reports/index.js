@@ -73,7 +73,7 @@ async function customerReport(event) {
   const today = beijingToday();
 
   const [customersR, followupsR, giftsR, photosR, ocrR, aiRecR, reviewsR, productsR, personsR] = await Promise.all([
-    rdb.from('customers').select('Id, customer_name, created_at, first_contact_date, deleted_at, person_id'),
+    rdb.from('customers').select('Id, created_at, first_contact_date, deleted_at, person_id'),
     rdb.from('followups').select('Id, customer_id, customer_name, followup_notes, followup_date, next_followup_date, created_at, deleted_at'),
     rdb.from('gifts').select('Id, customer_id, customer_name, gift_name, quantity, given_date, deleted_at'),
     rdb.from('photos').select('id, customer_id, customer_name, file_name, created_at, deleted_at'),
@@ -99,9 +99,10 @@ async function customerReport(event) {
   const personNameMap = {};
   for (const p of (assertOk(personsR).data || [])) personNameMap[p.id] = p.display_name;
   customers.forEach(c => {
+    // PMC-20：客户当前名只取 Person（customers.customer_name 已退出，CL-02）
     const personName = c.person_id ? personNameMap[c.person_id] : null;
-    custName[c.Id] = personName || c.customer_name;
-    if (personName) c.customer_name = personName; // 新增客户 feed 用
+    custName[c.Id] = personName || '';
+    c.customer_name = personName || ''; // 新增客户 feed 用
   });
 
   const totals = blankCustomerTotals();
@@ -303,11 +304,13 @@ async function recruitReport(event) {
   if (range.error) return range;
   const { start, end, days } = range;
 
-  const [candsR, fuR, msR, custR] = await Promise.all([
+  const [candsR, fuR, msR, custR, personsR] = await Promise.all([
     rdb.from('recruit_candidates').select('id, customer_id, stage, created_at, deleted_at'),
     rdb.from('recruit_followups').select('id, candidate_id, contact_method, interest_level, followup_notes, followup_date, next_followup_date, created_at, deleted_at'),
     rdb.from('recruit_milestones').select('id, candidate_id, from_stage, to_stage, happened_at, note'),
-    rdb.from('customers').select('Id, customer_name, deleted_at'),
+    rdb.from('customers').select('Id, person_id, deleted_at'),
+    // PMC-20：增员活动报表客户名取 Person（customers.customer_name 已退出，CL-02）
+    rdb.from('persons').select('id, display_name').is('deleted_at', null),
   ]);
 
   const candsAll = assertOk(candsR).data || [];
@@ -317,8 +320,10 @@ async function recruitReport(event) {
   const milestones = assertOk(msR).data || [];
   const customers = (assertOk(custR).data || []).filter(active);
 
+  const personNameMap = {};
+  for (const p of (assertOk(personsR).data || [])) personNameMap[p.id] = p.display_name;
   const custName = {};
-  customers.forEach(c => { custName[c.Id] = c.customer_name; });
+  customers.forEach(c => { custName[c.Id] = (c.person_id ? personNameMap[c.person_id] : null) || ''; });
   const candName = {};
   candsAll.forEach(c => { candName[c.id] = custName[c.customer_id] || ('候选人#' + c.id); });
 

@@ -89,8 +89,17 @@ async function enrichIdentity(rows) {
   }
   if (cids.length) {
     try {
-      var cr = assertOk(await rdb.from('customers').select('Id, customer_name').in('Id', cids).is('deleted_at', null));
-      (cr.data || []).forEach(function (c) { cmap[c.Id] = { id: c.Id, name: c.customer_name }; });
+      // PMC-20：客户展示名取 Person（customers.customer_name 已退出，CL-02）
+      var cr = assertOk(await rdb.from('customers').select('Id, person_id').in('Id', cids).is('deleted_at', null));
+      var custRows = cr.data || [];
+      var custPids = custRows.map(function (c) { return c.person_id; }).filter(Boolean);
+      var custPmap = {};
+      if (custPids.length) {
+        var cpr = assertOk(await rdb.from('persons').select('id, display_name')
+          .in('id', custPids).is('deleted_at', null));
+        (cpr.data || []).forEach(function (p) { custPmap[p.id] = p.display_name; });
+      }
+      custRows.forEach(function (c) { cmap[c.Id] = { id: c.Id, name: (c.person_id && custPmap[c.person_id]) || '' }; });
     } catch (e) { /* 客户身份合并失败不阻塞 */ }
   }
   if (rids.length) {

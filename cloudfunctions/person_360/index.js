@@ -217,11 +217,20 @@ function createService({ request = pgRequest, rpc = pgRpc, disclosure = disclose
     anchor_person_id: `eq.${idOf(anchorId)}`, deleted_at: 'is.null', limit: 1,
   }));
 
+  const findCustomerId = async anchorId => {
+    // PMC-20：360 头部需要客户链接/洞察跳转；legacy_customer_id 已退出（CL-03），按 person_id 反查
+    const customer = one(await request('customers', 'GET', {
+      select: 'Id,person_id', person_id: `eq.${idOf(anchorId)}`, deleted_at: 'is.null', limit: 1,
+    }));
+    return customer ? String(customer.Id) : null;
+  };
+
   async function get(personId) {
     const person = await findPerson(personId);
     if (!person) throw new Error('Person not found');
     const household = await findHousehold(person.id);
-    if (!household) return { person, household: null, members: [] };
+    const customerId = await findCustomerId(person.id);
+    if (!household) return { person, customerId, household: null, members: [] };
     const members = await request('household_members', 'GET', {
       select: 'id,person_id,relationship_to_anchor,confirmed_at',
       household_id: `eq.${idOf(household.id)}`, deleted_at: 'is.null', order: 'id.asc', limit: 50,
@@ -233,7 +242,7 @@ function createService({ request = pgRequest, rpc = pgRpc, disclosure = disclose
     }) : [];
     const names = new Map(people.map(item => [String(item.id), item]));
     return {
-      person, household,
+      person, customerId, household,
       members: members.map(member => ({ ...member, person: names.get(String(member.person_id)) || null })),
     };
   }

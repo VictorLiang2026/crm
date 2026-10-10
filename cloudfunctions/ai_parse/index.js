@@ -233,10 +233,21 @@ async function quickCapture(event) {
   // 名单（仅取名字，用于人物匹配与活动关联；只读）
   let customers = [], recruits = [], speakers = [], actNames = '';
   try {
+    // PMC-20：名单当前名取 Person（customers.customer_name 已退出，CL-02）
     const cr = assertOk(await rdb.from('customers')
-      .select('Id, customer_name').is('deleted_at', null)
+      .select('Id, person_id').is('deleted_at', null)
       .order('Id', { ascending: false }).limit(3000));
-    customers = (cr.data || []).map(r => ({ id: r.Id, name: r.customer_name, cid: r.Id })).filter(r => r.name);
+    const custPids = [];
+    (cr.data || []).forEach(function (r) { if (r.person_id != null && custPids.indexOf(r.person_id) < 0) custPids.push(r.person_id); });
+    const custPmap = {};
+    if (custPids.length) {
+      const cpr = assertOk(await rdb.from('persons').select('id, display_name')
+        .in('id', custPids).is('deleted_at', null));
+      (cpr.data || []).forEach(function (p) { custPmap[p.id] = p.display_name; });
+    }
+    customers = (cr.data || [])
+      .map(r => ({ id: r.Id, name: r.person_id != null ? (custPmap[r.person_id] || '') : '', cid: r.Id }))
+      .filter(r => r.name);
   } catch (e) { /* 名单读取失败不阻塞解析 */ }
   try {
     const rr = await rdb.from('v_recruit_candidates').select('candidate_id, customer_id, customer_name, stage').limit(3000);

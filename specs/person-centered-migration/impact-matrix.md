@@ -2,6 +2,8 @@
 
 用途：跨包追踪每个被修改的字段、表、视图、云函数 action、页面入口的消费者与影响面；修改共享模块前按执行约定 H 先登记全部消费者。PMC-00 无业务变更，PMC-01 完成全量影响盘点，本文件以盘点结果起步，后续每包更新。
 
+> **PMC-20 终态标注（2026-10-10）**：PMC-19 CL-01~CL-09 清理执行后，本矩阵中标记"待批准/计划中"的 customers 7 副本列、persons.legacy_customer_id、复合 FK×2、桥触发器、recruit 同步触发器、recruit 死列等行**均已按批准退出**（批准证据见 pmc-19-cleanup-proposal.md §6 与 evidence/PMC-19.md §10-§14）。PMC-20 修复 PMC-19 暴露的运行时回归并完成最终回归，新增行见文末「PMC-20」分节。本矩阵历史分节保留原状作为影响面追溯记录。
+
 ## 维护规则
 
 1. 每包涉及字段、表/视图、云函数 action、页面入口变化时，在对应分节追加行：`对象 | 变化类型 | 调用方/消费者 | 所属包 | 状态 | 证据`。
@@ -600,3 +602,24 @@ persons.legacy_customer_id（自引用）
 - U1/U2/U4 关闭、U3 调查关闭（补 FK 挂起 D8）、U5/U6 维持挂起（D8 独立批准）、U7/U8 维持登记——见 §九与 evidence/PMC-17.md §7.5。
 - 新登记：G-PMC17-1（候选）——`crm_test_scenario_v1` 触发器白名单滞后（bridge+PMC-15 三派生触发器未登记，dryRun/confirm/execute 必然 RAISE；既有，非本包引入；扩充须单独批准）。
 - 性能基线（2026-10-10 建立，网关 ExecutionTimeMs 中位）：列表 17ms / 搜索 22ms / 统计 37ms / 招募 13ms（evidence/PMC-17.md §6.4）。
+
+---
+
+## PMC-20：清理后终态复核与运行时回归修复（2026-10-10）
+
+### 20.1 PMC-19 清理对象的消费影响收口（批准后新增核实）
+
+| 对象 | 变化类型 | 调用方/消费者 | 所属包 | 状态 | 证据 |
+| --- | --- | --- | --- | --- | --- |
+| `actions_guard()` 触发器函数 | CREATE OR REPLACE：机会归属检查改经 customers.person_id（原引用已删 persons.legacy_customer_id，actions 写入全阻） | actions 表 INSERT/UPDATE 触发器 | PMC-20 | 已应用+RPC 验证 | migration `20261010190000`（+rollback）；tools/pmc20-verify-guard-accept/reject.sql |
+| `crm_person_roles_derive_v1()` | CREATE OR REPLACE：移除 legacy OR 分支（customers 全量 person_id 使其不可达） | person_roles 派生触发器树 | PMC-20 | 已应用+验证 | migration `20261010190100`（+rollback）；tools/pmc20-verify-roles.sql |
+| `crm_search_people_v1()` | CREATE OR REPLACE：三模板 customer 解析改 customers.person_id JOIN；输出 `legacy_customer_id`→`customer_id` | assistant/search-service.js（按 person_id 映射行，不读旧字段名）、console #/ai/search | PMC-20 | 已应用+三模板验证 | migration `20261010190200`（+rollback）；tools/pmc20-verify-search.sql |
+| 12 云函数运行时引用修复 | 代码改道（对 CL-02 已删列的 JS 引用） | activity_reports/activity_speakers/activity_tasks/ai_activity/ai_parse/ai_recommendations/followups/gifts/photos/products/person_360/today_coach | PMC-20 | 已部署（4 小批字节比对） | evidence/PMC-20.md §4.2 |
+| `crm/person-360.js`（托管） | 前端适配：客户链接经 getCustomerProfile customerId 渲染 #/customer/{id} | admin Person 360 头部/资料区 | PMC-20 | 已部署（SHA 一致） | evidence/PMC-20.md §4.3 |
+| `tests/households/person360-service.cjs` | 测试夹具适配 CL-03 契约（customers fixture {Id, person_id}） | test:households | PMC-20 | 已提交（5/5 PASS） | evidence/PMC-20.md §4.4 |
+
+### 20.2 最终回归覆盖面
+
+- 隔离测试：households 5/5、ai-gateway 14/14、ai-skills 7/7、recruit-goals 3/3、modular PASS、check:shared 58 副本 PASS；基线遗留失败清单见 evidence/PMC-20.md §6.1。
+- DB 只读探针：63 项全领域（tools/pmc20-regression-probe.sql）+ RPC（customers_page/person_directory/search 三模板/collect_metrics）+ 富客户（tools/pmc20-regression-rich-customer.sql）全绿。
+- 生产浏览器：console（Today/people/Person 360/settings 中英切换/ai/search/回收站/funnels/activities）+ admin（Person 360 #773 含 #/customer/770 链接、客户详情 #792）全绿，0 console 错误。

@@ -63,9 +63,9 @@ async function enrichRelated(rows) {
   });
   const nameMap = {};
   if (customerIds.length) {
-    const cs = assertOk(await rdb.from('customers').select('Id, customer_name, person_id')
+    const cs = assertOk(await rdb.from('customers').select('Id, person_id')
       .in('Id', customerIds).is('deleted_at', null)).data || [];
-    // PMC-10：展示姓名用 Person（customer_name 仍作回退）
+    // PMC-20：展示姓名取 Person（customers.customer_name 已退出，CL-02）
     const personIds = cs.map(c => c.person_id).filter(Boolean);
     const pMap = {};
     if (personIds.length) {
@@ -74,7 +74,7 @@ async function enrichRelated(rows) {
       ps.forEach(function (p) { pMap[p.id] = p.display_name; });
     }
     cs.forEach(function (c) {
-      nameMap['customer:' + c.Id] = (c.person_id && pMap[c.person_id]) || c.customer_name;
+      nameMap['customer:' + c.Id] = (c.person_id && pMap[c.person_id]) || '';
     });
   }
   if (recruitIds.length) {

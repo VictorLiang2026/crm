@@ -1,0 +1,23 @@
+-- ROLLBACK for 20261010164000_pmc19_cl02_rebuild_views_person_source.sql
+--
+-- Rollback context (full CL-02 reversal chain):
+--   1) 20261010164100 rollback restores the 7 customers copy columns and backfills
+--      real values from persons; 2) application code is redeployed from tag
+--      release-20261010093000; 3) optionally restore the pre-CL-02 view bodies.
+--
+-- Restoring the old view bodies is NOT required for correctness: the person-sourced
+-- views in the forward migration expose the identical column names/types/contract and
+-- keep working after the copy columns are re-added (they simply ignore the restored
+-- columns). Old bodies remain available in Git history (last defining migrations at or
+-- before tag release-20261010093000):
+--   customers_view / followups_view / gifts_view / products_view /
+--   ai_recommendations_view -> 20260910150000_followup_goal_enum_to_text.sql
+--   v_action_center                          -> 20261008223000_pmc10_action_center_person_names.sql
+--   v_recruit_candidates / v_recruit_candidates_trash
+--                                            -> 20261009091200_pmc12_recruit_view_person_read.sql
+--   v_recruit_candidates_person_only(_trash) -> 20261004011800_person_directory_roles.sql
+-- Known recovery limitation: photos_view predates migration tracking in Git; its
+-- pre-CL-02 body is not archived. If exact historical fidelity is ever required,
+-- reverse-map the current body (identical aliases, base fields move back from p.* to c.*)
+-- and verify row counts before use. No business data is affected by this limitation.
+SELECT 1;

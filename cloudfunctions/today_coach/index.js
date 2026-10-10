@@ -75,7 +75,8 @@ function cut(s, n) {
 async function loadAll() {
   const [cust, fol, rc, rf, rm, ai, opp, act, atask, apart, aspk, vac, pers] = await Promise.all([
     rdb.from('customers').select(
-      'Id, customer_name, gender, customer_stage, sales_priority, first_contact_date, created_at, updated_at, person_id'
+      // PMC-20：customer_name/gender 已退出（CL-02），当前值由 persons 合并
+      'Id, customer_stage, sales_priority, first_contact_date, created_at, updated_at, person_id'
     ).is('deleted_at', null),
     // followups：v1.7.6 增加 Id/activity_id/recommendation_id（活动跟进/AI复盘采纳行动到期判定）
     rdb.from('followups').select(
@@ -115,17 +116,22 @@ async function loadAll() {
     rdb.from('v_action_center').select(
       'action_id, action_type, person_type, person_id, person_name, title, next_action, action_date, priority, source, status, stage, days_until, last_followup_date'
     ),
-    // PMC-10：Person 基础资料（展示姓名切换的权威来源；仅取所需列）
-    rdb.from('persons').select('id, display_name').is('deleted_at', null),
+    // PMC-10：展示姓名切换——customers 有 person_id 且 Person 未软删时，展示名/性别取 persons；
+    // PMC-20：customers.customer_name/gender 已退出（CL-02），统计字段（customer_stage/sales_priority 等）不动
+    rdb.from('persons').select('id, display_name, gender').is('deleted_at', null),
   ]);
   if (vac && vac.error) throw new Error('v_action_center 读取失败：' + vac.error);
-  // PMC-10：展示姓名切换——customers 有 person_id 且 Person 未软删时，展示名用 persons.display_name；
-  // 统计字段（customer_stage/sales_priority 等）不动
+  // PMC-20：customers.customer_name/gender 已退出（CL-02），当前姓名/性别直接取 Person
   const personNameMap = {};
-  for (const p of (pers.data || [])) personNameMap[p.id] = p.display_name;
+  for (const p of (pers.data || [])) personNameMap[p.id] = p;
   for (const c of (cust.data || [])) {
-    if (c.person_id && personNameMap[c.person_id]) {
-      c.customer_name = personNameMap[c.person_id];
+    const p = c.person_id ? personNameMap[c.person_id] : null;
+    if (p) {
+      c.customer_name = p.display_name;
+      c.gender = p.gender || '';
+    } else {
+      c.customer_name = '';
+      c.gender = '';
     }
   }
   return {

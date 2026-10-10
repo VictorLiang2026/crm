@@ -43,9 +43,14 @@ async function create(event) {
   if (!customerId) return { error: 'customer_id required' };
   if (!data.gift_name) return { error: 'gift_name required' };
   if (!data.customer_name) {
-    const c = assertOk(await rdb.from('customers').select('customer_name').eq('Id', customerId).maybeSingle());
+    // PMC-20：customers.customer_name 已退出（CL-02）；礼品快照名取 Person 当前 display_name
+    const c = assertOk(await rdb.from('customers').select('person_id').eq('Id', customerId).maybeSingle());
     if (!c.data) return { error: 'customer not found' };
-    data.customer_name = c.data.customer_name;
+    if (c.data.person_id) {
+      const p = assertOk(await rdb.from('persons').select('display_name')
+        .eq('id', c.data.person_id).is('deleted_at', null).maybeSingle());
+      data.customer_name = (p.data && p.data.display_name) || '';
+    }
   }
   const payload = normFields(data, FIELDS);
   if (!Object.keys(payload).length) return { error: 'no valid fields' };

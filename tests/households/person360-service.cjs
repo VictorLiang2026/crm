@@ -16,8 +16,13 @@ Module._load = originalLoad;
 
 function fixture() {
   const people = [
-    { id: 11, display_name: '张玮（电信）', name_key: '张玮', legacy_customer_id: 101 },
-    { id: 22, display_name: '李宁', name_key: '李宁', legacy_customer_id: 202 },
+    { id: 11, display_name: '张玮（电信）', name_key: '张玮' },
+    { id: 22, display_name: '李宁', name_key: '李宁' },
+  ];
+  // PMC-20: legacy_customer_id 已退出（CL-03），客户链接经 customers.person_id 解析
+  const customers = [
+    { Id: 101, person_id: 11 },
+    { Id: 202, person_id: 22 },
   ];
   let household = null;
   let members = [];
@@ -29,7 +34,14 @@ function fixture() {
       if (filters.id?.startsWith('eq.')) return people.filter(p => String(p.id) === filters.id.slice(3));
       if (filters.id?.startsWith('in.')) return people.filter(p => filters.id.includes(String(p.id)));
       if (filters.name_key) return people.filter(p => p.name_key === filters.name_key.slice(3));
-      if (filters.legacy_customer_id) return people.filter(p => String(p.legacy_customer_id) === filters.legacy_customer_id.slice(3));
+      return [];
+    }
+    if (table === 'customers') {
+      if (method !== 'GET') throw new Error('Customer writes forbidden');
+      if (filters.person_id?.startsWith('eq.'))
+        return customers.filter(c => String(c.person_id) === filters.person_id.slice(3));
+      if (filters.Id?.startsWith('eq.'))
+        return customers.filter(c => String(c.Id) === filters.Id.slice(3));
       return [];
     }
     if (table === 'households') {
@@ -55,6 +67,7 @@ test('Person 360 reads an empty family without creating people or a household', 
   const { service, calls } = fixture();
   const result = await service.get(11);
   assert.equal(result.person.display_name, '张玮（电信）');
+  assert.equal(result.customerId, '101');
   assert.equal(result.household, null);
   assert.deepEqual(result.members, []);
   assert.ok(calls.every(call => call.method === 'GET'));
