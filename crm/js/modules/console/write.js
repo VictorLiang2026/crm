@@ -60,19 +60,64 @@ function dateToIso(dateStr) {
 export function openSheet({ title, sub, body }) {
   const errBox = h('div', { class: 'sheet-err', style: 'display:none' });
   const bodyEl = h('div', {}, [body, errBox]);
-  const overlay = h('div', { class: 'sheet-overlay' }, [
-    h('div', { class: 'sheet', role: 'dialog', 'aria-label': title }, [
-      h('div', { class: 'sheet-head' }, [
-        h('b', { class: 'sheet-title' }, title),
-        h('button', {
-          class: 'btn btn-ghost btn-sm', type: 'button', 'aria-label': t('close_aria'),
-          onclick: () => overlay.remove(),
-        }, [ic('x')]),
-      ]),
-      sub ? h('p', { class: 'sheet-sub' }, sub) : null,
-      bodyEl,
+  const sheetEl = h('div', { class: 'sheet', role: 'dialog', 'aria-label': title }, [
+    h('div', { class: 'sheet-handle', 'aria-hidden': 'true' }),
+    h('div', { class: 'sheet-head' }, [
+      h('b', { class: 'sheet-title' }, title),
+      h('button', {
+        class: 'btn btn-ghost btn-sm', type: 'button', 'aria-label': t('close_aria'),
+        onclick: () => closeSheet(),
+      }, [ic('x')]),
     ]),
+    sub ? h('p', { class: 'sheet-sub' }, sub) : null,
+    bodyEl,
   ]);
+  const overlay = h('div', { class: 'sheet-overlay' }, [sheetEl]);
+
+  // ---- 下滑关闭（仅移动端 handle 区域触发） ----
+  let startY = 0, dragY = 0, dragging = false;
+  const handle = sheetEl.querySelector('.sheet-handle');
+  handle.addEventListener('touchstart', (e) => {
+    startY = e.touches[0].clientY; dragging = true;
+    sheetEl.style.transition = 'none';
+  }, { passive: true });
+  handle.addEventListener('touchmove', (e) => {
+    if (!dragging) return;
+    dragY = e.touches[0].clientY - startY;
+    if (dragY > 0) {
+      sheetEl.style.transform = `translateY(${dragY}px)`;
+      overlay.style.background = `rgba(24,28,34,${Math.max(0.15, 0.45 - dragY / 600)})`;
+    }
+  }, { passive: true });
+  handle.addEventListener('touchend', () => {
+    if (!dragging) return;
+    dragging = false;
+    sheetEl.style.transition = 'transform .25s ease';
+    if (dragY > 80) {
+      closeSheet();
+    } else {
+      sheetEl.style.transform = '';
+      overlay.style.background = '';
+    }
+    dragY = 0;
+  });
+
+  // ---- 键盘避让：visualViewport 变化时限制 sheet 最大高度 ----
+  let vpHandler = null;
+  if (window.visualViewport) {
+    vpHandler = () => { sheetEl.style.maxHeight = `${window.visualViewport.height * 0.88}px`; };
+    window.visualViewport.addEventListener('resize', vpHandler);
+    vpHandler();
+  }
+
+  function closeSheet() {
+    if (vpHandler && window.visualViewport) window.visualViewport.removeEventListener('resize', vpHandler);
+    sheetEl.style.transition = 'transform .25s ease';
+    sheetEl.style.transform = 'translateY(100%)';
+    overlay.style.background = 'rgba(24,28,34,0)';
+    setTimeout(() => overlay.remove(), 250);
+  }
+
   return {
     overlay,
     showErr(msg) {
