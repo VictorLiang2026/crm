@@ -1,6 +1,6 @@
 # Handoff（接管状态）
 
-更新时间：2026-10-10（**PMC-17 已验收；PMC-18 定时监测已发布，90 天观察期开始**）。任何工具接手前先读本文件与 execution-contract。
+更新时间：2026-10-10（**PMC-19 清理提案完成，待用户逐项审阅批准表；PMC-18 定时监测继续运行中**）。任何工具接手前先读本文件与 execution-contract。
 
 ## 1. 执行状态
 
@@ -8,8 +8,8 @@
 | --- | --- |
 | 当前执行工具 | Trae；PMC-18 定时监测已实施，观察中（90 天周期） |
 | 最后验收通过包 | **PMC-17（全系统复审并验收 Person 为唯一基础信息来源）——2026-10-10 用户下发「确认验收」**：六项指令全部落地（①实时全量盘点 28 函数×action/47 表/12 视图/35 函数/51 触发器/11 模块 73 副本/双前端、无云端定时任务；②③Legacy customers 写路径改道 Person 受控边界 `PersonService.updateBasicsWithProjection`，customers.create 直写 person_id，桥/recruit 同步触发器按消费者接管证据保留为投影兜底；④migration A `20261010091000` + migration B `20261010093000`（customers.person_id NOT NULL + recruit 活跃行部分唯一索引 + 两 DB 函数适配）已应用并核对全绿；⑤隔离 9/9+全量 206/209+WP01 门 blockers=[]+性能基线建立；⑥影响矩阵 U1–U4 收口+「Person 唯一基础信息来源」验收报告）。部署 customers/assistant/person_360 三函数；静态零改动；发布标签 `release-20261010-102500`（提交 `46c30d7`）；验收记录发布标签 `release-20261010-103200`（提交 `81a54ec`，本地/远端/标签三端一致）；handoff 补充标签 `release-20261010-111200`（提交 `91c929a`）。限制项均非阻塞（G-PMC17-1 登记未修；D5/D8 退出、桥触发器移除、relationships 写入路径须单独授权；WP01 开放项+iPad 真机性能复测既定未验证）。详见 evidence/PMC-17.md §7 |
-| 正在执行包 | **PMC-18（真实运行观察与一致性复核）——观察中**。观察周期 90 天（2026-10-10 → 2026-01-08，用户确认），结束条件=周期到期+用户审阅。定时监测已实施：migration `20261010115000`（pmc18_observations 表 + pmc18_collect_metrics() 函数 + pmc18_customers_basics_audit 审计触发器），云函数 pmc18_observer（collect/listRecent），定时触发器 pmc18_daily_0200（每天 02:00）。T0 基线全绿（customers 782/782 映射、零孤儿、零字段漂移、零重复人物、性能持平）。详见 evidence/PMC-18.md |
-| 下一步唯一允许执行的动作 | **PMC-18：观察中（90 天周期），定期更新 evidence/handoff 观察记录；发现异常按事实/严重程度/影响范围/修复包登记，高风险不顺手重构。周期未完成不得进入 PMC-19/20**。本包不删除字段、不自动扩大到新功能 |
+| 正在执行包 | **PMC-19（旧字段及兼容对象清理提案）——提案完成，待用户逐项审阅批准表**。产物：[pmc-19-cleanup-proposal.md](pmc-19-cleanup-proposal.md)（9 项候选 CL-01~CL-09 + 逐项证明/变更SQL/恢复方案/部署顺序/回归/批次/批准表）；实地查询 public schema 核实全部对象状态（tools/pmc-19-catalog.sql）；代码扫描 25 文件引用 legacy_customer_id、11 视图读副本列、recruit 死列零消费者。CL-05/CL-06（死列）+ CL-01（D5 约束）前置满足；CL-02/CL-03/CL-04/CL-08/CL-09 前置未满足有活跃消费者。恢复方案全部满足 contract E。逐项批准表 9 项均为"待批准"。PMC-18 定时监测继续运行中（90 天周期，2026-10-10 → 2026-01-08）。详见 evidence/PMC-19.md |
+| 下一步唯一允许执行的动作 | **PMC-19：待用户逐项审阅批准表。用户批准本提案≠批准所有清理项——每项须独立批准。未批准项默认不执行。批准后按批次（B1→B5）执行。PMC-18 定时监测继续运行，发现异常按修复包处理。PMC-20 指令未收到，不自行开包** |
 | 回滚条件 | PMC-18：`cloudbase/rollbacks/20261010115000_pmc18_observation_table.rollback.sql`（DROP 审计触发器/函数 + DROP pmc18_collect_metrics + DROP pmc18_observations 表）+ 删除 pmc18_observer 云函数 + 删除 pmc18_daily_0200 定时触发器。PMC-17 migration B：`cloudbase/rollbacks/20261010093000_pmc17_customers_person_id_constraints.rollback.sql`（两函数原始定义逐字复原+DROP NOT NULL+DROP recruit 部分索引；不动 PMC-05 既有 UNIQUE/FK）；migration A：`cloudbase/rollbacks/20261010091000_pmc17_customers_person_link_backfill.rollback.sql`；代码回滚：`git revert` 本包发布提交 → 重新部署 customers/assistant/person_360 三函数（person-service.js 回退至改道前版本）。PMC-16（无 DB 变更）：`git revert` 本包发布提交 → 重新部署 person_360 函数与 admin.html 静态。PMC-15：`cloudbase/rollbacks/20261009220000_pmc15_role_derivation_relationship_governance.rollback.sql`（守卫式：逆对账恢复 703/792、删 777 补入行→DROP 5 触发器/2 函数/4 列→复原 origin CHECK）；代码用上一发布标签重新部署 ai_activity/person_360 与 4 静态模块。PMC-14 数据回滚：`cloudbase/rollbacks/20261009180000_pmc14_participant_canonical_backfill.sql`（按精确 id+预期值清 canonical，不动既有 2 行人工确认值）；代码回滚：`git revert d081a64`（本包提交）→ 重新部署 activities 函数。PMC-13 代码回滚：`git revert 9eb03e4` → 重新部署 activity_speakers/ai_activity 两函数；无结构/数据回滚（本包无 migration）。PMC-12 结构回滚：`cloudbase/rollbacks/20261009091200_pmc12_recruit_view_person_read.sql`；G-PMC11-2 结构回滚：`cloudbase/rollbacks/20261009070000_fix_v_recruit_candidates_left_join.sql` |
 
 ## 2. 版本基线（2026-10-09 PMC-13 发布时更新）
@@ -24,11 +24,13 @@
 | PMC-15 发布 | 标签 `release-20261009-231926`；migration `20261009220000`（+守卫 rollback，双备份）；部署 ai_activity/person_360 两函数（sync-shared 一致 + WP01 门 PASS）+ 4 静态模块（50 在线资产 SHA 全一致，admin.html 未改）；生产对账漂移=0（799 角色：customer 779/recruit 15/speaker 4/participant 1；origin legacy_backfill 790/manual 7/derived 2；relationships 0 行） |
 | PMC-16 发布 | 标签 `release-20261010-050207`；**零 migration**（零结构变更）；部署 person_360 函数（interaction-service.js 共享母本+副本 SHA 一致，sync-shared 56 副本一致 + WP01 门 PASS）+ admin.html 静态（OCR 恢复闭环；50 在线资产 SHA 全一致）；盘点工具 tools/pmc16-q1~q7-*.sql + tools/parse-tcb-raw.cjs |
 | PMC-17 发布 | 标签 `release-20261010-102500`（提交 `46c30d7`，代码+档案合一）；migration A `20261010091000` + migration B `20261010093000`（各含 rollback，双备份）已应用并核对全绿；部署 customers/assistant/person_360 三函数（person-service.js 共享母本+副本同步，WP01 门 PASS）；静态文件零改动；新增 tests/pmc/pmc17-write-boundary.test.cjs（9/9）。验收记录发布标签 `release-20261010-103200`（提交 `81a54ec`，云端产物未改变） |
+| PMC-18 发布 | 标签 `release-20261010-120000`（提交含定时监测基建）；migration `20261010115000`（pmc18_observations 表+函数+审计触发器，+rollback 双备份）已应用；部署 pmc18_observer 云函数 + pmc18_daily_0200 定时触发器；T0 基线全绿 |
+| PMC-19 发布 | 标签待发布后补充（仅文档包，无业务云端产物改变）；新建 pmc-19-cleanup-proposal.md + evidence/PMC-19.md + tools/pmc-19-catalog.sql；更新 decisions/tasks/handoff |
 | 云端 | PMC-17 部署 3 个函数（customers/assistant/person_360）；PMC-16 部署 1 个函数（person_360）+admin.html 静态；PMC-15 部署 2 个函数（ai_activity/person_360）+4 静态模块；PMC-14 部署 1 个函数（activities）；PMC-13 部署 2 个函数（activity_speakers/ai_activity）；PMC-12 部署 3 函数+admin.html；PMC-11 部署 8 AI 函数 |
 | 数据库迁移 | PMC-17 `20261010091000_pmc17_customers_person_link_backfill`（已应用：3 个无 Person 客户补建关联，customers 782/782 映射）+ `20261010093000_pmc17_customers_person_id_constraints`（已应用：customers.person_id SET NOT NULL、recruit_candidates(person_id) 活跃行部分唯一索引、person_identity_execute_v1/crm_test_scenario_v1 两函数适配）；PMC-15 `20261009220000_pmc15_role_derivation_relationship_governance`（已应用：person_roles origin/role CHECK、relationships 4 治理列+2 CHECK、2 SECURITY DEFINER 函数+5 触发器、重建 crm_search_people_v1、对账删 2 补 2）；PMC-14 `20261009180000_pmc14_participant_canonical_backfill`（已应用，数据回填 7 行软删行 canonical，无结构变更）；G-PMC11-2 修复 `20261009070000`（已应用）；persons anon 只读依赖 PMC-10 `20261008231500`，在效 |
 | 数据规模抽查（PMC-16 盘点） | interactions 9 行（全 manual，0 legacy 物化副本）；followups 250（软删 1，5 行姓名漂移=历史快照保留）；opportunities 9（customer 7/person-only 2）；actions 4、commitments 2；products 1、policy_review_reports 2、gifts 189、photos 8、ocr_records 6（含快照 2）；ai_recommendations 26（nba open 25/skipped 1）；11 表孤儿引用全部=0 |
 
-历史基线链：PMC-00 → …→ PMC-11 最终验收通过（`release-20261009-0823`）→ PMC-12（已验收，`release-20261009-141318`）→ PMC-13（已验收，`release-20261009-151917`）→ PMC-14（已验收，`release-20261009-203048`）→ PMC-15（已验收，`release-20261009-231926`）→ PMC-16（已验收，`release-20261010-050207`）→ **PMC-17（已验收，`release-20261010-102500`）**。
+历史基线链：PMC-00 → …→ PMC-11 最终验收通过（`release-20261009-0823`）→ PMC-12（已验收，`release-20261009-141318`）→ PMC-13（已验收，`release-20261009-151917`）→ PMC-14（已验收，`release-20261009-203048`）→ PMC-15（已验收，`release-20261009-231926`）→ PMC-16（已验收，`release-20261010-050207`）→ PMC-17（已验收，`release-20261010-102500`）→ PMC-18（用户授权提前验收，`release-20261010-120000`）→ **PMC-19（提案完成，待用户逐项审阅批准表）**。
 
 ## 3. 各模块读写权威来源与兼容方向
 
@@ -59,7 +61,8 @@
 - 已批准（2026-10-09）：**PMC-15 指令与五项推荐裁决**（用户预授权"有推荐二字直接选择推荐"：①角色组合模型+派生触发器；②关系治理列与词表/确认 CHECK；③households 不动仅注释；④confirmed-only 消费收紧；⑤断言保护对账删 2 补 2），含经 cloudbase_postgres 角色的生产 DDL 与限定范围 DML（影响与回滚已在 decisions.md/evidence 披露）。
 - 已批准（2026-10-10）：**PMC-16 指令与四项推荐裁决**（①11 表归属维持，零 customer_id→person_id 替换、零结构变更；②时间线双轨不重构，补测试锁定 + listInteractions 对齐 activeLegacy 防护；③OCR 恢复闭环仅改 admin.html 前端，冲突 diff+人工确认 forceRestore；④登记项维持：ai_recommendations 无 deleted_at=U7 续登、followups 软删无 batch 1 行不修）——见 decisions.md 2026-10-10 与 evidence/PMC-16.md §2。
 - 已批准（2026-10-10）：**PMC-17 指令与两项裁决**（①指令②③「改道受控边界（推荐）」：Legacy customers 写路径统一经 PersonService 受控边界，部署 customers/assistant/person_360 三函数；②指令④约束实施范围：migration A 回填补关联 + migration B 全部内容=两 DB 函数适配+customers 代码部署+customers.person_id 三重约束+recruit 活跃行部分唯一索引，发布顺序先部署 customers 函数代码→再应用 migration B）——见 decisions.md 2026-10-10 与 evidence/PMC-17.md §3/§5。
-- 未批准：PMC-18～PMC-20 全部实施包（指令未收到）；relationships pending 候选写入路径/确认 UI；G-PMC11-1 修复、G-PMC12-1 处置、G-PMC14-1 修复、G-PMC17-1 白名单扩充；一切删除/重命名已有对象（含 D5 姓名唯一约束解除、D8 customer_id 列/复合 FK 退出——须独立包单独批准）；`pr`/`pr_*` 相关一切；Legacy Quick Capture 流程变更；所有数据库变更（需 migration/rollback + 针对性确认）。
+- 已批准（2026-10-10）：**PMC-19 清理提案制定**（本包仅制定方案，不执行删除/改名/停用/清理；9 项候选 CL-01~CL-09 逐项含证明/变更SQL/恢复方案/回归清单；逐项批准表 9 项均为"待批准"——用户批准本提案≠批准所有清理项）——见 [pmc-19-cleanup-proposal.md](pmc-19-cleanup-proposal.md) §6 与 decisions.md 2026-10-10。
+- 未批准：PMC-20（指令未收到）；CL-01~CL-09 逐项清理执行（每项须独立批准）；relationships pending 候选写入路径/确认 UI；G-PMC11-1 修复、G-PMC12-1 处置（死列清理 CL-05/CL-06 待批准）、G-PMC14-1 修复、G-PMC17-1 白名单扩充；一切删除/重命名已有对象（含 D5 姓名唯一约束解除 CL-01、D8 customer_id 列/复合 FK 退出 CL-03/CL-04——须独立批准）；`pr`/`pr_*` 相关一切；Legacy Quick Capture 流程变更；所有数据库变更（需 migration/rollback + 针对性确认）。
 
 ## 5. 已登记缺口（观察项，非阻塞；修复须另获授权）
 
