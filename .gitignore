@@ -37,6 +37,7 @@ _backups/
 
 # 本地从线上拉取的参考副本(不提交)
 _online_*.html
+.remote-*
 
 # ===== 依赖 =====
 node_modules/

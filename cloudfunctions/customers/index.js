@@ -16,6 +16,7 @@
 'use strict';
 
 const { rdb, nowIso, normFields, assertOk } = require('./db');
+const { PersonService, PersonResolutionError } = require('./person-service');
 
 const FIELDS = [
   'customer_name', 'sales_priority', 'recruitment_priority', 'referral_priority',
@@ -24,6 +25,14 @@ const FIELDS = [
   'first_contact_date', 'birthday', 'customer_stage', 'phone',
   'profile', // 轻量客户画像 jsonb：{family,children,parents,career,needs,relationship,events[]}
 ];
+
+// PMC-17: Person 基础字段（权威=persons；customers 同名列仅为兼容投影）
+// 与 person-service BASIC_WRITABLE_FIELDS 对齐；customers 列名映射不同：customer_name/wx_account
+const PERSON_BASIC_FIELDS = {
+  customer_name: 'display_name', phone: 'phone', wx_account: 'wechat',
+  gender: 'gender', birthday: 'birthday', occupation: 'occupation', education: 'education',
+};
+const personService = () => new PersonService({ rdb });
 
 // 分页 RPC 保持旧列表字段完整：AI 解析同名匹配仍把返回行作为 oldC。
 
@@ -124,80 +133,105 @@ async function get(event) {
 async function create(event) {
   const data = event.data || {};
   if (!data.customer_name) return { error: 'customer_name required' };
-  const payload = normFields(data, FIELDS);
-  if (!Object.keys(payload).length) return { error: 'no valid fields' };
-  const r = assertOk(await rdb.from('customers').insert(payload).select('Id'));
-  const customerId = r.data[0].Id;
 
-  // PMC-08: 创建客户时自动建/关联 Person（统一基础资料写入口接管）
-  // 不凭同名自动合并：persons 中 display_name 完全匹配且唯一则关联，多个则报错，无则新建
+  // PMC-17: 基础字段经 Person 受控边界（resolveName 服务端解析 + 同名多候选拒绝自动合并）
   const nameKey = String(data.customer_name).trim().toLowerCase().replace(/\s+/g, ' ');
-  const personMatch = assertOk(await rdb.from('persons')
-    .select('id, display_name')
-    .eq('display_name', data.customer_name)
-    .is('deleted_at', null)
-    .limit(2));
-  const matches = personMatch.data || [];
+  let resolution;
+  try {
+    resolution = await personService().resolveName(String(data.customer_name));
+  } catch (e) {
+    if (e instanceof PersonResolutionError) return { error: e.message, code: e.code };
+    throw e;
+  }
+  const basic = {};
+  for (const [custKey, personKey] of Object.entries(PERSON_BASIC_FIELDS)) {
+    if (Object.prototype.hasOwnProperty.call(data, custKey)) basic[personKey] = data[custKey];
+  }
+
   let personId;
-  if (matches.length === 1) {
-    // 唯一匹配 → 关联
-    personId = matches[0].id;
-    assertOk(await rdb.from('persons')
-      .update({ legacy_customer_id: customerId, updated_at: nowIso() })
-      .eq('id', personId));
-  } else if (matches.length > 1) {
-    // 同名不同人 → 报错让人工确认（不自动选择）
-    return { error: '存在多个同名人物，请通过 Person 身份解析确认后关联', customerId };
+  if (resolution.candidates.length > 1) {
+    // 同名不同人 → 不自动选择；人工确认走 Person 身份解析流程
+    return { error: '存在多个同名人物，请通过 Person 身份解析确认后关联', code: 'PERSON_AMBIGUOUS',
+      candidates: resolution.candidates.map(c => ({ id: c.id, displayName: c.displayName,
+        organization: c.organization, occupation: c.occupation })) };
+  } else if (resolution.candidates.length === 1) {
+    const candidate = resolution.candidates[0];
+    if (candidate.legacyCustomerId) {
+      return { error: '同名人物已关联其他客户（#' + candidate.legacyCustomerId + '），请通过 Person 身份解析确认',
+        code: 'PERSON_ALREADY_LINKED' };
+    }
+    personId = candidate.id;
+    // 唯一匹配 → 基础字段经边界写入该 Person（空值不覆盖既有值）
+    const nonempty = Object.fromEntries(Object.entries(basic)
+      .filter(([, v]) => !(v == null || (typeof v === 'string' && v.trim() === ''))));
+    if (Object.keys(nonempty).length) {
+      const wr = await personService().updateBasicsWithProjection(personId, nonempty);
+      if (!wr.ok) return { error: wr.message || 'Person 基础资料写入冲突，请刷新重试', code: 'PERSON_CONFLICT' };
+    }
   } else {
-    // 无匹配 → 创建新 Person
+    // 无匹配 → 经边界口径创建新 Person（source 标记客户建档）
     const personPayload = {
-      display_name: data.customer_name,
+      display_name: resolution.displayName,
       name_key: nameKey,
-      phone: data.phone || null,
-      wechat: data.wx_account || null,
-      gender: data.gender || null,
-      birthday: data.birthday || null,
-      occupation: data.occupation || null,
-      education: data.education || null,
+      phone: basic.phone ?? null,
+      wechat: basic.wechat ?? null,
+      gender: basic.gender ?? null,
+      birthday: basic.birthday ?? null,
+      occupation: basic.occupation ?? null,
+      education: basic.education ?? null,
       source: '客户建档',
-      legacy_customer_id: customerId,
     };
     const pr = assertOk(await rdb.from('persons').insert(personPayload).select('id'));
     personId = pr.data[0].id;
   }
-  // 设置 customers.person_id（PMC-05 新增列）
-  if (personId) {
-    assertOk(await rdb.from('customers')
-      .update({ person_id: personId, updated_at: nowIso() })
-      .eq('Id', customerId));
-  }
+
+  // customers 业务字段建行（含基础字段投影值，保持旧客户端读到一致值）；
+  // person_id 随 INSERT 直写（PMC-17 migration B：customers.person_id NOT NULL + UNIQUE + FK）
+  const payload = { ...normFields(data, FIELDS), person_id: personId };
+  const r = assertOk(await rdb.from('customers').insert(payload).select('Id'));
+  const customerId = r.data[0].Id;
+
+  // 关联回写：persons.legacy_customer_id
+  assertOk(await rdb.from('persons')
+    .update({ legacy_customer_id: customerId, updated_at: nowIso() })
+    .eq('id', personId));
+
   return { id: customerId, personId: String(personId) };
 }
 
 async function update(event) {
   const id = parseInt(event.id, 10);
   if (!id) return { error: 'id required' };
+  const rawData = event.data || {};
+  if (!Object.keys(rawData).length) return { ok: true, updated: false };
+
+  // PMC-17: 基础字段（PERSON_BASIC_FIELDS 键）经 Person 受控边界写入；其余业务字段直写 customers
+  const basicIn = {};
+  const businessIn = {};
+  for (const [k, v] of Object.entries(rawData)) {
+    if (Object.prototype.hasOwnProperty.call(PERSON_BASIC_FIELDS, k)) basicIn[k] = v;
+    else businessIn[k] = v;
+  }
+
+  // 业务字段载荷（含 updated_at）
   const payload = normFields(
-    Object.assign({}, event.data, { updated_at: nowIso() }),
+    Object.assign({}, businessIn, { updated_at: nowIso() }),
     FIELDS.concat(['updated_at'])
   );
-  if (!Object.keys(payload).length) return { ok: true, updated: false };
 
-  // PMC-08: OCR 恢复保护——检测疑似快照整包覆盖
-  // 基础字段集合（与数据库触发器 customer_person_identity_bridge 同步的字段）
-  const PERSON_BRIDGE_FIELDS = ['customer_name', 'phone', 'wx_account', 'gender', 'birthday', 'occupation', 'education'];
-  const bridgeFieldsInPayload = PERSON_BRIDGE_FIELDS.filter(f => Object.prototype.hasOwnProperty.call(payload, f));
+  // PMC-08: OCR 恢复保护——检测疑似快照整包覆盖（仅针对基础字段）
+  const bridgeFieldsInPayload = Object.keys(basicIn);
   const isSnapshotRestore = bridgeFieldsInPayload.length >= 3;
 
   if (isSnapshotRestore && !event.forceRestore) {
     // 疑似 OCR 快照恢复：比较当前值，有冲突则要求重新预览
     const cur = assertOk(await rdb.from('customers')
-      .select(PERSON_BRIDGE_FIELDS.join(','))
+      .select(Object.keys(PERSON_BASIC_FIELDS).join(','))
       .eq('Id', id).maybeSingle());
     const curData = cur.data || {};
     const conflicts = bridgeFieldsInPayload.filter(f => {
       const curVal = curData[f] == null ? '' : String(curData[f]);
-      const newVal = payload[f] == null ? '' : String(payload[f]);
+      const newVal = basicIn[f] == null ? '' : String(basicIn[f]);
       return curVal !== newVal;
     });
     if (conflicts.length) {
@@ -210,12 +244,64 @@ async function update(event) {
     }
   }
 
-  const r = assertOk(await rdb.from('customers').update(payload).eq('Id', id).select('Id'));
-  const n = (r.data || []).length;
-  // PMC-08: 移除应用层 Person 映射——数据库触发器 customer_person_identity_bridge_trigger
-  // 已在 AFTER UPDATE 时经 legacy_customer_id 同步 customers→persons，避免双重更新
+  let personResult = null;
+  if (bridgeFieldsInPayload.length) {
+    // 定位关联 Person：优先 customers.person_id，回退 legacy_customer_id
+    const crow = assertOk(await rdb.from('customers')
+      .select('person_id').eq('Id', id).maybeSingle());
+    if (!crow.data) return { error: 'not found' };
+    let personId = crow.data.person_id ? String(crow.data.person_id) : null;
+    if (!personId) {
+      const prow = assertOk(await rdb.from('persons')
+        .select('id').eq('legacy_customer_id', id).is('deleted_at', null).maybeSingle());
+      personId = prow.data ? String(prow.data.id) : null;
+    }
+    if (!personId) {
+      // 无关联 Person：该客户尚无权威基础资料归属，拒绝静默旧值兜底
+      return { error: '该客户未关联 Person，基础字段无法写入；请先完成身份关联',
+        code: 'PERSON_NOT_LINKED', customerId: id };
+    }
+    // 经边界写入（person-service 白名单映射 customers→persons 键名）
+    const personFields = {};
+    for (const [custKey, personKey] of Object.entries(PERSON_BASIC_FIELDS)) {
+      if (Object.prototype.hasOwnProperty.call(basicIn, custKey)) personFields[personKey] = basicIn[custKey];
+    }
+    try {
+      personResult = await personService().updateBasicsWithProjection(personId, personFields, {
+        projection: {
+          table: 'customers',
+          match: { Id: id },
+          map: fields => Object.fromEntries(Object.entries(PERSON_BASIC_FIELDS)
+            .filter(([, pk]) => Object.prototype.hasOwnProperty.call(fields, pk))
+            .map(([ck, pk]) => [ck, fields[pk]])),
+        },
+      });
+      if (!personResult.ok) {
+        return { error: personResult.message || 'Person 基础资料写入冲突，请刷新后重试',
+          code: 'PERSON_CONFLICT', customerId: id };
+      }
+    } catch (e) {
+      if (e instanceof PersonResolutionError) {
+        return { error: e.message, code: e.code, customerId: id };
+      }
+      throw e;
+    }
+  }
 
-  return { ok: n === 1, updated: n };
+  let n = 0;
+  if (Object.keys(payload).length > 1 || !bridgeFieldsInPayload.length) {
+    // 有业务字段（payload 至少含 updated_at + 一个业务键）或无基础字段时照常更新 customers
+    const r = assertOk(await rdb.from('customers').update(payload).eq('Id', id).select('Id'));
+    n = (r.data || []).length;
+    if (!n) return { ok: false, updated: 0, error: 'not found or no change', customerId: id };
+  } else if (personResult) {
+    // 仅基础字段：边界已完成 persons+投影写入，customers.updated_at 已由投影刷新
+    n = 1;
+  }
+
+  return { ok: true, updated: n,
+    personId: personResult ? personResult.id : undefined,
+    personUpdated: personResult ? true : undefined };
 }
 
 // 级联软删除的子表清单（主键列名用于计数 select）

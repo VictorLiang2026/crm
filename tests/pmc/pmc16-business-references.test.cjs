@@ -35,13 +35,23 @@ class FakeQuery {
     this.op = 'select';
     this.payload = null;
     this._takeOne = false;
+    this._select = null;
   }
-  select() { return this; }
+  select(cols) { this._select = cols; return this; }
   eq(c, v) { this.filters.push(r => String(r[c]) === String(v)); return this; }
   is(c, v) { if (v === null) this.filters.push(r => r[c] == null); return this; }
+  limit() { return this; }
+  order() { return this; }
   update(row) { this.op = 'update'; this.payload = row; return this; }
   maybeSingle() { this._takeOne = true; return this._exec(); }
   then(resolve, reject) { return this._exec().then(resolve, reject); }
+  _project(r) {
+    if (!this._select) return { ...r };
+    const cols = String(this._select).split(',').map(s => s.trim());
+    const out = {};
+    for (const c of cols) if (c in r) out[c] = r[c];
+    return out;
+  }
   async _exec() {
     const rows = harness.db[this.table] || (harness.db[this.table] = []);
     if (this.op === 'update') {
@@ -50,14 +60,15 @@ class FakeQuery {
         if (this.filters.every(f => f(r))) { Object.assign(r, this.payload); updated.push(r); }
       }
       harness.updates.push({ table: this.table, payload: this.payload, updated: updated.length });
-      return { data: updated.map(r => ({ Id: r.Id })) };
+      return { data: updated.map(r => this._project(r)) };
     }
     const out = rows.filter(r => this.filters.every(f => f(r)));
-    return { data: this._takeOne ? (out[0] || null) : out };
+    if (this._takeOne) return { data: out[0] ? this._project(out[0]) : null };
+    return { data: out.map(r => this._project(r)) };
   }
 }
 
-const stubRdb = { from: t => new FakeQuery(t), rpc: () => Promise.resolve({ data: [] }) };
+const stubRdb = { from: t => new FakeQuery(t.replace(/^public\./, '')), rpc: () => Promise.resolve({ data: [] }) };
 function assertOk(res) { if (res && res.error) throw new Error(res.error.message || String(res.error)); return res; }
 function normFields(data, allowed) {
   const out = {};
@@ -82,8 +93,14 @@ const customersFn = require(path.join(REPO_ROOT, 'cloudfunctions', 'customers', 
 // ---------- A. customers.update OCR 恢复保护 ----------
 function customerFixture() {
   harness.updates = [];
+  // PMC-17：customers 基础字段写入改道 Person 受控边界，fixture 需含关联 Person
+  harness.db.persons = [{
+    id: 11, display_name: '张三', name_key: '张三', phone: '13800000000', wechat: 'zs-wx',
+    gender: '男', birthday: '1990-01-01', occupation: '工程师', education: '本科',
+    legacy_customer_id: 101, deleted_at: null, updated_at: '2026-10-01T00:00:00Z',
+  }];
   harness.db.customers = [{
-    Id: 101, customer_name: '张三', phone: '13800000000', wx_account: 'zs-wx',
+    Id: 101, person_id: 11, customer_name: '张三', phone: '13800000000', wx_account: 'zs-wx',
     gender: '男', birthday: '1990-01-01', occupation: '工程师', education: '本科',
     deleted_at: null,
   }];
@@ -107,7 +124,9 @@ test('A2 快照与当前值一致 → 直接恢复（幂等，无冲突）', asy
     data: { customer_name: '张三', phone: '13800000000', occupation: '工程师', gender: '男' },
   });
   assert.equal(res.ok, true);
-  assert.equal(harness.updates.length, 1);
+  // PMC-17：基础字段经边界写 persons（同值幂等）+ 投影回写 customers，共 2 次写
+  assert.equal(harness.updates.length, 2);
+  assert.equal(harness.db.persons[0].phone, '13800000000', 'persons 值不变');
 });
 
 test('A3 人工确认 forceRestore → 覆盖当前值', async () => {

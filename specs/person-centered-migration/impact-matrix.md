@@ -342,10 +342,10 @@ persons.legacy_customer_id（自引用）
 
 | # | 未知项 | 影响 | 补查任务 | 优先级 |
 | --- | --- | --- | --- | --- |
-| U1 | ~~3 个 customers 无对应 Person 的具体原因~~ **已补查（PMC-02，2026-10-07）**：#786/#789/#790 均活跃未删、近期经 legacy `customers.create` 建档（该路径不建 Person，1 条跟进/无子记录），无嘉宾/机会/招募关联 | 处置方案入 D2（data-model.md §8）：建议走身份命令流程补建 Person（人工确认）后回填 | 无需再查；待 D2 批准 | 高 → 已查明 |
-| U2 | `activity_participants.person_id` 无 FK 约束的原因 | 可能导致孤儿参与者记录 | 检查是否为历史遗留，是否需要补 FK | 中 |
-| U3 | `activity_speakers.customer_id` 无 FK 约束的原因 | 可能导致孤儿嘉宾记录 | 同上 | 中 |
-| U4 | `persons.legacy_customer_id` 自引用 FK 的语义 | 需确认是否允许 NULL | 检查约束定义是否允许 NULL | 低 |
+| U1 | ~~3 个 customers 无对应 Person 的具体原因~~ **已补查（PMC-02，2026-10-07）**：#786/#789/#790 均活跃未删、近期经 legacy `customers.create` 建档（该路径不建 Person，1 条跟进/无子记录），无嘉宾/机会/招募关联。**已收口（PMC-17，2026-10-10）**：migration A 回填后 3 行全部关联 Person（wp04：customers 782/782 映射、例外 0） | 已无未关联 customers | 无需再查 | 高 → **已关闭** |
+| U2 | ~~`activity_participants.person_id` 无 FK 约束的原因~~ **已补查（PMC-17，2026-10-10）**：FK 已在效（1 条），孤儿 0——未知前提过时 | 无孤儿风险 | 无需动作 | 中 → **已关闭** |
+| U3 | ~~`activity_speakers.customer_id` 无 FK 约束的原因~~ **已补查（PMC-17，2026-10-10）**：无 FK、孤儿 0；历史遗留便利链接，嘉宾已 Person 锚定（PMC-13） | 当前无孤儿 | 补 FK 属 D8 同期结构动作，挂起待独立批准 | 中 → **调查关闭，行动挂起** |
+| U4 | ~~`persons.legacy_customer_id` 自引用 FK 的语义~~ **已补查（PMC-17，2026-10-10）**：无 FK、可空（YES）；权威方向已反转为 customers.person_id（FK+UNIQUE+NOT NULL），legacy 列降为兼容回写 | 语义明确 | 无需动作 | 低 → **已关闭** |
 | U5 | `opportunities` 双 FK 约束（customer_id+person_id → persons(legacy_customer_id,id)）的迁移计划 | 阻塞机会域 Person 化 | 确认何时可以移除 customer_id 列 | 高 |
 | U6 | `recruit_candidates` 双 FK 约束同上 | 阻塞招募域 Person 化 | 同上 | 高 |
 | U7 | `ai_recommendations` 无 deleted_at 列 | 与其他表软删除不一致 | 确认是否需要补 deleted_at | 低 |
@@ -574,3 +574,29 @@ persons.legacy_customer_id（自引用）
 - 时间线双轨：同一跟进=一条业务事实；Legacy 表权威、interactions 物化行仅未来导入产物；去重 key=source_type:source_id；来源标识 `public.表#id` 输出至 Console。
 - OCR 恢复安全：跨角色修改后快照恢复受服务端冲突门+前端 diff 双重保护；冲突/失败不销毁恢复依据（冲突清单披露后才允许人工覆盖）；老快照 JSON 文本解析容错保持。
 - 历史保护：历史作者（created_by/confirmed_by uid）、发生时姓名、合同/报告快照、AI 历史输出（ai_recommendations 行与 nba）均不改写。
+
+## PMC-17：全系统复审并验收 Person 为唯一基础信息来源（2026-10-10）
+
+### 17.1 结构变更（migration A `20261010091000` + migration B `20261010093000`，均已应用，rollback 成双）
+
+| 对象 | 变更类型 | 消费者 | 状态 | 证据 |
+| --- | --- | --- | --- | --- |
+| customers.person_id 关联回填（migration A） | 数据：3 行未关联 customers 经人工确认身份补建/关联 Person；persons.legacy_customer_id 回写对齐 | wp04 身份审计、customers.get、recruit 视图 | 已应用；wp04 customers 782/782 映射、例外 0 | evidence/PMC-17.md §5 前置；migration A 核对记录 |
+| customers.person_id `SET NOT NULL`（migration B） | DDL：NOT NULL（UNIQUE/FK 查明 PMC-05 `20261008120000` 既有，不重复创建） | 全部 customers 写入口 | 已应用（pid_nullable=NO） | evidence/PMC-17.md §5.4 |
+| `recruit_candidates_person_id_active_key`（migration B） | DDL：活跃行部分唯一索引 `WHERE deleted_at IS NULL`（软删允许重复） | recruit create/identity command | 已应用 | 同上 |
+| `person_identity_execute_v1`（migration B） | CREATE OR REPLACE：客户分支 INSERT customers 直写 person_id（其余逐字不变） | person_360 executeIdentity / quickCaptureV2 / Console | 已应用；proacl service_role only | 同上 |
+| `crm_test_scenario_v1`（migration B） | CREATE OR REPLACE：种子调序（先 persons→manual 角色→customers 带 person_id→回写 legacy） | 测试基建 | 已应用；origin 语义保持 manual | 同上 |
+
+### 17.2 函数与前端变更（指令②③写路径改道）
+
+| 对象 | 变更类型 | 消费者 | 状态 | 证据 |
+| --- | --- | --- | --- | --- |
+| `cloudfunctions/_shared/person-service.js`（+assistant/person_360/customers 三副本） | 新增 `updateBasicsWithProjection`：白名单 7 字段写 persons+可选投影回写 customers | customers create/update（Legacy） | 已部署（三副本 SHA 一致；线上=本地逐字节一致） | evidence/PMC-17.md §3 |
+| `cloudfunctions/customers/index.js` | create 经 resolveName 服务端解析+三态处置；update 基础字段改道受控边界、未关联拒绝 PERSON_NOT_LINKED；create 直写 person_id | admin.html 客户新建/编辑、OCR forceRestore | 已部署 | 同上 |
+| 桥触发器/recruit 同步触发器 | 不变更（保留作投影兜底；移除须单独批准） | — | 在效 | evidence/PMC-17.md §7.4 |
+
+### 17.3 未知项收口与观察项
+
+- U1/U2/U4 关闭、U3 调查关闭（补 FK 挂起 D8）、U5/U6 维持挂起（D8 独立批准）、U7/U8 维持登记——见 §九与 evidence/PMC-17.md §7.5。
+- 新登记：G-PMC17-1（候选）——`crm_test_scenario_v1` 触发器白名单滞后（bridge+PMC-15 三派生触发器未登记，dryRun/confirm/execute 必然 RAISE；既有，非本包引入；扩充须单独批准）。
+- 性能基线（2026-10-10 建立，网关 ExecutionTimeMs 中位）：列表 17ms / 搜索 22ms / 统计 37ms / 招募 13ms（evidence/PMC-17.md §6.4）。

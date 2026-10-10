@@ -1,4 +1,6 @@
-/** Read-only identity resolution for future server-side CRM callers. */
+/** Read-only identity resolution for future server-side CRM callers.
+ *  PMC-17: 增加基础资料受控写入（updateBasicsWithProjection）——所有 Person 基础字段
+ *  写入统一经此边界：字段白名单、乐观锁、投影回写（投影仅作兼容，非权威）。 */
 'use strict';
 
 const MAX_DISPLAY_LENGTH = 160;
@@ -140,6 +142,74 @@ class PersonService {
       canCreateAfterConfirmation: status === 'confirm_new_qualified' ||
         (status === 'confirm_existing' && parsed.hasQualifier && qualifierMatches.length === 0),
     };
+  }
+
+  // PMC-17: Person 基础资料受控写入边界 + customers 投影回写
+  // personId 必须已知（resolveName/人工确认在前）；fields 仅接受白名单键（snake_case）。
+  // 顺序：persons UPDATE（乐观锁可空）→ 投影表 UPDATE。两步非事务（RDB 无跨表事务），
+  // 投影失败抛出错误由调用方处理重试，persons 值已为权威。
+  static get BASIC_WRITABLE_FIELDS() {
+    return ['display_name', 'phone', 'wechat', 'gender', 'birthday', 'occupation', 'education'];
+  }
+
+  async updateBasicsWithProjection(personIdValue, fields, { expectedUpdatedAt, projection } = {}) {
+    if (!this.rdb || typeof this.rdb.from !== 'function') {
+      throw new PersonResolutionError('INVALID_CONFIG', 'updateBasicsWithProjection requires rdb');
+    }
+    const pid = personId(personIdValue);
+    if (!fields || typeof fields !== 'object' || Array.isArray(fields)) {
+      throw new PersonResolutionError('INVALID_PAYLOAD', 'fields must be an object');
+    }
+    const allowed = new Set(PersonService.BASIC_WRITABLE_FIELDS);
+    const payload = {};
+    for (const [key, value] of Object.entries(fields)) {
+      if (!allowed.has(key)) {
+        throw new PersonResolutionError('FIELD_NOT_ALLOWED', 'Field not writable: ' + key);
+      }
+      payload[key] = (typeof value === 'string' && value.trim() === '') ? null : value;
+    }
+    if (!Object.keys(payload).length) {
+      throw new PersonResolutionError('INVALID_PAYLOAD', 'no writable fields provided');
+    }
+    payload.updated_at = new Date().toISOString();
+
+    // 存在性预检（避免对不存在/已软删 Person 空写）
+    const exist = await this.rdb.from('persons').select('id').eq('id', pid).is('deleted_at', null);
+    if (!exist || exist.error) {
+      throw new PersonResolutionError('READ_FAILED', 'Person read failed', exist?.error);
+    }
+    if (!Array.isArray(exist.data) || exist.data.length !== 1) {
+      throw new PersonResolutionError('PERSON_NOT_FOUND', 'Person not found or deleted: ' + pid);
+    }
+    let query = this.rdb.from('persons').update(payload)
+      .eq('id', pid).is('deleted_at', null);
+    if (expectedUpdatedAt) query = query.eq('updated_at', expectedUpdatedAt);
+    const wr = await query.select('id, updated_at');
+    if (!wr || wr.error) {
+      throw new PersonResolutionError('WRITE_FAILED', 'Person update failed', wr?.error);
+    }
+    if (!Array.isArray(wr.data) || wr.data.length === 0) {
+      return { ok: false, conflict: true, message: 'Concurrent modification detected; refresh and retry' };
+    }
+    const personRow = wr.data[0];
+
+    let projectionResult = null;
+    if (projection && projection.table && projection.match &&
+        typeof projection.table === 'string' && typeof projection.match === 'object') {
+      const projPayload = projection.map(fields);
+      if (projPayload && Object.keys(projPayload).length) {
+        projPayload.updated_at = payload.updated_at;
+        let pq = this.rdb.from(projection.table).update(projPayload);
+        for (const [k, v] of Object.entries(projection.match)) pq = pq.eq(k, v);
+        const pr = await pq.select('id');
+        if (!pr || pr.error) {
+          throw new PersonResolutionError('PROJECTION_FAILED',
+            'Projection update failed after Person write; retry required', pr?.error);
+        }
+        projectionResult = Array.isArray(pr.data) ? pr.data.length : 0;
+      }
+    }
+    return { ok: true, id: pid, updatedAt: personRow.updated_at, projectionUpdated: projectionResult };
   }
 }
 

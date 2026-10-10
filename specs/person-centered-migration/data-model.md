@@ -228,6 +228,7 @@
 
 - `customers` 新增 `person_id bigint`，**UNIQUE**（一人一条客户记录，D1），回填完成后置 `NOT NULL` 并加 FK `REFERENCES persons(id)`。
 - 分步：①加可空列（不锁视图）→ ②回填 → ③校验一对一 → ④加 UNIQUE + FK + NOT NULL（此步涉及约束变更，实施包单独确认）；每步核对依赖视图（`pg-view-rebuild-check`）。
+- **落实状态（2026-10-10，PMC-17 验收口径）**：① PMC-05 `20261008120000` 加列+UNIQUE+FK 在效；② PMC-06 B1 批次回填 779 行 + PMC-17 migration A `20261010091000` 补齐 3 个无 Person 客户（customers 782/782 映射）；③ 一对一校验零重复零孤儿；④ NOT NULL 经 PMC-17 migration B `20261010093000` 落实（生产核对 pid_nullable=NO）。D1 目标达成。
 
 ### 5.2 回填规则
 
