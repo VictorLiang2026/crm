@@ -112,7 +112,7 @@ function showLogin(appRoot) {
   document.body.classList.add('is-login');
   renderLogin({
     mount: appRoot,
-    brand: { name: 'Victor's CRM', tagline: 'RELATIONSHIPS, WITH INTELLIGENCE' },
+    brand: { name: "Victor's CRM", tagline: 'RELATIONSHIPS, WITH INTELLIGENCE' },
     signIn,
     onSuccess: () => enterApp(appRoot),
   });
