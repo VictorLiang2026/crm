@@ -68,7 +68,8 @@
 - 已批准（2026-10-10）：**PMC-19 CL-05/CL-06/CL-01 执行（B1+CL-01 全部）**——CL-05 DROP recruit_candidates.education 死列、CL-06 DROP recruit_candidates.mbti 死列、CL-01 DROP customers"客户列表_姓名_key" UNIQUE 约束；各含 migration+rollback 双备份；经 cloudbase_postgres 角色应用；pre/post 核对全绿。详见 evidence/PMC-19.md §10 与 decisions.md 2026-10-10。
 - 已批准（2026-10-10）：**PMC-19 全部清理项 CL-01~CL-09 执行**（用户逐项审阅批准表后批准全部；B1+CL-01 先行 `e40557e`，CL-02~CL-09 `0c511db`；各 migration+rollback 双备份，post 核对全绿）——见 evidence/PMC-19.md §10-§14 与 decisions.md 2026-10-10。
 - 已批准（2026-10-10）：**PMC-20 指令七项**（清理后复核+回归修复+最终回归+文档终态+发布+Codex handoff；本包无新增清理对象，修复仅限 PMC-19 暴露的运行时回归：3 个坏 DB 函数 + 12 云函数 + person-360.js + tests/households 夹具）——见 evidence/PMC-20.md 与 decisions.md 2026-10-10。
-- 未批准：PMC-21 及一切新工作包（指令未收到，不自行开包）；relationships pending 候选写入路径/确认 UI；G-PMC11-1 修复、G-PMC14-1 修复、G-PMC17-1 白名单扩充、console FAB aria-label 国际化（均只登记）；任何新删除/重命名已有对象；`pr`/`pr_*` 相关一切；Legacy Quick Capture 流程变更；所有数据库变更（需 migration/rollback + 针对性确认）。
+- 已批准（2026-10-11）：**FAB aria-label 双语修复 + Cam 认证端到端回归**（PMC-20 §8 登记项②⑥核销；i18n.js 新增 data-i18n-aria 同步机制、shell.js FAB 挂载该属性；零 DB/云函数变更；shell.js+i18n.js 单文件 hosting 部署、SHA 一致；Cam 登录 8 页面真实数据、AI 搜索认证端到端 PASS）——见 evidence/PMC-20.md §6.5 与 decisions.md 2026-10-11。
+- 未批准：PMC-21 及一切新工作包（指令未收到，不自行开包）；relationships pending 候选写入路径/确认 UI；G-PMC11-1 修复、G-PMC14-1 修复、G-PMC17-1 白名单扩充（均只登记）；任何新删除/重命名已有对象；`pr`/`pr_*` 相关一切；Legacy Quick Capture 流程变更；所有数据库变更（需 migration/rollback + 针对性确认）。
 
 ## 5. 已登记缺口（观察项，非阻塞；修复须另获授权）
 
@@ -88,7 +89,7 @@
 
 ## 6. 失败与未验证项
 
-- PMC-20 无失败项；限制（evidence/PMC-20.md §8）：①平台层自动备份控制台核实+真实恢复演练未执行（本包以只读 SQL 恢复演练替代：CL-03 恢复链 783/783 含软删行实测可回填）；②`fn invoke` 真实调用未验证（tcb CLI Cam 认证失败，功能等价由 DB RPC+浏览器真实链路覆盖）；③AI 摘要/会前准备/对话策略按钮真实模型调用未执行（避免模型成本，链路经 #/ai/search 端到端验证）；④复制电话/微信按钮未实测剪贴板（王寻寻无该数据，disabled 正确）；⑤基线遗留测试失败如实登记（context-engine/person-service/actions/quick-capture-v2/interactions/commitments/wp01——0c511db 及更早遗留，stash 干净 HEAD 复验同样失败，修复须单独授权）；⑥console FAB aria-label 固定中文（i18n 小缺口，只记录）。
+- PMC-20 无失败项；限制（evidence/PMC-20.md §8）：①平台层自动备份控制台核实+真实恢复演练未执行（本包以只读 SQL 恢复演练替代：CL-03 恢复链 783/783 含软删行实测可回填）；②~~`fn invoke` 真实调用未验证（tcb CLI Cam 认证失败，功能等价由 DB RPC+浏览器真实链路覆盖）~~ **2026-10-11 核销：浏览器 Cam 登录后端到端回归 8 页面真实数据、0 应用级错误（evidence §6.5）；CLI `fn invoke` 通道限制依旧**；③AI 摘要/会前准备/对话策略按钮真实模型调用未执行（避免模型成本，链路经 #/ai/search 端到端验证）；④复制电话/微信按钮未实测剪贴板（王寻寻无该数据，disabled 正确）；⑤基线遗留测试失败如实登记（context-engine/person-service/actions/quick-capture-v2/interactions/commitments/wp01——0c511db 及更早遗留，stash 干净 HEAD 复验同样失败，修复须单独授权）；⑥~~console FAB aria-label 固定中文（i18n 小缺口，只记录）~~ **2026-10-11 经用户批准修复并发布（data-i18n-aria 机制+shell.js，中英往返实测 PASS，evidence §6.5）**。
 - PMC-19 执行无失败项；CL-02/CL-03 执行后暴露 3 个 DB 函数运行时坏引用（actions_guard/crm_person_roles_derive_v1/crm_search_people_v1——函数体内动态引用已删列，静态扫描漏项），由 PMC-20 修复并验证。限制：迁移历史中 CL-02 函数迁移为 `202610101640xx` 系列、CL-03 为 `2026101017xx/18xx` 系列，全部含 rollback 且双目录备份一致。
 - PMC-17 无失败项；限制（evidence/PMC-17.md §7.7）：①~~桥触发器/recruit 同步触发器保留~~ **已随 PMC-19 CL-08/CL-09 退出**；②~~D5 姓名唯一约束解除、D8 customer_id 列退出本包不实施~~ **D5 已随 CL-01 退出**；③G-PMC17-1 登记未修、G-PMC11-1/G-PMC14-1 维持登记；④WP01 开放项 login/service-runtime/live-writes/mobile 既定未验证，无 iPad 真机性能复测；⑤性能无历史同口径基线，本包实测建立基线（列表 17ms/搜索 22ms/统计 37ms/招募 13ms）；⑥relationships pending 候选写入路径属后续工作包。
 - PMC-16 无失败项；限制（evidence/PMC-16.md §6/§7）：①iPad 生产浏览器 OCR 冲突 diff 人工路径深度回归已由用户验收关闭；②followups 软删无 batch 1 行与 ai_recommendations 无 deleted_at 维持登记（不修）；③G-PMC14-1 保持登记（全量 175 中 3 项既有失败，基线同）。
@@ -164,8 +165,8 @@
 ### 8.6 实际测试结果、未验证项和待处理问题
 
 - **通过**：隔离测试 households 5/5（CL-03 新契约）、ai-gateway 14/14、ai-skills 7/7、recruit-goals 3/3、modular PASS、check:shared PASS；DB 63 项探针全绿（12 视图/RPC/回收站/富客户/3 搜索模板）；生产浏览器 console+admin 双前端中英全绿、0 console 错误（清单见 evidence/PMC-20.md §6）。
-- **未验证**（§6 指令④要求如实标注）：见 §6 PMC-20 限制①-⑥。关键：平台层真实备份/恢复演练、`fn invoke`、AI 按钮真实模型调用。
-- **待处理（登记未修，修复须单独授权）**：G-PMC11-1（ai_activity ID 白名单）、G-PMC14-1（pmc11 fixture）、G-PMC17-1（scenario 白名单）、基线遗留测试失败清单、console FAB aria-label 国际化、followups 软删无 batch 1 行、ai_recommendations 无 deleted_at。
+- **未验证**（§6 指令④要求如实标注）：见 §6 PMC-20 限制①-⑥，其中②Cam 认证真实调用、⑥FAB aria-label 已在 2026-10-11 核销（evidence §6.5）。关键剩余：平台层真实备份/恢复演练、AI 按钮真实模型调用。
+- **待处理（登记未修，修复须单独授权）**：G-PMC11-1（ai_activity ID 白名单）、G-PMC14-1（pmc11 fixture）、G-PMC17-1（scenario 白名单）、基线遗留测试失败清单、followups 软删无 batch 1 行、ai_recommendations 无 deleted_at。
 
 ### 8.7 备份索引、恢复限制和操作入口
 
@@ -194,4 +195,4 @@
 **下一项唯一允许开展的工作（白名单）**：
 
 1. **PMC-18 定时监测例行处理**：pmc18_observations 异常 → 按修复包流程处理（先报告影响与授权）。
-2. **等待用户下发新指令**：不默认继续旧计划、不自行开新工作包。已登记的可选方向（均须用户指令才启动）：relationships pending 候选写入路径/确认 UI；G-PMC11-1/G-PMC14-1/G-PMC17-1 修复；基线遗留测试修复；console FAB aria-label 国际化；i18n.js/misc.js WIP 收尾（当前工作树未提交，属未完成状态，接手后须先向用户确认处置）。
+2. **等待用户下发新指令**：不默认继续旧计划、不自行开新工作包。已登记的可选方向（均须用户指令才启动）：relationships pending 候选写入路径/确认 UI；G-PMC11-1/G-PMC14-1/G-PMC17-1 修复；基线遗留测试修复；i18n.js/misc.js WIP 收尾（当前工作树未提交，属未完成状态，接手后须先向用户确认处置；注意 i18n.js 的 FAB 修复 8 行已随 2026-10-11 发布提交，WIP 仅剩 more 页 legacy 入口字典键）。

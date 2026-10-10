@@ -119,12 +119,31 @@ activity_reports、activity_speakers、activity_tasks、ai_activity（index+cont
 
 浏览器 console 错误收集：0 应用级错误。
 
-**发现（按规则 11 只记录不修）**：console 底部 FAB"快速记录"按钮的 `aria-label` 固定中文（可见内容为加号 SVG 图标，英文界面无视觉影响）——i18n 覆盖小缺口，登记待后续 i18n 迭代处理。
+**发现（按规则 11 只记录不修）**：console 底部 FAB"快速记录"按钮的 `aria-label` 固定中文（可见内容为加号 SVG 图标，英文界面无视觉影响）——i18n 覆盖小缺口，登记待后续 i18n 迭代处理。**已于 2026-10-11 经用户批准修复并发布（见 §6.5）**。
 
 ### 6.4 回归结论
 
 - 客户、Person、招募、嘉宾、参与者、关系、家庭、互动、Today、AI、搜索、统计、附件、删除与恢复全部通过（隔离测试 + DB 探针 + 生产浏览器三层）。
 - 未验证项见 §8。
+
+### 6.5 2026-10-11 追加：FAB aria-label 修复 + Cam 认证端到端回归
+
+**FAB aria-label 修复（用户批准的登记项）**：根因不是硬编码——shell.js FAB 早已使用 `t('nav_quick_record')`，但 `setLang()` 只刷新 `[data-i18n]` 节点的 textContent，FAB 的 aria-label 在 mount 时求值一次，切换语言后不跟随。修复：①`i18n.js` 的 `setLang()` 与 `scanI18n()` 新增 `[data-i18n-aria]` → `aria-label` 同步（新机制，现存元素零影响）；②shell.js FAB 加 `data-i18n-aria="nav_quick_record"`。线上实测：中文「快速记录」→ English「Quick Record」→ 切回「快速记录」，实时跟随。部署 shell.js + i18n.js 单文件 hosting，本地/线上 SHA256 一致。misc.js 配套的 more 页 legacy 入口 WIP 字典键仍未提交（工作区保留），i18n.js 本次仅提交 FAB 修复 8 行（WIP 键经 stash 隔离）。
+
+**Cam 认证端到端回归（核销 §8 旧第 2 项）**：用户在浏览器完成 Cam 登录后，逐页认证真实调用：
+
+| 页面 | 结果（真实数据） |
+| --- | --- |
+| #/today | ✅ 早安问候、晨间简报（AI Gateway）、Today 5、待履承诺、候选审核、机会速览 |
+| #/people | ✅ 20 行人物目录 |
+| #/person/773 | ✅ 王寻寻 Person 360 正常渲染（5 区块） |
+| #/opportunities | ✅ 机会列表与待确认候选真实记录 |
+| #/activities | ✅ 活动工作台计数（11/12） |
+| #/recruit | ✅ 候选人漏斗（陈旖俐等真实姓名） |
+| #/settings | ✅ 中英双向切换 |
+| #/ai/search | ✅「最近关系下降的重点客户」自然语言→AI Gateway 解析→数据库计算 0 人，空态诚实文案+来源标注完整（认证链路下 `crm_search_people_v1` 修复验证） |
+
+console 错误收集：0 应用级错误。限制：AI 页在自动化桥接下间歇出现 WebView renderer 占用导致工具掉线（IDE Electron 桥接不稳定，非页面报错；用户接管登录与常规页面均正常），最终一次搜索在新标签完成；tcb CLI `fn invoke` 的 Cam 认证限制依旧（CLI 通道），但浏览器认证通道已完整覆盖真实云函数调用。
 
 ## 7. 发布
 
@@ -134,13 +153,18 @@ activity_reports、activity_speakers、activity_tasks、ai_activity（index+cont
 - 三端核对：本地/GitHub/云端一致（commit、tag、函数清单）；迁移双目录哈希一致。
 - release.ps1 因工作树含 WIP 文件未使用，按手动 git 流程发布并在本记录说明。
 
+**2026-10-11 追加发布**（FAB 修复 + Cam 回归，零 DB/云函数变更）：
+
+- 提交/标签：见 git log 2026-10-11（档案回填提交记录精确哈希与标签）。
+- 部署范围：shell.js + i18n.js 两个托管文件单文件上传（本地/线上 SHA256 一致）。**未全量部署**；misc.js WIP 与 i18n.js WIP 字典键未纳入提交（stash 隔离 + 发布后恢复工作区）。
+
 ## 8. 未验证项（如实登记）
 
 | # | 项 | 原因 |
 | --- | --- | --- |
 | 1 | 平台层自动备份控制台核实 + 真实恢复演练 | 无隔离环境；本包恢复演练以只读 SQL 演练替代（§5），真实 PITR 演练须用户在云控制台执行 |
-| 2 | `fn invoke` 真实调用云函数（Cam 认证失败） | tcb CLI 认证限制；功能等价由 DB RPC + 浏览器真实链路覆盖 |
+| 2 | ~~`fn invoke` 真实调用云函数（Cam 认证失败）~~ **已核销（2026-10-11）** | 浏览器 Cam 登录后端到端回归 8 页面全部真实数据、0 应用级错误（§6.5）；CLI `fn invoke` 通道限制依旧但不再构成未验证项 |
 | 3 | AI 摘要/会前准备/对话策略按钮真实模型调用 | 避免产生真实模型成本；AI→云函数→RPC 链路已经 #/ai/search 模板端到端验证 |
 | 4 | 复制电话/微信按钮真实剪贴板操作 | 王寻寻无电话/微信数据，按钮正确 disabled；逻辑已代码审查 |
 | 5 | 基线遗留测试失败（§6.1 清单） | 0c511db 及更早遗留，修复须单独授权（规则 11） |
-| 6 | FAB aria-label 国际化 | 本轮只记录（§6.3 发现），修复须单独授权 |
+| 6 | ~~FAB aria-label 国际化~~ **已核销（2026-10-11）** | 用户批准修复并发布：`data-i18n-aria` 机制 + shell.js FAB，中英往返实测通过（§6.5） |
