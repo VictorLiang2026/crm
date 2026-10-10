@@ -29,7 +29,8 @@
 | PMC-19 CL-05/06/01 执行 | 提交 `e40557e`；标签 `release-20261010-163900`；migration `20261010163000`（CL-05 DROP education）+ `20261010163100`（CL-06 DROP mbti）+ `20261010163200`（CL-01 DROP UNIQUE 约束），各含 rollback，双备份；经 cloudbase_postgres 角色应用（8/11/16ms）；post 核对全绿；无云函数/静态文件改动（纯 DB 变更） |
 | PMC-19 CL-02~CL-09 执行 | 提交 `0c511db`；标签 `release-20261010-1745`；CL-04 DROP 复合 FK×2（`20261010170600/170610`）；CL-08 DROP 桥触发器+函数（`20261010170700`）；CL-09 DROP recruit 同步触发器+函数（`20261010170800`）；CL-02 重建 11 视图改读 persons + DROP customers 7 副本列 + 更新 6 个 DB 函数（`20261010164000/164100` + 6 个函数迁移）；CL-03 更新 25 个 JS + DROP persons.legacy_customer_id + 重建触发器（`20261010170900/180000/180100`）；部署 5 个云函数（customers/person_360/assistant/ai_activity/today_coach）；post 核对全绿；迁移双目录 130/130 一致 |
 | PMC-20 发布 | 提交 `970cc1b`；标签 `release-20261010-2118`；3 个坏 DB 函数兼容修复（migration `20261010190000/190100/190200` 各含 rollback，经 cloudbase_postgres 应用 + RPC 验证）+ 12 云函数 4 小批部署（activity_reports/activity_speakers/activity_tasks/ai_activity/ai_parse/ai_recommendations/followups/gifts/photos/products/person_360/today_coach）+ crm/person-360.js hosting（SHA 一致）+ tests/households 夹具适配；隔离测试与 DB 63 项探针与浏览器双前端中英回归全绿；i18n.js/misc.js 为 WIP 未纳入提交 |
-| 云端 | PMC-20 部署 12 函数 + person-360.js hosting + 3 DB 迁移；PMC-19 部署 5 函数（customers/person_360/assistant/ai_activity/today_coach）；PMC-17 部署 3 个函数；PMC-16 部署 1 个函数+admin.html 静态；PMC-15 部署 2 函数+4 静态模块；PMC-14 部署 1 函数；PMC-13 部署 2 函数；PMC-12 部署 3 函数+admin.html；PMC-11 部署 8 AI 函数 |
+| 云端 | PMC-20 部署 12 函数 + person-360.js hosting + 3 DB 迁移；2026-10-11 并行会话部署 person_360 函数（时间线故障修复）+ console 3 静态文件 + 1 view 恢复迁移；PMC-19 部署 5 函数（customers/person_360/assistant/ai_activity/today_coach）；PMC-17 部署 3 个函数；PMC-16 部署 1 个函数+admin.html 静态；PMC-15 部署 2 函数+4 静态模块；PMC-14 部署 1 函数；PMC-13 部署 2 函数；PMC-12 部署 3 函数+admin.html；PMC-11 部署 8 AI 函数 |
+| 2026-10-11 并行会话发布 | 提交 `bd3c9c5`；标签 `release-20261011-000403`（已推送，本地=GitHub）。①console 更多页 17 项旧版功能入口（misc.js + i18n.js 双语键）；②FAB aria-label 双语修复（data-i18n-aria 机制，与同日 Trae 会话开发的修复同构并被整合）；③person_360 时间线 customers 查询缺参线上故障修复（person-insights-service.js）；④WP01 门测试夹具对齐 CL-02/CL-03；⑤migration `20261010223000_pmc_restore_view_security_invoker`（+rollback，已应用：12 视图 reloptions 全部 security_invoker=true；外部镜像漏同步，经另一会话补齐 132/132）。线上 shell.js/i18n.js/misc.js SHA 与该提交一致 |
 | 数据库迁移 | PMC-17 `20261010091000_pmc17_customers_person_link_backfill`（已应用：3 个无 Person 客户补建关联，customers 782/782 映射）+ `20261010093000_pmc17_customers_person_id_constraints`（已应用：customers.person_id SET NOT NULL、recruit_candidates(person_id) 活跃行部分唯一索引、person_identity_execute_v1/crm_test_scenario_v1 两函数适配）；PMC-15 `20261009220000_pmc15_role_derivation_relationship_governance`（已应用：person_roles origin/role CHECK、relationships 4 治理列+2 CHECK、2 SECURITY DEFINER 函数+5 触发器、重建 crm_search_people_v1、对账删 2 补 2）；PMC-14 `20261009180000_pmc14_participant_canonical_backfill`（已应用，数据回填 7 行软删行 canonical，无结构变更）；G-PMC11-2 修复 `20261009070000`（已应用）；persons anon 只读依赖 PMC-10 `20261008231500`，在效 |
 | 数据规模抽查（PMC-16 盘点） | interactions 9 行（全 manual，0 legacy 物化副本）；followups 250（软删 1，5 行姓名漂移=历史快照保留）；opportunities 9（customer 7/person-only 2）；actions 4、commitments 2；products 1、policy_review_reports 2、gifts 189、photos 8、ocr_records 6（含快照 2）；ai_recommendations 26（nba open 25/skipped 1）；11 表孤儿引用全部=0 |
 
@@ -68,7 +69,7 @@
 - 已批准（2026-10-10）：**PMC-19 CL-05/CL-06/CL-01 执行（B1+CL-01 全部）**——CL-05 DROP recruit_candidates.education 死列、CL-06 DROP recruit_candidates.mbti 死列、CL-01 DROP customers"客户列表_姓名_key" UNIQUE 约束；各含 migration+rollback 双备份；经 cloudbase_postgres 角色应用；pre/post 核对全绿。详见 evidence/PMC-19.md §10 与 decisions.md 2026-10-10。
 - 已批准（2026-10-10）：**PMC-19 全部清理项 CL-01~CL-09 执行**（用户逐项审阅批准表后批准全部；B1+CL-01 先行 `e40557e`，CL-02~CL-09 `0c511db`；各 migration+rollback 双备份，post 核对全绿）——见 evidence/PMC-19.md §10-§14 与 decisions.md 2026-10-10。
 - 已批准（2026-10-10）：**PMC-20 指令七项**（清理后复核+回归修复+最终回归+文档终态+发布+Codex handoff；本包无新增清理对象，修复仅限 PMC-19 暴露的运行时回归：3 个坏 DB 函数 + 12 云函数 + person-360.js + tests/households 夹具）——见 evidence/PMC-20.md 与 decisions.md 2026-10-10。
-- 已批准（2026-10-11）：**FAB aria-label 双语修复 + Cam 认证端到端回归**（PMC-20 §8 登记项②⑥核销；i18n.js 新增 data-i18n-aria 同步机制、shell.js FAB 挂载该属性；零 DB/云函数变更；shell.js+i18n.js 单文件 hosting 部署、SHA 一致；Cam 登录 8 页面真实数据、AI 搜索认证端到端 PASS）——见 evidence/PMC-20.md §6.5 与 decisions.md 2026-10-11。
+- 已批准（2026-10-11）：**FAB aria-label 双语修复 + Cam 认证端到端回归**（PMC-20 §8 登记项②⑥核销）。FAB 修复=i18n.js setLang/scanI18n 新增 data-i18n-aria 同步机制+shell.js FAB 挂载该属性（根因=mount 单次求值不随语言切换）；该修复由本会话开发验证、同日并行会话整合进 `bd3c9c5`（标签 `release-20261011-000403`，含更多页 17 入口/时间线故障修复/夹具/view 迁移）发布，线上 SHA 三向一致。Cam 登录 8 页面真实数据、AI 搜索认证端到端 PASS、0 应用级错误——见 evidence/PMC-20.md §6.5 与 decisions.md 2026-10-11。
 - 未批准：PMC-21 及一切新工作包（指令未收到，不自行开包）；relationships pending 候选写入路径/确认 UI；G-PMC11-1 修复、G-PMC14-1 修复、G-PMC17-1 白名单扩充（均只登记）；任何新删除/重命名已有对象；`pr`/`pr_*` 相关一切；Legacy Quick Capture 流程变更；所有数据库变更（需 migration/rollback + 针对性确认）。
 
 ## 5. 已登记缺口（观察项，非阻塞；修复须另获授权）
@@ -170,7 +171,7 @@
 
 ### 8.7 备份索引、恢复限制和操作入口
 
-- **迁移双目录**：`cloudbase/migrations`（本地，Git 管理）+ `C:\Users\victor\cloudbase\migrations`（外部镜像，130/130 SHA 一致）；每个 migration 同名 `.rollback.sql`。
+- **迁移双目录**：`cloudbase/migrations`（本地，Git 管理）+ `C:\Users\victor\cloudbase\migrations`（外部镜像，132/132 SHA 一致——2026-10-11 `20261010223000` 一对补齐）；每个 migration 同名 `.rollback.sql`。
 - **恢复入口**：DDL 执行 `node tools/tcb-exec.cjs --file <sql> --role cloudbase_postgres`；只读查询 `--role service_role`（均需禁用沙箱）。rollback 按迁移时间倒序逆序执行。
 - **恢复限制**：①CL-03 恢复链有顺序（180000→170900→180100，见 §1 回滚条件）；②恢复脚本以 customers.person_id 现值为回填源，清理后新增数据天然被覆盖保护；③平台层 PITR 未演练，真实恢复能力以 §8.6 未验证项为准；④CRM 使用无前缀云函数，禁触 pr/pr_*。
 - **观察工具**：pmc18_observations 表（每日 02:00 采集）+ `SELECT * FROM public.pmc18_collect_metrics()` 手动执行；migration-check（`node tools/migration-check.cjs`）。
@@ -195,4 +196,4 @@
 **下一项唯一允许开展的工作（白名单）**：
 
 1. **PMC-18 定时监测例行处理**：pmc18_observations 异常 → 按修复包流程处理（先报告影响与授权）。
-2. **等待用户下发新指令**：不默认继续旧计划、不自行开新工作包。已登记的可选方向（均须用户指令才启动）：relationships pending 候选写入路径/确认 UI；G-PMC11-1/G-PMC14-1/G-PMC17-1 修复；基线遗留测试修复；i18n.js/misc.js WIP 收尾（当前工作树未提交，属未完成状态，接手后须先向用户确认处置；注意 i18n.js 的 FAB 修复 8 行已随 2026-10-11 发布提交，WIP 仅剩 more 页 legacy 入口字典键）。
+2. **等待用户下发新指令**：不默认继续旧计划、不自行开新工作包。已登记的可选方向（均须用户指令才启动）：relationships pending 候选写入路径/确认 UI；G-PMC11-1/G-PMC14-1/G-PMC17-1 修复；基线遗留测试修复。**i18n.js/misc.js 原 WIP 已随 2026-10-11 `bd3c9c5` 转正发布，不再是未完成状态**；另注意存在并行会话的 stash「pmc19-pmc20 untracked drafts (other session, do not drop)」，处置前须先与用户确认。

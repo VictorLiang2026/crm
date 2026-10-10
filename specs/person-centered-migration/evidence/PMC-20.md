@@ -128,7 +128,7 @@ activity_reports、activity_speakers、activity_tasks、ai_activity（index+cont
 
 ### 6.5 2026-10-11 追加：FAB aria-label 修复 + Cam 认证端到端回归
 
-**FAB aria-label 修复（用户批准的登记项）**：根因不是硬编码——shell.js FAB 早已使用 `t('nav_quick_record')`，但 `setLang()` 只刷新 `[data-i18n]` 节点的 textContent，FAB 的 aria-label 在 mount 时求值一次，切换语言后不跟随。修复：①`i18n.js` 的 `setLang()` 与 `scanI18n()` 新增 `[data-i18n-aria]` → `aria-label` 同步（新机制，现存元素零影响）；②shell.js FAB 加 `data-i18n-aria="nav_quick_record"`。线上实测：中文「快速记录」→ English「Quick Record」→ 切回「快速记录」，实时跟随。部署 shell.js + i18n.js 单文件 hosting，本地/线上 SHA256 一致。misc.js 配套的 more 页 legacy 入口 WIP 字典键仍未提交（工作区保留），i18n.js 本次仅提交 FAB 修复 8 行（WIP 键经 stash 隔离）。
+**FAB aria-label 修复（用户批准的登记项）**：根因不是硬编码——shell.js FAB 早已使用 `t('nav_quick_record')`，但 `setLang()` 只刷新 `[data-i18n]` 节点的 textContent，FAB 的 aria-label 在 mount 时求值一次，切换语言后不跟随。修复：①`i18n.js` 的 `setLang()` 与 `scanI18n()` 新增 `[data-i18n-aria]` → `aria-label` 同步（新机制，现存元素零影响）；②shell.js FAB 加 `data-i18n-aria="nav_quick_record"`。线上实测：中文「快速记录」→ English「Quick Record」→ 切回「快速记录」，实时跟随。**发布归属（核实后）**：本会话开发并先行单文件部署验证（SHA 一致）后，并行工作会话将该修复（连同 console 更多页 17 项旧版入口、person_360 时间线线上故障修复、测试夹具对齐、11 视图 security_invoker 恢复迁移）整合提交为 `bd3c9c5`、标签 `release-20261011-000403` 并推送；其发布流程重新部署的 i18n.js（含完整字典键）/shell.js/misc.js 为线上终态，本会话 2026-10-11 复核线上三文件 SHA 与 `bd3c9c5` 全部一致。原 i18n.js/misc.js WIP 已随该提交转正，不存在未提交 WIP 残留（本会话的隔离 stash 已被并行会话消费整合；另一 stash「pmc19-pmc20 untracked drafts」为并行会话标注 do-not-drop，未触碰）。
 
 **Cam 认证端到端回归（核销 §8 旧第 2 项）**：用户在浏览器完成 Cam 登录后，逐页认证真实调用：
 
@@ -153,10 +153,12 @@ console 错误收集：0 应用级错误。限制：AI 页在自动化桥接下�
 - 三端核对：本地/GitHub/云端一致（commit、tag、函数清单）；迁移双目录哈希一致。
 - release.ps1 因工作树含 WIP 文件未使用，按手动 git 流程发布并在本记录说明。
 
-**2026-10-11 追加发布**（FAB 修复 + Cam 回归，零 DB/云函数变更）：
+**2026-10-11 追加（FAB 修复 + Cam 回归）**：
 
-- 提交/标签：见 git log 2026-10-11（档案回填提交记录精确哈希与标签）。
-- 部署范围：shell.js + i18n.js 两个托管文件单文件上传（本地/线上 SHA256 一致）。**未全量部署**；misc.js WIP 与 i18n.js WIP 字典键未纳入提交（stash 隔离 + 发布后恢复工作区）。
+- 代码发布：`bd3c9c5`（标签 `release-20261011-000403`，已推送，本地=GitHub）——并行工作会话整合发布，含 FAB aria 修复（本会话开发）、console 更多页 17 项旧版入口（双语）、person_360 时间线 customers 查询缺参线上故障修复（person-insights-service.js）、WP01 门夹具对齐、migration `20261010223000_pmc_restore_view_security_invoker`（+rollback；已应用，12 视图 reloptions 实测均为 security_invoker=true）。
+- 云端一致性（本会话复核）：线上 shell.js/i18n.js/misc.js（pages/）SHA 与 `bd3c9c5` 全部一致；Cam 回归中 Person 360（#773）时间线正常渲染，与故障修复在线一致。
+- 迁移双目录：并行会话漏同步外部镜像，本会话按双备份约定补齐（非破坏性复制），132/132 文件名与 SHA 一致。
+- 本会话提交仅为档案（本节及 §6.5/§8、handoff、decisions、tasks 的追加记录），**云端产物未改变**；精确提交/标签见 git log 2026-10-11 档案回填提交。
 
 ## 8. 未验证项（如实登记）
 
