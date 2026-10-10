@@ -274,8 +274,8 @@ h1, h2, h3, p, ul { margin: 0; }
 .plan-list { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 7px; font-size: 13.5px; }
 
 /* ---------- 登录 ---------- */
-.login { min-height: calc(100vh - var(--topbar-h)); display: grid; grid-template-columns: 1.1fr 1fr; }
-body:has(.login) { padding-top: 0; }
+.login { min-height: calc(100vh - env(safe-area-inset-top)); display: grid; grid-template-columns: 1.1fr 1fr; }
+body:has(.login) { padding-top: env(safe-area-inset-top); }
 .login-hero {
   position: relative; overflow: hidden; color: #fff;
   background: linear-gradient(135deg, #23272e, #2e333b 55%, #3a2a31);
@@ -456,7 +456,7 @@ body:has(.login) { padding-top: 0; }
   .mini-grid { grid-template-columns: 1fr; }
   .kv { grid-template-columns: 72px 1fr; }
   .console-tabbar { display: grid; }
-  .login { grid-template-columns: 1fr; min-height: 100vh; }
+  .login { grid-template-columns: 1fr; min-height: calc(100vh - env(safe-area-inset-top)); }
   .login-hero { padding: 30px 24px; gap: 24px; }
   .login-hero h1 { font-size: 26px; }
   .login-points { display: none; }
