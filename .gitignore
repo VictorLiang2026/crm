@@ -52,7 +52,10 @@ build/
 *.tsbuildinfo
 
 # ===== IDE / 编辑器 =====
-.trae/
+.trae/*
+!.trae/skills/
+.trae/skills/*
+!.trae/skills/crm-release/
 .workbuddy/
 .vscode/
 .idea/
