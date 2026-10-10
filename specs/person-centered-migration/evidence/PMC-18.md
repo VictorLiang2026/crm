@@ -129,13 +129,15 @@ node D:\Temp\pmc17-wp01-capture.cjs
 node tools/tcb-exec.cjs --file D:\Temp\pmc18-select.sql
 ```
 
-### 3.7 验证结果
+### 3.7 验证结果与发布
 
 - pmc18_collect_metrics() 返回正确：mappings/field_drift/orphans/no_role 全绿
 - pmc18_observations 表 INSERT/SELECT 正常（测试行已清理）
 - 审计触发器定义正确（pg_get_triggerdef 确认）
 - 定时触发器配置：cron `0 0 2 * * * *`
 - 云函数 collect 逻辑：调 DB 函数 → 解析 → 写入观测表；listRecent：查询最近 N 条
+- **发布**：release-20261010-152000，29 函数全匹配，WP01 门 PASS（blockers=[]）
+- 权限：pmc18_observations 已启用 RLS（service_role 全权限，anon/authenticated 通过策略只读）
 
 ## 4. 异常记录
 
@@ -145,12 +147,18 @@ node tools/tcb-exec.cjs --file D:\Temp\pmc18-select.sql
 
 ## 5. 剩余风险
 
-- 旧字段写入（customers 基础字段裸写）目前无审计触发器，无法自动检测；需方案确认后决定是否加审计触发器
+- 旧字段写入（customers 基础字段裸写）审计触发器已加（`pmc18_customers_basics_audit`），需观察周期内是否有裸写告警
 - OCR 恢复状态列名待确认（restored_at 不存在），需查 ocr_records 表结构
 - 旧接口调用、同步失败、权限拒绝异常需分析云函数日志，尚未建立日志采集机制
 - 统计差异（v_action_center / v_funnel_stats）待首次定时采集
 
-## 6. 验收
+## 6. 观察日志
+
+| 日期 | 操作 | 结果 |
+| --- | --- | --- |
+| 2026-10-10 | T0 基线建立 + 定时监测发布 | 全绿；persons_without_role=1（测试数据）；性能持平/优于 PMC-17 基线 |
+
+## 7. 验收
 
 - 批准的观察周期（90 天）实际完成
 - 关键异常已处理并验证
