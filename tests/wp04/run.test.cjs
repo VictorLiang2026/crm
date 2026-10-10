@@ -6,8 +6,8 @@ const {SpeakerProfileService}=require('../../cloudfunctions/person_360/speaker-p
 const {evaluate}=require('./audit.cjs');
 const name='【系统测试·勿联系】虚构同名甲';
 function fixture(){
- const tables={persons:[1,2].map(id=>({id,display_name:name,name_key:parsePersonName(name).nameKey,legacy_customer_id:100+id,deleted_at:null})),
-  customers:[{Id:101},{Id:102}],activities:[{id:301}],activity_participants:[],activity_speakers:[],recruit_candidates:[]};
+ const tables={persons:[1,2].map(id=>({id,display_name:name,name_key:parsePersonName(name).nameKey,deleted_at:null})),
+  customers:[{Id:101,person_id:1},{Id:102,person_id:2}],activities:[{id:301}],activity_participants:[],activity_speakers:[],recruit_candidates:[]};
  const writes=[],reads=[];
  async function request(table,method,filters={},body){
   assert.ok(Object.hasOwn(tables,table));
@@ -17,6 +17,7 @@ function fixture(){
    if(['select','order','limit'].includes(key))return true;
    if(value==='is.null')return row[key]==null;
    if(value.startsWith('eq.'))return String(row[key])===value.slice(3);
+   if(value.startsWith('in.('))return value.slice(4,-1).split(',').map(s=>s.trim()).includes(String(row[key]));
    throw Error('Unexpected fixture filter');
   })).slice(0,Number(filters.limit||100));
  }
@@ -58,7 +59,7 @@ test('missing confirmation, missing caller, forged and deleted identity produce 
  }
 });
 test('Person-only participants retain null legacy identity; read failure never writes',async()=>{
- const f=fixture();f.tables.persons[1].legacy_customer_id=null;
+ const f=fixture();f.tables.customers=f.tables.customers.filter(c=>c.Id!==102);
  await new ParticipantService({request:f.request}).add(selected,'crm_test_actor');
  assert.equal(f.writes[0].body.person_id,null);assert.equal(f.writes[0].body.canonical_person_id,2);
  const failed=fixture();const request=async(...args)=>{if(args[0]==='persons')throw Error('fictional read failure');return failed.request(...args);};

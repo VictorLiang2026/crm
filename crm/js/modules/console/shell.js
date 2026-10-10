@@ -37,7 +37,7 @@ export function mountShell({ appRoot, operator, onQuickCapture }) {
       h('span', { class: 'avatar', title: (operator && operator.name) || '' }, initial),
     ]),
   ]);
-  const fab = h('button', { class: 'fab', type: 'button', 'aria-label': t('nav_quick_record'), onclick: onQuickCapture }, [ic('plus')]);
+  const fab = h('button', { class: 'fab', type: 'button', 'aria-label': t('nav_quick_record'), 'data-i18n-aria': 'nav_quick_record', onclick: onQuickCapture }, [ic('plus')]);
   const tabbar = h('nav', { class: 'console-tabbar' }, phoneTabs().map((slot) => slot
     ? h('a', { class: 'tab-item', 'data-nav': slot.hash, href: slot.hash }, [ic(slot.icon), h('span', { 'data-i18n': NAV_KEYS[slot.hash] }, slot.label)])
     : h('div', { class: 'fab-slot' }, fab)));

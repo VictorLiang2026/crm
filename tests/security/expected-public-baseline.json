@@ -2178,16 +2178,6 @@
       }
     },
     {
-      "kind": "routine",
-      "name": "recruit_candidate_person_sync()",
-      "detail": {
-        "anon_execute": false,
-        "service_execute": true,
-        "security_definer": true,
-        "authenticated_execute": false
-      }
-    },
-    {
       "kind": "sequence",
       "name": "伴手礼_Id_seq",
       "detail": {
@@ -2671,16 +2661,6 @@
     },
     {
       "kind": "routine",
-      "name": "customer_person_identity_bridge()",
-      "detail": {
-        "anon_execute": false,
-        "service_execute": true,
-        "security_definer": true,
-        "authenticated_execute": false
-      }
-    },
-    {
-      "kind": "routine",
       "name": "person_directory_page_v1(p_page integer, p_page_size integer, p_keyword text, p_sort_field text, p_sort_dir text)",
       "detail": {
         "anon_execute": false,
@@ -2938,16 +2918,6 @@
         "service_execute": true,
         "security_definer": true,
         "authenticated_execute": false
-      }
-    },
-    {
-      "kind": "routine",
-      "name": "pmc18_customers_basics_audit_fn()",
-      "detail": {
-        "anon_execute": true,
-        "service_execute": true,
-        "security_definer": true,
-        "authenticated_execute": true
       }
     },
     {

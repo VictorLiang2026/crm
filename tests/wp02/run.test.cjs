@@ -53,10 +53,16 @@ const plain=v=>JSON.parse(JSON.stringify(v));
 test('AI Search includes marked matching rows without altering SQL criteria or totals',async()=>{
  const {runSearch}=require('../../cloudfunctions/assistant/search-service');
  const rows=[{person_id:910001,legacy_customer_id:920001,display_name:marker+'虚构甲',relationship_id:930001}];
- const db=fixtureDb({},[{batchKey:batch,table:'customers',id:'920001'}]),calls=[];
- const response=await runSearch({query:marker+'最近关系下降的重点客户'},{app:{},
-  gateway:{runAITask:async()=>({result:{template:'declining_priority',months:3},taskId:'fixture-task',resultId:'fixture-result'})},
-  data:{search:async(...args)=>{calls.push(args);return {rows,total:1,coverage:{rows:1}};},linkTestAudit:async()=>({ok:true}),testDataReader:refs=>TD.disclose(refs,{rdb:db})}});
+ // PMC-19 CL-03 改道后：披露经 canonical person（persons）；customer 映射由服务内部 REST 解析，
+ // 此处 stub 掉该 fetch，保持离线 fixture 确定性。
+ const db=fixtureDb({},[{batchKey:batch,table:'customers',id:'920001'},{batchKey:batch,table:'persons',id:'910001'}]),calls=[];
+ const realFetch=globalThis.fetch;globalThis.fetch=async()=>({json:async()=>[]});
+ let response;
+ try {
+  response=await runSearch({query:marker+'最近关系下降的重点客户'},{app:{},
+   gateway:{runAITask:async()=>({result:{template:'declining_priority',months:3},taskId:'fixture-task',resultId:'fixture-result'})},
+   data:{search:async(...args)=>{calls.push(args);return {rows,total:1,coverage:{rows:1}};},linkTestAudit:async()=>({ok:true}),testDataReader:refs=>TD.disclose(refs,{rdb:db})}});
+ } finally { globalThis.fetch=realFetch; }
  assert.deepEqual(calls,[['declining_priority',3,30]]);assert.equal(response.total,1);
  assert.deepEqual(response.rows,rows);assert.equal(response.testData.containsTestData,true);assert.equal(response.execution.businessDataWritten,false);
 });

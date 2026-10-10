@@ -60,7 +60,7 @@ class PersonInsightsService {
     const read = this.boundedRead();
     const person = await new InteractionService({ request: read }).findPerson(id);
     // PMC-19 CL-03: legacy_customer_id removed; resolve customer_id via customers.person_id
-    const customer = (await read('customers', { select: 'Id', person_id: `eq.${id}`,
+    const customer = (await read('customers', 'GET', { select: 'Id', person_id: `eq.${id}`,
       deleted_at: 'is.null', limit: 1 }))[0] || null;
     const customerId = customer?.Id ?? null;
     const adapter = new LegacyInteractionAdapter({ request: read });

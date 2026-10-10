@@ -4,9 +4,9 @@ const {PersonInsightsService}=require('../../cloudfunctions/person_360/person-in
 const mark='【系统测试·勿联系】';
 function fixture(){
  const calls=[];
- const data={persons:[{id:71,legacy_customer_id:81}], interactions:[{id:301,person_id:71,source_type:'followups',source_id:1,interaction_type:'followup',interaction_at:'2026-09-30',summary:mark+'物化互动'}],
+ const data={persons:[{id:71}],customers:[{Id:81,person_id:71}],interactions:[{id:301,person_id:71,source_type:'followups',source_id:1,interaction_type:'followup',interaction_at:'2026-09-30',summary:mark+'物化互动'}],
  followups:Array.from({length:55},(_,i)=>({Id:i+1,followup_date:'2026-09-28',interaction_summary:mark+'跟进 '+(i+1)})),
- recruit_candidates:[],recruit_followups:[],activity_participants:[{id:91,activity_id:21,person_type:'customer',person_id:81,status:'invited',created_at:'2026-09-29'},{id:92,activity_id:21,person_type:'customer',person_id:81,status:'attended',created_at:'2026-09-29'}],
+ recruit_candidates:[],recruit_followups:[],activity_participants:[{id:91,activity_id:21,person_type:'customer',person_id:81,canonical_person_id:71,status:'invited',created_at:'2026-09-29'},{id:92,activity_id:21,person_type:'customer',person_id:81,canonical_person_id:71,status:'attended',created_at:'2026-09-29'}],
  activity_speakers:[],activities:[{id:21,name:mark+'活动',activity_date:'2026-09-29'}],context_items:[
  {id:101,person_id:71,item_type:'fact',category:'偏好',content:mark+'事实',confirmed:true,created_at:'2026-09-01',last_verified_at:'2026-09-30'},
  {id:102,person_id:71,item_type:'signal',category:'兴趣',content:mark+'信号',confirmed:false,created_at:'2026-09-20'},

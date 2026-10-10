@@ -5,10 +5,10 @@ const { ParticipantService } = require('../../cloudfunctions/person_360/particip
 function fixture() {
   const tables = {
     persons: [
-      { id: 11, display_name: '张玮（电信）', name_key: '张玮', legacy_customer_id: 101, deleted_at: null },
-      { id: 22, display_name: '李宁', name_key: '李宁', legacy_customer_id: null, deleted_at: null },
+      { id: 11, display_name: '张玮（电信）', name_key: '张玮', deleted_at: null },
+      { id: 22, display_name: '李宁', name_key: '李宁', deleted_at: null },
     ],
-    customers: [{ Id: 101, deleted_at: null }],
+    customers: [{ Id: 101, person_id: 11, deleted_at: null }],
     recruit_candidates: [], activity_speakers: [],
     activities: [{ id: 301, deleted_at: null }],
     activity_participants: [],
@@ -27,6 +27,7 @@ function fixture() {
       if (['select', 'order', 'limit'].includes(key)) return true;
       if (value === 'is.null') return row[key] == null;
       if (value.startsWith('eq.')) return String(row[key]) === value.slice(3);
+      if (value.startsWith('in.(')) return value.slice(4, -1).split(',').map(s => s.trim()).includes(String(row[key]));
       throw new Error(`Unexpected filter ${key}`);
     })).slice(0, Number(filters.limit || 100));
   }

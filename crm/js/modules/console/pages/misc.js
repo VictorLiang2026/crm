@@ -2,7 +2,7 @@
 import { h } from '../dom.js';
 import { ic } from '../icons.js';
 import { data } from '../data.js';
-import { wpTag, pageHead, card, emptyNote, loadInto, sk, bdg } from '../ui.js';
+import { wpTag, pageHead, card, emptyNote, loadInto, sk, bdg, sectionTitle } from '../ui.js';
 import { t } from '../i18n.js';
 import { openQuickCapture } from '../write.js';
 
@@ -127,6 +127,29 @@ export function renderAI(ctx) {
   );
 }
 
+// 旧版功能入口：跨页跳转 admin.html 对应路由（console 路由不处理这些 hash）。
+// 整合策略：console 原生等价功能上线后，从 LEGACY_ENTRIES 移除对应项。
+const LEGACY_ADMIN = '/crm/admin.html';
+const LEGACY_ENTRIES = [
+  ['gear', 'legacy_account', '#/account'],
+  ['file', 'legacy_test_scenario', '#/test-scenario'],
+  ['users', 'legacy_customers', '#/customers'],
+  ['chat', 'legacy_followups', '#/more/followups'],
+  ['target', 'legacy_funnels', '#/funnels'],
+  ['sparkle', 'legacy_ai_suggestions', '#/ai-suggestions'],
+  ['shield', 'legacy_policy_review', '#/more/policy-review'],
+  ['grid', 'legacy_products', '#/more/products'],
+  ['bell', 'legacy_gifts', '#/more/gifts'],
+  ['search', 'legacy_photos', '#/more/photos'],
+  ['mic', 'legacy_speakers', '#/speakers'],
+  ['calendar', 'legacy_topics', '#/topics'],
+  ['recruit', 'legacy_recruit_goals', '#/recruit/goals'],
+  ['clock', 'legacy_activity_customer', '#/activity/customer'],
+  ['target', 'legacy_activity_recruit', '#/activity/recruit'],
+  ['refresh', 'legacy_customers_trash', '#/customers/trash'],
+  ['refresh', 'legacy_recruit_trash', '#/recruit/trash'],
+];
+
 export function renderMore(ctx) {
   const tiles = [
     ['#/today', 'home', t('nav_today'), t('tile_today_desc')],
@@ -159,5 +182,12 @@ export function renderMore(ctx) {
         h('button', { class: 'btn btn-ghost', type: 'button', style: 'margin-left:auto', onclick: () => ctx.signOut() }, [ic('logout'), t('setting_signout')]),
       ],
     }),
+    h('div', { style: 'height:16px' }),
+    sectionTitle(t('legacy_section_title')),
+    h('p', { class: 'foot-note', style: 'margin:0 0 12px' }, t('legacy_section_desc')),
+    h('div', { class: 'tile-grid' }, LEGACY_ENTRIES.map(([icon, key, hash]) =>
+      h('a', { class: 'tile', href: LEGACY_ADMIN + hash }, [
+        ic(icon), h('b', {}, t(key)), h('span', {}, t(key + '_desc')),
+      ]))),
   );
 }

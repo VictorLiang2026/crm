@@ -96,7 +96,7 @@ module.exports = async function smoke(root, test) {
       assert.equal(await b.evaluate("document.getElementById('view').innerText.includes('修改密码')"), true);
       await b.evaluate("sessionStorage.removeItem('crm_fixture_fail_signout')");
       await b.click('#view button', '退出登录');
-      await b.wait(text('CRM 登录'), 15000);
+      await b.wait("document.getElementById('view')?.innerText?.includes('CRM 登录') === true", 15000);
       assert.equal(await b.evaluate("sessionStorage.getItem('crm_fixture_signed_out')"), '1');
       assert.equal(await b.evaluate("getComputedStyle(document.getElementById('mod-switch')).display"), 'none');
       assert.equal(await b.evaluate("getComputedStyle(document.getElementById('qc-entry-btn')).display"), 'none');
@@ -117,7 +117,7 @@ module.exports = async function smoke(root, test) {
       assert.equal(await b.evaluate('window.__crmTest.passwordChanges'), 1);
       await b.evaluate("document.querySelector('[name=account-old-password]').value='local-fixture-only'");
       await b.click('#view button', '修改密码');
-      await b.wait(text('CRM 登录'), 15000);
+      await b.wait("document.getElementById('view')?.innerText?.includes('CRM 登录') === true", 15000);
       assert.equal(await b.evaluate("sessionStorage.getItem('crm_fixture_pw_changed')"), '1');
       await b.evaluate("document.querySelector('[name=username]').value='[CRM_TEST_ONLY]'; document.querySelector('[name=password]').value='NewTestPass123!'");
       await b.click('button', '登录');

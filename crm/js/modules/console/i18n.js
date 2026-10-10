@@ -430,6 +430,43 @@ const DICT = {
   'wp3_title': { 'zh-CN': 'WP3 AI 能力：', 'en': 'WP3 AI: ' },
   'wp3_desc': { 'zh-CN': '晨间简报、会前准备、五段式自然语言命令、复盘候选（模型经 Gateway 配置）。', 'en': 'Morning brief, pre-meeting prep, 5-step NL command, review candidates (model via Gateway).' },
   'legacy_note': { 'zh-CN': '旧版完整功能继续在 admin.html 使用', 'en': 'Legacy full features continue in admin.html' },
+  // more page: legacy admin.html entries（console 原生等价上线后逐一移除）
+  'legacy_section_title': { 'zh-CN': '旧版功能入口', 'en': 'Legacy Entries' },
+  'legacy_section_desc': { 'zh-CN': '以下功能当前仍由旧版 admin.html 提供；console 原生等价功能上线后逐一移除。', 'en': 'Still served by legacy admin.html; each link is removed once a console-native equivalent ships.' },
+  'legacy_account': { 'zh-CN': '账号与应用维护', 'en': 'Account & App Maintenance' },
+  'legacy_account_desc': { 'zh-CN': '旧版账号维护（含旧密码直改）', 'en': 'Legacy account care incl. old-password change' },
+  'legacy_test_scenario': { 'zh-CN': '测试场景', 'en': 'Test Scenarios' },
+  'legacy_test_scenario_desc': { 'zh-CN': '受控生成 / 打开虚构测试场景', 'en': 'Controlled fictional test scenarios' },
+  'legacy_customers': { 'zh-CN': '传统客户列表', 'en': 'Legacy Customers' },
+  'legacy_customers_desc': { 'zh-CN': '原客户列表与详情', 'en': 'Original customer list & detail' },
+  'legacy_followups': { 'zh-CN': '传统跟进', 'en': 'Legacy Follow-ups' },
+  'legacy_followups_desc': { 'zh-CN': '选择客户后进入旧跟进记录', 'en': 'Pick a customer, then open follow-ups' },
+  'legacy_funnels': { 'zh-CN': '经营漏斗', 'en': 'Funnels' },
+  'legacy_funnels_desc': { 'zh-CN': '原漏斗分析', 'en': 'Original funnel analysis' },
+  'legacy_ai_suggestions': { 'zh-CN': 'AI建议历史', 'en': 'AI Suggestions' },
+  'legacy_ai_suggestions_desc': { 'zh-CN': '原 AI 建议记录', 'en': 'Original AI suggestion records' },
+  'legacy_policy_review': { 'zh-CN': '保单检视', 'en': 'Policy Review' },
+  'legacy_policy_review_desc': { 'zh-CN': '旧客户详情中的保单检视', 'en': 'Policy review in legacy customer detail' },
+  'legacy_products': { 'zh-CN': '产品', 'en': 'Products' },
+  'legacy_products_desc': { 'zh-CN': '旧客户详情中的产品资料', 'en': 'Products in legacy customer detail' },
+  'legacy_gifts': { 'zh-CN': '伴手礼', 'en': 'Gifts' },
+  'legacy_gifts_desc': { 'zh-CN': '旧客户详情中的伴手礼', 'en': 'Gifts in legacy customer detail' },
+  'legacy_photos': { 'zh-CN': '照片/OCR', 'en': 'Photos / OCR' },
+  'legacy_photos_desc': { 'zh-CN': '选择客户后进入照片或 OCR 记录', 'en': 'Pick a customer, then open photos / OCR' },
+  'legacy_speakers': { 'zh-CN': '嘉宾资源', 'en': 'Speakers' },
+  'legacy_speakers_desc': { 'zh-CN': '原嘉宾档案', 'en': 'Original speaker profiles' },
+  'legacy_topics': { 'zh-CN': '主题资源', 'en': 'Topics' },
+  'legacy_topics_desc': { 'zh-CN': '原活动主题', 'en': 'Original activity topics' },
+  'legacy_recruit_goals': { 'zh-CN': '招募目标', 'en': 'Recruit Goals' },
+  'legacy_recruit_goals_desc': { 'zh-CN': '目标维护（console 暂只读）', 'en': 'Goal maintenance (console read-only)' },
+  'legacy_activity_customer': { 'zh-CN': '客户活动量', 'en': 'Customer Activity Volume' },
+  'legacy_activity_customer_desc': { 'zh-CN': '原客户经营活动量', 'en': 'Original customer activity volume' },
+  'legacy_activity_recruit': { 'zh-CN': '增员活动量', 'en': 'Recruit Activity Volume' },
+  'legacy_activity_recruit_desc': { 'zh-CN': '原组织发展活动量', 'en': 'Original recruit activity volume' },
+  'legacy_customers_trash': { 'zh-CN': '客户回收站', 'en': 'Customer Recycle Bin' },
+  'legacy_customers_trash_desc': { 'zh-CN': '原客户恢复入口', 'en': 'Original customer restore entry' },
+  'legacy_recruit_trash': { 'zh-CN': '增员回收站', 'en': 'Recruit Recycle Bin' },
+  'legacy_recruit_trash_desc': { 'zh-CN': '原候选人恢复入口', 'en': 'Original recruit restore entry' },
 
   // opportunities page
   'opp_kicker': { 'zh-CN': 'OPPORTUNITIES', 'en': 'OPPORTUNITIES' },
@@ -912,6 +949,10 @@ export function setLang(lang) {
     const k = n.getAttribute('data-i18n');
     if (k) n.textContent = t(k);
   });
+  document.querySelectorAll('[data-i18n-aria]').forEach(n => {
+    const k = n.getAttribute('data-i18n-aria');
+    if (k) n.setAttribute('aria-label', t(k));
+  });
 }
 
 export function t(key) {
@@ -931,5 +972,9 @@ export function scanI18n(root) {
   root?.querySelectorAll?.('[data-i18n]')?.forEach?.(n => {
     const k = n.getAttribute('data-i18n');
     if (k) n.textContent = t(k);
+  });
+  root?.querySelectorAll?.('[data-i18n-aria]')?.forEach?.(n => {
+    const k = n.getAttribute('data-i18n-aria');
+    if (k) n.setAttribute('aria-label', t(k));
   });
 }
