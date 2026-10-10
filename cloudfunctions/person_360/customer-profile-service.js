@@ -1,7 +1,7 @@
 'use strict';
 const testData = require('./test-data');
 const CUSTOMER_FIELDS = 'Id,customer_name,phone,source,gender,birthday,occupation,hobbies,customer_stage,sales_priority,recruitment_priority,referral_priority,additional_info,marital_status,tags,annual_income,household_income,properties_info,first_contact_date,wx_account,education,mbti,updated_at';
-const PERSON_FIELDS = 'id,display_name,legacy_customer_id,phone,wechat,gender,birthday,occupation,organization,education,source,notes,updated_at';
+const PERSON_FIELDS = 'id,display_name,phone,wechat,gender,birthday,occupation,organization,education,source,notes,updated_at';
 
 // Read the explicitly linked customer afresh; never reconcile identities by name.
 async function getCustomerProfile(personId, { request, disclose = testData.disclose }) {
@@ -11,15 +11,15 @@ async function getCustomerProfile(personId, { request, disclose = testData.discl
     select: PERSON_FIELDS, id: `eq.${id}`, deleted_at: 'is.null', limit: 1,
   });
   if (!person) throw Error('Person not found');
-  const linked = person.legacy_customer_id != null;
-  if (linked && !/^[1-9]\d*$/.test(String(person.legacy_customer_id))) throw Error('Invalid customer link');
+  // PMC-19 CL-03: legacy_customer_id removed; resolve customer via customers.person_id
   const [customers, roles] = await Promise.all([
-    linked ? request('customers', 'GET', {
-      select: CUSTOMER_FIELDS, Id: `eq.${person.legacy_customer_id}`, deleted_at: 'is.null', limit: 1,
-    }) : [],
+    request('customers', 'GET', {
+      select: CUSTOMER_FIELDS, person_id: `eq.${id}`, deleted_at: 'is.null', limit: 1,
+    }),
     request('person_roles', 'GET', { select: 'id,role,origin', person_id: `eq.${id}`, order: 'id.asc', limit: 50 }),
   ]);
   const customer = customers[0] || null;
+  const linked = customer != null;
   const summary = await disclose([
     ...testData.refsForRows('persons', [person]), ...testData.refsForRows('customers', customers),
     ...testData.refsForRows('person_roles', roles),

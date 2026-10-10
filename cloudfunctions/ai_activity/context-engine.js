@@ -7,7 +7,7 @@ const LIMITS = Object.freeze({ interactions: 5, interactionsMax: 10, opportuniti
   activityInteractions: 20, activityPersons: 20, activityRelationships: 20 });
 const FIELDS = Object.freeze({
   // PMC-11: persons.display_name is the identity authority; customers keeps domain state.
-  persons: ['id', 'display_name', 'phone', 'wechat', 'gender', 'birthday', 'occupation', 'organization', 'education', 'legacy_customer_id'],
+  persons: ['id', 'display_name', 'phone', 'wechat', 'gender', 'birthday', 'occupation', 'organization', 'education'],
   customers: ['Id', 'person_id', 'customer_name', 'occupation', 'customer_stage', 'sales_priority', 'next_action', 'next_action_date'],
   followups: ['Id', 'customer_id', 'followup_date', 'interaction_summary', 'followup_notes', 'next_action', 'next_action_date', 'next_followup_date'],
   opportunities: ['id', 'customer_id', 'person_id', 'opportunity_type', 'status', 'last_progress', 'next_action', 'next_action_date'],
@@ -197,19 +197,24 @@ function createContextEngine({ rdb, now = () => new Date() } = {}) {
           row.data.canonical_person_id == null && row.data.person_type === type)
           .map(row => Number(row.data.person_id)).filter(value =>
             Number.isSafeInteger(value) && value > 0))].slice(0, LIMITS.activityPersons);
-        const [speakers, recruits, customers] = await Promise.all([
+        const [speakers, recruits] = await Promise.all([
           exactIds('speaker').length ? read('activity_speakers', {
             id: exactIds('speaker'), deleted_at: null }, { limit: LIMITS.activityPersons }) : [],
           exactIds('recruit').length ? read('recruit_candidates', {
             id: exactIds('recruit'), deleted_at: null }, { limit: LIMITS.activityPersons }) : [],
-          exactIds('customer').length ? read('persons', {
-            legacy_customer_id: exactIds('customer'), deleted_at: null },
-          { limit: LIMITS.activityPersons }) : [],
         ]);
+        // PMC-19 CL-03: legacy_customer_id removed; resolve customer→person via customers.Id
+        let customerPersonMap = new Map();
+        const customerIdsForResolve = exactIds('customer');
+        if (customerIdsForResolve.length) {
+          const custRows = await read('customers', { Id: customerIdsForResolve, deleted_at: null },
+            { limit: LIMITS.activityPersons });
+          customerPersonMap = new Map(custRows.map(row => [String(row.data.Id), row.data.person_id]));
+        }
         const resolved = new Map([
           ...speakers.map(row => [`speaker:${row.data.id}`, row.data.person_id]),
           ...recruits.map(row => [`recruit:${row.data.id}`, row.data.person_id]),
-          ...customers.map(row => [`customer:${row.data.legacy_customer_id}`, row.data.id]),
+          ...[...customerPersonMap.entries()].map(([cid, pid]) => [`customer:${cid}`, pid]),
         ]);
         for (const row of participants) {
           const personId = row.data.canonical_person_id ||

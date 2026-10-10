@@ -66,7 +66,7 @@ class SpeakerProfileService {
       throw new Error('Selected Person changed; resolve identity again');
     }
     const people = await this.request('persons', 'GET', {
-      select: 'id,display_name,phone,wechat,organization,occupation,legacy_customer_id',
+      select: 'id,display_name,phone,wechat,organization,occupation',
       id: `eq.${personId}`, deleted_at: 'is.null', limit: 1,
     });
     if (people.length !== 1 || people[0].display_name !== data.selectedDisplayName) {
@@ -76,12 +76,11 @@ class SpeakerProfileService {
   }
 
   async activeCustomerId(person) {
-    if (person.legacy_customer_id == null) return null;
-    const customerId = idOf(person.legacy_customer_id);
+    // PMC-19 CL-03: legacy_customer_id removed; resolve customer_id via customers.person_id
     const customers = await this.request('customers', 'GET', {
-      select: 'Id', Id: `eq.${customerId}`, deleted_at: 'is.null', limit: 1,
+      select: 'Id', person_id: `eq.${idOf(person.id)}`, deleted_at: 'is.null', limit: 1,
     });
-    return customers.length === 1 ? Number(customerId) : null;
+    return customers.length === 1 ? Number(customers[0].Id) : null;
   }
 
   async create(data, uid) {

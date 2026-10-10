@@ -135,7 +135,7 @@ sections.push(tbl(
   [16, 38, 46]
 ));
 sections.push(spacer());
-sections.push(p('两轨连接点：persons.legacy_customer_id 与 customers 一对一快照映射；opportunities、activity_participants、activity_speakers、recruit_candidates 均增加 person_id/canonical_person_id 外键；旧跟进/增员跟进通过只读适配器投影为 Person 时间线，但不回填、不改写旧表。'));
+sections.push(p('两轨连接点：customers.person_id 指向 persons.id（PMC-19 后 legacy_customer_id 已退出）；opportunities、activity_participants、activity_speakers、recruit_candidates 均有 person_id/canonical_person_id 外键；旧跟进/增员跟进通过只读适配器投影为 Person 时间线，但不回填、不改写旧表。'));
 sections.push(spacer());
 
 sections.push(h2('2.2 请求链路'));
@@ -192,7 +192,7 @@ sections.push(h2('3.3 Person 身份与关系域 — 6 张表（新）'));
 sections.push(tbl(
   ['表', '关键字段', '用途'],
   [
-    ['persons', 'id(bigint), display_name, name_key, legacy_customer_id, gender, birthday, phone, wechat, profile, deleted_at', '统一人物身份；由 customers 1:1 快照回填（776 条），新建需人工确认'],
+    ['persons', 'id(bigint), display_name, name_key, gender, birthday, phone, wechat, profile, deleted_at', '统一人物身份；PMC-19 后 legacy_customer_id 已退出，由 customers.person_id 关联'],
     ['person_roles', 'person_id, role(customer/recruit/speaker/participant 等)', '人物角色多值层，一次性回填 792 条'],
     ['relationships', 'from_person_id → to_person_id, relationship_type, direction', '人与人的有向关系边'],
     ['households', 'id, household_name', '家庭单元'],

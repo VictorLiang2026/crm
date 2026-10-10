@@ -38,7 +38,7 @@ class RelationshipDecayService {
     const now = this.now();
     if (!(now instanceof Date) || !Number.isFinite(now.getTime())) throw new Error('Invalid evaluation time');
     const read = (table, filters) => this.request(table, 'GET', filters);
-    const person = (await read('persons', { select: 'id,legacy_customer_id',
+    const person = (await read('persons', { select: 'id',
       id: `eq.${id}`, deleted_at: 'is.null', limit: 1 }))[0];
     if (!person) throw new Error('Person not found');
     const [facts, customers, timeline] = await Promise.all([
@@ -46,8 +46,9 @@ class RelationshipDecayService {
         person_id: `eq.${id}`, item_type: 'in.(fact,inference)', confirmed: 'eq.true',
         category: 'in.(relationship_strength,relationship_importance,last_meaningful_interaction_at)',
         order: 'created_at.desc,id.desc', limit: 30 }),
-      person.legacy_customer_id == null ? [] : read('customers', {
-        select: 'Id,sales_priority', Id: `eq.${idOf(person.legacy_customer_id)}`,
+      // PMC-19 CL-03: legacy_customer_id removed; resolve customer via customers.person_id
+      read('customers', {
+        select: 'Id,sales_priority', person_id: `eq.${id}`,
         deleted_at: 'is.null', limit: 1 }),
       this.listInteractions(id),
     ]);

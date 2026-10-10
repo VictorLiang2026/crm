@@ -671,7 +671,7 @@ function buildActionCandidates(d, nbaIdx, today, facts) {
   if (facts) {
     const canonical = mapActions(d, facts, today, dayKeyOf, diffDays);
     const explicitOpportunityIds = new Set(canonical.filter(x => x.opportunity_id).map(x => Number(x.opportunity_id)));
-    const exactKeys = new Set(canonical.map(x => [x.legacy_customer_id || '', x.title.trim().toLowerCase(), x.action_date].join('|')));
+    const exactKeys = new Set(canonical.map(x => [x.customer_id || '', x.title.trim().toLowerCase(), x.action_date].join('|')));
     const filtered = list.filter(x => {
       const opportunityId = String(x.action_id || '').match(/^opportunity-(\d+)$/);
       if (opportunityId && explicitOpportunityIds.has(Number(opportunityId[1]))) return false;

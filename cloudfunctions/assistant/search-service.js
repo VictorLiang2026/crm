@@ -46,8 +46,25 @@ async function runSearch(event, { app, data, gateway } = {}) {
       execution: { modelCalled: true, businessDataRead: false, businessDataWritten: false } };
   }
   const found = await database.search(template, months, 30);
+  // PMC-19 CL-03: legacy_customer_id removed; resolve customer_id via customers.person_id
+  const searchPersonIds = found.rows.map(r => r.person_id).filter(Boolean);
+  const personToCustomer = new Map();
+  if (searchPersonIds.length) {
+    const env = process.env.TCB_ENV, cKey = process.env.CRM_ASSISTANT_DB_API_KEY;
+    const custUrl = new URL(`https://${env}.api.tcloudbasegateway.com/v1/rdb/rest/customers`);
+    custUrl.searchParams.set('select', 'Id,person_id');
+    custUrl.searchParams.set('person_id', `in.(${searchPersonIds.join(',')})`);
+    custUrl.searchParams.set('deleted_at', 'is.null');
+    const custResp = await fetch(custUrl, {
+      headers: { Authorization: `Bearer ${cKey}`, 'Accept-Profile': 'public', Accept: 'application/json' },
+    });
+    const custRows = await custResp.json();
+    for (const c of (Array.isArray(custRows) ? custRows : [])) {
+      personToCustomer.set(String(c.person_id), String(c.Id));
+    }
+  }
   const refs = found.rows.flatMap(row => [
-    ['persons',row.person_id],['customers',row.legacy_customer_id],['activity_participants',row.participant_id],
+    ['persons',row.person_id],['customers',personToCustomer.get(String(row.person_id))],['activity_participants',row.participant_id],
     ['activities',row.activity_id],['household_members',row.child_member_id],['relationships',row.relationship_id],
     [row.education_source_table,row.education_source_id],
   ].filter(([table,id]) => testData.TABLES.has(table) && id != null).map(([table,id]) => ({table,id:String(id)})));

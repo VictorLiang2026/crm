@@ -20,10 +20,13 @@ function add(items, type, row, content, primary, date, certainty) {
 async function buildCandidateContext(data, personId) {
   const id = idOf(personId);
   const read = data.read;
-  const person = (await read('persons', { select: 'id,display_name,legacy_customer_id,'+
+  const person = (await read('persons', { select: 'id,display_name,'+
     'occupation,organization,updated_at', id: `eq.${id}`, deleted_at: 'is.null', limit: 1 }))[0];
   if (!person) { const error = new Error('Person not found'); error.code='INVALID_INPUT'; throw error; }
-  const customerId = person.legacy_customer_id;
+  // PMC-19 CL-03: legacy_customer_id removed; resolve customer_id via customers.person_id
+  const customer = (await read('customers', { select: 'Id', person_id: `eq.${id}`,
+    deleted_at: 'is.null', limit: 1 }))[0] || null;
+  const customerId = customer?.Id ?? null;
   const [interactions, items, participants, recruit, opportunities] = await Promise.all([
     read('interactions', { select: 'id,interaction_at,summary,importance,source_type,source_id',
       person_id: `eq.${id}`, order: 'interaction_at.desc,id.desc', limit: 5 }),

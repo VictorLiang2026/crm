@@ -254,3 +254,156 @@ attnum 3–9, 14, 20 = `........pg.dropped.N........`（8 个已删除列空洞�
 - **代码级回归通过**：0 代码消费者，FIELDS 不含死列，函数读视图（已验证正常）。
 - **功能调用受限**：tcb fn invoke 需 Cam 登录，当前环境无 `~/.cloudbase` 目录；本包为纯 DB 变更（无代码改动），函数未变且读取已验证视图，风险极低。
 - **限制声明**：CL-01 功能验证（创建同名客户不报约束冲突）未做，因 Cam 认证不可用；约束已在 DB 级核实删除（constraint_exists=0）。
+
+---
+
+## 11. CL-04/CL-08/CL-09 执行（用户批准全部清理项）
+
+状态：**已执行（2026-10-10，用户批准 CL-01~CL-09 全部）**。
+
+### 11.1 CL-04：复合 FK 退出
+
+| 项 | SQL | 结果 |
+| --- | --- | --- |
+| opportunities_customer_person_fk | `ALTER TABLE public.opportunities DROP CONSTRAINT IF EXISTS opportunities_customer_person_fk;` | ✅ |
+| recruit_candidates_customer_person_fk | `ALTER TABLE public.recruit_candidates DROP CONSTRAINT IF EXISTS recruit_candidates_customer_person_fk;` | ✅ |
+
+简单 FK（opportunities_customer_id_fkey、recruit_candidates_customer_id_fkey）已存在，不受影响。
+
+### 11.2 CL-08：桥触发器退出
+
+| 项 | SQL | 结果 |
+| --- | --- | --- |
+| 触发器 | `DROP TRIGGER IF EXISTS customer_person_identity_bridge_trigger ON public.customers;` | ✅ |
+| 函数 | `DROP FUNCTION IF EXISTS public.customer_person_identity_bridge();` | ✅ |
+
+### 11.3 CL-09：recruit 同步触发器退出
+
+| 项 | SQL | 结果 |
+| --- | --- | --- |
+| 触发器 | `DROP TRIGGER IF EXISTS recruit_candidate_person_sync_trigger ON public.recruit_candidates;` | ✅ |
+| 函数 | `DROP FUNCTION IF EXISTS public.recruit_candidate_person_sync();` | ✅ |
+
+---
+
+## 12. CL-02 完整执行：customers 7 副本列退出
+
+### 12.1 视图重建（11 个视图改读 persons）
+
+所有 11 视图已重建为从 persons 读取基础字段（display_name/phone/birthday/gender/occupation/education/wechat），不再依赖 customers 副本列。视图行数验证全部一致。
+
+### 12.2 customers 函数部署
+
+customers/index.js 已部署：FIELDS 数组移除 5 个基础列，OCR 快照检查改读 persons，投影回写已移除。
+
+### 12.3 副本列 DROP
+
+| 列 | SQL | 结果 |
+| --- | --- | --- |
+| customer_name | `ALTER TABLE public.customers DROP COLUMN IF EXISTS customer_name;` | ✅ |
+| phone | 同上 | ✅ |
+| birthday | 同上 | ✅ |
+| gender | 同上 | ✅ |
+| occupation | 同上 | ✅ |
+| education | 同上 | ✅ |
+| wx_account | 同上 | ✅ |
+
+额外 DROP：pmc18_customers_basics_audit 触发器 + 函数（触发器用 `OF customer_name,...` 创建了列级依赖，阻止 DROP COLUMN）。
+
+### 12.4 数据库函数更新（6 个）
+
+DROP COLUMN 成功但以下 PL/pgSQL 函数在 runtime 仍引用已删列，需 CREATE OR REPLACE 更新：
+
+| 函数 | 变更要点 | 结果 |
+| --- | --- | --- |
+| crm_customers_page_v1 | `COALESCE(p.X, c.X)` → `p.X`；JOIN 移除 `p.deleted_at IS NULL` | ✅ |
+| person_directory_page_v1 | `c.customer_name` → `p.display_name AS customer_name`；JOIN 走 `c.person_id=p.id` | ✅ |
+| person_identity_execute_v1 | 移除 `customer_name` 查询和 INSERT 列；customer 查询改走 `person_id` | ✅ |
+| person_identity_preview_v1 | `SELECT "Id" FROM customers WHERE customer_name=...` → 通过 `person_id` 查 | ✅ |
+| crm_test_scenario_v1 | identity collision check 走 persons JOIN；INSERT 去 customer_name | ✅ |
+| pmc18_collect_metrics | field_drift CTE 返回 0；softdelete_cross JOIN 走 `person_id` | ✅ |
+
+验证：crm_customers_page_v1(1,5) 返回 782 行活跃客户，customer_name 正确来自 persons.display_name ✅；pmc18_collect_metrics 全部指标正常 ✅。
+
+---
+
+## 13. CL-03 执行：persons.legacy_customer_id 列退出
+
+### 13.1 JS 文件更新（25 个）
+
+25 个 JS 文件引用 `legacy_customer_id`，全部更新为通过 `customers.person_id` JOIN 查询 customer_id：
+
+| 目录 | 文件数 | 说明 |
+| --- | --- | --- |
+| _shared/ | 4 | person-service.js, interaction-service.js, context-engine.js, action-service.js（复制到 assistant/、person_360/、ai_activity/） |
+| customers/ | 2 | index.js, person-service.js |
+| person_360/ | 9 | index.js, customer-profile-service.js, insurance-context-service.js 等 |
+| assistant/ | 3 | opportunity-candidate-context.js, search-service.js, summarize-service.js |
+| today_coach/ | 3 | index.js, morning-brief.js, action-facts.js |
+
+验证：`grep -r legacy_customer_id cloudfunctions/` 仅剩注释（26 行 `// PMC-19 CL-03`），无代码引用 ✅。全部 `node -c` 语法检查通过 ✅。
+
+### 13.2 云函数部署（5 个）
+
+| 函数 | 部署结果 |
+| --- | --- |
+| customers | ✅ |
+| person_360 | ✅ |
+| assistant | ✅ |
+| ai_activity | ✅ |
+| today_coach | ✅ |
+
+### 13.3 依赖对象清理
+
+DROP COLUMN 前需清理依赖：
+
+| 依赖对象 | 类型 | 操作 |
+| --- | --- | --- |
+| crm_person_role_persons_sync | 触发器 | DROP（`AFTER UPDATE OF legacy_customer_id` 列级依赖） |
+| persons_legacy_customer_id_key | UNIQUE 约束 | DROP |
+| persons_legacy_customer_id_id_unique | UNIQUE 约束（复合 FK 锚点） | DROP |
+| crm_person_role_sync_v1() | 函数 | CREATE OR REPLACE（移除 `legacy_customer_id` 引用） |
+
+### 13.4 DROP COLUMN 执行
+
+| 步骤 | SQL | 结果 |
+| --- | --- | --- |
+| 1. 更新函数 | `CREATE OR REPLACE FUNCTION crm_person_role_sync_v1()` | ✅ |
+| 2. DROP 触发器 | `DROP TRIGGER IF EXISTS crm_person_role_persons_sync` | ✅ |
+| 3. DROP 约束 1 | `DROP CONSTRAINT persons_legacy_customer_id_key` | ✅ |
+| 4. DROP 约束 2 | `DROP CONSTRAINT persons_legacy_customer_id_id_unique` | ✅ |
+| 5. DROP COLUMN | `ALTER TABLE persons DROP COLUMN legacy_customer_id` | ✅ |
+| 6. 重建触发器 | `CREATE TRIGGER crm_person_role_persons_sync AFTER UPDATE OF deleted_at` | ✅ |
+
+### 13.5 Post-migration 核对
+
+| 指标 | 期望 | 实测 | 结果 |
+| --- | --- | --- | --- |
+| legacy_customer_id 列存在 | 0 | 0 | ✅ 已删 |
+| persons 总行 | 787 | 787 | ✅ 数据完整 |
+| customers 总行 | 783 | 783 | ✅ 数据完整 |
+| crm_person_role_persons_sync 触发器 | 1 | 1 | ✅ 已重建 |
+| crm_customers_page_v1 正常 | 782 行 | 782 行 | ✅ |
+| pmc18_collect_metrics 正常 | 全部 0 异常 | 全部 0 | ✅ |
+
+### 13.6 迁移文件双备份
+
+CL-02 函数更新（6 个）+ CL-03 migration/rollback + CL-03 函数更新已复制到：
+- `d:\CRM\crm\cloudbase\migrations\`
+- `C:\Users\victor\cloudbase\migrations\`
+
+---
+
+## 14. PMC-19 完成总结
+
+| 清理项 | 对象 | 执行状态 |
+| --- | --- | --- |
+| CL-01 | customers UNIQUE(customer_name) | ✅ 已删 |
+| CL-02 | customers 7 副本列 + 11 视图 + 6 函数 | ✅ 已删/已更新 |
+| CL-03 | persons.legacy_customer_id + 25 JS 文件 | ✅ 已删/已更新 |
+| CL-04 | 复合 FK（opportunities + recruit_candidates） | ✅ 已删 |
+| CL-05 | recruit_candidates.education | ✅ 已删 |
+| CL-06 | recruit_candidates.mbti | ✅ 已删 |
+| CL-07 | 已删除列空洞 | ✅ 无需操作 |
+| CL-08 | 桥触发器 + 函数 | ✅ 已删 |
+| CL-09 | recruit 同步触发器 + 函数 | ✅ 已删 |

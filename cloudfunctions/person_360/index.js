@@ -209,7 +209,7 @@ async function listActivityData(event) {
 
 function createService({ request = pgRequest, rpc = pgRpc, disclosure = disclose } = {}) {
   const findPerson = async id => one(await request('persons', 'GET', {
-    select: 'id,display_name,legacy_customer_id,occupation,organization',
+    select: 'id,display_name,occupation,organization',
     id: `eq.${idOf(id)}`, deleted_at: 'is.null', limit: 1,
   }));
   const findHousehold = async anchorId => one(await request('households', 'GET', {
@@ -228,7 +228,7 @@ function createService({ request = pgRequest, rpc = pgRpc, disclosure = disclose
     });
     const ids = members.map(member => idOf(member.person_id));
     const people = ids.length ? await request('persons', 'GET', {
-      select: 'id,display_name,legacy_customer_id',
+      select: 'id,display_name',
       id: `in.(${ids.join(',')})`, deleted_at: 'is.null', limit: 50,
     }) : [];
     const names = new Map(people.map(item => [String(item.id), item]));
@@ -239,8 +239,13 @@ function createService({ request = pgRequest, rpc = pgRpc, disclosure = disclose
   }
 
   async function lookupCustomer(customerId) {
+    // PMC-19 CL-03: legacy_customer_id removed; resolve person via customers.person_id
+    const customer = one(await request('customers', 'GET', {
+      select: 'Id,person_id', Id: `eq.${idOf(customerId)}`, deleted_at: 'is.null', limit: 1,
+    }));
+    if (!customer || !customer.person_id) throw new Error('This customer has no Person record yet');
     const person = one(await request('persons', 'GET', {
-      select: 'id,display_name', legacy_customer_id: `eq.${idOf(customerId)}`,
+      select: 'id,display_name', id: `eq.${idOf(customer.person_id)}`,
       deleted_at: 'is.null', limit: 1,
     }));
     if (!person) throw new Error('This customer has no Person record yet');
@@ -395,18 +400,30 @@ function createService({ request = pgRequest, rpc = pgRpc, disclosure = disclose
     const pageRows = rows.slice(0, pageSize);
     const personIds = [...new Set(pageRows.map(row => row.person_id).filter(Boolean).map(idOf))];
     const customerIds = [...new Set(pageRows.map(row => row.customer_id).filter(Boolean).map(idOf))];
-    const [linked, legacy] = await Promise.all([
+    // PMC-19 CL-03: legacy_customer_id removed; resolve persons for customerIds via customers.person_id
+    const [linked, legacyCustomers] = await Promise.all([
       personIds.length ? request('persons', 'GET', {
-        select: 'id,display_name,legacy_customer_id', id: `in.(${personIds.join(',')})`,
+        select: 'id,display_name', id: `in.(${personIds.join(',')})`,
         deleted_at: 'is.null', limit: 50,
       }) : [],
-      customerIds.length ? request('persons', 'GET', {
-        select: 'id,display_name,legacy_customer_id', legacy_customer_id: `in.(${customerIds.join(',')})`,
-        deleted_at: 'is.null', limit: 50,
+      customerIds.length ? request('customers', 'GET', {
+        select: 'Id,person_id', Id: `in.(${customerIds.join(',')})`, deleted_at: 'is.null', limit: 50,
       }) : [],
     ]);
+    const legacyPersonIds = legacyCustomers.map(c => c.person_id).filter(Boolean);
+    const legacyPersons = legacyPersonIds.length ? await request('persons', 'GET', {
+      select: 'id,display_name', id: `in.(${legacyPersonIds.join(',')})`,
+      deleted_at: 'is.null', limit: 50,
+    }) : [];
     const byPerson = new Map(linked.map(person => [String(person.id), person]));
-    const byCustomer = new Map(legacy.map(person => [String(person.legacy_customer_id), person]));
+    const legacyPersonMap = new Map(legacyPersons.map(person => [String(person.id), person]));
+    const byCustomer = new Map();
+    for (const c of legacyCustomers) {
+      if (c.person_id) {
+        const person = legacyPersonMap.get(String(c.person_id));
+        if (person) byCustomer.set(String(c.Id), person);
+      }
+    }
     return { rows: pageRows.map(row => ({ ...row,
       person: byPerson.get(String(row.person_id)) || byCustomer.get(String(row.customer_id)) || null,
     })), page, pageSize, hasMore: rows.length > pageSize };
@@ -476,12 +493,17 @@ function createService({ request = pgRequest, rpc = pgRpc, disclosure = disclose
   async function listOpportunities(personId) {
     const person = await findPerson(personId);
     if (!person) throw new Error('Person not found');
+    // PMC-19 CL-03: legacy_customer_id removed; resolve customer_id via customers.person_id
+    const customer = one(await request('customers', 'GET', {
+      select: 'Id', person_id: `eq.${idOf(person.id)}`, deleted_at: 'is.null', limit: 1,
+    }));
+    const customerId = customer?.Id ?? null;
     const own = await request('opportunities', 'GET', {
       select: '*', person_id: `eq.${idOf(person.id)}`,
       deleted_at: 'is.null', order: 'updated_at.desc', limit: 100,
     });
-    const legacy = person.legacy_customer_id == null ? [] : await request('opportunities', 'GET', {
-      select: '*', customer_id: `eq.${idOf(person.legacy_customer_id)}`,
+    const legacy = customerId == null ? [] : await request('opportunities', 'GET', {
+      select: '*', customer_id: `eq.${idOf(customerId)}`,
       deleted_at: 'is.null', order: 'updated_at.desc', limit: 100,
     });
     const byId = new Map();
@@ -628,7 +650,7 @@ function createService({ request = pgRequest, rpc = pgRpc, disclosure = disclose
   async function search(name) {
     const { nameKey } = parsePersonName(name);
     const candidates = await request('persons', 'GET', {
-      select: 'id,display_name,occupation,organization,legacy_customer_id',
+      select: 'id,display_name,occupation,organization',
       name_key: `eq.${nameKey}`, deleted_at: 'is.null', order: 'id.asc', limit: 11,
     });
     return { candidates: candidates.slice(0, 10), hasMore: candidates.length > 10 };

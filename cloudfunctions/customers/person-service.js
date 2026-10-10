@@ -5,7 +5,7 @@
 
 const MAX_DISPLAY_LENGTH = 160;
 const MAX_CANDIDATES = 10;
-const COLUMNS = 'id,display_name,name_key,organization,occupation,legacy_customer_id';
+const COLUMNS = 'id,display_name,name_key,organization,occupation';
 
 class PersonResolutionError extends Error {
   constructor(code, message, cause) {
@@ -97,7 +97,27 @@ class PersonService {
       throw new PersonResolutionError('READ_FAILED', 'Person search returned an invalid result', response?.error);
     }
     const hasMore = response.data.length > MAX_CANDIDATES;
-    const candidates = response.data.slice(0, MAX_CANDIDATES).map(row => {
+    const candidateRows = response.data.slice(0, MAX_CANDIDATES);
+    // PMC-19 CL-03: legacy_customer_id removed; resolve customer_id via customers.person_id
+    const pidList = candidateRows.map(row => personId(row.id));
+    let personToCustomer = new Map();
+    if (pidList.length) {
+      let custRows;
+      try {
+        custRows = this.request
+          ? await this.request('customers', 'GET', {
+              select: 'Id,person_id', person_id: `in.(${pidList.join(',')})`, deleted_at: 'is.null',
+            })
+          : (await this.rdb.from('public.customers')
+              .select('Id,person_id').in('person_id', pidList).is('deleted_at', null)).data;
+      } catch (error) {
+        throw new PersonResolutionError('READ_FAILED', 'Customer lookup failed', error);
+      }
+      if (Array.isArray(custRows)) {
+        personToCustomer = new Map(custRows.map(c => [String(c.person_id), String(c.Id)]));
+      }
+    }
+    const candidates = candidateRows.map(row => {
       if (!row || typeof row.display_name !== 'string' || row.name_key !== parsed.nameKey) {
         throw new PersonResolutionError('READ_FAILED', 'Person search returned an inconsistent row');
       }
@@ -107,12 +127,13 @@ class PersonService {
       if (candidateName.nameKey !== parsed.nameKey) {
         throw new PersonResolutionError('READ_FAILED', 'Person search returned a mismatched name key');
       }
+      const pid = personId(row.id);
       return {
-        id: personId(row.id),
+        id: pid,
         displayName: row.display_name,
         organization: row.organization ?? null,
         occupation: row.occupation ?? null,
-        legacyCustomerId: row.legacy_customer_id == null ? null : String(row.legacy_customer_id),
+        legacyCustomerId: personToCustomer.get(pid) ?? null,
       };
     });
     let status;

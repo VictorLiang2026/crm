@@ -6,7 +6,7 @@ const SELECT = {
   commitments: 'id,person_id,commitment_type,content,due_at,status',
   opportunities: 'id,person_id,customer_id,opportunity_type,status,next_action,updated_at',
   opportunity_candidates: 'id,person_id,draft,status,created_at',
-  persons: 'id,display_name,legacy_customer_id,deleted_at',
+  persons: 'id,display_name,deleted_at',
 };
 const GUIDANCE = Object.freeze({
   overdue_commitment: '先核对逾期承诺的真实进展，再决定如何履约或沟通。',

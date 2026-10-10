@@ -3,7 +3,7 @@
 const crypto = require('crypto');
 
 const COLUMNS = 'id,person_id,opportunity_id,interaction_id,activity_id,action_type,title,description,due_at,priority,status,source,urgency_score,impact_score,confidence_score,effort_score,priority_score,updated_at';
-const PERSON_COLUMNS = 'id,display_name,legacy_customer_id,deleted_at';
+const PERSON_COLUMNS = 'id,display_name,deleted_at';
 
 function clamp(value, fallback) {
   const n = Number(value);
@@ -81,7 +81,8 @@ async function readOpenActions({ env, key, fetchImpl = fetch }) {
 
 function mapActions(data, facts, today, dayKeyOf, diffDays) {
   const personMap = new Map(facts.persons.map(p => [Number(p.id), p]));
-  const customerMap = new Map((data.customers || []).map(c => [Number(c.Id), c]));
+  // PMC-19 CL-03: legacy_customer_id removed; resolve customer via customers.person_id
+  const customerByPersonId = new Map((data.customers || []).map(c => [Number(c.person_id), c]));
   const followupMap = new Map();
   for (const f of data.followups || []) {
     const current = followupMap.get(Number(f.customer_id));
@@ -93,8 +94,7 @@ function mapActions(data, facts, today, dayKeyOf, diffDays) {
   return facts.rows.flatMap(row => {
     const person = personMap.get(Number(row.person_id));
     if (!person || person.deleted_at) return [];
-    const customer = person.legacy_customer_id ? customerMap.get(Number(person.legacy_customer_id)) : null;
-    if (person.legacy_customer_id && !customer) return [];
+    const customer = customerByPersonId.get(Number(person.id)) || null;
     const actionDate = dayKeyOf(row.due_at) || '';
     const days = actionDate ? diffDays(actionDate, today) : null;
     const last = customer ? followupMap.get(Number(customer.Id)) : null;
@@ -112,7 +112,7 @@ function mapActions(data, facts, today, dayKeyOf, diffDays) {
     const status = days === null ? 'unscheduled' : days < 0 ? 'overdue' : days === 0 ? 'today' : 'upcoming';
     return [{
       action_id: `action-${row.id}`, action_type: row.action_type, person_type: 'person',
-      person_id: Number(person.id), legacy_customer_id: person.legacy_customer_id || null,
+      person_id: Number(person.id), customer_id: customer?.Id || null,
       opportunity_id: row.opportunity_id || null, activity_id: row.activity_id || null,
       person_name: person.display_name, title: row.title, source: row.source,
       status, stage: customer?.customer_stage || '',

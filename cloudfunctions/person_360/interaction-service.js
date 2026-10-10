@@ -41,7 +41,7 @@ class InteractionService {
 
   async findPerson(personId) {
     const person = one(await this.request('persons', 'GET', {
-      select: 'id,legacy_customer_id', id: `eq.${idOf(personId)}`,
+      select: 'id', id: `eq.${idOf(personId)}`,
       deleted_at: 'is.null', limit: 1,
     }));
     if (!person) throw new Error('Person not found');
@@ -58,8 +58,12 @@ class InteractionService {
     const rows = stored.map(item => ({ ...item, virtual: false }));
     const adapter = new LegacyInteractionAdapter({ request: this.request });
     const legacyRows = [];
-    if (person.legacy_customer_id != null) {
-      legacyRows.push(...await adapter.listForCustomer(person.legacy_customer_id, person.id));
+    // PMC-19 CL-03: legacy_customer_id removed; resolve customer_id via customers.person_id
+    const customer = one(await this.request('customers', 'GET', {
+      select: 'Id,person_id', person_id: `eq.${idOf(person.id)}`, deleted_at: 'is.null', limit: 1,
+    }));
+    if (customer) {
+      legacyRows.push(...await adapter.listForCustomer(String(customer.Id), person.id));
     }
     legacyRows.push(...await adapter.listCanonicalAttended(person.id));
     // PMC-16: drop stored ledger copies of legacy sources that no longer exist, so a

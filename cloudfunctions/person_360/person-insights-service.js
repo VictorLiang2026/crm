@@ -59,15 +59,19 @@ class PersonInsightsService {
     const id = idOf(personId);
     const read = this.boundedRead();
     const person = await new InteractionService({ request: read }).findPerson(id);
+    // PMC-19 CL-03: legacy_customer_id removed; resolve customer_id via customers.person_id
+    const customer = (await read('customers', { select: 'Id', person_id: `eq.${id}`,
+      deleted_at: 'is.null', limit: 1 }))[0] || null;
+    const customerId = customer?.Id ?? null;
     const adapter = new LegacyInteractionAdapter({ request: read });
     const stored = await read('interactions', 'GET', {
       select: 'id,person_id,interaction_type,interaction_at,channel,summary,raw_note,activity_id,source_type,source_id,created_at',
       person_id: `eq.${id}`, order: 'interaction_at.desc,id.desc', limit: 50,
     });
     const virtual = [];
-    if (person.legacy_customer_id != null) virtual.push(...await adapter.listForCustomer(person.legacy_customer_id, id));
+    if (customerId != null) virtual.push(...await adapter.listForCustomer(String(customerId), id));
     virtual.push(...await adapter.listCanonicalAttended(id));
-    if (person.legacy_customer_id == null) {
+    if (customerId == null) {
       const candidates = await read('recruit_candidates', 'GET', {
         select: 'id,person_id', person_id: `eq.${id}`, deleted_at: 'is.null', limit: 50,
       });
@@ -96,7 +100,7 @@ class PersonInsightsService {
       summary: row.summary, channel: row.channel || null,
       source: `public.${row.source_id == null ? 'interactions' : row.source_type}#${row.source_id ?? row.id}`,
       activityId: row.activity_id || null, candidateId: row.candidate_id || null,
-      customerId: row.source_type === 'followups' ? person.legacy_customer_id : null,
+      customerId: row.source_type === 'followups' ? customerId : null,
     }));
     const refs = [ ...testData.refsForRows('persons', [person]), ...pageRows.map(row => {
       const match = /^public\.([a-z_]+)#([1-9]\d*)$/.exec(row.source);

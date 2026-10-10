@@ -55,8 +55,11 @@ class InsuranceContextService {
 
   async build(person) {
     const personId = idOf(person?.id);
-    const customerId = person.legacy_customer_id == null ? null : idOf(person.legacy_customer_id);
     const read = (table, filters) => this.request(table, 'GET', filters);
+    // PMC-19 CL-03: legacy_customer_id removed; resolve customer_id via customers.person_id
+    const customerRow = (await read('customers', { select: 'Id', person_id: `eq.${personId}`,
+      deleted_at: 'is.null', limit: 1 }))[0] || null;
+    const customerId = customerRow?.Id ?? null;
     const [products, reports, ocr, photos, ownOpportunities, legacyOpportunities,
       actions, links, interactions, facts] = await Promise.all([
       customerId ? read('products', { select: 'id,items,created_at,' + Object.keys(CATEGORIES).join(','),

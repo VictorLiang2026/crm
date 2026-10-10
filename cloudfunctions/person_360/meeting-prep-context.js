@@ -26,10 +26,13 @@ class MeetingPrepContextBuilder {
   async build(personId) {
     const id = idOf(personId);
     const read = (table, filters) => this.request(table, 'GET', filters);
-    const person = (await read('persons', { select: 'id,display_name,occupation,organization,legacy_customer_id',
+    const person = (await read('persons', { select: 'id,display_name,occupation,organization',
       id: `eq.${id}`, deleted_at: 'is.null', limit: 1 }))[0];
     if (!person) throw new Error('Person not found');
-    const customerId = person.legacy_customer_id == null ? null : idOf(person.legacy_customer_id);
+    // PMC-19 CL-03: legacy_customer_id removed; resolve customer_id via customers.person_id
+    const customerRow = (await read('customers', { select: 'Id', person_id: `eq.${id}`,
+      deleted_at: 'is.null', limit: 1 }))[0] || null;
+    const customerId = customerRow?.Id ?? null;
     const [ownedHouseholds, memberships, outgoing, incoming, contextItems,
       storedOpportunities, legacyOpportunities, actions, commitments, interactions, insurance] = await Promise.all([
       read('households', { select: 'id,anchor_person_id,important_facts',

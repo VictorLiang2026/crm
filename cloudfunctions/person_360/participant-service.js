@@ -21,14 +21,13 @@ class ParticipantService {
   }
 
   async legacyId(person, type) {
-    if (person.legacy_customer_id == null) return null;
-    const customerId = idOf(person.legacy_customer_id);
-    if (type === 'customer') {
-      const rows = await this.request('customers', 'GET', {
-        select: 'Id', Id: `eq.${customerId}`, deleted_at: 'is.null', limit: 1,
-      });
-      return rows.length === 1 ? customerId : null;
-    }
+    // PMC-19 CL-03: legacy_customer_id removed; resolve customer_id via customers.person_id
+    const customers = await this.request('customers', 'GET', {
+      select: 'Id', person_id: `eq.${idOf(person.id)}`, deleted_at: 'is.null', limit: 1,
+    });
+    if (customers.length !== 1) return null;
+    const customerId = idOf(customers[0].Id);
+    if (type === 'customer') return customerId;
     const table = type === 'recruit' ? 'recruit_candidates' : 'activity_speakers';
     const rows = await this.request(table, 'GET', {
       select: 'id,customer_id', customer_id: `eq.${customerId}`,
@@ -59,7 +58,7 @@ class ParticipantService {
     });
     if (activities.length !== 1) throw new Error('Activity not found');
     const people = await this.request('persons', 'GET', {
-      select: 'id,display_name,legacy_customer_id', id: `eq.${personId}`,
+      select: 'id,display_name', id: `eq.${personId}`,
       deleted_at: 'is.null', limit: 1,
     });
     const person = people[0];

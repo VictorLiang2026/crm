@@ -49,11 +49,16 @@ class ActivityInteractionService {
         customerId = speaker?.customer_id;
       }
     }
-    const filters = personId ? { id: `eq.${idOf(personId)}` } :
-      customerId ? { legacy_customer_id: `eq.${idOf(customerId)}` } : null;
-    if (!filters) throw new Error('Participant has no confirmed Person identity');
+    // PMC-19 CL-03: legacy_customer_id removed; resolve person via customers.person_id
+    if (!personId && customerId) {
+      const customer = one(await this.request('customers', 'GET', {
+        select: 'Id,person_id', Id: `eq.${idOf(customerId)}`, deleted_at: 'is.null', limit: 1,
+      }));
+      personId = customer?.person_id;
+    }
+    if (!personId) throw new Error('Participant has no confirmed Person identity');
     const person = one(await this.request('persons', 'GET', {
-      select: 'id,display_name,legacy_customer_id', ...filters, deleted_at: 'is.null', limit: 2,
+      select: 'id,display_name', id: `eq.${idOf(personId)}`, deleted_at: 'is.null', limit: 2,
     }));
     if (!person) throw new Error('Participant has no active Person identity');
     return person;
@@ -100,15 +105,21 @@ class ActivityInteractionService {
     }
     const person = await this.personFor(participant);
     const instant = new Date(at).toISOString();
-    if (type === 'post_event_followup' && person.legacy_customer_id != null) {
-      const legacy = await this.request('followups', 'GET', {
-        select: 'Id,interaction_summary,followup_notes',
-        customer_id: `eq.${idOf(person.legacy_customer_id)}`,
-        activity_id: `eq.${activityId}`, deleted_at: 'is.null', limit: 50,
-      });
-      if (legacy.some(row => [row.interaction_summary, row.followup_notes]
-        .some(value => typeof value === 'string' && value.trim() === summary))) {
-        throw new Error('Activity event already exists as a followup');
+    if (type === 'post_event_followup') {
+      // PMC-19 CL-03: legacy_customer_id removed; resolve customer_id via customers.person_id
+      const customer = one(await this.request('customers', 'GET', {
+        select: 'Id', person_id: `eq.${idOf(person.id)}`, deleted_at: 'is.null', limit: 1,
+      }));
+      if (customer) {
+        const legacy = await this.request('followups', 'GET', {
+          select: 'Id,interaction_summary,followup_notes',
+          customer_id: `eq.${idOf(customer.Id)}`,
+          activity_id: `eq.${activityId}`, deleted_at: 'is.null', limit: 50,
+        });
+        if (legacy.some(row => [row.interaction_summary, row.followup_notes]
+          .some(value => typeof value === 'string' && value.trim() === summary))) {
+          throw new Error('Activity event already exists as a followup');
+        }
       }
     }
     const duplicates = await this.request('interactions', 'GET', {

@@ -54,7 +54,7 @@ class ActionService {
 
   async findPerson(personId) {
     const person = one(await this.request('persons', 'GET', {
-      select: 'id,legacy_customer_id', id: `eq.${idOf(personId)}`,
+      select: 'id', id: `eq.${idOf(personId)}`,
       deleted_at: 'is.null', limit: 1,
     }));
     if (!person) throw new Error('Person not found');
@@ -105,12 +105,20 @@ class ActionService {
         select: 'id', id: `eq.${opportunityId}`,
         person_id: `eq.${idOf(person.id)}`, deleted_at: 'is.null', limit: 1,
       }));
-      const legacy = direct || person.legacy_customer_id == null ? null :
-        one(await this.request('opportunities', 'GET', {
-          select: 'id', id: `eq.${opportunityId}`,
-          customer_id: `eq.${idOf(person.legacy_customer_id)}`,
-          deleted_at: 'is.null', limit: 1,
+      let legacy = null;
+      if (!direct) {
+        // PMC-19 CL-03: legacy_customer_id removed; resolve customer_id via customers.person_id
+        const customer = one(await this.request('customers', 'GET', {
+          select: 'Id,person_id', person_id: `eq.${idOf(person.id)}`, deleted_at: 'is.null', limit: 1,
         }));
+        if (customer) {
+          legacy = one(await this.request('opportunities', 'GET', {
+            select: 'id', id: `eq.${opportunityId}`,
+            customer_id: `eq.${idOf(customer.Id)}`,
+            deleted_at: 'is.null', limit: 1,
+          }));
+        }
+      }
       if (!direct && !legacy) throw new Error('Opportunity not found for Person');
     }
     if (data.interaction_id != null) {

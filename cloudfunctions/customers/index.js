@@ -18,11 +18,13 @@
 const { rdb, nowIso, normFields, assertOk } = require('./db');
 const { PersonService, PersonResolutionError } = require('./person-service');
 
+// PMC-19 CL-02: base columns removed from FIELDS (customer_name, gender, occupation, birthday, phone)
+// These are now exclusively on persons; customers columns dropped
 const FIELDS = [
-  'customer_name', 'sales_priority', 'recruitment_priority', 'referral_priority',
-  'hobbies', 'additional_info', 'gender', 'source', 'tags', 'marital_status',
-  'properties_info', 'occupation', 'annual_income', 'household_income',
-  'first_contact_date', 'birthday', 'customer_stage', 'phone',
+  'sales_priority', 'recruitment_priority', 'referral_priority',
+  'hobbies', 'additional_info', 'source', 'tags', 'marital_status',
+  'properties_info', 'annual_income', 'household_income',
+  'first_contact_date', 'customer_stage',
   'profile', // 轻量客户画像 jsonb：{family,children,parents,career,needs,relationship,events[]}
 ];
 
@@ -191,11 +193,7 @@ async function create(event) {
   const r = assertOk(await rdb.from('customers').insert(payload).select('Id'));
   const customerId = r.data[0].Id;
 
-  // 关联回写：persons.legacy_customer_id
-  assertOk(await rdb.from('persons')
-    .update({ legacy_customer_id: customerId, updated_at: nowIso() })
-    .eq('id', personId));
-
+  // PMC-19 CL-03: legacy_customer_id write removed; customers.person_id is the link
   return { id: customerId, personId: String(personId) };
 }
 
@@ -225,10 +223,24 @@ async function update(event) {
 
   if (isSnapshotRestore && !event.forceRestore) {
     // 疑似 OCR 快照恢复：比较当前值，有冲突则要求重新预览
-    const cur = assertOk(await rdb.from('customers')
-      .select(Object.keys(PERSON_BASIC_FIELDS).join(','))
-      .eq('Id', id).maybeSingle());
-    const curData = cur.data || {};
+    // PMC-19 CL-02: read base fields from persons (customers columns dropped)
+    const crowOCR = assertOk(await rdb.from('customers')
+      .select('person_id').eq('Id', id).maybeSingle());
+    const prowOCR = crowOCR.data && crowOCR.data.person_id
+      ? assertOk(await rdb.from('persons')
+          .select('display_name, phone, wechat, gender, birthday, occupation, education')
+          .eq('id', crowOCR.data.person_id).maybeSingle())
+      : { data: null };
+    const curData = {};
+    if (prowOCR.data) {
+      curData.customer_name = prowOCR.data.display_name;
+      curData.phone = prowOCR.data.phone;
+      curData.wx_account = prowOCR.data.wechat;
+      curData.gender = prowOCR.data.gender;
+      curData.birthday = prowOCR.data.birthday;
+      curData.occupation = prowOCR.data.occupation;
+      curData.education = prowOCR.data.education;
+    }
     const conflicts = bridgeFieldsInPayload.filter(f => {
       const curVal = curData[f] == null ? '' : String(curData[f]);
       const newVal = basicIn[f] == null ? '' : String(basicIn[f]);
@@ -246,36 +258,24 @@ async function update(event) {
 
   let personResult = null;
   if (bridgeFieldsInPayload.length) {
-    // 定位关联 Person：优先 customers.person_id，回退 legacy_customer_id
-    const crow = assertOk(await rdb.from('customers')
-      .select('person_id').eq('Id', id).maybeSingle());
-    if (!crow.data) return { error: 'not found' };
-    let personId = crow.data.person_id ? String(crow.data.person_id) : null;
-    if (!personId) {
-      const prow = assertOk(await rdb.from('persons')
-        .select('id').eq('legacy_customer_id', id).is('deleted_at', null).maybeSingle());
-      personId = prow.data ? String(prow.data.id) : null;
-    }
-    if (!personId) {
-      // 无关联 Person：该客户尚无权威基础资料归属，拒绝静默旧值兜底
-      return { error: '该客户未关联 Person，基础字段无法写入；请先完成身份关联',
-        code: 'PERSON_NOT_LINKED', customerId: id };
-    }
+      // PMC-19 CL-03: legacy_customer_id removed; persons linked via customers.person_id
+      const crow = assertOk(await rdb.from('customers')
+        .select('person_id').eq('Id', id).maybeSingle());
+      if (!crow.data) return { error: 'not found' };
+      let personId = crow.data.person_id ? String(crow.data.person_id) : null;
+      if (!personId) {
+        // 无关联 Person：该客户尚无权威基础资料归属，拒绝静默旧值兜底
+        return { error: '该客户未关联 Person，基础字段无法写入；请先完成身份关联',
+          code: 'PERSON_NOT_LINKED', customerId: id };
+      }
     // 经边界写入（person-service 白名单映射 customers→persons 键名）
     const personFields = {};
     for (const [custKey, personKey] of Object.entries(PERSON_BASIC_FIELDS)) {
       if (Object.prototype.hasOwnProperty.call(basicIn, custKey)) personFields[personKey] = basicIn[custKey];
     }
     try {
-      personResult = await personService().updateBasicsWithProjection(personId, personFields, {
-        projection: {
-          table: 'customers',
-          match: { Id: id },
-          map: fields => Object.fromEntries(Object.entries(PERSON_BASIC_FIELDS)
-            .filter(([, pk]) => Object.prototype.hasOwnProperty.call(fields, pk))
-            .map(([ck, pk]) => [ck, fields[pk]])),
-        },
-      });
+      // PMC-19 CL-02: projection to customers removed (base columns dropped)
+      personResult = await personService().updateBasicsWithProjection(personId, personFields, {});
       if (!personResult.ok) {
         return { error: personResult.message || 'Person 基础资料写入冲突，请刷新后重试',
           code: 'PERSON_CONFLICT', customerId: id };

@@ -39,7 +39,7 @@ async function runSummarize(event) {
   }
 
   const persons = await restGet('persons', {
-    select: 'id,display_name,occupation,organization,legacy_customer_id',
+    select: 'id,display_name,occupation,organization',
     id: `eq.${personId}`, deleted_at: 'is.null', limit: 1,
   });
   const person = Array.isArray(persons) && persons[0];
