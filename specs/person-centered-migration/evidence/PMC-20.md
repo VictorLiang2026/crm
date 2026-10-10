@@ -128,8 +128,8 @@ activity_reports、activity_speakers、activity_tasks、ai_activity（index+cont
 
 ## 7. 发布
 
-- 提交：见 git log（本包提交 + handoff 提交）。
-- 标签：`release-YYYYMMDD-HHMM`（见提交记录）。
+- 提交：`970cc1b`（PMC-20 收官：102 files +3770/-136——修复代码+21 migration/rollback+工具+6 文档）+ 档案回填提交（见 git log）。
+- 标签：`release-20261010-2118`（提交 `970cc1b`）+ 档案回填标签（见 git log）。
 - 部署范围：12 云函数（§4.2）+ person-360.js hosting + 3 DB 迁移（§4.1）。**未全量部署**；i18n.js/misc.js 为 WIP 未纳入提交。
 - 三端核对：本地/GitHub/云端一致（commit、tag、函数清单）；迁移双目录哈希一致。
 - release.ps1 因工作树含 WIP 文件未使用，按手动 git 流程发布并在本记录说明。
