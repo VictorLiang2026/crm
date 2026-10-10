@@ -1,15 +1,15 @@
 # Handoff（接管状态）
 
-更新时间：2026-10-10（**PMC-17 已验收（确认验收）并发布验收记录；等待 PMC-18 指令**）。任何工具接手前先读本文件与 execution-contract。
+更新时间：2026-10-10（**PMC-17 已验收；PMC-18 已开包（观察包），待用户确认观察周期与结束条件**）。任何工具接手前先读本文件与 execution-contract。
 
 ## 1. 执行状态
 
 | 项 | 值 |
 | --- | --- |
-| 当前执行工具 | Trae；PMC-17 已验收（2026-10-10 用户确认验收）；等待 PMC-18 指令 |
-| 最后验收通过包 | **PMC-17（全系统复审并验收 Person 为唯一基础信息来源）——2026-10-10 用户下发「确认验收」**：六项指令全部落地（①实时全量盘点 28 函数×action/47 表/12 视图/35 函数/51 触发器/11 模块 73 副本/双前端、无云端定时任务；②③Legacy customers 写路径改道 Person 受控边界 `PersonService.updateBasicsWithProjection`，customers.create 直写 person_id，桥/recruit 同步触发器按消费者接管证据保留为投影兜底；④migration A `20261010091000` + migration B `20261010093000`（customers.person_id NOT NULL + recruit 活跃行部分唯一索引 + 两 DB 函数适配）已应用并核对全绿；⑤隔离 9/9+全量 206/209+WP01 门 blockers=[]+性能基线建立；⑥影响矩阵 U1–U4 收口+「Person 唯一基础信息来源」验收报告）。部署 customers/assistant/person_360 三函数；静态零改动；发布标签 `release-20261010-102500`（提交 `46c30d7`）；验收记录发布标签 `release-20261010-103200`（提交 `81a54ec`，本地/远端/标签三端一致）。限制项均非阻塞（G-PMC17-1 登记未修；D5/D8 退出、桥触发器移除、relationships 写入路径须单独授权；WP01 开放项+iPad 真机性能复测既定未验证）。详见 evidence/PMC-17.md §7 |
-| 正在执行包 | **无**——PMC-17 已验收；等待用户下发 PMC-18 指令 |
-| 下一步唯一允许执行的动作 | **等待 PMC-18 指令；未收到指令不开包**。桥触发器/recruit 同步触发器移除、D5 姓名唯一约束解除、D8 customer_id 列/复合 FK 退出、G-PMC17-1 白名单扩充、G-PMC11-1/G-PMC12-1/G-PMC14-1 修复、relationships pending 候选写入路径均须单独授权 |
+| 当前执行工具 | Trae；PMC-18 已开包（2026-10-10 用户下发指令），执行中——待用户确认观察周期与结束条件 |
+| 最后验收通过包 | **PMC-17（全系统复审并验收 Person 为唯一基础信息来源）——2026-10-10 用户下发「确认验收」**：六项指令全部落地（①实时全量盘点 28 函数×action/47 表/12 视图/35 函数/51 触发器/11 模块 73 副本/双前端、无云端定时任务；②③Legacy customers 写路径改道 Person 受控边界 `PersonService.updateBasicsWithProjection`，customers.create 直写 person_id，桥/recruit 同步触发器按消费者接管证据保留为投影兜底；④migration A `20261010091000` + migration B `20261010093000`（customers.person_id NOT NULL + recruit 活跃行部分唯一索引 + 两 DB 函数适配）已应用并核对全绿；⑤隔离 9/9+全量 206/209+WP01 门 blockers=[]+性能基线建立；⑥影响矩阵 U1–U4 收口+「Person 唯一基础信息来源」验收报告）。部署 customers/assistant/person_360 三函数；静态零改动；发布标签 `release-20261010-102500`（提交 `46c30d7`）；验收记录发布标签 `release-20261010-103200`（提交 `81a54ec`，本地/远端/标签三端一致）；handoff 补充标签 `release-20261010-111200`（提交 `91c929a`）。限制项均非阻塞（G-PMC17-1 登记未修；D5/D8 退出、桥触发器移除、relationships 写入路径须单独授权；WP01 开放项+iPad 真机性能复测既定未验证）。详见 evidence/PMC-17.md §7 |
+| 正在执行包 | **PMC-18（真实运行观察与一致性复核）——观察包，不删除字段、不扩大新功能**。指令①待用户确认观察周期与结束条件（参考 90～180 天，不默认）；②观察项：身份新增遗漏/字段漂移/旧字段写入/旧接口调用/同步失败/重复人物/孤立引用/权限拒绝异常/查询性能/统计差异/OCR 恢复及跨角色编辑问题；③优先复用已有日志与只读核对工具，新监测代码须先说明影响并确认；④发现问题按事实/严重程度/影响范围/修复包登记，高风险按规则处理不顺手重构；⑤定期更新 evidence/handoff（起止/样本/指标/异常/处理/剩余风险）。详见 evidence/PMC-18.md |
+| 下一步唯一允许执行的动作 | **PMC-18：先与用户确认观察周期与结束条件，再建立观察基线（复用 tools/migration-check.sql + wp04 audit + 性能探针）**。未确认周期前不宣称观察完成；周期未完成状态保持"观察中"，不得进入 PMC-20。本包不删除字段、不自动扩大到新功能 |
 | 回滚条件 | PMC-17 migration B：`cloudbase/rollbacks/20261010093000_pmc17_customers_person_id_constraints.rollback.sql`（两函数原始定义逐字复原+DROP NOT NULL+DROP recruit 部分索引；不动 PMC-05 既有 UNIQUE/FK）；migration A：`cloudbase/rollbacks/20261010091000_pmc17_customers_person_link_backfill.rollback.sql`；代码回滚：`git revert` 本包发布提交 → 重新部署 customers/assistant/person_360 三函数（person-service.js 回退至改道前版本）。PMC-16（无 DB 变更）：`git revert` 本包发布提交 → 重新部署 person_360 函数与 admin.html 静态。PMC-15：`cloudbase/rollbacks/20261009220000_pmc15_role_derivation_relationship_governance.rollback.sql`（守卫式：逆对账恢复 703/792、删 777 补入行→DROP 5 触发器/2 函数/4 列→复原 origin CHECK）；代码用上一发布标签重新部署 ai_activity/person_360 与 4 静态模块。PMC-14 数据回滚：`cloudbase/rollbacks/20261009180000_pmc14_participant_canonical_backfill.sql`（按精确 id+预期值清 canonical，不动既有 2 行人工确认值）；代码回滚：`git revert d081a64`（本包提交）→ 重新部署 activities 函数。PMC-13 代码回滚：`git revert 9eb03e4` → 重新部署 activity_speakers/ai_activity 两函数；无结构/数据回滚（本包无 migration）。PMC-12 结构回滚：`cloudbase/rollbacks/20261009091200_pmc12_recruit_view_person_read.sql`；G-PMC11-2 结构回滚：`cloudbase/rollbacks/20261009070000_fix_v_recruit_candidates_left_join.sql` |
 
 ## 2. 版本基线（2026-10-09 PMC-13 发布时更新）
