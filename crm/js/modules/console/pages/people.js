@@ -86,14 +86,18 @@ export function renderPeople(ctx) {
           return bdg(label, tone);
         });
         if (p.recruit_id) badges.push(bdg(t('badge_recruiting'), 'gold'));
-        return h('tr', { onclick: () => { location.hash = `#/person/${p.id}`; } }, [
+        const cols = SORT_COLUMNS();
+        const cells = [
           h('td', {}, h('a', {}, [p.display_name, h('span', { class: 'badge-stack' }, badges)])),
           h('td', {}, p.sales_priority ? translateEnum('sales_priority', p.sales_priority) : '-'),
           h('td', {}, p.customer_stage ? h('span', { class: 'badge stage' }, translateEnum('customer_stage', p.customer_stage)) : '-'),
           h('td', {}, fmtDate(p.latest_followup_date)),
           h('td', {}, fmtDate(p.next_followup_date)),
           h('td', {}, String(p.id)),
-        ]);
+        ];
+        // 手机卡片式布局用：td 携带字段名（与表头同源，i18n 一致）
+        cells.forEach((td, i) => { if (i > 0) td.setAttribute('data-label', cols[i].label); });
+        return h('tr', { onclick: () => { location.hash = `#/person/${p.id}`; } }, cells);
       }));
       return h('div', { class: 'table-scroll' }, h('table', { class: 'people-table' }, [thead, tbody]));
     });
@@ -119,7 +123,7 @@ export function renderPeople(ctx) {
         h('button', { class: 'btn btn-primary btn-sm', type: 'button', onclick: doSearch }, t('btn_search')),
       ]),
       h('button', {
-        class: 'btn btn-soft btn-sm', type: 'button', style: 'margin-left:auto',
+        class: 'btn btn-primary', type: 'button', style: 'margin-left:auto',
         onclick: () => openPersonNew(ctx, { onDone: (newId) => { if (newId) location.hash = `#/person/${newId}`; else runQuery(); } }),
       }, [ic('plus'), t('btn_new_person')]),
     ]),
