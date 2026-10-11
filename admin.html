@@ -2012,14 +2012,17 @@ function openCustomerForm(customer){
     formFields.push(f);
   });
   modal(isEdit?'编辑客户':'新增客户', formFields, customer, async function(data){
-    if(!data.customer_name){ toast('姓名必填','err'); return; }
+    if(!data.customer_name){ throw new Error('姓名必填'); }
     if(isEdit){
-      await callFn('customers', {action:'update', id:customer.Id, data:data});
+      var r = await callFn('customers', {action:'update', id:customer.Id, data:data, editSource:'form'});
+      // 云函数返回 {error} 时不抛异常，必须显式检查，否则会出现“提示已保存但数据未更新”
+      if(r && r.error){ throw new Error(r.message || r.error); }
       toast('已保存');
     } else {
-      var r = await callFn('customers', {action:'create', data:data});
-      toast('已创建 #'+r.id);
-      location.hash = '#/customer/'+r.id;
+      var c = await callFn('customers', {action:'create', data:data});
+      if(c && c.error){ throw new Error(c.message || c.error); }
+      toast('已创建 #'+c.id);
+      location.hash = '#/customer/'+c.id;
     }
     invalidateCustomers();
     if(isEdit) showDetail(customer.Id);

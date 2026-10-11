@@ -210,7 +210,7 @@ async function listActivityData(event) {
 
 function createService({ request = pgRequest, rpc = pgRpc, disclosure = disclose } = {}) {
   const findPerson = async id => one(await request('persons', 'GET', {
-    select: 'id,display_name,occupation,organization',
+    select: 'id,display_name,occupation,organization,updated_at',
     id: `eq.${idOf(id)}`, deleted_at: 'is.null', limit: 1,
   }));
   const findHousehold = async anchorId => one(await request('households', 'GET', {

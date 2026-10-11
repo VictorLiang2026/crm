@@ -47,6 +47,7 @@ export async function renderPerson360({ root, personId, callFn, openLegacyTab })
     legacy.href = `#/customer/${model.customerId}`;
     top.append(legacy);
   }
+  top.append(button('编辑人物资料', () => openPersonEditor({ root, personId, callFn, openLegacyTab, model }), 'btn-sm'));
   wrap.append(top, node('h2', '', `${model.person.display_name} · Person 360`));
   const profile = node('section', 'card person360-card person360-profile');
   wrap.append(profile);
@@ -312,4 +313,201 @@ export async function renderPerson360({ root, personId, callFn, openLegacyTab })
   root.replaceChildren(wrap);
   mountPersonWorkItems({root:workItems,personId,personName:model.person.display_name,
     callFn,isCurrent:() => location.hash === hash});
+}
+
+// 人物资料编辑面板：persons 域走 person_360.updatePerson；customers 域走 customers.update(editSource:'form')
+async function openPersonEditor({ root, personId, callFn, openLegacyTab, model }) {
+  const STAGES = ['', '新认识', '关系维护', '需求挖掘', '方案沟通', '成交推进', '转介绍经营'];
+  const PRIORITIES = ['', 'A', 'B', 'C', 'D', 'E'];
+  const MARITAL = ['', '未婚', '已婚', '未知'];
+
+  const overlay = node('div', 'modal-overlay');
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  const form = node('div', 'modal');
+  form.style.maxWidth = '760px';
+  form.append(node('h3', '', '编辑人物资料'));
+  const body = node('div', {}, node('div', 'loading', '正在载入资料…'));
+  form.append(body);
+  const footer = node('div', 'modal-footer');
+  const cancelBtn = button('取消', () => overlay.remove());
+  const saveBtn = button('保存', async () => {}, 'btn-primary');
+  saveBtn.disabled = true;
+  footer.append(cancelBtn, saveBtn);
+  form.append(footer);
+  overlay.append(form);
+  document.getElementById('modal-root')?.appendChild(overlay) || document.body.appendChild(overlay);
+
+  let profile;
+  try {
+    profile = await callFn('person_360', { action: 'getCustomerProfile', personId: String(personId) });
+    if (!profile || profile.error) throw new Error(profile?.error || '资料加载失败');
+  } catch (err) {
+    body.replaceChildren(node('p', 'person360-error', `载入失败：${err.message}`));
+    return;
+  }
+  const f = profile.fields || {};
+  const linked = profile.status === 'linked';
+  const customerId = profile.customerId;
+  const expectedUpdatedAt = f.person_updated_at || model.person.updated_at || f.updated_at;
+
+  const input = (value, max = 120) => {
+    const el = node('input');
+    el.maxLength = max; el.value = value == null ? '' : String(value); return el;
+  };
+  const numInput = (value) => {
+    const el = node('input');
+    el.type = 'number'; el.value = value == null ? '' : String(value); return el;
+  };
+  const dateInput = (value) => {
+    const el = node('input');
+    el.type = 'date'; el.value = String(value || '').slice(0, 10); return el;
+  };
+  const select = (options, value) => {
+    const el = node('select');
+    for (const v of options) {
+      const opt = node('option', '', v || '—'); opt.value = v; el.append(opt);
+    }
+    el.value = value == null ? '' : String(value);
+    return el;
+  };
+  const textarea = (value, max = 2000) => {
+    const el = node('textarea');
+    el.maxLength = max; el.value = value == null ? '' : String(value); return el;
+  };
+  const field = (label, ctrl, hint) => {
+    const wrap = node('div', 'field');
+    wrap.append(node('label', {}, label));
+    if (hint) wrap.append(node('span', 'person360-muted', hint));
+    wrap.append(ctrl);
+    return wrap;
+  };
+  const row = (...children) => {
+    const r = document.createElement('div');
+    r.style.cssText = 'display:flex;gap:10px;flex-wrap:wrap';
+    r.append(...children);
+    return r;
+  };
+
+  // ---------- persons 域字段 ----------
+  const nameInput = input(f.customer_name);
+  const phoneInput = input(f.phone, 40);
+  const wechatInput = input(f.wx_account, 80);
+  const genderSel = select(['', '男', '女', '未知'], f.gender);
+  const birthdayInput = dateInput(f.birthday);
+  const occupationInput = input(f.occupation);
+  const organizationInput = input(f.organization);
+  const educationInput = input(f.education);
+  const notesTa = textarea(f.additional_info);
+  if (linked) notesTa.disabled = true;
+
+  const personSection = node('div', {});
+  personSection.append(node('h4', '', '人物基础信息（persons）'));
+  personSection.append(
+    field('姓名 *', nameInput),
+    row(field('电话', phoneInput), field('生日', birthdayInput)),
+    row(field('性别', genderSel), field('微信', wechatInput)),
+    row(field('职业', occupationInput), field('单位', organizationInput), field('学历', educationInput)),
+    field(linked ? '备注（关联客户时只读，附加信息请到下方客户域编辑）' : '备注', notesTa),
+  );
+
+  // ---------- customers 域字段（仅 linked 显示） ----------
+  let customerSection = null;
+  const custInputs = {};
+  if (linked && customerId) {
+    custInputs.source = input(f.source);
+    custInputs.hobbies = input(f.hobbies);
+    custInputs.customer_stage = select(STAGES, f.customer_stage);
+    custInputs.sales_priority = select(PRIORITIES, f.sales_priority);
+    custInputs.recruitment_priority = select(PRIORITIES, f.recruitment_priority);
+    custInputs.referral_priority = select(PRIORITIES, f.referral_priority);
+    custInputs.additional_info = textarea(f.additional_info);
+    custInputs.marital_status = select(MARITAL, f.marital_status);
+    custInputs.tags = input(f.tags);
+    custInputs.annual_income = numInput(f.annual_income);
+    custInputs.household_income = input(f.household_income);
+    custInputs.properties_info = input(f.properties_info);
+    custInputs.first_contact_date = dateInput(f.first_contact_date);
+
+    customerSection = node('div', {});
+    customerSection.append(node('h4', '', '客户业务信息（customers）'));
+    customerSection.append(
+      row(field('来源', custInputs.source), field('爱好', custInputs.hobbies)),
+      field('客户经营阶段', custInputs.customer_stage),
+      row(field('销售优先级', custInputs.sales_priority),
+        field('招募优先级', custInputs.recruitment_priority),
+        field('转介绍优先级', custInputs.referral_priority)),
+      field('附加信息', custInputs.additional_info),
+      row(field('婚况', custInputs.marital_status), field('标签', custInputs.tags)),
+      row(field('年收入', custInputs.annual_income), field('家庭收入', custInputs.household_income)),
+      field('房产信息', custInputs.properties_info),
+      field('首次接触日期', custInputs.first_contact_date),
+    );
+  }
+
+  body.replaceChildren(personSection);
+  if (customerSection) body.append(customerSection);
+  saveBtn.disabled = false;
+
+  saveBtn.onclick = async () => {
+    if (!nameInput.value.trim()) { window.alert('姓名必填'); return; }
+    saveBtn.disabled = true; saveBtn.textContent = '保存中…';
+
+    // persons 域变更
+    const personChanged = {};
+    const pput = (key, val, orig) => { if (String(val ?? '') !== String(orig ?? '')) personChanged[key] = val; };
+    pput('displayName', nameInput.value.trim(), f.customer_name);
+    pput('phone', phoneInput.value.trim(), f.phone);
+    pput('birthday', birthdayInput.value || null, String(f.birthday || '').slice(0, 10));
+    pput('gender', genderSel.value || null, f.gender || '');
+    pput('wechat', wechatInput.value.trim(), f.wx_account);
+    pput('occupation', occupationInput.value.trim(), f.occupation);
+    pput('organization', organizationInput.value.trim(), f.organization);
+    pput('education', educationInput.value.trim(), f.education);
+    if (!linked) pput('notes', notesTa.value, f.additional_info);
+
+    // customers 域变更
+    const custChanged = {};
+    const cput = (key, val, orig) => { if (String(val ?? '') !== String(orig ?? '')) custChanged[key] = val; };
+    if (linked && customerId) {
+      cput('source', custInputs.source.value.trim(), f.source);
+      cput('hobbies', custInputs.hobbies.value.trim(), f.hobbies);
+      cput('customer_stage', custInputs.customer_stage.value || null, f.customer_stage || '');
+      cput('sales_priority', custInputs.sales_priority.value || null, f.sales_priority || '');
+      cput('recruitment_priority', custInputs.recruitment_priority.value || null, f.recruitment_priority || '');
+      cput('referral_priority', custInputs.referral_priority.value || null, f.referral_priority || '');
+      cput('additional_info', custInputs.additional_info.value, f.additional_info);
+      cput('marital_status', custInputs.marital_status.value || null, f.marital_status || '');
+      cput('tags', custInputs.tags.value.trim(), f.tags);
+      cput('annual_income', custInputs.annual_income.value === '' ? null : Number(custInputs.annual_income.value), f.annual_income);
+      cput('household_income', custInputs.household_income.value.trim(), f.household_income);
+      cput('properties_info', custInputs.properties_info.value.trim(), f.properties_info);
+      cput('first_contact_date', custInputs.first_contact_date.value || null, String(f.first_contact_date || '').slice(0, 10));
+    }
+
+    try {
+      if (Object.keys(personChanged).length) {
+        // 后端 dispatcher 取 event.data（与 console write.js 一致），参数必须包在 data 里
+        const res = await callFn('person_360', {
+          action: 'updatePerson',
+          data: { personId: String(personId), expectedUpdatedAt, ...personChanged },
+        });
+        if (!res || res.error || res.ok === false) {
+          throw new Error((res && (res.message || res.error)) || '人物资料保存失败');
+        }
+      }
+      if (Object.keys(custChanged).length) {
+        const res = await callFn('customers', {
+          action: 'update', id: Number(customerId), data: custChanged, editSource: 'form',
+        });
+        if (!res || res.error) {
+          throw new Error((res && (res.message || res.error)) || '客户资料保存失败');
+        }
+      }
+      overlay.remove();
+      await renderPerson360({ root, personId, callFn, openLegacyTab });
+    } catch (err) {
+      window.alert(`保存失败：${err.message}`);
+      saveBtn.disabled = false; saveBtn.textContent = '保存';
+    }
+  };
 }

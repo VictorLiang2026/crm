@@ -5,7 +5,7 @@
  *   get:    { action:'get', id } → { customer, followups, products, gifts, photos, recommendations, reports }
  *           reports = 保单检视报告最近 10 条（按 report_date DESC, id DESC）
  *   create: { action:'create', data:{...} } → { id }
- *   update: { action:'update', id, data:{...} } → { ok }
+ *   update: { action:'update', id, data:{...}, editSource?:'form', forceRestore?:true } → { ok }
  *   remove: { action:'remove', id } → { ok, cascaded }（软删除 deleted_at，级联标记子记录）
  *   trashList: { action:'trashList', page?, pageSize?, keyword?, sortDir? } → { rows, total, page, pageSize }
  *              （回收站：已删除客户 + 级联删除的子记录计数，默认按删除时间倒序）
@@ -151,40 +151,48 @@ async function create(event) {
   }
 
   let personId;
-  if (resolution.candidates.length > 1) {
-    // 同名不同人 → 不自动选择；人工确认走 Person 身份解析流程
-    return { error: '存在多个同名人物，请通过 Person 身份解析确认后关联', code: 'PERSON_AMBIGUOUS',
-      candidates: resolution.candidates.map(c => ({ id: c.id, displayName: c.displayName,
-        organization: c.organization, occupation: c.occupation })) };
-  } else if (resolution.candidates.length === 1) {
-    const candidate = resolution.candidates[0];
-    if (candidate.legacyCustomerId) {
-      return { error: '同名人物已关联其他客户（#' + candidate.legacyCustomerId + '），请通过 Person 身份解析确认',
-        code: 'PERSON_ALREADY_LINKED' };
+  try {
+    if (resolution.candidates.length > 1) {
+      // 同名不同人 → 不自动选择；人工确认走 Person 身份解析流程
+      return { error: '存在多个同名人物，请通过 Person 身份解析确认后关联', code: 'PERSON_AMBIGUOUS',
+        candidates: resolution.candidates.map(c => ({ id: c.id, displayName: c.displayName,
+          organization: c.organization, occupation: c.occupation })) };
+    } else if (resolution.candidates.length === 1) {
+      const candidate = resolution.candidates[0];
+      if (candidate.legacyCustomerId) {
+        return { error: '同名人物已关联其他客户（#' + candidate.legacyCustomerId + '），请通过 Person 身份解析确认',
+          code: 'PERSON_ALREADY_LINKED' };
+      }
+      personId = candidate.id;
+      // 唯一匹配 → 基础字段经边界写入该 Person（空值不覆盖既有值）
+      const nonempty = Object.fromEntries(Object.entries(basic)
+        .filter(([, v]) => !(v == null || (typeof v === 'string' && v.trim() === ''))));
+      if (Object.keys(nonempty).length) {
+        const wr = await personService().updateBasicsWithProjection(personId, nonempty);
+        if (!wr.ok) return { error: wr.message || 'Person 基础资料写入冲突，请刷新重试', code: 'PERSON_CONFLICT' };
+      }
+    } else {
+      // 无匹配 → 经边界口径创建新 Person（source 标记客户建档）
+      const personPayload = {
+        display_name: resolution.displayName,
+        name_key: nameKey,
+        phone: basic.phone ?? null,
+        wechat: basic.wechat ?? null,
+        gender: basic.gender ?? null,
+        birthday: basic.birthday ?? null,
+        occupation: basic.occupation ?? null,
+        education: basic.education ?? null,
+        source: '客户建档',
+      };
+      // persons 写入必须走 service_role 受控通道（rdb/anon 无 INSERT 权限）
+      const created = await personService().createPerson(personPayload);
+      personId = created.id;
     }
-    personId = candidate.id;
-    // 唯一匹配 → 基础字段经边界写入该 Person（空值不覆盖既有值）
-    const nonempty = Object.fromEntries(Object.entries(basic)
-      .filter(([, v]) => !(v == null || (typeof v === 'string' && v.trim() === ''))));
-    if (Object.keys(nonempty).length) {
-      const wr = await personService().updateBasicsWithProjection(personId, nonempty);
-      if (!wr.ok) return { error: wr.message || 'Person 基础资料写入冲突，请刷新重试', code: 'PERSON_CONFLICT' };
+  } catch (e) {
+    if (e instanceof PersonResolutionError) {
+      return { error: e.message, code: e.code, detail: e.cause || undefined };
     }
-  } else {
-    // 无匹配 → 经边界口径创建新 Person（source 标记客户建档）
-    const personPayload = {
-      display_name: resolution.displayName,
-      name_key: nameKey,
-      phone: basic.phone ?? null,
-      wechat: basic.wechat ?? null,
-      gender: basic.gender ?? null,
-      birthday: basic.birthday ?? null,
-      occupation: basic.occupation ?? null,
-      education: basic.education ?? null,
-      source: '客户建档',
-    };
-    const pr = assertOk(await rdb.from('persons').insert(personPayload).select('id'));
-    personId = pr.data[0].id;
+    throw e;
   }
 
   // customers 业务字段建行（含基础字段投影值，保持旧客户端读到一致值）；
@@ -218,8 +226,10 @@ async function update(event) {
   );
 
   // PMC-08: OCR 恢复保护——检测疑似快照整包覆盖（仅针对基础字段）
+  // editSource:'form' 为人工表单逐字段编辑（人工点确定即确认），不属于快照恢复，跳过本守卫；
+  // OCR 恢复/AI 应用等其它调用方不传该标志，守卫行为不变。
   const bridgeFieldsInPayload = Object.keys(basicIn);
-  const isSnapshotRestore = bridgeFieldsInPayload.length >= 3;
+  const isSnapshotRestore = bridgeFieldsInPayload.length >= 3 && event.editSource !== 'form';
 
   if (isSnapshotRestore && !event.forceRestore) {
     // 疑似 OCR 快照恢复：比较当前值，有冲突则要求重新预览
@@ -282,7 +292,7 @@ async function update(event) {
       }
     } catch (e) {
       if (e instanceof PersonResolutionError) {
-        return { error: e.message, code: e.code, customerId: id };
+        return { error: e.message, code: e.code, customerId: id, detail: e.cause || undefined };
       }
       throw e;
     }

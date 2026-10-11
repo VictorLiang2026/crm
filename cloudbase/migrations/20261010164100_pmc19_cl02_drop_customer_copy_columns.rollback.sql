@@ -7,7 +7,7 @@
 --   (constraint customers_person_id_fkey, PMC-17), so the UPDATE ... FROM persons below
 --   restores their copy values too; nothing is left as an empty column. Soft-deleted
 --   customers are included (their Person rows are retained, also soft-deleted).
---
+
 -- Chain ordering: this rollback assumes persons columns display_name/phone/birthday/
 -- gender/occupation/education/wechat are intact (they are the authority). Apply BEFORE
 -- redeploying pre-CL-02 application code (tag release-20261010093000). If you also need

@@ -67,6 +67,67 @@ function personId(value) {
   return String(value);
 }
 
+// 受控建档允许的 persons 列白名单（created_at/updated_at/id/delete_batch_id 等由库侧管理）
+const PERSON_INSERT_FIELDS = new Set([
+  'display_name', 'name_key', 'phone', 'wechat', 'gender', 'birthday',
+  'occupation', 'organization', 'education', 'source',
+]);
+
+function safeJsonParse(text) {
+  try { return JSON.parse(text); } catch (e) { return null; }
+}
+
+// persons 受控写入通道：node-sdk rdb 网关在库内映射为 anon，而 persons 仅授予 anon
+// SELECT（persons_anon_read），写权限只给 service_role（persons_service_only）。
+// 因此所有 persons 写入必须与 person_360 pgRequest 一样，使用服务端 service_role
+// 受控密钥直连 PostgREST；密钥只存在于函数环境变量，绝不下发客户端。
+async function personRestWrite(method, filters, body) {
+  const env = process.env.TCB_ENV;
+  const key = process.env.CRM_PERSON360_DB_API_KEY;
+  if (!/^crm-[a-z0-9]+$/.test(env || '') || !key) {
+    throw new PersonResolutionError('INVALID_CONFIG', 'Person write channel is not configured');
+  }
+  if (method !== 'POST' && method !== 'PATCH') {
+    throw new PersonResolutionError('INVALID_CONFIG', 'Unsupported person write method');
+  }
+  const url = new URL(`https://${env}.api.tcloudbasegateway.com/v1/rdb/rest/persons`);
+  for (const [name, value] of Object.entries(filters || {})) {
+    url.searchParams.set(name, String(value));
+  }
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
+  try {
+    const response = await fetch(url, {
+      method,
+      headers: {
+        Authorization: `Bearer ${key}`,
+        'Accept-Profile': 'public',
+        'Content-Profile': 'public',
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        Prefer: 'return=representation',
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    const text = await response.text();
+    if (!response.ok) {
+      const detail = safeJsonParse(text);
+      throw new PersonResolutionError('WRITE_FAILED',
+        'Person write failed (' + response.status + ')',
+        detail && (detail.message || detail.error) || text.slice(0, 300));
+    }
+    const rows = text ? JSON.parse(text) : [];
+    if (!Array.isArray(rows)) throw new PersonResolutionError('WRITE_FAILED', 'Unexpected person write response');
+    return rows;
+  } catch (error) {
+    if (error instanceof PersonResolutionError) throw error;
+    throw new PersonResolutionError('WRITE_FAILED', 'Person write request failed: ' + error.message);
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 class PersonService {
   constructor({ rdb, request } = {}) {
     if ((!rdb || typeof rdb.from !== 'function') && typeof request !== 'function') {
@@ -202,17 +263,15 @@ class PersonService {
     if (!Array.isArray(exist.data) || exist.data.length !== 1) {
       throw new PersonResolutionError('PERSON_NOT_FOUND', 'Person not found or deleted: ' + pid);
     }
-    let query = this.rdb.from('persons').update(payload)
-      .eq('id', pid).is('deleted_at', null);
-    if (expectedUpdatedAt) query = query.eq('updated_at', expectedUpdatedAt);
-    const wr = await query.select('id, updated_at');
-    if (!wr || wr.error) {
-      throw new PersonResolutionError('WRITE_FAILED', 'Person update failed', wr?.error);
-    }
-    if (!Array.isArray(wr.data) || wr.data.length === 0) {
+    // persons 写入走 service_role 受控 REST（anon 网关无 persons 写权限）；
+    // 读预检仍走 rdb（anon 对未删除行有 SELECT）。
+    const filters = { id: `eq.${pid}`, deleted_at: 'is.null' };
+    if (expectedUpdatedAt) filters.updated_at = `eq.${expectedUpdatedAt}`;
+    const rows = await personRestWrite('PATCH', filters, payload);
+    if (rows.length === 0) {
       return { ok: false, conflict: true, message: 'Concurrent modification detected; refresh and retry' };
     }
-    const personRow = wr.data[0];
+    const personRow = rows[0];
 
     let projectionResult = null;
     if (projection && projection.table && projection.match &&
@@ -231,6 +290,30 @@ class PersonService {
       }
     }
     return { ok: true, id: pid, updatedAt: personRow.updated_at, projectionUpdated: projectionResult };
+  }
+
+  // PMC-17 建档边界：resolveName 确认无匹配后由本方法创建 Person；只接受白名单列。
+  // 同样必须走 service_role 受控 REST（rdb/anon 无 persons INSERT 权限）。
+  async createPerson(fields) {
+    if (!fields || typeof fields !== 'object' || Array.isArray(fields)) {
+      throw new PersonResolutionError('INVALID_PAYLOAD', 'fields must be an object');
+    }
+    const payload = {};
+    for (const [key, value] of Object.entries(fields)) {
+      if (!PERSON_INSERT_FIELDS.has(key)) {
+        throw new PersonResolutionError('FIELD_NOT_ALLOWED', 'Field not insertable: ' + key);
+      }
+      payload[key] = (typeof value === 'string' && value.trim() === '') ? null : value;
+    }
+    if (!payload.display_name || !payload.name_key) {
+      throw new PersonResolutionError('INVALID_PAYLOAD', 'display_name and name_key are required');
+    }
+    const rows = await personRestWrite('POST', {}, payload);
+    const row = rows[0];
+    if (!row || row.id == null) {
+      throw new PersonResolutionError('WRITE_FAILED', 'Person create returned no id');
+    }
+    return { id: String(row.id), row };
   }
 }
 

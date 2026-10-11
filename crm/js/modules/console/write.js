@@ -869,7 +869,8 @@ export function openPersonEdit(ctx, { personId, onDone } = {}) {
     sheet.swap(body);
 
     async function doSave(btn) {
-      const data = { personId: String(personId), expectedUpdatedAt: f.updated_at };
+      // linked 人物的 f.updated_at 属于 customers 行；乐观锁必须使用 persons 版本号 person_updated_at
+      const data = { personId: String(personId), expectedUpdatedAt: f.person_updated_at || f.updated_at };
       const changed = {};
       const put = (key, val, orig) => { if (String(val ?? '') !== String(orig ?? '')) changed[key] = val; };
       put('displayName', nameInput.value.trim(), f.customer_name);

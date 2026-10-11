@@ -34,10 +34,13 @@ async function getCustomerProfile(personId, { request, disclose = testData.discl
     additional_info: person.notes, updated_at: person.updated_at,
   };
   // PMC-20：人物当前基础信息只来自 persons；客户行仅提供销售/增员域字段。
+  // person_updated_at：persons 行版本号，供 updatePerson 乐观锁使用（linked 时
+  // fields.updated_at 是 customers.updated_at，不能用于 persons 的乐观锁比对）。
   const personIdentity = {
     customer_name: person.display_name, phone: person.phone, wx_account: person.wechat,
     gender: person.gender, birthday: person.birthday, occupation: person.occupation,
     organization: person.organization, education: person.education,
+    person_updated_at: person.updated_at,
   };
   const fields = customer
     ? Object.assign({}, customer, personIdentity)
