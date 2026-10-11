@@ -5,7 +5,7 @@
 import { h } from '../dom.js';
 import { ic } from '../icons.js';
 import { data } from '../data.js';
-import { openWorkItemDone, openOpportunityAdvance, openQuickCapture, openPersonEdit } from '../write.js';
+import { openWorkItemDone, openOpportunityAdvance, openQuickCapture, openPersonEdit, openPersonDelete } from '../write.js';
 import {
   wpTag, pageHead, emptyNote, loadInto, bdg, kvGrid, sectionTitle,
   fmtDate, weekdayCN, dueLabel, toneByDue, textOf,
@@ -547,6 +547,13 @@ export function renderPerson(ctx, id) {
           onclick: () => openQuickCapture(wctx, { personId: String(id), onDone: wctx.onWriteDone }),
           title: t('btn_record_comm_full'),
         }, [ic('mic'), t('btn_record_comm')]),
+        h('button', {
+          class: 'btn btn-ghost', type: 'button', style: 'color:var(--red)',
+          onclick: () => openPersonDelete(wctx, {
+            personId: String(id), displayName: titleNode.textContent,
+            onDone: () => { location.hash = '#/people'; },
+          }),
+        }, [ic('trash'), t('btn_delete_person')]),
         h('a', {
           class: 'btn btn-ghost', href: `/crm/admin.html#/person/${id}`,
           target: '_blank', rel: 'noopener',

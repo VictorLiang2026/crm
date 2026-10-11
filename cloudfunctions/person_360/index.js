@@ -119,7 +119,8 @@ async function pgRpc(name, body) {
     'crm_person_only_recruit_delete_v1', 'crm_work_item_preview_v1',
     'crm_work_item_execute_v1', 'crm_opportunity_preview_v1',
     'crm_opportunity_execute_v1','crm_activity_review_preview_v1',
-    'crm_activity_review_execute_v1']).has(name)) throw new Error('Invalid RPC');
+    'crm_activity_review_execute_v1','crm_person_delete_preview_v1',
+    'crm_person_delete_execute_v1','crm_person_restore_v1']).has(name)) throw new Error('Invalid RPC');
   const env = process.env.TCB_ENV;
   const key = process.env.CRM_PERSON360_DB_API_KEY;
   if (!/^crm-[a-z0-9]+$/.test(env || '') || !key) throw new Error('Person 360 is not configured');
@@ -142,7 +143,7 @@ async function pgRpc(name, body) {
     if (!response.ok) {
       const problem = await response.json().catch(() => null);
       const message = typeof problem?.message === 'string' ? problem.message : '';
-      if (/^(Invalid |Selected Person|Same-name|Deleted identity|Customer |Preview |Identity candidates|Active Person|Person-only recruit|Test account|Test parent|Idempotency key|Unauthorized|Speaker profile|Work item|Action |Commitment |Opportunity |Person changed|Activity |Outcome )/.test(message)) {
+      if (/^(Invalid |Selected Person|Same-name|Deleted identity|Customer |Preview |Identity candidates|Active Person|Person-only recruit|Test account|Test parent|Idempotency key|Unauthorized|Speaker profile|Work item|Action |Commitment |Opportunity |Person changed|Person not found|Activity |Outcome )/.test(message)) {
         throw new Error(message);
       }
       throw new Error(`Database request failed (${response.status})`);
@@ -397,6 +398,58 @@ function createService({ request = pgRequest, rpc = pgRpc, disclosure = disclose
         message: 'Concurrent modification detected; please refresh and retry' };
     }
     return { ok: true, updated: true, id: personId, updatedAt: payload.updated_at };
+  }
+
+  // Person 回收站（WP 人物删除）：删除走 preview→execute 三段式，恢复对齐旧回收站直接执行。
+  const COMMAND_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+  async function previewPersonDelete(data, uid) {
+    if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('Invalid person delete command');
+    const key = String(data.idempotencyKey || '');
+    if (!COMMAND_UUID.test(key)) throw new Error('Invalid idempotency key');
+    const personId = idOf(data.personId);
+    return rpc('crm_person_delete_preview_v1', {
+      p_actor_uid: uid, p_idempotency_key: key, p_person_id: Number(personId),
+    });
+  }
+
+  async function executePersonDelete(data, uid) {
+    const previewId = String(data?.previewId || '');
+    if (!COMMAND_UUID.test(previewId)) throw new Error('Invalid preview ID');
+    return rpc('crm_person_delete_execute_v1', { p_actor_uid: uid, p_preview_id: previewId });
+  }
+
+  async function restorePerson(data, uid) {
+    if (typeof uid !== 'string' || !uid.trim()) throw new Error('Unauthorized person restore');
+    const personId = idOf(data?.personId ?? data);
+    return rpc('crm_person_restore_v1', { p_actor_uid: uid, p_person_id: Number(personId) });
+  }
+
+  async function listPersonTrash(event = {}) {
+    const { page, pageSize, offset } = directoryPage(event);
+    const rows = await request('persons', 'GET', {
+      select: 'id,display_name,occupation,organization,updated_at,deleted_at,delete_batch_id',
+      deleted_at: 'not.is.null', order: 'deleted_at.desc,id.desc',
+      limit: pageSize + 1, offset,
+    });
+    const pageRows = rows.slice(0, pageSize);
+    const personIds = pageRows.map(row => row.id);
+    const customers = personIds.length ? await request('customers', 'GET', {
+      select: 'Id,person_id,deleted_at', person_id: `in.(${personIds.join(',')})`, limit: pageSize,
+    }) : [];
+    const customerByPerson = new Map(customers.map(c => [String(c.person_id), c]));
+    for (const row of pageRows) {
+      const c = customerByPerson.get(String(row.id));
+      row.customer_id = c ? c.Id : null;
+      row.customer_deleted = c ? c.deleted_at != null : false;
+      // 无批次标记的历史删除行只能恢复人物本体，关联数据不可考。
+      row.batch_scoped = row.delete_batch_id != null;
+      delete row.delete_batch_id;
+    }
+    return {
+      rows: pageRows, page, pageSize,
+      hasMore: rows.length > pageSize,
+    };
   }
 
   async function listOpportunityDirectory(event = {}) {
@@ -754,6 +807,7 @@ function createService({ request = pgRequest, rpc = pgRpc, disclosure = disclose
 
   return { get, lookupCustomer, search, saveFacts, addMember, removeMember,
     listPeople, listOpportunityDirectory, resolveIdentity, previewIdentity, executeIdentity,
+    updatePerson, previewPersonDelete, executePersonDelete, restorePerson, listPersonTrash,
     listPersonOnlyRecruits, getPersonOnlyRecruit, listPersonOnlyRecruitTrash,
     changePersonOnlyRecruit,
     listOpportunities, listRecruitContext, createOpportunity, updateOpportunity, closeOpportunity, removeOpportunity,
@@ -782,6 +836,10 @@ exports.main = async event => {
       case 'previewIdentity': return await service.previewIdentity(event.data, uid);
       case 'executeIdentity': return await service.executeIdentity(event.data, uid);
       case 'updatePerson': return await service.updatePerson(event.data, uid);
+      case 'previewPersonDelete': return await service.previewPersonDelete(event.data, uid);
+      case 'executePersonDelete': return await service.executePersonDelete(event.data, uid);
+      case 'restorePerson': return await service.restorePerson(event.data, uid);
+      case 'listPersonTrash': return await service.listPersonTrash(event);
       case 'listOpportunityDirectory': return await service.listOpportunityDirectory(event);
       case 'listPendingOpportunityCandidates': return await new OpportunityWorkflowService({request:pgRequest,rpc:pgRpc}).listPending(uid);
       case 'listOpportunities': return await service.listOpportunities(event.personId);

@@ -1,6 +1,6 @@
 // Console 路由：hash 精确表 + 详情正则；未知路由回落到今日。
 import {
-  renderToday, renderPeople, renderPerson, renderOpportunities,
+  renderToday, renderPeople, renderPeopleTrash, renderPerson, renderOpportunities,
   renderActivities, renderActivity, renderRecruit, renderAI, renderMore,
   renderSettings,
 } from './views.js';
@@ -8,6 +8,7 @@ import {
 const EXACT = new Map([
   ['#/today', renderToday],
   ['#/people', renderPeople],
+  ['#/people-trash', renderPeopleTrash],
   ['#/opportunities', renderOpportunities],
   ['#/activities', renderActivities],
   ['#/recruit', renderRecruit],
@@ -25,6 +26,7 @@ const NAV_OF = {
   '#/': '#/today',
   '#/today': '#/today',
   '#/people': '#/people',
+  '#/people-trash': '#/people',
   '#/opportunities': '#/opportunities',
   '#/activities': '#/activities',
   '#/recruit': '#/recruit',

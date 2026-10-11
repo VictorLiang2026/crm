@@ -527,13 +527,104 @@
     },
     {
       "kind": "relation",
-      "name": "crm_work_item_commands",
+      "name": "crm_activity_review_commands",
       "detail": {
         "rls": true,
         "type": "r",
         "policies": [
           {
-            "name": "crm_work_item_commands_service_only",
+            "name": "crm_activity_review_commands_service_only",
+            "roles": [
+              "service_role"
+            ],
+            "command": "*",
+            "check_hash": "b326b5062b2f0e69046810717534cb09",
+            "permissive": true,
+            "using_hash": "b326b5062b2f0e69046810717534cb09"
+          }
+        ],
+        "force_rls": true,
+        "privileges": {
+          "anon": [],
+          "service_role": [
+            "INSERT",
+            "SELECT",
+            "UPDATE"
+          ],
+          "authenticated": []
+        },
+        "security_invoker": false
+      }
+    },
+    {
+      "kind": "relation",
+      "name": "crm_activity_review_source_claims",
+      "detail": {
+        "rls": true,
+        "type": "r",
+        "policies": [
+          {
+            "name": "crm_activity_review_source_claims_service_only",
+            "roles": [
+              "service_role"
+            ],
+            "command": "*",
+            "check_hash": "b326b5062b2f0e69046810717534cb09",
+            "permissive": true,
+            "using_hash": "b326b5062b2f0e69046810717534cb09"
+          }
+        ],
+        "force_rls": true,
+        "privileges": {
+          "anon": [],
+          "service_role": [
+            "INSERT",
+            "SELECT"
+          ],
+          "authenticated": []
+        },
+        "security_invoker": false
+      }
+    },
+    {
+      "kind": "relation",
+      "name": "crm_opportunity_action_links",
+      "detail": {
+        "rls": true,
+        "type": "r",
+        "policies": [
+          {
+            "name": "crm_opportunity_action_links_service_only",
+            "roles": [
+              "service_role"
+            ],
+            "command": "*",
+            "check_hash": "b326b5062b2f0e69046810717534cb09",
+            "permissive": true,
+            "using_hash": "b326b5062b2f0e69046810717534cb09"
+          }
+        ],
+        "force_rls": true,
+        "privileges": {
+          "anon": [],
+          "service_role": [
+            "INSERT",
+            "SELECT"
+          ],
+          "authenticated": []
+        },
+        "security_invoker": false
+      }
+    },
+    {
+      "kind": "relation",
+      "name": "crm_opportunity_commands",
+      "detail": {
+        "rls": true,
+        "type": "r",
+        "policies": [
+          {
+            "name": "crm_opportunity_commands_service_only",
             "roles": [
               "service_role"
             ],
@@ -627,6 +718,37 @@
         "policies": [
           {
             "name": "crm_test_records_service_only",
+            "roles": [
+              "service_role"
+            ],
+            "command": "*",
+            "check_hash": "b326b5062b2f0e69046810717534cb09",
+            "permissive": true,
+            "using_hash": "b326b5062b2f0e69046810717534cb09"
+          }
+        ],
+        "force_rls": true,
+        "privileges": {
+          "anon": [],
+          "service_role": [
+            "INSERT",
+            "SELECT",
+            "UPDATE"
+          ],
+          "authenticated": []
+        },
+        "security_invoker": false
+      }
+    },
+    {
+      "kind": "relation",
+      "name": "crm_work_item_commands",
+      "detail": {
+        "rls": true,
+        "type": "r",
+        "policies": [
+          {
+            "name": "crm_work_item_commands_service_only",
             "roles": [
               "service_role"
             ],
@@ -1239,6 +1361,78 @@
     },
     {
       "kind": "relation",
+      "name": "person_delete_commands",
+      "detail": {
+        "rls": true,
+        "type": "r",
+        "policies": [
+          {
+            "name": "person_delete_commands_service_only",
+            "roles": [
+              "service_role"
+            ],
+            "command": "*",
+            "check_hash": "b326b5062b2f0e69046810717534cb09",
+            "permissive": true,
+            "using_hash": "b326b5062b2f0e69046810717534cb09"
+          }
+        ],
+        "force_rls": true,
+        "privileges": {
+          "anon": [],
+          "service_role": [
+            "DELETE",
+            "INSERT",
+            "MAINTAIN",
+            "REFERENCES",
+            "SELECT",
+            "TRIGGER",
+            "TRUNCATE",
+            "UPDATE"
+          ],
+          "authenticated": []
+        },
+        "security_invoker": false
+      }
+    },
+    {
+      "kind": "relation",
+      "name": "person_identity_commands",
+      "detail": {
+        "rls": true,
+        "type": "r",
+        "policies": [
+          {
+            "name": "person_identity_commands_service_only",
+            "roles": [
+              "service_role"
+            ],
+            "command": "*",
+            "check_hash": "b326b5062b2f0e69046810717534cb09",
+            "permissive": true,
+            "using_hash": "b326b5062b2f0e69046810717534cb09"
+          }
+        ],
+        "force_rls": true,
+        "privileges": {
+          "anon": [],
+          "service_role": [
+            "DELETE",
+            "INSERT",
+            "MAINTAIN",
+            "REFERENCES",
+            "SELECT",
+            "TRIGGER",
+            "TRUNCATE",
+            "UPDATE"
+          ],
+          "authenticated": []
+        },
+        "security_invoker": false
+      }
+    },
+    {
+      "kind": "relation",
       "name": "person_roles",
       "detail": {
         "rls": true,
@@ -1431,6 +1625,55 @@
           "service_role": [
             "INSERT",
             "SELECT",
+            "UPDATE"
+          ],
+          "authenticated": []
+        },
+        "security_invoker": false
+      }
+    },
+    {
+      "kind": "relation",
+      "name": "pmc18_observations",
+      "detail": {
+        "rls": true,
+        "type": "r",
+        "policies": [
+          {
+            "name": "pmc18_obs_read",
+            "roles": [
+              "anon",
+              "authenticated"
+            ],
+            "command": "r",
+            "check_hash": "d41d8cd98f00b204e9800998ecf8427e",
+            "permissive": true,
+            "using_hash": "b326b5062b2f0e69046810717534cb09"
+          },
+          {
+            "name": "pmc18_obs_service_all",
+            "roles": [
+              "service_role"
+            ],
+            "command": "*",
+            "check_hash": "b326b5062b2f0e69046810717534cb09",
+            "permissive": true,
+            "using_hash": "b326b5062b2f0e69046810717534cb09"
+          }
+        ],
+        "force_rls": false,
+        "privileges": {
+          "anon": [
+            "SELECT"
+          ],
+          "service_role": [
+            "DELETE",
+            "INSERT",
+            "MAINTAIN",
+            "REFERENCES",
+            "SELECT",
+            "TRIGGER",
+            "TRUNCATE",
             "UPDATE"
           ],
           "authenticated": []
@@ -1902,6 +2145,56 @@
     },
     {
       "kind": "relation",
+      "name": "v_recruit_candidates_person_only",
+      "detail": {
+        "rls": false,
+        "type": "v",
+        "policies": [],
+        "force_rls": false,
+        "privileges": {
+          "anon": [],
+          "service_role": [
+            "DELETE",
+            "INSERT",
+            "MAINTAIN",
+            "REFERENCES",
+            "SELECT",
+            "TRIGGER",
+            "TRUNCATE",
+            "UPDATE"
+          ],
+          "authenticated": []
+        },
+        "security_invoker": true
+      }
+    },
+    {
+      "kind": "relation",
+      "name": "v_recruit_candidates_person_only_trash",
+      "detail": {
+        "rls": false,
+        "type": "v",
+        "policies": [],
+        "force_rls": false,
+        "privileges": {
+          "anon": [],
+          "service_role": [
+            "DELETE",
+            "INSERT",
+            "MAINTAIN",
+            "REFERENCES",
+            "SELECT",
+            "TRIGGER",
+            "TRUNCATE",
+            "UPDATE"
+          ],
+          "authenticated": []
+        },
+        "security_invoker": true
+      }
+    },
+    {
+      "kind": "relation",
       "name": "v_recruit_candidates_trash",
       "detail": {
         "rls": false,
@@ -1989,6 +2282,26 @@
     },
     {
       "kind": "routine",
+      "name": "crm_activity_review_execute_v1(p_actor_uid text, p_preview_id uuid)",
+      "detail": {
+        "anon_execute": false,
+        "service_execute": true,
+        "security_definer": false,
+        "authenticated_execute": false
+      }
+    },
+    {
+      "kind": "routine",
+      "name": "crm_activity_review_preview_v1(p_actor_uid text, p_idempotency_key uuid, p_operation text, p_activity_id bigint, p_ai_result_id bigint, p_candidate_index integer, p_payload jsonb)",
+      "detail": {
+        "anon_execute": false,
+        "service_execute": true,
+        "security_definer": false,
+        "authenticated_execute": false
+      }
+    },
+    {
+      "kind": "routine",
       "name": "crm_customers_page_v1(p_page integer, p_page_size integer, p_keyword text, p_sort_field text, p_sort_dir text, p_today date, p_exact_name text)",
       "detail": {
         "anon_execute": true,
@@ -2009,6 +2322,46 @@
     },
     {
       "kind": "routine",
+      "name": "crm_opportunity_execute_v1(p_actor_uid text, p_preview_id uuid)",
+      "detail": {
+        "anon_execute": false,
+        "service_execute": true,
+        "security_definer": false,
+        "authenticated_execute": false
+      }
+    },
+    {
+      "kind": "routine",
+      "name": "crm_opportunity_preview_v1(p_actor_uid text, p_idempotency_key uuid, p_operation text, p_person_id bigint, p_opportunity_id bigint, p_payload jsonb)",
+      "detail": {
+        "anon_execute": false,
+        "service_execute": true,
+        "security_definer": false,
+        "authenticated_execute": false
+      }
+    },
+    {
+      "kind": "routine",
+      "name": "crm_person_delete_execute_v1(p_actor_uid text, p_preview_id uuid)",
+      "detail": {
+        "anon_execute": false,
+        "service_execute": true,
+        "security_definer": false,
+        "authenticated_execute": false
+      }
+    },
+    {
+      "kind": "routine",
+      "name": "crm_person_delete_preview_v1(p_actor_uid text, p_idempotency_key uuid, p_person_id bigint)",
+      "detail": {
+        "anon_execute": false,
+        "service_execute": true,
+        "security_definer": false,
+        "authenticated_execute": false
+      }
+    },
+    {
+      "kind": "routine",
       "name": "crm_person_only_recruit_delete_v1(p_actor_uid text, p_action text, p_ids bigint[])",
       "detail": {
         "anon_execute": false,
@@ -2019,37 +2372,7 @@
     },
     {
       "kind": "routine",
-      "name": "crm_recruit_goals_save_v1(p_goal_month text, p_goals jsonb, p_operator text)",
-      "detail": {
-        "anon_execute": true,
-        "service_execute": true,
-        "security_definer": false,
-        "authenticated_execute": false
-      }
-    },
-    {
-      "kind": "routine",
-      "name": "crm_work_item_execute_v1(p_actor_uid text, p_preview_id uuid)",
-      "detail": {
-        "anon_execute": false,
-        "service_execute": true,
-        "security_definer": false,
-        "authenticated_execute": false
-      }
-    },
-    {
-      "kind": "routine",
-      "name": "crm_work_item_preview_v1(p_actor_uid text, p_idempotency_key uuid, p_kind text, p_operation text, p_person_id bigint, p_item_id bigint, p_payload jsonb)",
-      "detail": {
-        "anon_execute": false,
-        "service_execute": true,
-        "security_definer": false,
-        "authenticated_execute": false
-      }
-    },
-    {
-      "kind": "routine",
-      "name": "crm_search_people_v1(p_template text, p_months integer, p_limit integer)",
+      "name": "crm_person_restore_v1(p_actor_uid text, p_person_id bigint)",
       "detail": {
         "anon_execute": false,
         "service_execute": true,
@@ -2079,11 +2402,41 @@
     },
     {
       "kind": "routine",
+      "name": "crm_recruit_goals_save_v1(p_goal_month text, p_goals jsonb, p_operator text)",
+      "detail": {
+        "anon_execute": true,
+        "service_execute": true,
+        "security_definer": false,
+        "authenticated_execute": false
+      }
+    },
+    {
+      "kind": "routine",
+      "name": "crm_search_people_v1(p_template text, p_months integer, p_limit integer)",
+      "detail": {
+        "anon_execute": false,
+        "service_execute": true,
+        "security_definer": false,
+        "authenticated_execute": false
+      }
+    },
+    {
+      "kind": "routine",
       "name": "crm_test_disclosure_v1(p_refs jsonb, p_scope text)",
       "detail": {
         "anon_execute": true,
         "service_execute": true,
         "security_definer": true,
+        "authenticated_execute": false
+      }
+    },
+    {
+      "kind": "routine",
+      "name": "crm_test_identity_command_guard_v1()",
+      "detail": {
+        "anon_execute": false,
+        "service_execute": true,
+        "security_definer": false,
         "authenticated_execute": false
       }
     },
@@ -2129,6 +2482,26 @@
     },
     {
       "kind": "routine",
+      "name": "crm_work_item_execute_v1(p_actor_uid text, p_preview_id uuid)",
+      "detail": {
+        "anon_execute": false,
+        "service_execute": true,
+        "security_definer": false,
+        "authenticated_execute": false
+      }
+    },
+    {
+      "kind": "routine",
+      "name": "crm_work_item_preview_v1(p_actor_uid text, p_idempotency_key uuid, p_kind text, p_operation text, p_person_id bigint, p_item_id bigint, p_payload jsonb)",
+      "detail": {
+        "anon_execute": false,
+        "service_execute": true,
+        "security_definer": false,
+        "authenticated_execute": false
+      }
+    },
+    {
+      "kind": "routine",
       "name": "learnings_guard()",
       "detail": {
         "anon_execute": false,
@@ -2149,6 +2522,46 @@
     },
     {
       "kind": "routine",
+      "name": "person_directory_page_v1(p_page integer, p_page_size integer, p_keyword text, p_sort_field text, p_sort_dir text)",
+      "detail": {
+        "anon_execute": false,
+        "service_execute": true,
+        "security_definer": false,
+        "authenticated_execute": false
+      }
+    },
+    {
+      "kind": "routine",
+      "name": "person_identity_execute_v1(p_actor_uid text, p_preview_id uuid)",
+      "detail": {
+        "anon_execute": false,
+        "service_execute": true,
+        "security_definer": false,
+        "authenticated_execute": false
+      }
+    },
+    {
+      "kind": "routine",
+      "name": "person_identity_preview_v1(p_actor_uid text, p_idempotency_key uuid, p_kind text, p_payload jsonb)",
+      "detail": {
+        "anon_execute": false,
+        "service_execute": true,
+        "security_definer": false,
+        "authenticated_execute": false
+      }
+    },
+    {
+      "kind": "routine",
+      "name": "pmc18_collect_metrics()",
+      "detail": {
+        "anon_execute": false,
+        "service_execute": true,
+        "security_definer": true,
+        "authenticated_execute": false
+      }
+    },
+    {
+      "kind": "routine",
       "name": "quick_capture_v2_command_v1(p_stage text, p_actor_uid text, p_command_id uuid, p_person_id bigint, p_selected_display_name text, p_draft jsonb, p_preview_hash text, p_ai_task_id bigint, p_ai_result_id bigint)",
       "detail": {
         "anon_execute": false,
@@ -2159,7 +2572,7 @@
     },
     {
       "kind": "routine",
-      "name": "quick_capture_v2_plan_v1(p_actor_uid text, p_person_id bigint, p_selected_display_name text, p_draft jsonb, p_ai_task_id bigint, p_ai_result_id bigint)",
+      "name": "quick_capture_v2_commit(p_person_id bigint, p_selected_display_name text, p_actor_uid text, p_interaction jsonb, p_facts jsonb, p_signals jsonb)",
       "detail": {
         "anon_execute": false,
         "service_execute": true,
@@ -2169,7 +2582,7 @@
     },
     {
       "kind": "routine",
-      "name": "quick_capture_v2_commit(p_person_id bigint, p_selected_display_name text, p_actor_uid text, p_interaction jsonb, p_facts jsonb, p_signals jsonb)",
+      "name": "quick_capture_v2_plan_v1(p_actor_uid text, p_person_id bigint, p_selected_display_name text, p_draft jsonb, p_ai_task_id bigint, p_ai_result_id bigint)",
       "detail": {
         "anon_execute": false,
         "service_execute": true,
@@ -2498,6 +2911,17 @@
     },
     {
       "kind": "sequence",
+      "name": "pmc18_observations_id_seq",
+      "detail": {
+        "anon_read": true,
+        "anon_usage": true,
+        "service_usage": true,
+        "authenticated_read": true,
+        "authenticated_usage": true
+      }
+    },
+    {
+      "kind": "sequence",
       "name": "policy_review_reports_id_seq",
       "detail": {
         "anon_read": true,
@@ -2571,364 +2995,6 @@
         "service_usage": true,
         "authenticated_read": false,
         "authenticated_usage": false
-      }
-    },
-    {
-      "kind": "relation",
-      "name": "person_identity_commands",
-      "detail": {
-        "rls": true,
-        "type": "r",
-        "policies": [
-          {
-            "name": "person_identity_commands_service_only",
-            "roles": [
-              "service_role"
-            ],
-            "command": "*",
-            "check_hash": "b326b5062b2f0e69046810717534cb09",
-            "permissive": true,
-            "using_hash": "b326b5062b2f0e69046810717534cb09"
-          }
-        ],
-        "force_rls": true,
-        "privileges": {
-          "anon": [],
-          "service_role": [
-            "DELETE",
-            "INSERT",
-            "MAINTAIN",
-            "REFERENCES",
-            "SELECT",
-            "TRIGGER",
-            "TRUNCATE",
-            "UPDATE"
-          ],
-          "authenticated": []
-        },
-        "security_invoker": false
-      }
-    },
-    {
-      "kind": "relation",
-      "name": "v_recruit_candidates_person_only",
-      "detail": {
-        "rls": false,
-        "type": "v",
-        "policies": [],
-        "force_rls": false,
-        "privileges": {
-          "anon": [],
-          "service_role": [
-            "DELETE",
-            "INSERT",
-            "MAINTAIN",
-            "REFERENCES",
-            "SELECT",
-            "TRIGGER",
-            "TRUNCATE",
-            "UPDATE"
-          ],
-          "authenticated": []
-        },
-        "security_invoker": true
-      }
-    },
-    {
-      "kind": "relation",
-      "name": "v_recruit_candidates_person_only_trash",
-      "detail": {
-        "rls": false,
-        "type": "v",
-        "policies": [],
-        "force_rls": false,
-        "privileges": {
-          "anon": [],
-          "service_role": [
-            "DELETE",
-            "INSERT",
-            "MAINTAIN",
-            "REFERENCES",
-            "SELECT",
-            "TRIGGER",
-            "TRUNCATE",
-            "UPDATE"
-          ],
-          "authenticated": []
-        },
-        "security_invoker": true
-      }
-    },
-    {
-      "kind": "routine",
-      "name": "person_directory_page_v1(p_page integer, p_page_size integer, p_keyword text, p_sort_field text, p_sort_dir text)",
-      "detail": {
-        "anon_execute": false,
-        "service_execute": true,
-        "security_definer": false,
-        "authenticated_execute": false
-      }
-    },
-    {
-      "kind": "routine",
-      "name": "person_identity_execute_v1(p_actor_uid text, p_preview_id uuid)",
-      "detail": {
-        "anon_execute": false,
-        "service_execute": true,
-        "security_definer": false,
-        "authenticated_execute": false
-      }
-    },
-    {
-      "kind": "routine",
-      "name": "person_identity_preview_v1(p_actor_uid text, p_idempotency_key uuid, p_kind text, p_payload jsonb)",
-      "detail": {
-        "anon_execute": false,
-        "service_execute": true,
-        "security_definer": false,
-        "authenticated_execute": false
-      }
-    },
-    {
-      "kind": "routine",
-      "name": "crm_test_identity_command_guard_v1()",
-      "detail": {
-        "anon_execute": false,
-        "service_execute": true,
-        "security_definer": false,
-        "authenticated_execute": false
-      }
-    },
-    {
-      "kind": "relation",
-      "name": "crm_opportunity_action_links",
-      "detail": {
-        "rls": true,
-        "type": "r",
-        "policies": [
-          {
-            "name": "crm_opportunity_action_links_service_only",
-            "roles": [
-              "service_role"
-            ],
-            "command": "*",
-            "check_hash": "b326b5062b2f0e69046810717534cb09",
-            "permissive": true,
-            "using_hash": "b326b5062b2f0e69046810717534cb09"
-          }
-        ],
-        "force_rls": true,
-        "privileges": {
-          "anon": [],
-          "service_role": [
-            "INSERT",
-            "SELECT"
-          ],
-          "authenticated": []
-        },
-        "security_invoker": false
-      }
-    },
-    {
-      "kind": "relation",
-      "name": "crm_opportunity_commands",
-      "detail": {
-        "rls": true,
-        "type": "r",
-        "policies": [
-          {
-            "name": "crm_opportunity_commands_service_only",
-            "roles": [
-              "service_role"
-            ],
-            "command": "*",
-            "check_hash": "b326b5062b2f0e69046810717534cb09",
-            "permissive": true,
-            "using_hash": "b326b5062b2f0e69046810717534cb09"
-          }
-        ],
-        "force_rls": true,
-        "privileges": {
-          "anon": [],
-          "service_role": [
-            "INSERT",
-            "SELECT",
-            "UPDATE"
-          ],
-          "authenticated": []
-        },
-        "security_invoker": false
-      }
-    },
-    {
-      "kind": "routine",
-      "name": "crm_opportunity_execute_v1(p_actor_uid text, p_preview_id uuid)",
-      "detail": {
-        "anon_execute": false,
-        "service_execute": true,
-        "security_definer": false,
-        "authenticated_execute": false
-      }
-    },
-    {
-      "kind": "routine",
-      "name": "crm_opportunity_preview_v1(p_actor_uid text, p_idempotency_key uuid, p_operation text, p_person_id bigint, p_opportunity_id bigint, p_payload jsonb)",
-      "detail": {
-        "anon_execute": false,
-        "service_execute": true,
-        "security_definer": false,
-        "authenticated_execute": false
-      }
-    },
-    {
-      "kind": "relation",
-      "name": "crm_activity_review_commands",
-      "detail": {
-        "rls": true,
-        "type": "r",
-        "policies": [
-          {
-            "name": "crm_activity_review_commands_service_only",
-            "roles": [
-              "service_role"
-            ],
-            "command": "*",
-            "check_hash": "b326b5062b2f0e69046810717534cb09",
-            "permissive": true,
-            "using_hash": "b326b5062b2f0e69046810717534cb09"
-          }
-        ],
-        "force_rls": true,
-        "privileges": {
-          "anon": [],
-          "service_role": [
-            "INSERT",
-            "SELECT",
-            "UPDATE"
-          ],
-          "authenticated": []
-        },
-        "security_invoker": false
-      }
-    },
-    {
-      "kind": "relation",
-      "name": "crm_activity_review_source_claims",
-      "detail": {
-        "rls": true,
-        "type": "r",
-        "policies": [
-          {
-            "name": "crm_activity_review_source_claims_service_only",
-            "roles": [
-              "service_role"
-            ],
-            "command": "*",
-            "check_hash": "b326b5062b2f0e69046810717534cb09",
-            "permissive": true,
-            "using_hash": "b326b5062b2f0e69046810717534cb09"
-          }
-        ],
-        "force_rls": true,
-        "privileges": {
-          "anon": [],
-          "service_role": [
-            "INSERT",
-            "SELECT"
-          ],
-          "authenticated": []
-        },
-        "security_invoker": false
-      }
-    },
-    {
-      "kind": "routine",
-      "name": "crm_activity_review_execute_v1(p_actor_uid text, p_preview_id uuid)",
-      "detail": {
-        "anon_execute": false,
-        "service_execute": true,
-        "security_definer": false,
-        "authenticated_execute": false
-      }
-    },
-    {
-      "kind": "routine",
-      "name": "crm_activity_review_preview_v1(p_actor_uid text, p_idempotency_key uuid, p_operation text, p_activity_id bigint, p_ai_result_id bigint, p_candidate_index integer, p_payload jsonb)",
-      "detail": {
-        "anon_execute": false,
-        "service_execute": true,
-        "security_definer": false,
-        "authenticated_execute": false
-      }
-    },
-    {
-      "kind": "relation",
-      "name": "pmc18_observations",
-      "detail": {
-        "rls": true,
-        "type": "r",
-        "policies": [
-          {
-            "name": "pmc18_obs_read",
-            "roles": [
-              "anon",
-              "authenticated"
-            ],
-            "command": "r",
-            "check_hash": "d41d8cd98f00b204e9800998ecf8427e",
-            "permissive": true,
-            "using_hash": "b326b5062b2f0e69046810717534cb09"
-          },
-          {
-            "name": "pmc18_obs_service_all",
-            "roles": [
-              "service_role"
-            ],
-            "command": "*",
-            "check_hash": "b326b5062b2f0e69046810717534cb09",
-            "permissive": true,
-            "using_hash": "b326b5062b2f0e69046810717534cb09"
-          }
-        ],
-        "force_rls": false,
-        "privileges": {
-          "anon": [
-            "SELECT"
-          ],
-          "service_role": [
-            "DELETE",
-            "INSERT",
-            "MAINTAIN",
-            "REFERENCES",
-            "SELECT",
-            "TRIGGER",
-            "TRUNCATE",
-            "UPDATE"
-          ],
-          "authenticated": []
-        },
-        "security_invoker": false
-      }
-    },
-    {
-      "kind": "routine",
-      "name": "pmc18_collect_metrics()",
-      "detail": {
-        "anon_execute": false,
-        "service_execute": true,
-        "security_definer": true,
-        "authenticated_execute": false
-      }
-    },
-    {
-      "kind": "sequence",
-      "name": "pmc18_observations_id_seq",
-      "detail": {
-        "anon_read": true,
-        "anon_usage": true,
-        "service_usage": true,
-        "authenticated_read": true,
-        "authenticated_usage": true
       }
     }
   ]

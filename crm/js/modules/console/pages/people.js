@@ -122,8 +122,11 @@ export function renderPeople(ctx) {
         ic('search'), input,
         h('button', { class: 'btn btn-primary btn-sm', type: 'button', onclick: doSearch }, t('btn_search')),
       ]),
+      h('a', {
+        class: 'btn btn-ghost', href: '#/people-trash', style: 'margin-left:auto',
+      }, [ic('trash'), t('btn_trash')]),
       h('button', {
-        class: 'btn btn-primary', type: 'button', style: 'margin-left:auto',
+        class: 'btn btn-primary', type: 'button',
         onclick: () => openPersonNew(ctx, { onDone: (newId) => { if (newId) location.hash = `#/person/${newId}`; else runQuery(); } }),
       }, [ic('plus'), t('btn_new_person')]),
     ]),

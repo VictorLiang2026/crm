@@ -744,10 +744,28 @@ export function openPersonNew(ctx, { onDone } = {}) {
     if (candidates.length) {
       rows.push(h('p', { class: 'sheet-note', style: 'margin:0 0 8px' },
         `${t('identity_pick_existing')} ${t('identity_qualifier_hint')}`));
-      candidates.forEach((c) => rows.push(h('a', {
-        class: 'cand', href: `#/person/${c.id}`,
-        onclick: () => sheet.overlay.remove(),
-      }, `${c.displayName || c.display_name}（${c.occupation || t('occupation_empty')} · ${c.organization || t('organization_empty')}）#${c.id}`)));
+      candidates.forEach((c) => {
+        const cName = c.displayName || c.display_name;
+        const link = h('a', {
+          class: 'cand', href: `#/person/${c.id}`,
+          onclick: () => sheet.overlay.remove(),
+        }, `${cName}（${c.occupation || t('occupation_empty')} · ${c.organization || t('organization_empty')}）#${c.id}`);
+        const editBtn = h('button', {
+          class: 'btn btn-ghost btn-sm', type: 'button',
+          onclick: (e) => {
+            e.preventDefault(); e.stopPropagation();
+            openPersonEdit(ctx, { personId: c.id, onDone: () => doResolve(checkBtn) });
+          },
+        }, t('btn_edit'));
+        const delBtn = h('button', {
+          class: 'btn btn-ghost btn-sm', type: 'button', style: 'color:var(--red)',
+          onclick: (e) => {
+            e.preventDefault(); e.stopPropagation();
+            openPersonDelete(ctx, { personId: c.id, displayName: cName, onDone: () => doResolve(checkBtn) });
+          },
+        }, t('btn_delete'));
+        rows.push(h('div', { class: 'cand-wrap' }, [link, h('div', { class: 'cand-ops' }, [editBtn, delBtn])]));
+      });
     } else if (res.hasMore) {
       rows.push(h('div', { class: 'sheet-err' }, t('identity_has_more')));
     } else if (res.deletedIdentity) {
@@ -877,4 +895,64 @@ export function openPersonEdit(ctx, { personId, onDone } = {}) {
       } catch (err) { busy(btn, false, t('btn_save')); sheet.showErr(err.message); }
     }
   })();
+}
+
+// ---------- 人物：删除（服务端预览 → 人工确认 → 执行；级联软删除，回收站可恢复） ----------
+export function openPersonDelete(ctx, { personId, displayName, onDone } = {}) {
+  const sheet = openSheet({
+    title: t('del_person_title'), sub: displayName || `#${personId}`,
+    body: h('div', { class: 'muted' }, t('edit_loading')),
+  });
+  document.body.appendChild(sheet.overlay);
+  (async () => {
+    let pv;
+    try {
+      pv = await p360(ctx, 'previewPersonDelete', { data: { idempotencyKey: uuid(), personId: String(personId) } });
+    } catch (err) { sheet.showErr(err.message); return; }
+    const p = (pv && pv.preview) || {};
+    const cascade = [];
+    if (p.customerId) cascade.push(kvRow(t('del_cascade_customer'), `#${p.customerId}`));
+    if (p.recruitCount) cascade.push(kvRow(t('del_cascade_recruit'), `×${p.recruitCount}`));
+    if (p.opportunityCount) cascade.push(kvRow(t('del_cascade_opportunity'), `×${p.opportunityCount}`));
+    if (p.relationshipCount) cascade.push(kvRow(t('del_cascade_relationship'), `×${p.relationshipCount}`));
+    if (p.householdCount) cascade.push(kvRow(t('del_cascade_household'), `×${p.householdCount}`));
+    if (p.householdMembershipCount) cascade.push(kvRow(t('del_cascade_membership'), `×${p.householdMembershipCount}`));
+    if (p.participantCount) cascade.push(kvRow(t('del_cascade_participant'), `×${p.participantCount}`));
+    if (p.speakerCount) cascade.push(kvRow(t('del_cascade_speaker'), `×${p.speakerCount}`));
+    const ledger = t('del_ledger_note')
+      .replace('{interactions}', p.interactionCount || 0)
+      .replace('{actions}', p.openActionCount || 0)
+      .replace('{commitments}', p.openCommitmentCount || 0)
+      .replace('{contexts}', p.contextItemCount || 0);
+    const notes = [h('div', { class: 'sheet-note', style: 'margin-top:8px' }, ledger)];
+    if (p.customerAlreadyDeleted) {
+      notes.push(h('div', { class: 'sheet-note', style: 'margin-top:4px' }, t('del_customer_skip_note')));
+    }
+    if (!cascade.length) {
+      notes.push(h('div', { class: 'sheet-note', style: 'margin-top:4px' }, t('del_none_note')));
+    }
+    sheet.swap(h('div', {}, [
+      h('p', { class: 'sheet-note', style: 'margin:0 0 10px' }, t('del_person_preview_note')),
+      previewBlock([
+        kvRow(t('new_person_name'), p.displayName || displayName || `#${personId}`),
+        ...cascade,
+        ...notes,
+      ]),
+      h('div', { class: 'sheet-actions' }, [
+        h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => sheet.overlay.remove() }, t('cancel')),
+        h('button', { class: 'btn btn-primary', type: 'button', onclick: (e) => doDelete(e.currentTarget, pv) }, t('btn_confirm_delete')),
+      ]),
+    ]));
+  })();
+
+  async function doDelete(btn, pv) {
+    busy(btn, true, t('deleting'));
+    try {
+      const res = await p360(ctx, 'executePersonDelete', { data: { previewId: pv.previewId } });
+      if (!res || res.ok === false) throw new Error(t('delete_failed'));
+      sheet.overlay.remove();
+      ctx.toast(t('person_deleted'), 'ok');
+      if (onDone) onDone();
+    } catch (err) { busy(btn, false, t('btn_confirm_delete')); sheet.showErr(err.message); }
+  }
 }

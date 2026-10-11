@@ -31,6 +31,8 @@ export const data = {
 
   // ---------- 人物目录 ----------
   listPeople: (ctx, params) => p360(ctx, 'listPeople', params || {}),
+  listPersonTrash: (ctx, params) => p360(ctx, 'listPersonTrash', params || {}),
+  restorePerson: (ctx, personId) => p360(ctx, 'restorePerson', { data: { personId: String(personId) } }),
 
   // ---------- Person 360 ----------
   personHome: (ctx, personId) => p360(ctx, 'get', { personId }),
