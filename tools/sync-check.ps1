@@ -1,5 +1,5 @@
 # No deployment or business invocation. Errors must never become a green result.
-param([switch]$CloudOnly, [string[]]$PreservedUntracked = @())
+param([switch]$CloudOnly, [switch]$AllowPreservedDocs)
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $PSScriptRoot
 Set-Location $repo
@@ -14,9 +14,18 @@ try {
   & node (Join-Path $PSScriptRoot 'sync-shared.cjs') --check
   if ($LASTEXITCODE -ne 0) { throw 'Shared module hash check failed.' }
   if (!$CloudOnly) {
+    $preservedUntracked = @()
+    if ($AllowPreservedDocs) {
+      $preservedUntracked = @(
+        'docs/CRM Person中心系统现状与Codex执行计划 20261011 晚间复核版.docx',
+        'docs/CRM Person中心系统现状与Codex执行计划 20261011.docx',
+        'docs/testing/person-plan-20261011-snapshot.json',
+        'docs/work-packages/pc01-baseline-20261011.md'
+      )
+    }
     $trackedChanges = @(GitRead @('status','--porcelain','--untracked-files=no'))
     $untracked = @(GitRead @('ls-files','--others','--exclude-standard'))
-    $unexpectedUntracked = @($untracked | Where-Object { $_ -notin $PreservedUntracked })
+    $unexpectedUntracked = @($untracked | Where-Object { $_ -notin $preservedUntracked })
     if ($trackedChanges.Count -or $unexpectedUntracked.Count) {
       throw 'Uncommitted tracked changes or unapproved untracked files.'
     }
