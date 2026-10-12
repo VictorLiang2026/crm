@@ -114,7 +114,7 @@ async function pgRequest(table, method, filters = {}, body) {
 }
 
 async function pgRpc(name, body) {
-  if (!new Set(['quick_capture_v2_commit', 'person_directory_page_v1',
+  if (!new Set(['quick_capture_v2_commit', 'person_directory_page_v1', 'person_directory_filtered_page_v1',
     'person_identity_preview_v1', 'person_identity_execute_v1',
     'crm_person_only_recruit_delete_v1', 'crm_work_item_preview_v1',
     'crm_work_item_execute_v1', 'crm_opportunity_preview_v1',
@@ -274,10 +274,34 @@ function createService({ request = pgRequest, rpc = pgRpc, disclosure = disclose
       'referral_priority', 'latest_followup_date', 'next_followup_date'].includes(sortField) || !['asc', 'desc'].includes(sortDir)) {
       throw new Error('Invalid directory sort');
     }
-    return rpc('person_directory_page_v1', {
+    const rolesAllowed = new Set(['customer', 'recruit', 'referrer', 'speaker', 'participant', 'partner', 'alumni', 'other']);
+    const normalize = (values, allowed) => {
+      if (values != null && !Array.isArray(values)) throw new Error('Invalid directory filters');
+      const unique = [...new Set((values || []).map(String))];
+      if (unique.some(value => !allowed.has(value))) throw new Error('Invalid directory filters');
+      return unique;
+    };
+    const roles = normalize(event.roles, rolesAllowed);
+    const priorities = values => normalize(values, new Set(['A', 'B', 'C', 'D', 'E']));
+    const customerPriorities = priorities(event.customerPriorities);
+    const recruitPriorities = priorities(event.recruitPriorities);
+    const referralPriorities = priorities(event.referralPriorities);
+    if ((customerPriorities.length && !roles.includes('customer'))
+      || (recruitPriorities.length && !roles.includes('recruit'))
+      || (referralPriorities.length && !roles.includes('referrer'))) {
+      throw new Error('Priority filters require the matching role');
+    }
+    const rpcName = roles.length || customerPriorities.length || recruitPriorities.length || referralPriorities.length
+      ? 'person_directory_filtered_page_v1' : 'person_directory_page_v1';
+    const params = {
       p_page: page, p_page_size: pageSize, p_keyword: keyword,
       p_sort_field: sortField, p_sort_dir: sortDir,
+    };
+    if (rpcName === 'person_directory_filtered_page_v1') Object.assign(params, {
+      p_roles: roles, p_customer_priorities: customerPriorities,
+      p_recruit_priorities: recruitPriorities, p_referral_priorities: referralPriorities,
     });
+    return rpc(rpcName, params);
   }
 
   async function resolveIdentity(name) {

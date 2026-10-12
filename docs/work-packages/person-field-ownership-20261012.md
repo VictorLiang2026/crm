@@ -45,3 +45,12 @@
 - 根因：目录 RPC 默认使用 `id` 排序；函数在多表查询的窗口排序中展开未限定的列名，和招募记录的 `id` 冲突。排序 SQL 失败后被 Person 360 的通用错误包装隐藏。
 - 修复：迁移 `20261012130000_person_directory_sort_qualification` 为全部允许的排序字段映射明确表别名，并以 `p.id` 作稳定次序；接口、返回字段、分页和 service_role-only ACL 不变。迁移已应用并在远端历史中核验。回滚文件为同名 `.rollback.sql`。
 - 验证：目录 handler 与迁移静态回归 4/4 通过；远端函数定义包含别名限定；远端执行权限核验为 service_role=true、anon=false、authenticated=false。管理端函数调用受 CloudBase CAM 认证拦截，CLS 日志 Topic 未配置，因此未能通过当前管理工具直接调用生产 RPC；需在 Console 刷新页面确认列表展示。
+
+## 2026-10-12 人物列表筛选与转换标签修正
+
+- 筛选器现位于人物列表工具栏“搜索”右侧、“回收站”左侧；角色和对应优先级支持多选，只有点击搜索才应用。回收站恢复为单列表，不显示筛选器。
+- 新增双语字典项，招募转换列改为“转招募”，按钮按目标显示“转客户/转招募”；已存在的人物角色使用绿色/金色彩色徽标。
+- 新增 public RPC `person_directory_filtered_page_v1`，仅 `service_role` 可执行；旧 `person_directory_page_v1` 与回收站 RPC 保持不变。迁移 `20261012140000_person_directory_filters` 已应用，配对 rollback 已保存。
+- 本地验证：人物服务/SQL 静态测试 5/5 通过；security metadata evaluator 4/4 通过；模块化前端检查通过；后端 regression 36 PASS、0 FAIL、6 SKIP；JS 语法、`git diff --check` 及 58 份共享副本核对通过。
+- 发布完成：迁移 `20261012140000_person_directory_filters` 已应用；`person_360` 云函数部署成功；仅上传人物目录、回收站、i18n 与 Console 样式 4 个静态文件。云端核对通过：51 个可达页面资源一致，29 个云函数的 175 个源码/配置文件一致，`person_360` 在云端与本地源码匹配。
+- 最终验证：人物目录浏览器回归 3/3 PASS；WP01 为 `PASS_WITH_LIMITATIONS`，107 PASS、0 FAIL、5 SKIP，catalog 827 项无差异、匿名检查 61/61 PASS；明确保留 `login=MANUAL_LOGIN`、`service-runtime/live-writes/mobile=UNVERIFIED`。Git 提交、标签及 GitHub 同步结果见本轮交付报告。

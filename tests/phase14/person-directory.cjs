@@ -11,7 +11,7 @@ Module._load = function(name, parent, main) {
 const { createService, main } = require('../../cloudfunctions/person_360/index.js');
 Module._load = originalLoad;
 
-test('people directory delegates bounded sorting and pagination to public RPC', async () => {
+test('people directory delegates bounded sorting, pagination, and filters to public RPC', async () => {
   const calls = [];
   const service = createService({ rpc: async (name, params) => {
     calls.push({ name, params });
@@ -30,6 +30,11 @@ test('people directory delegates bounded sorting and pagination to public RPC', 
     assert.equal(calls.at(-1).params.p_sort_field, sortField);
     assert.equal(calls.at(-1).params.p_sort_dir, 'asc');
   }
+  await service.listPeople({ roles: ['recruit','customer','recruit'], customerPriorities: ['A','A'], recruitPriorities: ['B'] });
+  assert.deepEqual(calls.at(-1), { name: 'person_directory_filtered_page_v1', params: {
+    p_page: 1, p_page_size: 20, p_keyword: '', p_sort_field: 'id', p_sort_dir: 'desc',
+    p_roles: ['recruit','customer'], p_customer_priorities: ['A'], p_recruit_priorities: ['B'], p_referral_priorities: [],
+  } });
   await service.listPersonTrash({ roles: ['recruit','customer','recruit'],
     recruitPriorities: ['A','C','A'], customerPriorities: ['B'], referralPriorities: [] });
   assert.deepEqual(calls.at(-1), { name:'person_trash_page_v1', params: {
@@ -39,7 +44,9 @@ test('people directory delegates bounded sorting and pagination to public RPC', 
   await assert.rejects(service.listPeople({ keyword: '*' }), /Invalid directory keyword/);
   await assert.rejects(service.listPeople({ pageSize: 1000 }), /Invalid directory page/);
   await assert.rejects(service.listPeople({ sortField: 'phone' }), /Invalid directory sort/);
-  assert.equal(calls.length, 8);
+  await assert.rejects(service.listPeople({ roles: ['invalid'] }), /Invalid directory filters/);
+  await assert.rejects(service.listPeople({ roles: ['customer'], recruitPriorities: ['A'] }), /matching role/);
+  assert.equal(calls.length, 9);
 });
 
 test('opportunity directory maps explicit Person links before legacy customer links', async () => {

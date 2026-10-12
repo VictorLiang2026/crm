@@ -17,3 +17,19 @@ test('person directory SQL qualifies every allowlisted sort expression', () => {
   assert.match(sql, /current_user <> 'service_role'/);
 });
 
+test('filtered person directory SQL validates filters and limits execution to service_role', () => {
+  const root = path.resolve(__dirname, '../..');
+  const sql = fs.readFileSync(path.join(root, 'cloudbase/migrations/20261012140000_person_directory_filters.sql'), 'utf8');
+  const rollback = fs.readFileSync(path.join(root, 'cloudbase/migrations/20261012140000_person_directory_filters.rollback.sql'), 'utf8');
+  assert.match(sql, /CREATE OR REPLACE FUNCTION public\.person_directory_filtered_page_v1/);
+  assert.match(sql, /current_user <> 'service_role'/);
+  assert.match(sql, /public\.person_roles/);
+  assert.match(sql, /p\.sales_priority = ANY\(p_customer_priorities\)/);
+  assert.match(sql, /rc\.recruitment_priority = ANY\(p_recruit_priorities\)/);
+  assert.match(sql, /p\.referral_priority = ANY\(p_referral_priorities\)/);
+  assert.match(sql, /REVOKE ALL ON FUNCTION public\.person_directory_filtered_page_v1/);
+  assert.match(sql, /GRANT EXECUTE ON FUNCTION public\.person_directory_filtered_page_v1[\s\S]*TO service_role/);
+  assert.match(rollback, /DROP FUNCTION public\.person_directory_filtered_page_v1/);
+  assert.doesNotMatch(sql, /\b(?:FROM|JOIN)\s+pr\./i);
+});
+

@@ -37,13 +37,17 @@ function fmtDate(v) {
 }
 
 export function renderPeople(ctx) {
-  const state = { page: 1, keyword: '', sortField: 'id', sortDir: 'desc' };
+  const emptyFilters = () => ({ roles: [], customerPriorities: [], recruitPriorities: [], referralPriorities: [] });
+  const state = { page: 1, keyword: '', sortField: 'id', sortDir: 'desc', filters: emptyFilters(), pendingFilters: emptyFilters() };
   const listEl = h('div', {});
   const metaEl = h('span', { class: 'foot-note' }, '');
   const input = h('input', { placeholder: t('search_name_ph') });
   const prevBtn = h('button', { class: 'btn btn-ghost btn-sm', type: 'button' }, t('btn_prev'));
   const nextBtn = h('button', { class: 'btn btn-ghost btn-sm', type: 'button' }, t('btn_next'));
   const pageInfo = h('span', { class: 'pager-info' }, '');
+  const filterButton = h('button', { class: 'btn btn-ghost btn-sm people-filter-trigger', type: 'button' });
+  const filterPanel = h('div', { class: 'people-filter-panel', hidden: true });
+  const priorityFilters = h('div', { class: 'people-filter-priorities' });
 
   function arrow(field) {
     if (state.sortField !== field) return '';
@@ -55,6 +59,7 @@ export function renderPeople(ctx) {
       const res = await data.listPeople(ctx, {
         page: state.page, pageSize: PAGE_SIZE, keyword: state.keyword,
         sortField: state.sortField, sortDir: state.sortDir,
+        ...state.filters,
       });
       const rows = res.rows || [];
       metaEl.textContent = state.keyword
@@ -93,14 +98,14 @@ export function renderPeople(ctx) {
         const hasCustomer = (p.roles || []).includes('customer');
         const hasRecruit = (p.roles || []).includes('recruit') || !!p.recruit_id;
         const convertCell = (kind, active) => h('td', {}, active
-          ? bdg(t('role_exists'), kind === 'customer' ? 'ink' : 'gold')
+          ? bdg(t('role_exists'), kind === 'customer' ? 'jade' : 'gold')
           : h('button', {
             class: 'btn btn-ghost btn-sm', type: 'button',
             onclick: (ev) => {
               ev.stopPropagation();
               openPersonRoleConversion(ctx, { person: p, kind, onDone: runQuery });
             },
-          }, t('btn_convert')));
+          }, t(kind === 'customer' ? 'btn_convert_customer' : 'btn_convert_recruit')));
         const cells = [
           h('td', {}, h('a', {}, [p.display_name, h('span', { class: 'badge-stack' }, badges)])),
           h('td', {}, p.sales_priority ? translateEnum('sales_priority', p.sales_priority) : '-'),
@@ -124,10 +129,85 @@ export function renderPeople(ctx) {
   nextBtn.onclick = () => { state.page++; runQuery(); };
   const doSearch = () => {
     state.keyword = input.value.trim().slice(0, 40);
+    state.filters = Object.fromEntries(Object.entries(state.pendingFilters).map(([key, values]) => [key, [...values]]));
     state.page = 1;
+    filterPanel.hidden = true;
+    updateFilterButton();
     runQuery();
   };
   input.addEventListener('keydown', (e) => { if (e.key === 'Enter') doSearch(); });
+
+  const roles = ['customer', 'recruit', 'referrer', 'speaker', 'participant', 'partner', 'alumni', 'other'];
+  const roleLabels = {
+    customer: t('customer'), recruit: t('recruit'), referrer: t('role_referrer'),
+    speaker: t('speaker'), participant: t('participant'), partner: t('role_partner'),
+    alumni: t('role_alumni'), other: t('role_other'),
+  };
+  function checkboxGroup(values, options, onChange) {
+    return h('div', { class: 'people-filter-checks' }, options.map(([value, label]) => {
+      const input = h('input', { type: 'checkbox', checked: values.includes(value) });
+      input.addEventListener('change', () => onChange(value, input.checked));
+      return h('label', { class: 'people-filter-check', 'data-filter-value': value }, [input, h('span', {}, label)]);
+    }));
+  }
+  function renderPriorityFilters() {
+    const selectedRoles = state.pendingFilters.roles;
+    const groups = [];
+    for (const [role, key, labelKey] of [
+      ['customer', 'customerPriorities', 'customer'],
+      ['recruit', 'recruitPriorities', 'recruit'],
+      ['referrer', 'referralPriorities', 'role_referrer'],
+    ]) {
+      if (!selectedRoles.includes(role)) continue;
+      groups.push(h('section', { class: 'people-filter-group' }, [
+        h('div', { class: 'people-filter-title' }, t('filter_priority_for').replace('{role}', t(labelKey))),
+        checkboxGroup(state.pendingFilters[key], ['A', 'B', 'C', 'D', 'E'].map(value => [value, value]), (value, checked) => {
+          const set = new Set(state.pendingFilters[key]);
+          checked ? set.add(value) : set.delete(value);
+          state.pendingFilters[key] = [...set];
+        }),
+      ]));
+    }
+    priorityFilters.replaceChildren(...groups);
+  }
+  function updateFilterButton() {
+    const count = Object.values(state.filters).reduce((sum, values) => sum + values.length, 0);
+    filterButton.replaceChildren(t('people_filter'), count ? h('span', { class: 'people-filter-count' }, String(count)) : null);
+    filterButton.setAttribute('aria-expanded', String(!filterPanel.hidden));
+  }
+  function renderFilterPanel() {
+    const roleFilters = checkboxGroup(state.pendingFilters.roles, roles.map(role => [role, roleLabels[role]]), (value, checked) => {
+      const set = new Set(state.pendingFilters.roles);
+      checked ? set.add(value) : set.delete(value);
+      state.pendingFilters.roles = [...set];
+      if (!checked) {
+        const key = { customer: 'customerPriorities', recruit: 'recruitPriorities', referrer: 'referralPriorities' }[value];
+        if (key) state.pendingFilters[key] = [];
+      }
+      renderPriorityFilters();
+    });
+    const apply = h('button', { class: 'btn btn-primary btn-sm', type: 'button', onclick: doSearch }, t('btn_search'));
+    const reset = h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => {
+      state.pendingFilters = emptyFilters();
+      renderFilterPanel();
+    } }, t('btn_reset'));
+    filterPanel.replaceChildren(
+      h('div', { class: 'people-filter-title' }, t('filter_role')),
+      roleFilters,
+      priorityFilters,
+      h('div', { class: 'people-filter-actions' }, [reset, apply]),
+    );
+    renderPriorityFilters();
+  }
+  filterButton.onclick = () => {
+    if (filterPanel.hidden) {
+      state.pendingFilters = Object.fromEntries(Object.entries(state.filters).map(([key, values]) => [key, [...values]]));
+      renderFilterPanel();
+    }
+    filterPanel.hidden = !filterPanel.hidden;
+    updateFilterButton();
+  };
+  updateFilterButton();
 
   ctx.main.replaceChildren(
     pageHead({
@@ -139,8 +219,9 @@ export function renderPeople(ctx) {
         ic('search'), input,
         h('button', { class: 'btn btn-primary btn-sm', type: 'button', onclick: doSearch }, t('btn_search')),
       ]),
+      h('div', { class: 'people-filter-anchor' }, [filterButton, filterPanel]),
       h('a', {
-        class: 'btn btn-ghost', href: '#/people-trash', style: 'margin-left:auto',
+        class: 'btn btn-ghost', href: '#/people-trash',
       }, [ic('trash'), t('btn_trash')]),
       h('button', {
         class: 'btn btn-primary', type: 'button',
