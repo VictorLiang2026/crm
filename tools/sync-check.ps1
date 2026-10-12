@@ -1,4 +1,4 @@
-# No deployment or business invocation. Errors must never become a green result.
+﻿# No deployment or business invocation. Errors must never become a green result.
 param([switch]$CloudOnly, [switch]$AllowPreservedDocs)
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $PSScriptRoot
