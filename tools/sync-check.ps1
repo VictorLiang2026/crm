@@ -1,5 +1,5 @@
 # No deployment or business invocation. Errors must never become a green result.
-param([switch]$CloudOnly)
+param([switch]$CloudOnly, [string[]]$PreservedUntracked = @())
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $PSScriptRoot
 Set-Location $repo
@@ -14,7 +14,12 @@ try {
   & node (Join-Path $PSScriptRoot 'sync-shared.cjs') --check
   if ($LASTEXITCODE -ne 0) { throw 'Shared module hash check failed.' }
   if (!$CloudOnly) {
-    if (@(GitRead @('status','--porcelain')).Count) { throw 'Uncommitted changes.' }
+    $trackedChanges = @(GitRead @('status','--porcelain','--untracked-files=no'))
+    $untracked = @(GitRead @('ls-files','--others','--exclude-standard'))
+    $unexpectedUntracked = @($untracked | Where-Object { $_ -notin $PreservedUntracked })
+    if ($trackedChanges.Count -or $unexpectedUntracked.Count) {
+      throw 'Uncommitted tracked changes or unapproved untracked files.'
+    }
     $branch = GitRead @('branch','--show-current')
     if ($branch -ne 'master') { throw 'Release verification requires master.' }
     $local = GitRead @('rev-parse','HEAD')
