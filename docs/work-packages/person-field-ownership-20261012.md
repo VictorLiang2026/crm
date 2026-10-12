@@ -38,3 +38,10 @@
 ## Git 发布
 
 发布提交、标签、推送和发布后本地/远端核对结果列于本轮交付报告。
+
+## 2026-10-12 人物目录加载故障修复
+
+- 现象：Console 人物目录显示“数据加载失败 / Person 360 request failed”。
+- 根因：目录 RPC 默认使用 `id` 排序；函数在多表查询的窗口排序中展开未限定的列名，和招募记录的 `id` 冲突。排序 SQL 失败后被 Person 360 的通用错误包装隐藏。
+- 修复：迁移 `20261012130000_person_directory_sort_qualification` 为全部允许的排序字段映射明确表别名，并以 `p.id` 作稳定次序；接口、返回字段、分页和 service_role-only ACL 不变。迁移已应用并在远端历史中核验。回滚文件为同名 `.rollback.sql`。
+- 验证：目录 handler 与迁移静态回归 4/4 通过；远端函数定义包含别名限定；远端执行权限核验为 service_role=true、anon=false、authenticated=false。管理端函数调用受 CloudBase CAM 认证拦截，CLS 日志 Topic 未配置，因此未能通过当前管理工具直接调用生产 RPC；需在 Console 刷新页面确认列表展示。
