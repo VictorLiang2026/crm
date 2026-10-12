@@ -70,7 +70,8 @@ function personId(value) {
 // 受控建档允许的 persons 列白名单（created_at/updated_at/id/delete_batch_id 等由库侧管理）
 const PERSON_INSERT_FIELDS = new Set([
   'display_name', 'name_key', 'phone', 'wechat', 'gender', 'birthday',
-  'occupation', 'organization', 'education', 'source',
+  'occupation', 'organization', 'education', 'source', 'hobbies', 'customer_stage',
+  'sales_priority', 'referral_priority', 'marital_status', 'first_contact_date', 'notes',
 ]);
 
 function safeJsonParse(text) {
@@ -231,7 +232,9 @@ class PersonService {
   // 顺序：persons UPDATE（乐观锁可空）→ 投影表 UPDATE。两步非事务（RDB 无跨表事务），
   // 投影失败抛出错误由调用方处理重试，persons 值已为权威。
   static get BASIC_WRITABLE_FIELDS() {
-    return ['display_name', 'phone', 'wechat', 'gender', 'birthday', 'occupation', 'education'];
+    return ['display_name', 'phone', 'wechat', 'gender', 'birthday', 'occupation', 'education',
+      'source', 'hobbies', 'customer_stage', 'sales_priority', 'referral_priority',
+      'marital_status', 'first_contact_date', 'notes'];
   }
 
   async updateBasicsWithProjection(personIdValue, fields, { expectedUpdatedAt, projection } = {}) {

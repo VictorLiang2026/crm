@@ -42,9 +42,13 @@ function overviewNode(ctx, id, setName) {
     const infoPairs = [
       [t('field_phone'), f.phone], [t('field_gender'), translateEnum('gender', f.gender)], [t('field_birthday'), f.birthday],
       [t('field_occupation'), f.occupation], [t('field_organization'), f.organization], [t('field_education'), f.education],
-      [t('field_wechat'), f.wx_account], [t('field_source'), translateEnum('person_source', f.source)],
+      [t('field_wechat'), f.wx_account], [t('field_source'), translateEnum('person_source', f.source)], [t('field_hobbies'), f.hobbies],
       [t('field_customer_stage'), translateEnum('customer_stage', f.customer_stage)], [t('field_sales_priority'), translateEnum('sales_priority', f.sales_priority)],
-      [t('field_marital'), translateEnum('marital_status', f.marital_status)], [t('field_income'), f.annual_income], [t('field_updated'), fmtDate(f.updated_at)],
+      [t('col_recruit_priority'), translateEnum('sales_priority', f.recruitment_priority)],
+      [t('field_referral_priority'), translateEnum('sales_priority', f.referral_priority)],
+      [t('field_marital'), translateEnum('marital_status', f.marital_status)],
+      [t('field_first_contact_date'), fmtDate(f.first_contact_date)],
+      [t('field_income'), f.annual_income], [t('field_updated'), fmtDate(f.person_updated_at || f.updated_at)],
     ];
     const activeWorks = (works.rows || []).filter((r) =>
       (r.kind === 'action' && (r.status === 'open' || r.status === 'in_progress')) ||

@@ -539,7 +539,8 @@ var OPP_STATUSES = ['发现','沟通','方案','成交','关闭'];
 var REF_STATUSES = ['潜在线索','已介绍','已联系','已建立关系','成交','关闭'];
 
 // v1.8 Sprint10：常用字段在前；more:true 的冷字段由表单折叠进「更多信息」（全库填写率<5%）
-var CUSTOMER_FIELDS = [
+// 人物字段仅由 Person 资料维护；Quick Capture 保留旧字段面板，后端按归属路由。
+var PERSON_FIELDS = [
   {name:'customer_name',label:'姓名',type:'text',req:true},
   {name:'phone',label:'电话',type:'text'},
   {name:'source',label:'来源',type:'text'},
@@ -549,16 +550,21 @@ var CUSTOMER_FIELDS = [
   {name:'hobbies',label:'爱好',type:'text'},
   {name:'customer_stage',label:'客户经营阶段',type:'select',options:STAGES},
   {name:'sales_priority',label:'销售优先级',type:'select',options:PRIORITIES},
-  {name:'recruitment_priority',label:'招募优先级',type:'select',options:PRIORITIES},
   {name:'referral_priority',label:'转介绍优先级',type:'select',options:PRIORITIES},
-  {name:'additional_info',label:'附加信息',type:'textarea'},
   {name:'marital_status',label:'婚况',type:'select',options:['','未婚','已婚','未知'],more:true},
+  {name:'first_contact_date',label:'首次接触日期',type:'date',more:true},
+];
+var CUSTOMER_FIELDS = [
+  {name:'customer_name',label:'姓名',type:'text',req:true},
+  {name:'additional_info',label:'客户备注',type:'textarea'},
   {name:'tags',label:'标签',type:'text',more:true},
   {name:'annual_income',label:'年收入',type:'number',more:true},
   {name:'household_income',label:'家庭收入',type:'text',more:true},
   {name:'properties_info',label:'房产信息',type:'text',more:true},
-  {name:'first_contact_date',label:'首次接触日期',type:'date',more:true},
 ];
+var QUICK_CAPTURE_FIELDS = PERSON_FIELDS.concat([
+  {name:'recruitment_priority',label:'招募优先级（创建招募记录）',type:'select',options:PRIORITIES},
+], CUSTOMER_FIELDS.filter(function(f){ return f.name !== 'customer_name'; }));
 
 // 保单检视（原“产品额度”）：11 个险种类别（个人养老金 PPA 排在长期护理 LTC 之前）
 // 后端表名仍为 products（兼容生产数据），仅 UI、Tab、文案全量改名为“保单检视”
@@ -2011,7 +2017,7 @@ function openCustomerForm(customer){
     if(f.more && !formFields.some(function(x){ return x.type === 'moreToggle'; })) formFields.push({type:'moreToggle'});
     formFields.push(f);
   });
-  modal(isEdit?'编辑客户':'新增客户', formFields, customer, async function(data){
+  var formOverlay = modal(isEdit?'编辑客户':'新增客户', formFields, customer, async function(data){
     if(!data.customer_name){ throw new Error('姓名必填'); }
     if(isEdit){
       var r = await callFn('customers', {action:'update', id:customer.Id, data:data, editSource:'form'});
@@ -2027,6 +2033,27 @@ function openCustomerForm(customer){
     invalidateCustomers();
     if(isEdit) showDetail(customer.Id);
   }, {wide:true, nameDupCheck:true, nameDupExcludeId: isEdit?customer.Id:null});
+  var formModal = formOverlay.querySelector('.modal');
+  if(formModal){
+    var personNote = el('div', {style:'grid-column:1/-1;margin:0 0 12px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:#f8fafc;color:var(--text-secondary);font-size:13px;line-height:1.6'});
+    if(isEdit){
+      personNote.appendChild(el('div', {}, [
+        (customer.customer_name || '人物'),
+        customer.phone ? ' · ' + customer.phone : '',
+        customer.occupation ? ' · ' + customer.occupation : '',
+        customer.organization ? ' · ' + customer.organization : '',
+      ].join('')));
+      personNote.appendChild(el('div', {style:'margin-top:3px;font-size:12px;color:var(--muted)'}, '人物基础信息统一由 Person 360 维护。'));
+      personNote.appendChild(el('button', {type:'button', class:'btn btn-sm', style:'margin-top:6px', onclick:async function(){
+        try{
+          var person = await callFn('person_360', {action:'lookupCustomer', customerId:customer.Id});
+          if(person.error) throw new Error(person.error);
+          location.hash = '#/person/' + person.personId;
+        }catch(e){ toast('Person 360 暂不可用：' + e.message, 'err'); }
+      }}, 'Person 360'));
+    }
+    if(isEdit) formModal.insertBefore(personNote, formModal.querySelector('.modal-footer'));
+  }
 }
 
 // ==================== 客户详情 ====================
@@ -4157,7 +4184,7 @@ async function saveParsedFiles(customerId, filesToSave, ocrRawText, ocrSummary, 
 }
 
 function openNewCustomerModal(parsed, filesToSave, ocrRawText){
-  modal('确认客户信息（AI 解析结果）', CUSTOMER_FIELDS, parsed, async function(data){
+  modal('确认客户与人物信息（AI 解析结果）', QUICK_CAPTURE_FIELDS, parsed, async function(data){
     if(!data.customer_name){ toast('姓名必填','err'); return; }
     var r = await callFn('customers', {action:'create', data:data});
     toast('已创建 #'+r.id);
@@ -4193,7 +4220,7 @@ function openMergeCompareModal(parsed, matches, filesToSave, selIdx, ocrRawText)
   var formValues = {};
   var diffRows = [];
   var parseDate = new Date().toISOString().slice(0,10);
-  CUSTOMER_FIELDS.forEach(function(f){
+  QUICK_CAPTURE_FIELDS.forEach(function(f){
     var oldV = oldC[f.name] == null ? '' : String(oldC[f.name]);
     var newV = parsed[f.name] == null ? '' : String(parsed[f.name]);
     if(f.name === 'additional_info'){
@@ -4235,7 +4262,7 @@ function openMergeCompareModal(parsed, matches, filesToSave, selIdx, ocrRawText)
 
   // 可编辑表单（默认保留旧值；附加信息已自动追加新内容+分隔线+解析日期）
   var formWrap = el('div', {});
-  CUSTOMER_FIELDS.forEach(function(f){ formWrap.appendChild(makeField(f, formValues[f.name])); });
+  QUICK_CAPTURE_FIELDS.forEach(function(f){ formWrap.appendChild(makeField(f, formValues[f.name])); });
   m.appendChild(formWrap);
   // 姓名失焦查重：排除当前正在更新的客户
   attachNameDupCheck(formWrap, oldC.Id);
@@ -4249,7 +4276,7 @@ function openMergeCompareModal(parsed, matches, filesToSave, selIdx, ocrRawText)
         if(!raw.customer_name){ toast('姓名必填','err'); return; }
         // 只传操作者改过的字段，没改过的不传 → 后端不动，彻底防止清零
         var data = {};
-        CUSTOMER_FIELDS.forEach(function(f){
+        QUICK_CAPTURE_FIELDS.forEach(function(f){
           var oldV = oldC[f.name] == null ? '' : String(oldC[f.name]);
           var newV = raw[f.name] == null ? '' : String(raw[f.name]);
           // additional_info 总是传（已做追加合并）；其他只有变化才传
@@ -6185,27 +6212,18 @@ function openSpeakerForm(s, selectedPerson){
   if(!s && !selectedPerson){ toast('请先核对并选择 Person', 'err'); return; }
   var FIELDS = [
     {name:'name', label:'姓名', type:'text', req:true},
-    {name:'phone', label:'电话', type:'text'},
-    {name:'wechat', label:'微信', type:'text'},
-    {name:'organization', label:'机构', type:'text'},
     {name:'position', label:'职务', type:'text'},
     {name:'relationship_stage', label:'关系阶段', type:'select', options:SP_STAGE.map(function(x){ return {v:x.v, label:x.label}; })},
     {name:'status', label:'状态', type:'select', options:[{v:'active', label:'可用'}, {v:'inactive', label:'停用'}]},
     {name:'expertise', label:'专业领域', type:'text'},
     {name:'topic_summary', label:'可分享主题', type:'textarea'},
     {name:'preferred_format', label:'偏好形式（如线上/线下/专题分享）', type:'text'},
-    {name:'source', label:'来源', type:'text'},
     {name:'last_contact_date', label:'最近联系日期', type:'date'},
     {name:'last_contact_note', label:'最近联系备注', type:'textarea'},
     {name:'next_contact_date', label:'下次联系日期', type:'date'},
     {name:'cooperation_count', label:'合作次数', type:'text'},
     {name:'notes', label:'备注', type:'textarea'},
   ];
-  if(selectedPerson){
-    FIELDS = FIELDS.filter(function(field){
-      return ['name','phone','wechat','organization'].indexOf(field.name) < 0;
-    });
-  }
   // 编辑时才允许看到关联ID（新建强制走同名确认自动关联；无主嘉宾编辑时会引导补关联）
   if(s){
     FIELDS.push({name:'customer_id', label:'关联客户ID' + (s.customer_id ? '' : '（当前为空，保存时自动补建/确认）'), type:'text'});
@@ -8407,11 +8425,12 @@ function openCandidateForm(id, presetCust){
       var box = el('div', {style:'border:1px solid var(--border);border-radius:6px;padding:8px 10px;background:#f8fafc'});
       box.appendChild(el('div', {style:'font-size:13px;font-weight:600;margin-bottom:4px'}, '✓ 已关联客户：' + (c.customer_name || '')));
       var grid = el('div', {style:'display:grid;grid-template-columns:1fr 1fr;gap:2px 12px;font-size:12px;color:var(--text-secondary)'});
-      [['性别', c.gender], ['电话', c.phone], ['微信', c.wx_account], ['职业', c.occupation], ['年收入', c.annual_income], ['学历', c.education], ['MBTI', c.mbti], ['来源', c.source]].forEach(function(f){
+      [['电话', c.phone], ['职业', c.occupation], ['机构', c.organization]].forEach(function(f){
         grid.appendChild(el('div', {}, f[0] + '：' + (f[1] != null && f[1] !== '' ? String(f[1]) : '-')));
       });
       box.appendChild(grid);
-      box.appendChild(el('div', {style:'font-size:11px;color:var(--muted);margin-top:4px'}, '客户基础信息只读，如需修改请到客户管理中编辑'));
+      box.appendChild(el('div', {style:'font-size:11px;color:var(--muted);margin-top:4px'}, '人物基础信息只读，完整资料请到 Person 360 查看'));
+      if(c.person_id) box.appendChild(el('button', {class:'btn btn-sm', style:'margin-top:6px', onclick:function(){ location.hash = '#/person/' + c.person_id; }}, '打开 Person 360'));
       return box;
     }
     var selectedCust = null;
@@ -8483,9 +8502,10 @@ function openCandidateForm(id, presetCust){
     inputs._customer_id = { _getCustId: function(){ return selectedCust ? selectedCust.Id : null; } };
   }
 
-  // 增员专属字段（基础信息在客户表，这里只管增员属性）
+  // 增员优先级及其他招募专属字段归 recruit_candidates。
   var fields = [
     {name:'stage', label:'阶段', type:'select', options:RC_STAGES},
+    {name:'recruitment_priority', label:'招募优先级', type:'select', options:PRIORITIES},
     {name:'motivation', label:'求职动机', type:'textarea'},
     {name:'concerns', label:'顾虑点', type:'textarea'},
     {name:'work_experience', label:'工作经历', type:'textarea'},

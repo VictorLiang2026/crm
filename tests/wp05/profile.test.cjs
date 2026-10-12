@@ -9,14 +9,17 @@ function fixture({linked=true, missing=false, summary={status:'verified',contain
     if(table==='persons')return [{id:71,display_name:marked?'【系统测试·勿联系】虚构甲':'虚构旧名',phone:'虚构旧联系方式',occupation:'旧职业'}];
     if(table==='customers')return (missing||!linked)?[]:[{...customer}];
     if(table==='person_roles')return [{id:1,role:'customer',origin:'manual'}];
+    if(table==='recruit_candidates')return [{id:61,recruitment_priority:'高'}];
     throw Error('Unexpected table');
   };
   return {calls,customer,load:()=>getCustomerProfile(71,{request,disclose:async()=>summary})};
 }
 test('linked fields read Person master and keep customer-only business fields',async()=>{
  const f=fixture();const first=await f.load();assert.equal(first.fields.occupation,'旧职业');assert.equal(first.fields.phone,'虚构旧联系方式');
+ assert.equal(first.fields.recruitment_priority,'高');assert.equal(first.fields.recruit_id,'61');
  f.customer.occupation='【系统测试·勿联系】虚构更新职业';assert.equal((await f.load()).fields.occupation,'旧职业');
  assert.ok(f.calls.every(c=>c.method==='GET'));assert.ok(f.calls.filter(c=>c.table==='customers').every(c=>c.filters.person_id==='eq.71'&&c.filters.deleted_at==='is.null'));
+ assert.ok(f.calls.filter(c=>c.table==='recruit_candidates').every(c=>c.filters.person_id==='eq.71'&&c.filters.deleted_at==='is.null'));
 });
 test('absent customer row exposes Person-master fields without customer business fields',async()=>{
  const r=await fixture({missing:true}).load();assert.equal(r.status,'person_only');assert.equal(r.customerId,null);

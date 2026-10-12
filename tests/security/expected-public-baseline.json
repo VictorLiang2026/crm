@@ -2552,6 +2552,16 @@
     },
     {
       "kind": "routine",
+      "name": "person_trash_page_v1(p_page integer, p_page_size integer, p_roles text[], p_customer_priorities text[], p_recruit_priorities text[], p_referral_priorities text[])",
+      "detail": {
+        "anon_execute": false,
+        "authenticated_execute": false,
+        "service_execute": true,
+        "security_definer": false
+      }
+    },
+    {
+      "kind": "routine",
       "name": "pmc18_collect_metrics()",
       "detail": {
         "anon_execute": false,

@@ -32,6 +32,7 @@ function candidateIdOf(value) {
 // recruit_candidates 表只保留增员专属字段（基础信息在 customers 表）
 const FIELDS = [
   'customer_id', 'recommender_id', 'stage', 'stage_changed_at',
+  'recruitment_priority',
   'potential_score', 'potential_reason', 'motivation', 'concerns',
   'work_experience', 'family_situation', 'personality_tags',
   'career_plan', 'next_action_date', 'next_action', 'activity_history',
@@ -118,6 +119,9 @@ async function create(event) {
     .select('id').eq('customer_id', data.customer_id).is('deleted_at', null).limit(1).maybeSingle());
   if (dup.data) return { error: '该客户已在增员列表中', existing_id: dup.data.id };
   const payload = normFields(data, FIELDS);
+  if (payload.recruitment_priority != null && !['A', 'B', 'C', 'D', 'E'].includes(payload.recruitment_priority)) {
+    return { error: 'Invalid recruitment_priority' };
+  }
   const ts = nowIso();
   payload.created_at = ts;
   payload.updated_at = ts;
@@ -140,6 +144,9 @@ async function update(event) {
   const id = candidateIdOf(event.id);
   const data = event.data || {};
   const payload = normFields(data, FIELDS);
+  if (payload.recruitment_priority != null && !['A', 'B', 'C', 'D', 'E'].includes(payload.recruitment_priority)) {
+    return { error: 'Invalid recruitment_priority' };
+  }
   payload.updated_at = nowIso();
 
   // 若阶段变更，记录里程碑 + 更新 stage_changed_at

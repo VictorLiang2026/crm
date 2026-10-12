@@ -1,4 +1,5 @@
 import { renderTestDataNotice } from './test-data-notice.js';
+import { t } from './console/i18n.js';
 
 const CORE = [['customer_name','姓名'],['phone','电话'],['wx_account','微信'],['gender','性别'],
   ['birthday','生日'],['occupation','职业'],['organization','单位'],['hobbies','爱好'],
@@ -53,7 +54,7 @@ export async function renderPersonProfile({ root, personId, callFn, openLegacyTa
     root.append(more);
     const actions = node('div', 'person360-profile-actions');
     if (model.customerId) {
-      for (const [tab,label] of [['info','编辑基本信息'],['profile','查看 / 编辑客户画像']]) {
+      for (const [tab,label] of [['profile','查看 / 编辑客户画像']]) {
         const link = node('a', 'btn', label);
         link.href = `#/customer/${model.customerId}`;
         link.addEventListener('click', event => {
@@ -62,7 +63,7 @@ export async function renderPersonProfile({ root, personId, callFn, openLegacyTa
         });
         actions.append(link);
       }
-      root.append(node('p', 'person360-muted', '资料统一在原客户详情编辑；返回此页会重新读取。'));
+      root.append(node('p', 'person360-muted', t('person_fields_edit_hint')));
     } else root.append(node('p', 'person360-muted', '尚未关联客户。这里仅展示人物资料，不按姓名自动关联或创建客户。'));
     const feedback = node('p', 'person360-muted');
     feedback.setAttribute('role', 'status');

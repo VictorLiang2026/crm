@@ -270,8 +270,8 @@ function createService({ request = pgRequest, rpc = pgRpc, disclosure = disclose
     }
     const sortField = String(event.sortField || 'id');
     const sortDir = String(event.sortDir || 'desc');
-    if (!['id', 'display_name', 'updated_at', 'sales_priority', 'customer_stage',
-      'latest_followup_date', 'next_followup_date'].includes(sortField) || !['asc', 'desc'].includes(sortDir)) {
+    if (!['id', 'display_name', 'updated_at', 'sales_priority', 'recruitment_priority',
+      'referral_priority', 'latest_followup_date', 'next_followup_date'].includes(sortField) || !['asc', 'desc'].includes(sortDir)) {
       throw new Error('Invalid directory sort');
     }
     return rpc('person_directory_page_v1', {
@@ -359,12 +359,16 @@ function createService({ request = pgRequest, rpc = pgRpc, disclosure = disclose
   // 与 resolveName（解析候选身份）严格区分：本 action 只接受已知 personId，不凭姓名匹配
   const PERSON_EDITABLE_FIELDS = new Set([
     'display_name', 'phone', 'birthday', 'gender',
-    'occupation', 'organization', 'education', 'wechat', 'notes',
+    'occupation', 'organization', 'education', 'wechat', 'notes', 'source', 'hobbies',
+    'customer_stage', 'sales_priority', 'referral_priority', 'marital_status', 'first_contact_date',
   ]);
   const PERSON_FIELD_MAP = {
     displayName: 'display_name', phone: 'phone', birthday: 'birthday',
     gender: 'gender', occupation: 'occupation', organization: 'organization',
-    education: 'education', wechat: 'wechat', notes: 'notes',
+    education: 'education', wechat: 'wechat', notes: 'notes', source: 'source',
+    hobbies: 'hobbies', customerStage: 'customer_stage', salesPriority: 'sales_priority',
+    referralPriority: 'referral_priority', maritalStatus: 'marital_status',
+    firstContactDate: 'first_contact_date',
   };
 
   async function updatePerson(data, uid) {
@@ -380,7 +384,18 @@ function createService({ request = pgRequest, rpc = pgRpc, disclosure = disclose
       if (Object.prototype.hasOwnProperty.call(data, camelKey) &&
           PERSON_EDITABLE_FIELDS.has(snakeKey)) {
         const val = data[camelKey];
-        payload[snakeKey] = (typeof val === 'string' && val.trim() === '') ? null : val;
+        const value = (typeof val === 'string' && val.trim() === '') ? null : val;
+        if (['sales_priority', 'referral_priority'].includes(snakeKey) && value != null &&
+            !['A', 'B', 'C', 'D', 'E'].includes(value)) throw new Error('Invalid priority: ' + camelKey);
+        if (snakeKey === 'customer_stage' && value != null &&
+            !['新认识', '关系维护', '需求挖掘', '方案沟通', '成交推进', '转介绍经营'].includes(value)) {
+          throw new Error('Invalid customer stage');
+        }
+        if (snakeKey === 'first_contact_date' && value != null &&
+            (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value))) {
+          throw new Error('Invalid first contact date');
+        }
+        payload[snakeKey] = value;
       }
     }
     if (!Object.keys(payload).length) return { ok: true, updated: false };
@@ -427,29 +442,16 @@ function createService({ request = pgRequest, rpc = pgRpc, disclosure = disclose
 
   async function listPersonTrash(event = {}) {
     const { page, pageSize, offset } = directoryPage(event);
-    const rows = await request('persons', 'GET', {
-      select: 'id,display_name,occupation,organization,updated_at,deleted_at,delete_batch_id',
-      deleted_at: 'not.is.null', order: 'deleted_at.desc,id.desc',
-      limit: pageSize + 1, offset,
+    const rolesAllowed = new Set(['customer', 'recruit', 'referrer', 'speaker', 'participant', 'partner', 'alumni', 'other']);
+    const roleValues = [...new Set((Array.isArray(event.roles) ? event.roles : []).map(String).filter(role => rolesAllowed.has(role)))];
+    const priorityValues = values => [...new Set((Array.isArray(values) ? values : []).map(String).filter(value => ['A', 'B', 'C', 'D', 'E'].includes(value)))];
+    const result = await rpc('person_trash_page_v1', {
+      p_page: page, p_page_size: pageSize, p_roles: roleValues,
+      p_customer_priorities: priorityValues(event.customerPriorities),
+      p_recruit_priorities: priorityValues(event.recruitPriorities),
+      p_referral_priorities: priorityValues(event.referralPriorities),
     });
-    const pageRows = rows.slice(0, pageSize);
-    const personIds = pageRows.map(row => row.id);
-    const customers = personIds.length ? await request('customers', 'GET', {
-      select: 'Id,person_id,deleted_at', person_id: `in.(${personIds.join(',')})`, limit: pageSize,
-    }) : [];
-    const customerByPerson = new Map(customers.map(c => [String(c.person_id), c]));
-    for (const row of pageRows) {
-      const c = customerByPerson.get(String(row.id));
-      row.customer_id = c ? c.Id : null;
-      row.customer_deleted = c ? c.deleted_at != null : false;
-      // 无批次标记的历史删除行只能恢复人物本体，关联数据不可考。
-      row.batch_scoped = row.delete_batch_id != null;
-      delete row.delete_batch_id;
-    }
-    return {
-      rows: pageRows, page, pageSize,
-      hasMore: rows.length > pageSize,
-    };
+    return result;
   }
 
   async function listOpportunityDirectory(event = {}) {

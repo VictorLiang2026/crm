@@ -4,7 +4,7 @@ const { PersonService } = require('./person-service');
 
 const STAGES = new Set(['new', 'contacted', 'cooperated', 'stable', 'deep', 'inactive']);
 const STATUSES = new Set(['active', 'inactive']);
-const TEXT_FIELDS = ['position', 'expertise', 'topic_summary', 'source', 'last_contact_note',
+const TEXT_FIELDS = ['position', 'expertise', 'topic_summary', 'last_contact_note',
   'preferred_format', 'notes'];
 const DATE_FIELDS = ['last_contact_date', 'next_contact_date'];
 
@@ -99,8 +99,7 @@ class SpeakerProfileService {
     const now = new Date().toISOString();
     const rows = await this.request('activity_speakers', 'POST', {}, {
       ...profileData(data.profile), person_id: Number(person.id),
-      name: person.display_name, phone: person.phone || null,
-      wechat: person.wechat || null, organization: person.organization || null,
+      name: person.display_name,
       customer_id: customerId,
       created_at: now, updated_at: now,
     });

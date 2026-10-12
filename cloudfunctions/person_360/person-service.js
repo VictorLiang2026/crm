@@ -70,7 +70,8 @@ function personId(value) {
 // 受控建档允许的 persons 列白名单（created_at/updated_at/id/delete_batch_id 等由库侧管理）
 const PERSON_INSERT_FIELDS = new Set([
   'display_name', 'name_key', 'phone', 'wechat', 'gender', 'birthday',
-  'occupation', 'organization', 'education', 'source',
+  'occupation', 'organization', 'education', 'source', 'hobbies', 'customer_stage',
+  'sales_priority', 'referral_priority', 'marital_status', 'first_contact_date', 'notes',
 ]);
 
 function safeJsonParse(text) {
@@ -231,7 +232,9 @@ class PersonService {
   // 顺序：persons UPDATE（乐观锁可空）→ 投影表 UPDATE。两步非事务（RDB 无跨表事务），
   // 投影失败抛出错误由调用方处理重试，persons 值已为权威。
   static get BASIC_WRITABLE_FIELDS() {
-    return ['display_name', 'phone', 'wechat', 'gender', 'birthday', 'occupation', 'education'];
+    return ['display_name', 'phone', 'wechat', 'gender', 'birthday', 'occupation', 'education',
+      'source', 'hobbies', 'customer_stage', 'sales_priority', 'referral_priority',
+      'marital_status', 'first_contact_date', 'notes'];
   }
 
   async updateBasicsWithProjection(personIdValue, fields, { expectedUpdatedAt, projection } = {}) {
@@ -248,7 +251,20 @@ class PersonService {
       if (!allowed.has(key)) {
         throw new PersonResolutionError('FIELD_NOT_ALLOWED', 'Field not writable: ' + key);
       }
-      payload[key] = (typeof value === 'string' && value.trim() === '') ? null : value;
+      const normalized = (typeof value === 'string' && value.trim() === '') ? null : value;
+      if (['sales_priority', 'referral_priority'].includes(key) && normalized != null &&
+          !['A', 'B', 'C', 'D', 'E'].includes(normalized)) {
+        throw new PersonResolutionError('INVALID_PAYLOAD', 'Invalid priority: ' + key);
+      }
+      if (key === 'customer_stage' && normalized != null &&
+          !['新认识', '关系维护', '需求挖掘', '方案沟通', '成交推进', '转介绍经营'].includes(normalized)) {
+        throw new PersonResolutionError('INVALID_PAYLOAD', 'Invalid customer_stage');
+      }
+      if (key === 'first_contact_date' && normalized != null &&
+          (typeof normalized !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(normalized))) {
+        throw new PersonResolutionError('INVALID_PAYLOAD', 'Invalid first_contact_date');
+      }
+      payload[key] = normalized;
     }
     if (!Object.keys(payload).length) {
       throw new PersonResolutionError('INVALID_PAYLOAD', 'no writable fields provided');

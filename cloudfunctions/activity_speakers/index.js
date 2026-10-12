@@ -16,8 +16,8 @@
 
 const { rdb, normFields, assertOk, nowIso } = require('./db');
 
-const SP_FIELDS = ['name', 'phone', 'wechat', 'organization', 'position', 'relationship_stage',
-  'expertise', 'topic_summary', 'source', 'last_contact_date', 'next_contact_date', 'last_contact_note',
+const SP_FIELDS = ['name', 'position', 'relationship_stage',
+  'expertise', 'topic_summary', 'last_contact_date', 'next_contact_date', 'last_contact_note',
   'cooperation_count', 'preferred_format', 'status', 'customer_id', 'recruit_candidate_id', 'notes'];
 const STAGE_ENUM = ['new', 'contacted', 'cooperated', 'stable', 'deep', 'inactive'];
 const STATUS_ENUM = ['active', 'inactive'];
@@ -62,10 +62,20 @@ function safeKw(s) {
   return String(s || '').replace(/[%,_()\\]/g, function (c) { return '\\' + c; });
 }
 
-function kwOrCond(kw) {
+function kwOrCond(kw, personIds = []) {
   const s = safeKw(kw);
-  return ['name', 'organization', 'expertise', 'topic_summary']
-    .map(function (c) { return c + '.ilike.%' + s + '%'; }).join(',');
+  const parts = ['name', 'expertise', 'topic_summary']
+    .map(function (c) { return c + '.ilike.%' + s + '%'; });
+  if (personIds.length) parts.push('person_id.in.(' + personIds.join(',') + ')');
+  return parts.join(',');
+}
+
+async function matchingPersonIds(kw) {
+  const safe = safeKw(kw);
+  const result = assertOk(await rdb.from('persons').select('id')
+    .or('organization.ilike.%' + safe + '%,phone.ilike.%' + safe + '%')
+    .is('deleted_at', null).limit(100));
+  return (result.data || []).map(row => String(row.id)).filter(id => /^\d+$/.test(id));
 }
 
 // 身份合并（PMC-13：Person 优先读基础信息，customers 回退；弱关联只读展示，失败不阻塞主流程）
@@ -111,11 +121,11 @@ async function enrichIdentity(rows) {
   return rows.map(function (r) {
     var person = r.person_id != null ? (pmap[r.person_id] || null) : null;
     return Object.assign({}, r, {
-      // Person 优先读基础信息（裁决①），原值回退
+      // Shared Person fields are authoritative; speaker rows retain role-specific attributes only.
       name: person && person.display_name ? person.display_name : r.name,
-      phone: person && person.phone ? person.phone : (r.phone || null),
-      wechat: person && person.wechat ? person.wechat : (r.wechat || null),
-      organization: person && person.organization ? person.organization : (r.organization || null),
+      phone: person ? person.phone : null,
+      wechat: person ? person.wechat : null,
+      organization: person ? person.organization : null,
       linked_person: person ? { id: r.person_id, name: person.display_name } : null,
       linked_customer: r.customer_id != null ? (cmap[r.customer_id] || null) : null,
       linked_recruit: r.recruit_candidate_id != null ? (rmap[r.recruit_candidate_id] || null) : null,
@@ -126,7 +136,7 @@ async function enrichIdentity(rows) {
 async function list(event) {
   let q = rdb.from('activity_speakers').select().is('deleted_at', null);
   const kw = String(event.keyword || '').trim();
-  if (kw) q = q.or(kwOrCond(kw));
+  if (kw) q = q.or(kwOrCond(kw, await matchingPersonIds(kw)));
   if (event.status) q = q.eq('status', event.status);
   if (event.stage) q = q.eq('relationship_stage', event.stage);
   const r = assertOk(await q.order('updated_at', { ascending: false }).limit(100));
@@ -183,12 +193,13 @@ async function remove(event) {
 async function search(event) {
   const kw = String(event.keyword || '').trim();
   if (kw.length < 1) return { rows: [] };
+  const personIds = await matchingPersonIds(kw);
   // 供添加参与者联想：仅返回启用中的嘉宾（停用嘉宾不在管理页 list 过滤，但不可加入活动）
   const r = assertOk(await rdb.from('activity_speakers')
-    .select('id, name, organization, position, phone, expertise, topic_summary')
-    .or(kwOrCond(kw))
+    .select('id, name, position, expertise, topic_summary, person_id')
+    .or(kwOrCond(kw, personIds))
     .is('deleted_at', null)
     .eq('status', 'active')
     .limit(10));
-  return { rows: r.data || [] };
+  return { rows: await enrichIdentity(r.data || []) };
 }

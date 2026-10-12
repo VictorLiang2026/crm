@@ -819,6 +819,53 @@ export function openPersonNew(ctx, { onDone } = {}) {
   }
 }
 
+// Person → role conversion is a reviewed server command: preview first, then explicit human confirmation.
+export function openPersonRoleConversion(ctx, { person, kind, onDone } = {}) {
+  if (!person?.id || !['customer', 'recruit'].includes(kind)) return;
+  const label = kind === 'customer' ? t('customer') : t('recruit');
+  const sheet = openSheet({
+    title: t('role_conversion_title').replace('{role}', label),
+    sub: person.display_name || `#${person.id}`,
+    body: h('div', { class: 'muted' }, t('edit_loading')),
+  });
+  document.body.appendChild(sheet.overlay);
+  (async () => {
+    try {
+      const pv = await p360(ctx, 'previewIdentity', { data: {
+        kind, personId: String(person.id), displayName: person.display_name,
+        idempotencyKey: uuid(),
+      } });
+      if (!pv || pv.error || !pv.previewId) throw new Error(pv?.message || pv?.error || t('role_conversion_preview_failed'));
+      const preview = pv.preview || {};
+      const previewRows = [
+        kvRow(t('field_name'), preview.displayName || person.display_name),
+        kvRow(t('role_conversion_target'), label),
+      ];
+      if (preview.customerId) previewRows.push(kvRow(t('role_conversion_existing_customer'), `#${preview.customerId}`));
+      if (preview.recruitId) previewRows.push(kvRow(t('role_conversion_existing_recruit'), `#${preview.recruitId}`));
+      sheet.swap(h('div', {}, [
+        h('p', { class: 'sheet-note' }, t('role_conversion_preview')),
+        previewBlock(previewRows),
+        h('div', { class: 'sheet-actions' }, [
+          h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => sheet.overlay.remove() }, t('cancel')),
+          h('button', { class: 'btn btn-primary', type: 'button', onclick: (e) => execute(e.currentTarget, pv) }, t('btn_confirm')),
+        ]),
+      ]));
+    } catch (err) { sheet.showErr(err.message); }
+  })();
+
+  async function execute(btn, pv) {
+    busy(btn, true, t('creating'));
+    try {
+      const result = await p360(ctx, 'executeIdentity', { data: { previewId: pv.previewId } });
+      if (!result || result.error || result.ok === false) throw new Error(result?.message || result?.error || t('create_failed'));
+      sheet.overlay.remove();
+      ctx.toast(t('role_conversion_done').replace('{role}', label), 'ok');
+      onDone?.();
+    } catch (err) { busy(btn, false, t('btn_confirm')); sheet.showErr(err.message); }
+  }
+}
+
 // ---------- 人物：编辑基础资料（updatePerson，乐观锁；客户档案字段不在本表单范围） ----------
 export function openPersonEdit(ctx, { personId, onDone } = {}) {
   const sheet = openSheet({
@@ -832,7 +879,6 @@ export function openPersonEdit(ctx, { personId, onDone } = {}) {
     catch (err) { sheet.showErr(err.message); return; }
     if (profile && profile.error) { sheet.showErr(String(profile.error)); return; }
     const f = profile.fields || {};
-    const linked = profile.status === 'linked';
     const nameInput = h('input', { class: 'sheet-input', maxlength: '120', value: f.customer_name || '' });
     const phoneInput = h('input', { class: 'sheet-input', maxlength: '40', value: f.phone || '' });
     const birthdayInput = h('input', { class: 'sheet-input', type: 'date', value: String(f.birthday || '').slice(0, 10) });
@@ -841,8 +887,21 @@ export function openPersonEdit(ctx, { personId, onDone } = {}) {
     const organizationInput = h('input', { class: 'sheet-input', maxlength: '120', value: f.organization || '' });
     const educationInput = h('input', { class: 'sheet-input', maxlength: '120', value: f.education || '' });
     const wechatInput = h('input', { class: 'sheet-input', maxlength: '80', value: f.wx_account || '' });
-    const notesTa = h('textarea', { class: 'sheet-textarea', style: 'min-height:64px', maxlength: '2000' }, f.additional_info || '');
-    if (linked) notesTa.disabled = true;
+    const sourceInput = h('input', { class: 'sheet-input', maxlength: '120', value: f.source || '' });
+    const hobbiesTa = h('textarea', { class: 'sheet-textarea', style: 'min-height:56px', maxlength: '1000' }, f.hobbies || '');
+    const stageSel = sel([
+      ['', '—'], ['新认识', t('customer_stage_new')], ['关系维护', t('customer_stage_maintenance')],
+      ['需求挖掘', t('customer_stage_discovery')], ['方案沟通', t('customer_stage_proposal')],
+      ['成交推进', t('customer_stage_closing')], ['转介绍经营', t('customer_stage_referral')],
+    ], f.customer_stage || '');
+    const priorityOptions = [['', '—'], ...['A', 'B', 'C', 'D', 'E'].map(v => [v, t(`priority_${v.toLowerCase()}`)])];
+    const salesPrioritySel = sel(priorityOptions, f.sales_priority || '');
+    const referralPrioritySel = sel(priorityOptions, f.referral_priority || '');
+    const maritalSel = sel([
+      ['', '—'], ['未婚', t('marital_single')], ['已婚', t('marital_married')], ['未知', t('marital_unknown')],
+    ], f.marital_status || '');
+    const firstContactInput = h('input', { class: 'sheet-input', type: 'date', value: String(f.first_contact_date || '').slice(0, 10) });
+    const notesTa = h('textarea', { class: 'sheet-textarea', style: 'min-height:64px', maxlength: '2000' }, f.person_notes || '');
     const body = h('div', {}, [
       fieldRow(t('field_name'), nameInput),
       h('div', { style: 'display:flex;gap:10px' }, [
@@ -858,9 +917,18 @@ export function openPersonEdit(ctx, { personId, onDone } = {}) {
         h('div', { class: 'sheet-field', style: 'flex:1' }, [h('label', {}, t('field_organization')), organizationInput]),
         h('div', { class: 'sheet-field', style: 'flex:1' }, [h('label', {}, t('field_education')), educationInput]),
       ]),
-      linked
-        ? fieldRow(t('field_notes_customer'), notesTa, t('edit_notes_linked_note'))
-        : fieldRow(t('field_notes'), notesTa),
+      fieldRow(t('field_source'), sourceInput),
+      fieldRow(t('field_hobbies'), hobbiesTa),
+      h('div', { style: 'display:flex;gap:10px' }, [
+        h('div', { class: 'sheet-field', style: 'flex:1' }, [h('label', {}, t('field_customer_stage')), stageSel]),
+        h('div', { class: 'sheet-field', style: 'flex:1' }, [h('label', {}, t('field_sales_priority')), salesPrioritySel]),
+        h('div', { class: 'sheet-field', style: 'flex:1' }, [h('label', {}, t('field_referral_priority')), referralPrioritySel]),
+      ]),
+      h('div', { style: 'display:flex;gap:10px' }, [
+        h('div', { class: 'sheet-field', style: 'flex:1' }, [h('label', {}, t('field_marital')), maritalSel]),
+        h('div', { class: 'sheet-field', style: 'flex:1' }, [h('label', {}, t('field_first_contact_date')), firstContactInput]),
+      ]),
+      fieldRow(t('field_notes'), notesTa),
       h('div', { class: 'sheet-actions' }, [
         h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => sheet.overlay.remove() }, t('cancel')),
         h('button', { class: 'btn btn-primary', type: 'button', onclick: (e) => doSave(e.currentTarget) }, t('btn_save')),
@@ -881,7 +949,14 @@ export function openPersonEdit(ctx, { personId, onDone } = {}) {
       put('organization', organizationInput.value.trim(), f.organization);
       put('education', educationInput.value.trim(), f.education);
       put('wechat', wechatInput.value.trim(), f.wx_account);
-      if (!linked) put('notes', notesTa.value.trim(), f.additional_info);
+      put('source', sourceInput.value.trim(), f.source);
+      put('hobbies', hobbiesTa.value.trim(), f.hobbies);
+      put('customerStage', stageSel.value, f.customer_stage || '');
+      put('salesPriority', salesPrioritySel.value, f.sales_priority || '');
+      put('referralPriority', referralPrioritySel.value, f.referral_priority || '');
+      put('maritalStatus', maritalSel.value, f.marital_status || '');
+      put('firstContactDate', firstContactInput.value, String(f.first_contact_date || '').slice(0, 10));
+      put('notes', notesTa.value.trim(), f.person_notes);
       if (!Object.keys(changed).length) { sheet.showErr(t('edit_no_changes')); return; }
       Object.assign(data, changed);
       if (changed.displayName === '') { sheet.showErr(t('new_person_name')); return; }

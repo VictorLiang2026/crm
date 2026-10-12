@@ -35,6 +35,8 @@ class Browser {
       else if (pathname === '/crm/js/modules/work-items.js') { res.setHeader('Content-Type', 'text/javascript; charset=utf-8'); res.end(fs.readFileSync(path.join(this.root, 'crm/js/modules/work-items.js'))); }
       else if (pathname === '/crm/css/work-items.css') { res.setHeader('Content-Type', 'text/css; charset=utf-8'); res.end(fs.readFileSync(path.join(this.root, 'crm/css/work-items.css'))); }
       else if (pathname === '/crm/js/modules/person-insights.js') { res.setHeader('Content-Type', 'text/javascript; charset=utf-8'); res.end(fs.readFileSync(path.join(this.root, 'crm/js/modules/person-insights.js'))); }
+      else if (pathname === '/crm/js/modules/person-360.js') { res.setHeader('Content-Type', 'text/javascript; charset=utf-8'); res.end(fs.readFileSync(path.join(this.root, 'crm/js/modules/person-360.js'))); }
+      else if (pathname === '/crm/js/modules/console/i18n.js') { res.setHeader('Content-Type', 'text/javascript; charset=utf-8'); res.end(fs.readFileSync(path.join(this.root, 'crm/js/modules/console/i18n.js'))); }
       else if (pathname === '/crm/js/modules/person-profile.js') { res.setHeader('Content-Type', 'text/javascript; charset=utf-8'); res.end(fs.readFileSync(path.join(this.root, 'crm/js/modules/person-profile.js'))); }
       else if (pathname === '/crm/js/modules/phase14-hubs.js') { res.setHeader('Content-Type', 'text/javascript; charset=utf-8'); res.end(fs.readFileSync(path.join(this.root, 'crm/js/modules/phase14-hubs.js'))); }
       else if (pathname === '/crm/js/modules/account-settings.js') { res.setHeader('Content-Type', 'text/javascript; charset=utf-8'); res.end(fs.readFileSync(path.join(this.root, 'crm/js/modules/account-settings.js'))); }
@@ -60,6 +62,16 @@ class Browser {
       else if (pathname === '/crm/css/quick-capture-v2.css') {
         res.setHeader('Content-Type', 'text/css; charset=utf-8');
         res.end(fs.readFileSync(path.join(this.root, pathname.slice(1))));
+      }
+      else if (pathname === '/crm/css/console.css') {
+        res.setHeader('Content-Type', 'text/css; charset=utf-8');
+        res.end(fs.readFileSync(path.join(this.root, pathname.slice(1))));
+      }
+      else if (pathname.startsWith('/crm/js/modules/console/') || pathname.startsWith('/crm/js/core/')) {
+        const file = path.resolve(this.root, pathname.slice(1));
+        const allowedRoot = path.resolve(this.root, pathname.startsWith('/crm/js/core/') ? 'crm/js/core' : 'crm/js/modules/console') + path.sep;
+        if (!file.startsWith(allowedRoot) || !fs.existsSync(file) || !fs.statSync(file).isFile()) { res.writeHead(404); res.end(); }
+        else { res.setHeader('Content-Type', 'text/javascript; charset=utf-8'); res.end(fs.readFileSync(file)); }
       }
       else { res.writeHead(404); res.end(); }
     });

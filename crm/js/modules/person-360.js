@@ -5,6 +5,7 @@ import { mountPersonWorkItems } from './work-items.js';
 import { mountOpportunityWorkflow } from './opportunity-workflow.js';
 // Isolated Person 360 view. All data requests use the existing authenticated callFn bridge.
 import { renderOpportunityCandidates } from './opportunity-candidates.js';
+import { t } from './console/i18n.js';
 const ROLE_LABELS = { spouse: '配偶', child: '子女', parent: '父母', sibling: '兄弟姐妹', other: '其他' };
 
 function node(tag, className, value) {
@@ -397,50 +398,47 @@ async function openPersonEditor({ root, personId, callFn, openLegacyTab, model }
   const occupationInput = input(f.occupation);
   const organizationInput = input(f.organization);
   const educationInput = input(f.education);
-  const notesTa = textarea(f.additional_info);
-  if (linked) notesTa.disabled = true;
+  const sourceInput = input(f.source, 120);
+  const hobbiesTa = textarea(f.hobbies, 1000);
+  const customerStageSel = select(STAGES, f.customer_stage);
+  const priorities = ['', 'A', 'B', 'C', 'D', 'E'];
+  const salesPrioritySel = select(priorities, f.sales_priority);
+  const referralPrioritySel = select(priorities, f.referral_priority);
+  const maritalSel = select(['', '未婚', '已婚', '未知'], f.marital_status);
+  const firstContactInput = dateInput(f.first_contact_date);
+  const notesTa = textarea(f.person_notes);
 
   const personSection = node('div', {});
-  personSection.append(node('h4', '', '人物基础信息（persons）'));
+  personSection.append(node('h4', '', t('sec_person_info')));
   personSection.append(
-    field('姓名 *', nameInput),
-    row(field('电话', phoneInput), field('生日', birthdayInput)),
-    row(field('性别', genderSel), field('微信', wechatInput)),
-    row(field('职业', occupationInput), field('单位', organizationInput), field('学历', educationInput)),
-    field(linked ? '备注（关联客户时只读，附加信息请到下方客户域编辑）' : '备注', notesTa),
+    field(t('field_name') + ' *', nameInput),
+    row(field(t('field_phone'), phoneInput), field(t('field_birthday'), birthdayInput)),
+    row(field(t('field_gender'), genderSel), field(t('field_wechat'), wechatInput)),
+    row(field(t('field_occupation'), occupationInput), field(t('field_organization'), organizationInput), field(t('field_education'), educationInput)),
+    row(field(t('field_source'), sourceInput), field(t('field_hobbies'), hobbiesTa)),
+    row(field(t('field_customer_stage'), customerStageSel), field(t('field_sales_priority'), salesPrioritySel), field(t('field_referral_priority'), referralPrioritySel)),
+    row(field(t('field_marital'), maritalSel), field(t('field_first_contact_date'), firstContactInput)),
+    field(t('field_notes'), notesTa),
   );
 
   // ---------- customers 域字段（仅 linked 显示） ----------
   let customerSection = null;
   const custInputs = {};
   if (linked && customerId) {
-    custInputs.source = input(f.source);
-    custInputs.hobbies = input(f.hobbies);
-    custInputs.customer_stage = select(STAGES, f.customer_stage);
-    custInputs.sales_priority = select(PRIORITIES, f.sales_priority);
-    custInputs.recruitment_priority = select(PRIORITIES, f.recruitment_priority);
-    custInputs.referral_priority = select(PRIORITIES, f.referral_priority);
     custInputs.additional_info = textarea(f.additional_info);
-    custInputs.marital_status = select(MARITAL, f.marital_status);
     custInputs.tags = input(f.tags);
     custInputs.annual_income = numInput(f.annual_income);
     custInputs.household_income = input(f.household_income);
     custInputs.properties_info = input(f.properties_info);
-    custInputs.first_contact_date = dateInput(f.first_contact_date);
+    custInputs.mbti = input(f.mbti);
 
     customerSection = node('div', {});
-    customerSection.append(node('h4', '', '客户业务信息（customers）'));
+    customerSection.append(node('h4', '', t('sec_customer_specific_info')));
     customerSection.append(
-      row(field('来源', custInputs.source), field('爱好', custInputs.hobbies)),
-      field('客户经营阶段', custInputs.customer_stage),
-      row(field('销售优先级', custInputs.sales_priority),
-        field('招募优先级', custInputs.recruitment_priority),
-        field('转介绍优先级', custInputs.referral_priority)),
-      field('附加信息', custInputs.additional_info),
-      row(field('婚况', custInputs.marital_status), field('标签', custInputs.tags)),
-      row(field('年收入', custInputs.annual_income), field('家庭收入', custInputs.household_income)),
-      field('房产信息', custInputs.properties_info),
-      field('首次接触日期', custInputs.first_contact_date),
+      field(t('field_customer_notes'), custInputs.additional_info),
+      row(field(t('field_customer_tags'), custInputs.tags), field('MBTI', custInputs.mbti)),
+      row(field(t('field_income'), custInputs.annual_income), field(t('field_household_income'), custInputs.household_income)),
+      field(t('field_properties'), custInputs.properties_info),
     );
   }
 
@@ -463,25 +461,25 @@ async function openPersonEditor({ root, personId, callFn, openLegacyTab, model }
     pput('occupation', occupationInput.value.trim(), f.occupation);
     pput('organization', organizationInput.value.trim(), f.organization);
     pput('education', educationInput.value.trim(), f.education);
-    if (!linked) pput('notes', notesTa.value, f.additional_info);
+    pput('source', sourceInput.value.trim(), f.source);
+    pput('hobbies', hobbiesTa.value.trim(), f.hobbies);
+    pput('customerStage', customerStageSel.value, f.customer_stage || '');
+    pput('salesPriority', salesPrioritySel.value, f.sales_priority || '');
+    pput('referralPriority', referralPrioritySel.value, f.referral_priority || '');
+    pput('maritalStatus', maritalSel.value, f.marital_status || '');
+    pput('firstContactDate', firstContactInput.value || null, String(f.first_contact_date || '').slice(0, 10));
+    pput('notes', notesTa.value, f.person_notes);
 
     // customers 域变更
     const custChanged = {};
     const cput = (key, val, orig) => { if (String(val ?? '') !== String(orig ?? '')) custChanged[key] = val; };
     if (linked && customerId) {
-      cput('source', custInputs.source.value.trim(), f.source);
-      cput('hobbies', custInputs.hobbies.value.trim(), f.hobbies);
-      cput('customer_stage', custInputs.customer_stage.value || null, f.customer_stage || '');
-      cput('sales_priority', custInputs.sales_priority.value || null, f.sales_priority || '');
-      cput('recruitment_priority', custInputs.recruitment_priority.value || null, f.recruitment_priority || '');
-      cput('referral_priority', custInputs.referral_priority.value || null, f.referral_priority || '');
       cput('additional_info', custInputs.additional_info.value, f.additional_info);
-      cput('marital_status', custInputs.marital_status.value || null, f.marital_status || '');
       cput('tags', custInputs.tags.value.trim(), f.tags);
       cput('annual_income', custInputs.annual_income.value === '' ? null : Number(custInputs.annual_income.value), f.annual_income);
       cput('household_income', custInputs.household_income.value.trim(), f.household_income);
       cput('properties_info', custInputs.properties_info.value.trim(), f.properties_info);
-      cput('first_contact_date', custInputs.first_contact_date.value || null, String(f.first_contact_date || '').slice(0, 10));
+      cput('mbti', custInputs.mbti.value.trim(), f.mbti);
     }
 
     try {

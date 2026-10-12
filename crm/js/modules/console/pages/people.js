@@ -2,7 +2,7 @@
 import { h } from '../dom.js';
 import { ic } from '../icons.js';
 import { data } from '../data.js';
-import { openPersonNew } from '../write.js';
+import { openPersonNew, openPersonRoleConversion } from '../write.js';
 import { wpTag, pageHead, emptyNote, loadInto, bdg, textOf } from '../ui.js';
 import { t, translateEnum } from '../i18n.js';
 
@@ -20,10 +20,13 @@ const ROLE_BADGE = () => ({
 
 const SORT_COLUMNS = () => ([
   { field: 'display_name', label: t('col_name') },
-  { field: 'sales_priority', label: t('col_priority') },
-  { field: 'customer_stage', label: t('col_customer_stage'), full: t('col_customer_stage_full') },
+  { field: 'sales_priority', label: t('col_customer_priority') },
+  { field: 'recruitment_priority', label: t('col_recruit_priority') },
+  { field: 'referral_priority', label: t('col_referral_priority') },
   { field: 'latest_followup_date', label: t('col_latest_followup'), full: t('col_latest_followup_full') },
   { field: 'next_followup_date', label: t('col_next_followup'), full: t('col_next_followup_full') },
+  { field: 'convert_customer', label: t('col_convert_customer'), sortable: false },
+  { field: 'convert_recruit', label: t('col_convert_recruit'), sortable: false },
   { field: 'id', label: t('col_id') },
 ]);
 
@@ -65,9 +68,9 @@ export function renderPeople(ctx) {
       }
       const thead = h('thead', {}, h('tr', {}, SORT_COLUMNS().map((col) => {
         const th = h('th', {
-          class: 'sortable-th',
+          class: col.sortable === false ? '' : 'sortable-th',
           title: col.full || undefined,
-          onclick: () => {
+          onclick: col.sortable === false ? undefined : () => {
             if (state.sortField === col.field) {
               state.sortDir = state.sortDir === 'asc' ? 'desc' : 'asc';
             } else {
@@ -87,15 +90,29 @@ export function renderPeople(ctx) {
         });
         if (p.recruit_id) badges.push(bdg(t('badge_recruiting'), 'gold'));
         const cols = SORT_COLUMNS();
+        const hasCustomer = (p.roles || []).includes('customer');
+        const hasRecruit = (p.roles || []).includes('recruit') || !!p.recruit_id;
+        const convertCell = (kind, active) => h('td', {}, active
+          ? bdg(t('role_exists'), kind === 'customer' ? 'ink' : 'gold')
+          : h('button', {
+            class: 'btn btn-ghost btn-sm', type: 'button',
+            onclick: (ev) => {
+              ev.stopPropagation();
+              openPersonRoleConversion(ctx, { person: p, kind, onDone: runQuery });
+            },
+          }, t('btn_convert')));
         const cells = [
           h('td', {}, h('a', {}, [p.display_name, h('span', { class: 'badge-stack' }, badges)])),
           h('td', {}, p.sales_priority ? translateEnum('sales_priority', p.sales_priority) : '-'),
-          h('td', {}, p.customer_stage ? h('span', { class: 'badge stage' }, translateEnum('customer_stage', p.customer_stage)) : '-'),
+          h('td', {}, p.recruitment_priority ? translateEnum('sales_priority', p.recruitment_priority) : '-'),
+          h('td', {}, p.referral_priority ? translateEnum('sales_priority', p.referral_priority) : '-'),
           h('td', {}, fmtDate(p.latest_followup_date)),
           h('td', {}, fmtDate(p.next_followup_date)),
+          convertCell('customer', hasCustomer),
+          convertCell('recruit', hasRecruit),
           h('td', {}, String(p.id)),
         ];
-        // 手机卡片式布局用：td 携带字段名（与表头同源，i18n 一致）
+        // Keep existing responsive labels aligned with the localized table headers.
         cells.forEach((td, i) => { if (i > 0) td.setAttribute('data-label', cols[i].label); });
         return h('tr', { onclick: () => { location.hash = `#/person/${p.id}`; } }, cells);
       }));

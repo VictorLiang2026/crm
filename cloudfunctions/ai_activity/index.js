@@ -35,6 +35,31 @@
 
 const { app, rdb, generateText, extractJson, assertOk, nowIso } = require('./db');
 
+async function loadCustomerCanonical(customerIds) {
+  const ids = [...new Set((customerIds || []).filter(value => value != null).map(String))];
+  if (!ids.length) return [];
+  const customers = assertOk(await rdb.from('customers')
+    .select('Id,person_id,additional_info').in('Id', ids)).data || [];
+  const personIds = [...new Set(customers.map(row => row.person_id).filter(Boolean).map(String))];
+  const people = personIds.length ? assertOk(await rdb.from('persons')
+    .select('id,customer_stage,sales_priority').in('id', personIds)).data || [] : [];
+  const personById = new Map(people.map(row => [String(row.id), row]));
+  return customers.map(row => ({ ...row, ...(personById.get(String(row.person_id)) || {}) }));
+}
+
+async function enrichSpeakerPeople(rows) {
+  const ids = [...new Set((rows || []).map(row => row.person_id).filter(Boolean).map(String))];
+  if (!ids.length) return rows || [];
+  const people = assertOk(await rdb.from('persons')
+    .select('id,display_name,organization')
+    .in('id', ids).is('deleted_at', null)).data || [];
+  const byId = new Map(people.map(person => [String(person.id), person]));
+  return (rows || []).map(row => {
+    const person = byId.get(String(row.person_id));
+    return person ? { ...row, name: person.display_name, organization: person.organization } : row;
+  });
+}
+
 function bjNow() { return new Date(Date.now() + 8 * 3600 * 1000); }
 function todayStr() { return bjNow().toISOString().slice(0, 10); }
 function clip(v, n) { return typeof v === 'string' ? v.trim().slice(0, n) : ''; }
@@ -84,13 +109,11 @@ function participantPersonId(p, customerRow, recruitRow) {
 async function loadRecruitPeople(ids) {
   if (!ids.length) return [];
   const recruits = assertOk(await rdb.from('recruit_candidates')
-    .select('id, customer_id, person_id, stage').in('id', ids).is('deleted_at', null)).data || [];
+    .select('id, customer_id, person_id, stage, recruitment_priority').in('id', ids).is('deleted_at', null)).data || [];
   const customerIds = [...new Set(recruits.map(r => r.customer_id).filter(id => id != null))];
   const people = new Map();
   if (customerIds.length) {
-    const customers = assertOk(await rdb.from('customers')
-      .select('Id, person_id, recruitment_priority')
-      .in('Id', customerIds).is('deleted_at', null)).data || [];
+    const customers = await loadCustomerCanonical(customerIds);
     customers.forEach(c => people.set(String(c.Id), c));
   }
   // PMC-20：候选人本人及背后客户的 Person 名/职业一次性批量取
@@ -105,7 +128,7 @@ async function loadRecruitPeople(ids) {
     const pid = r.person_id != null ? r.person_id : (c ? c.person_id : null);
     const prof = pid != null ? (profiles[String(pid)] || null) : null;
     return { id: r.id, customer_id: r.customer_id, person_id: r.person_id, stage: r.stage,
-      name: prof ? prof.name : '', priority: c ? (c.recruitment_priority || '') : '',
+      name: prof ? prof.name : '', priority: r.recruitment_priority || '',
       occupation: prof ? (prof.occupation || '') : '' };
   });
 }
@@ -147,8 +170,7 @@ exports.main = async (event, context) => {
     var recruitMap = {};
 
     if (customerIds.length) {
-      var cs = assertOk(await rdb.from('customers').select('Id, person_id, customer_stage, sales_priority, additional_info')
-        .in('Id', customerIds).is('deleted_at', null)).data || [];
+      var cs = await loadCustomerCanonical(customerIds);
       cs.forEach(function(c){ customerMap[c.Id] = c; });
     }
     if (recruitIds.length) {
@@ -318,8 +340,7 @@ async function loadActivityContext(activityId) {
   var speakerIds = parts.filter(function(p){ return p.person_type === 'speaker' && p.person_id; }).map(function(p){ return p.person_id; });
   var nameMap = {};
   if (customerIds.length) {
-    var cs = assertOk(await rdb.from('customers').select('Id, person_id, customer_stage, sales_priority')
-      .in('Id', customerIds).is('deleted_at', null)).data || [];
+    var cs = await loadCustomerCanonical(customerIds);
     cs.forEach(function(c){ nameMap['customer:' + c.Id] = c; });
   }
   if (recruitIds.length) {
@@ -327,9 +348,9 @@ async function loadActivityContext(activityId) {
     rs.forEach(function(rc){ nameMap['recruit:' + rc.id] = rc; });
   }
   if (speakerIds.length) {
-    var sps = assertOk(await rdb.from('activity_speakers').select('id, name, organization, position, expertise, topic_summary, relationship_stage, cooperation_count, person_id')
+    var sps = assertOk(await rdb.from('activity_speakers').select('id, name, position, expertise, topic_summary, relationship_stage, cooperation_count, person_id')
       .in('id', speakerIds).is('deleted_at', null)).data || [];
-    // PMC-13：嘉宾 name 改为 Person 优先读（裁决③），organization/position 保持嘉宾域
+    sps = await enrichSpeakerPeople(sps);
     var spPids = sps.filter(function(s){ return s.person_id; }).map(function(s){ return s.person_id; });
     var spPmap = {};
     if (spPids.length) {
@@ -399,6 +420,7 @@ async function recommendSpeakers(event) {
   var pool = assertOk(await rdb.from('activity_speakers').select()
     .eq('status', 'active').is('deleted_at', null)
     .order('updated_at', { ascending: false }).limit(50)).data || [];
+  pool = await enrichSpeakerPeople(pool);
   var parts = assertOk(await rdb.from('activity_participants').select('person_type, person_id')
     .eq('activity_id', activityId).is('deleted_at', null)).data || [];
   var existingIds = {};
@@ -690,9 +712,7 @@ async function postReview(event) {
 
     var customerMap = {}, recruitMap = {}, speakerMap = {};
     if (customerIds.length) {
-      var cs = assertOk(await rdb.from('customers')
-        .select('Id, person_id, customer_stage, sales_priority, additional_info')
-        .in('Id', customerIds).is('deleted_at', null)).data || [];
+      var cs = await loadCustomerCanonical(customerIds);
       cs.forEach(function (c) { customerMap[c.Id] = c; });
     }
     if (recruitIds.length) {
@@ -701,9 +721,10 @@ async function postReview(event) {
     }
     if (speakerIds.length) {
       var sps = assertOk(await rdb.from('activity_speakers')
-        .select('id, name, organization, position, expertise, topic_summary, relationship_stage, cooperation_count, last_contact_date, next_contact_date')
+        .select('id, name, position, expertise, topic_summary, relationship_stage, cooperation_count, last_contact_date, next_contact_date, person_id')
         .in('id', speakerIds).is('deleted_at', null)).data || [];
-      sps.forEach(function (s) { speakerMap[s.id] = s; });
+      var enrichedSpeakers = await enrichSpeakerPeople(sps);
+      enrichedSpeakers.forEach(function (s) { speakerMap[s.id] = s; });
     }
 
     // PMC-11：参与者人物名统一取 Person（嘉宾属嘉宾域，不经过 persons）
@@ -780,6 +801,7 @@ async function postReview(event) {
     var speakerPool = assertOk(await rdb.from('activity_speakers').select()
       .eq('status', 'active').is('deleted_at', null)
       .order('updated_at', { ascending: false }).limit(30)).data || [];
+    speakerPool = await enrichSpeakerPeople(speakerPool);
     var speakerPoolMap = {};
     speakerPool.forEach(function (s) { speakerPoolMap[s.id] = s; });
 
@@ -1071,9 +1093,7 @@ async function participantReview(event) {
     var allCustIds = uniqArr(customerIds.concat(recruitCustIds));
     var customerMap = {};
     if (allCustIds.length) {
-      var cs = assertOk(await rdb.from('customers')
-        .select('Id, person_id, customer_stage, sales_priority, additional_info')
-        .in('Id', allCustIds).is('deleted_at', null)).data || [];
+      var cs = await loadCustomerCanonical(allCustIds);
       cs.forEach(function (c) { customerMap[c.Id] = c; });
     }
 
@@ -1384,8 +1404,9 @@ async function learning(event) {
     var topicMap = {};
     topics.forEach(function (t) { topicMap[t.id] = t; });
     var speakers = assertOk(await rdb.from('activity_speakers')
-      .select('id, name, organization, expertise, relationship_stage, cooperation_count, status')
+      .select('id, name, expertise, relationship_stage, cooperation_count, status, person_id')
       .is('deleted_at', null)).data || [];
+    speakers = await enrichSpeakerPeople(speakers);
     var speakerMap = {};
     speakers.forEach(function (s) { speakerMap[s.id] = s; });
 
@@ -1407,9 +1428,7 @@ async function learning(event) {
         .map(function (p) { return recruitMap[p.person_id].customer_id; })));
     var customerMap = {};
     if (custIds.length) {
-      var cs = assertOk(await rdb.from('customers')
-        .select('Id, person_id, customer_stage, sales_priority')
-        .in('Id', custIds).is('deleted_at', null)).data || [];
+      var cs = await loadCustomerCanonical(custIds);
       cs.forEach(function (c) { customerMap[c.Id] = c; });
     }
     // PMC-11：进入 AI 事实单的人名取 Person 当前名（canonical_person_id 优先；未映射回退旧名）

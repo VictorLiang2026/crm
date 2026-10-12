@@ -23,7 +23,9 @@ try {
   & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'sync-check.ps1') -CloudOnly
   if ($LASTEXITCODE -ne 0) { throw 'Cloud verification failed. Deploy/fix the intended changes first.' }
   if (@(GitChecked @('status','--porcelain')).Count) {
-    GitChecked @('add','-A') | Out-Host
+    # Stage edits and deletions to tracked files only. New artifacts must be staged
+    # explicitly by the work package so user-owned untracked files stay untouched.
+    GitChecked @('add','-u') | Out-Host
     GitChecked @('commit','-m',$Message) | Out-Host
   }
   GitChecked @('tag','-a',$Tag,'-m',$Message) | Out-Host

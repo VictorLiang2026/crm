@@ -75,8 +75,8 @@ function cut(s, n) {
 async function loadAll() {
   const [cust, fol, rc, rf, rm, ai, opp, act, atask, apart, aspk, vac, pers] = await Promise.all([
     rdb.from('customers').select(
-      // PMC-20：customer_name/gender 已退出（CL-02），当前值由 persons 合并
-      'Id, customer_stage, sales_priority, first_contact_date, created_at, updated_at, person_id'
+      // Person-owned values are loaded from persons and merged below.
+      'Id, created_at, updated_at, person_id'
     ).is('deleted_at', null),
     // followups：v1.7.6 增加 Id/activity_id/recommendation_id（活动跟进/AI复盘采纳行动到期判定）
     rdb.from('followups').select(
@@ -110,7 +110,7 @@ async function loadAll() {
     ).is('deleted_at', null),
     // 嘉宾资源池（v1.7.6：到联系时间判定）
     rdb.from('activity_speakers').select(
-      'id, name, organization, position, expertise, relationship_stage, status, next_contact_date, last_contact_date, cooperation_count, updated_at'
+      'id, name, position, expertise, relationship_stage, status, next_contact_date, last_contact_date, cooperation_count, updated_at, person_id'
     ).is('deleted_at', null),
     // v1.8 Sprint3：Action Center 统一行动视图（Today 5 数据源；逾期/到期/阶段/最近跟进等事实 SQL 已计算）
     rdb.from('v_action_center').select(
@@ -118,7 +118,7 @@ async function loadAll() {
     ),
     // PMC-10：展示姓名切换——customers 有 person_id 且 Person 未软删时，展示名/性别取 persons；
     // PMC-20：customers.customer_name/gender 已退出（CL-02），统计字段（customer_stage/sales_priority 等）不动
-    rdb.from('persons').select('id, display_name, gender').is('deleted_at', null),
+    rdb.from('persons').select('id, display_name, gender, organization, customer_stage, sales_priority, first_contact_date').is('deleted_at', null),
   ]);
   if (vac && vac.error) throw new Error('v_action_center 读取失败：' + vac.error);
   // PMC-20：customers.customer_name/gender 已退出（CL-02），当前姓名/性别直接取 Person
@@ -129,10 +129,20 @@ async function loadAll() {
     if (p) {
       c.customer_name = p.display_name;
       c.gender = p.gender || '';
+      c.customer_stage = p.customer_stage || null;
+      c.sales_priority = p.sales_priority || null;
+      c.first_contact_date = p.first_contact_date || null;
     } else {
       c.customer_name = '';
       c.gender = '';
     }
+  }
+  for (const speaker of (aspk.data || [])) {
+    const person = speaker.person_id ? personNameMap[speaker.person_id] : null;
+    if (person) {
+      speaker.name = person.display_name;
+      speaker.organization = person.organization || '';
+    } else speaker.organization = '';
   }
   return {
     readErrors: [cust, fol, rc, rf, rm, ai, opp, act, atask, apart, aspk]

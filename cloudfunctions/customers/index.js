@@ -21,10 +21,8 @@ const { PersonService, PersonResolutionError } = require('./person-service');
 // PMC-19 CL-02: base columns removed from FIELDS (customer_name, gender, occupation, birthday, phone)
 // These are now exclusively on persons; customers columns dropped
 const FIELDS = [
-  'sales_priority', 'recruitment_priority', 'referral_priority',
-  'hobbies', 'additional_info', 'source', 'tags', 'marital_status',
+  'additional_info', 'tags',
   'properties_info', 'annual_income', 'household_income',
-  'first_contact_date', 'customer_stage',
   'profile', // 轻量客户画像 jsonb：{family,children,parents,career,needs,relationship,events[]}
 ];
 
@@ -33,6 +31,11 @@ const FIELDS = [
 const PERSON_BASIC_FIELDS = {
   customer_name: 'display_name', phone: 'phone', wx_account: 'wechat',
   gender: 'gender', birthday: 'birthday', occupation: 'occupation', education: 'education',
+};
+const PERSON_CUSTOM_FIELDS = {
+  source: 'source', hobbies: 'hobbies', customer_stage: 'customer_stage',
+  sales_priority: 'sales_priority', referral_priority: 'referral_priority',
+  marital_status: 'marital_status', first_contact_date: 'first_contact_date',
 };
 const personService = () => new PersonService({ rdb });
 
@@ -86,7 +89,7 @@ async function get(event) {
   // PMC-09: 基础字段从 persons 读取（经 person_id），persons 无值时回退 customers
   if (c.data.person_id) {
     const p = assertOk(await rdb.from('persons')
-      .select('display_name, phone, wechat, gender, birthday, occupation, education')
+      .select('display_name, phone, wechat, gender, birthday, occupation, education,source,hobbies,customer_stage,sales_priority,referral_priority,marital_status,first_contact_date')
       .eq('id', c.data.person_id).is('deleted_at', null).maybeSingle());
     if (p.data) {
       c.data.customer_name = p.data.display_name || c.data.customer_name;
@@ -96,7 +99,18 @@ async function get(event) {
       c.data.birthday = p.data.birthday || c.data.birthday;
       c.data.occupation = p.data.occupation || c.data.occupation;
       c.data.education = p.data.education || c.data.education;
+      Object.assign(c.data, {
+        source: p.data.source, hobbies: p.data.hobbies, customer_stage: p.data.customer_stage,
+        sales_priority: p.data.sales_priority, referral_priority: p.data.referral_priority,
+        marital_status: p.data.marital_status, first_contact_date: p.data.first_contact_date,
+      });
     }
+  }
+  if (c.data.person_id) {
+    const rc = assertOk(await rdb.from('recruit_candidates')
+      .select('id,recruitment_priority').eq('person_id', c.data.person_id)
+      .is('deleted_at', null).order('id', { ascending: false }).limit(1));
+    c.data.recruitment_priority = rc.data?.[0]?.recruitment_priority ?? null;
   }
   const [fol, prod, gif, pho, ai, rpt] = await Promise.all([
     rdb.from('followups').select().eq('customer_id', id).is('deleted_at', null)
@@ -149,6 +163,9 @@ async function create(event) {
   for (const [custKey, personKey] of Object.entries(PERSON_BASIC_FIELDS)) {
     if (Object.prototype.hasOwnProperty.call(data, custKey)) basic[personKey] = data[custKey];
   }
+  for (const [custKey, personKey] of Object.entries(PERSON_CUSTOM_FIELDS)) {
+    if (Object.prototype.hasOwnProperty.call(data, custKey)) basic[personKey] = data[custKey];
+  }
 
   let personId;
   try {
@@ -182,7 +199,13 @@ async function create(event) {
         birthday: basic.birthday ?? null,
         occupation: basic.occupation ?? null,
         education: basic.education ?? null,
-        source: '客户建档',
+        source: basic.source || '客户建档',
+        hobbies: basic.hobbies ?? null,
+        customer_stage: basic.customer_stage ?? null,
+        sales_priority: basic.sales_priority ?? null,
+        referral_priority: basic.referral_priority ?? null,
+        marital_status: basic.marital_status ?? null,
+        first_contact_date: basic.first_contact_date ?? null,
       };
       // persons 写入必须走 service_role 受控通道（rdb/anon 无 INSERT 权限）
       const created = await personService().createPerson(personPayload);
@@ -201,6 +224,10 @@ async function create(event) {
   const r = assertOk(await rdb.from('customers').insert(payload).select('Id'));
   const customerId = r.data[0].Id;
 
+  if (data.recruitment_priority) {
+    await ensureRecruitPriority({ customerId, personId, priority: data.recruitment_priority });
+  }
+
   // PMC-19 CL-03: legacy_customer_id write removed; customers.person_id is the link
   return { id: customerId, personId: String(personId) };
 }
@@ -213,9 +240,12 @@ async function update(event) {
 
   // PMC-17: 基础字段（PERSON_BASIC_FIELDS 键）经 Person 受控边界写入；其余业务字段直写 customers
   const basicIn = {};
+  let recruitmentPriority;
   const businessIn = {};
   for (const [k, v] of Object.entries(rawData)) {
     if (Object.prototype.hasOwnProperty.call(PERSON_BASIC_FIELDS, k)) basicIn[k] = v;
+    else if (Object.prototype.hasOwnProperty.call(PERSON_CUSTOM_FIELDS, k)) basicIn[k] = v;
+    else if (k === 'recruitment_priority') recruitmentPriority = v;
     else businessIn[k] = v;
   }
 
@@ -238,7 +268,7 @@ async function update(event) {
       .select('person_id').eq('Id', id).maybeSingle());
     const prowOCR = crowOCR.data && crowOCR.data.person_id
       ? assertOk(await rdb.from('persons')
-          .select('display_name, phone, wechat, gender, birthday, occupation, education')
+          .select('display_name, phone, wechat, gender, birthday, occupation, education,source,hobbies,customer_stage,sales_priority,referral_priority,marital_status,first_contact_date')
           .eq('id', crowOCR.data.person_id).maybeSingle())
       : { data: null };
     const curData = {};
@@ -250,6 +280,13 @@ async function update(event) {
       curData.birthday = prowOCR.data.birthday;
       curData.occupation = prowOCR.data.occupation;
       curData.education = prowOCR.data.education;
+      curData.source = prowOCR.data.source;
+      curData.hobbies = prowOCR.data.hobbies;
+      curData.customer_stage = prowOCR.data.customer_stage;
+      curData.sales_priority = prowOCR.data.sales_priority;
+      curData.referral_priority = prowOCR.data.referral_priority;
+      curData.marital_status = prowOCR.data.marital_status;
+      curData.first_contact_date = prowOCR.data.first_contact_date;
     }
     const conflicts = bridgeFieldsInPayload.filter(f => {
       const curVal = curData[f] == null ? '' : String(curData[f]);
@@ -283,6 +320,9 @@ async function update(event) {
     for (const [custKey, personKey] of Object.entries(PERSON_BASIC_FIELDS)) {
       if (Object.prototype.hasOwnProperty.call(basicIn, custKey)) personFields[personKey] = basicIn[custKey];
     }
+    for (const [custKey, personKey] of Object.entries(PERSON_CUSTOM_FIELDS)) {
+      if (Object.prototype.hasOwnProperty.call(basicIn, custKey)) personFields[personKey] = basicIn[custKey];
+    }
     try {
       // PMC-19 CL-02: projection to customers removed (base columns dropped)
       personResult = await personService().updateBasicsWithProjection(personId, personFields, {});
@@ -309,9 +349,42 @@ async function update(event) {
     n = 1;
   }
 
+  if (recruitmentPriority !== undefined) {
+    const personRow = assertOk(await rdb.from('customers').select('person_id').eq('Id', id).maybeSingle()).data;
+    if (!personRow?.person_id) return { error: 'Person is not linked to this customer', code: 'PERSON_NOT_LINKED' };
+    await ensureRecruitPriority({ customerId: id, personId: personRow.person_id, priority: recruitmentPriority });
+  }
+
   return { ok: true, updated: n,
     personId: personResult ? personResult.id : undefined,
     personUpdated: personResult ? true : undefined };
+}
+
+async function ensureRecruitPriority({ customerId, personId, priority }) {
+  const normalized = priority == null || String(priority).trim() === '' ? null : String(priority);
+  if (normalized != null && !['A', 'B', 'C', 'D', 'E'].includes(normalized)) {
+    throw new Error('Invalid recruitment_priority');
+  }
+  const found = assertOk(await rdb.from('recruit_candidates')
+    .select('id,deleted_at').eq('person_id', personId).order('id', { ascending: false }).limit(1));
+  const candidate = (found.data || [])[0] || null;
+  if (candidate) {
+    assertOk(await rdb.from('recruit_candidates').update({ recruitment_priority: normalized, updated_at: nowIso() }).eq('id', candidate.id));
+    return;
+  }
+  if (normalized == null) return;
+  const person = assertOk(await rdb.from('persons').select('display_name').eq('id', personId).maybeSingle()).data;
+  if (!person) throw new Error('Person not found for recruitment priority');
+  const ts = nowIso();
+  const inserted = assertOk(await rdb.from('recruit_candidates').insert({
+    customer_id: customerId, person_id: personId, name: person.display_name,
+    stage: '新增人才', stage_changed_at: ts, recruitment_priority: normalized,
+    created_at: ts, updated_at: ts,
+  }).select('id').single());
+  assertOk(await rdb.from('recruit_milestones').insert({
+    candidate_id: inserted.data.id, from_stage: null, to_stage: '新增人才',
+    note: '创建候选人',
+  }));
 }
 
 // 级联软删除的子表清单（主键列名用于计数 select）

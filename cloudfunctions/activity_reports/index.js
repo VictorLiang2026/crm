@@ -73,7 +73,7 @@ async function customerReport(event) {
   const today = beijingToday();
 
   const [customersR, followupsR, giftsR, photosR, ocrR, aiRecR, reviewsR, productsR, personsR] = await Promise.all([
-    rdb.from('customers').select('Id, created_at, first_contact_date, deleted_at, person_id'),
+    rdb.from('customers').select('Id, created_at, deleted_at, person_id'),
     rdb.from('followups').select('Id, customer_id, customer_name, followup_notes, followup_date, next_followup_date, created_at, deleted_at'),
     rdb.from('gifts').select('Id, customer_id, customer_name, gift_name, quantity, given_date, deleted_at'),
     rdb.from('photos').select('id, customer_id, customer_name, file_name, created_at, deleted_at'),
@@ -82,7 +82,7 @@ async function customerReport(event) {
     rdb.from('policy_review_reports').select('id, customer_id, customer_name, report_date, report_type, created_at, deleted_at'),
     rdb.from('products').select('*'),
     // PMC-10：Person 基础资料（展示姓名权威来源；统计计数不依赖此表）
-    rdb.from('persons').select('id, display_name').is('deleted_at', null),
+    rdb.from('persons').select('id, display_name, first_contact_date').is('deleted_at', null),
   ]);
 
   const customers = (assertOk(customersR).data || []).filter(active);
@@ -97,12 +97,17 @@ async function customerReport(event) {
   const custName = {};
   // PMC-10：展示姓名用 Person（person_id 存在且 Person 未软删时覆盖；客户总数/分桶统计仍基于 customers）
   const personNameMap = {};
-  for (const p of (assertOk(personsR).data || [])) personNameMap[p.id] = p.display_name;
+  const personMap = {};
+  for (const p of (assertOk(personsR).data || [])) {
+    personNameMap[p.id] = p.display_name;
+    personMap[String(p.id)] = p;
+  }
   customers.forEach(c => {
     // PMC-20：客户当前名只取 Person（customers.customer_name 已退出，CL-02）
     const personName = c.person_id ? personNameMap[c.person_id] : null;
     custName[c.Id] = personName || '';
     c.customer_name = personName || ''; // 新增客户 feed 用
+    c.first_contact_date = c.person_id != null ? personMap[String(c.person_id)]?.first_contact_date || null : null;
   });
 
   const totals = blankCustomerTotals();

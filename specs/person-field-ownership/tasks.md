@@ -1,0 +1,38 @@
+# Implementation plan
+
+- [x] 1. Confirm live baseline and migration dependencies
+  - Resolve the mismatch between online migration history and the live public schema; record the baseline commit/tag and preexisting workspace files.
+  - Inventory every dependent public view/function and role-specific writer.
+  - Evidence: baseline commit/tag `dc443d832f7c245ff0b55a1c477c10465f376f94` / `release-20261011-181627`; GitHub master/tag were verified to match before release. Public migration ledger omitted local 20261011120000/130000, but live delete-batch objects existed and online `crm_delete_batch` matched the 130000 definition; neither historical migration was replayed. New migrations 20261012100000, 20261012110000, and 20261012120000 applied successfully. Four unrelated untracked user files remain unstaged.
+  - Inventory covered the 11 dependent public views, directory/trash functions, writers and grants. Post-deploy `sync-check.ps1 -CloudOnly`: 51 static assets and 29 CRM functions / 175 source/config files match.
+  - _Requirement: 4, 10_
+- [x] 2. Add reversible data migration
+  - Add Person-owned fields and recruit priority with explicit public names.
+  - Backfill customer/speaker values with Person-wins behavior.
+  - Update existing recruit rows and create the 558 missing candidates with milestones.
+  - Rebuild dependent views/functions/grants and remove duplicate base columns.
+  - Add and review rollback SQL.
+  - Evidence: 558 candidate rows carry the migration milestone marker; post-migration counts are 574 recruit priorities total / 571 active. Duplicate person fields are absent from `public.customers` and `public.activity_speakers`; Person fields and `public.recruit_candidates.recruitment_priority` exist. Eight dependent views returned rows successfully. The recycle RPC is service_role-only. All three migrations have rollback SQL.
+  - _Requirement: 2, 3, 4, 5, 10_
+- [x] 3. Move service writes and role summaries
+  - Update Person service/profile, customer CRUD, recruit CRUD, and speaker profile service.
+  - Keep the legacy callFn surface and role-specific note semantics.
+  - Evidence: all 29 CRM functions match deployed source; backend compatibility regression passed.
+  - _Requirement: 1, 2, 3, 8, 10_
+- [x] 4. Update console and legacy forms
+  - Put shared Person attributes in the Person editor and recruit priority in recruit forms.
+  - Show compact Person context in role forms and use the existing console style.
+  - Add confirmed customer/recruit conversion controls to the Person directory.
+  - Evidence: 9 changed static files uploaded and match the host; Person form browser tests passed 8/8.
+  - _Requirement: 6, 8, 9, 10_
+- [x] 5. Add Person directory and recycle-bin behavior
+  - Add priority/date sorting and remove generic priority/customer stage.
+  - Add dependent multi-select role/priority filters with server-side paging.
+  - Evidence: browser tests passed 2/2 for sortable directory columns and search-applied multi-select filters.
+  - _Requirement: 6, 7, 9_
+- [x] 6. Validate, publish, and reconcile
+  - Run applicable static and business regression checks and record evidence.
+  - Deploy only affected files/functions; commit, push, tag, and verify local/remote/cloud consistency.
+  - Evidence: full regression 107 passed / 0 failed / 5 skipped; WP01 `PASS_WITH_LIMITATIONS`; GitHub and tag reconciliation is recorded in `docs/work-packages/person-field-ownership-20261012.md` after release.
+  - Open verification items: manual logged-in production walkthrough and service-role/live-write probe were not run; mobile visual acceptance is outside this iPad-first work package.
+  - _Requirement: 10_

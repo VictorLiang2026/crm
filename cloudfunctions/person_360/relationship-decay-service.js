@@ -38,7 +38,7 @@ class RelationshipDecayService {
     const now = this.now();
     if (!(now instanceof Date) || !Number.isFinite(now.getTime())) throw new Error('Invalid evaluation time');
     const read = (table, filters) => this.request(table, 'GET', filters);
-    const person = (await read('persons', { select: 'id',
+    const person = (await read('persons', { select: 'id,sales_priority',
       id: `eq.${id}`, deleted_at: 'is.null', limit: 1 }))[0];
     if (!person) throw new Error('Person not found');
     const [facts, customers, timeline] = await Promise.all([
@@ -48,7 +48,7 @@ class RelationshipDecayService {
         order: 'created_at.desc,id.desc', limit: 30 }),
       // PMC-19 CL-03: legacy_customer_id removed; resolve customer via customers.person_id
       read('customers', {
-        select: 'Id,sales_priority', person_id: `eq.${id}`,
+        select: 'Id', person_id: `eq.${id}`,
         deleted_at: 'is.null', limit: 1 }),
       this.listInteractions(id),
     ]);
@@ -58,7 +58,7 @@ class RelationshipDecayService {
     const strengthFact = latest('relationship_strength', 'inference');
     const importanceFact = latest('relationship_importance', 'inference');
     const meaningfulFact = latest('last_meaningful_interaction_at', 'fact');
-    const priority = customers[0]?.sales_priority;
+    const priority = person.sales_priority;
     const explicitImportance = importanceFact ? factValue(importanceFact) : null;
     const importance = explicitImportance ?? PRIORITY_IMPORTANCE[String(priority || '')] ?? null;
     const importanceSource = importanceFact ? 'explicit' :
@@ -89,7 +89,7 @@ class RelationshipDecayService {
       persisted: false, sources: {
         strength: strengthFact ? `public.context_items#${strengthFact.id}` : null,
         importance: importanceFact ? `public.context_items#${importanceFact.id}` :
-          importanceSource === 'sales_priority_proxy' ? `public.customers#${customers[0].Id}` : null,
+          importanceSource === 'sales_priority_proxy' ? `public.persons#${person.id}` : null,
         last_meaningful: meaningful?.source || null,
         cadence: cadenceRows.slice(0, 24).map(row =>
           `public.${row.virtual ? row.source_type : 'interactions'}#${row.source_id || row.id}`),

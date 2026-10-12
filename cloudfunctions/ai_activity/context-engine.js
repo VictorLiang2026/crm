@@ -8,8 +8,8 @@ const LIMITS = Object.freeze({ interactions: 5, interactionsMax: 10, opportuniti
 const FIELDS = Object.freeze({
   // PMC-20: identity fields (name/occupation) live only on persons (CL-02 dropped
   // customers.customer_name/occupation); customers keeps domain state only.
-  persons: ['id', 'display_name', 'phone', 'wechat', 'gender', 'birthday', 'occupation', 'organization', 'education'],
-  customers: ['Id', 'person_id', 'customer_stage', 'sales_priority', 'next_action', 'next_action_date'],
+  persons: ['id', 'display_name', 'gender', 'birthday', 'occupation', 'organization', 'education'],
+  customers: ['Id', 'person_id', 'customer_stage', 'sales_priority', 'first_contact_date', 'next_action', 'next_action_date'],
   followups: ['Id', 'customer_id', 'followup_date', 'interaction_summary', 'followup_notes', 'next_action', 'next_action_date', 'next_followup_date'],
   opportunities: ['id', 'customer_id', 'person_id', 'opportunity_type', 'status', 'last_progress', 'next_action', 'next_action_date'],
   products: ['id', 'customer_id', 'items', 'created_at'],
@@ -72,7 +72,11 @@ function createContextEngine({ rdb, now = () => new Date() } = {}) {
 
   async function read(table, filters, { order, limit = 1, one = false } = {}) {
     if (!Object.hasOwn(FIELDS, table)) throw new ContextError('INVALID_CONFIG', 'Unknown context source');
-    let query = rdb.from(table).select(FIELDS[table].join(','));
+    // Customer-owned actions stay on customers; Person-owned fields are joined below.
+    const selectFields = table === 'customers'
+      ? 'Id,person_id,next_action,next_action_date'
+      : FIELDS[table].join(',');
+    let query = rdb.from(table).select(selectFields);
     for (const [column, value] of Object.entries(filters || {})) {
       if (!FIELDS[table].includes(column) && column !== 'deleted_at') {
         throw new ContextError('INVALID_CONFIG', 'Unknown context filter');
@@ -86,7 +90,20 @@ function createContextEngine({ rdb, now = () => new Date() } = {}) {
     try { response = await query; }
     catch (error) { throw new ContextError('READ_FAILED', `Context read failed: ${table}`, error); }
     if (!response || response.error) throw new ContextError('READ_FAILED', `Context read failed: ${table}`, response?.error);
-    const rows = Array.isArray(response.data) ? response.data : response.data ? [response.data] : [];
+    let rows = Array.isArray(response.data) ? response.data : response.data ? [response.data] : [];
+    if (table === 'customers' && rows.length) {
+      const personIds = [...new Set(rows.map(row => row.person_id).filter(id => id != null))];
+      if (personIds.length) {
+        const peopleResponse = await rdb.from('persons')
+          .select('id,customer_stage,sales_priority,first_contact_date')
+          .in('id', personIds).is('deleted_at', null);
+        if (!peopleResponse || peopleResponse.error) {
+          throw new ContextError('READ_FAILED', 'Context read failed: persons', peopleResponse?.error);
+        }
+        const people = new Map((peopleResponse.data || []).map(person => [String(person.id), person]));
+        rows = rows.map(row => ({ ...row, ...(people.get(String(row.person_id)) || {}) }));
+      }
+    }
     if (rows.length > limit) throw new ContextError('READ_FAILED', `Context read exceeded limit: ${table}`);
     const wrapped = rows.map(row => {
       const rowId = row[IDS[table] || 'id'];

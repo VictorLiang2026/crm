@@ -42,8 +42,10 @@ function fixture() {
   const service = createService({
     request: async (table, method, filters) => {
       calls.push({ table, method, filters });
-      assert.equal(table, 'persons'); assert.equal(method, 'GET');
-      return filters.name_key === 'eq.张玮' ? [person] : [];
+      assert.equal(method, 'GET');
+      if (table === 'persons') return filters.name_key === 'eq.张玮' ? [person] : [];
+      if (table === 'customers') return [{ Id: 101, person_id: 11 }];
+      assert.fail(`Unexpected lookup table: ${table}`);
     },
     rpc: async (name, body) => { calls.push({ name, body }); return { interactionId: 19, contextItemCount: 2 }; },
   });

@@ -133,7 +133,7 @@ async function loadPersonIdentity(rdb, customer) {
   const identity = { source: 'customers_legacy', person_id: null, unmapped: true, conflicts: [] };
   if (customer.person_id == null) return Object.assign({}, fallback, { identity: identity });
   const r = await rdb.from('persons')
-    .select('id, display_name, phone, wechat, gender, birthday, occupation, organization, education')
+    .select('id, display_name, phone, wechat, gender, birthday, occupation, organization, education, source, hobbies, customer_stage, sales_priority, referral_priority, marital_status, first_contact_date')
     .eq('id', customer.person_id).is('deleted_at', null).maybeSingle();
   if (r.error) throw new Error(r.error);
   const p = r.data;
@@ -155,7 +155,7 @@ async function loadPersonIdentity(rdb, customer) {
   });
   merged.organization = p.organization || null;
   merged.education = p.education || null;
-  return Object.assign({}, fallback, merged, { identity: identity });
+  return Object.assign({}, fallback, merged, { source: p.source, hobbies: p.hobbies, customer_stage: p.customer_stage, sales_priority: p.sales_priority, referral_priority: p.referral_priority, marital_status: p.marital_status, first_contact_date: p.first_contact_date, identity: identity });
 }
 
 function identityNotice(identity) {
@@ -178,6 +178,7 @@ async function generate(event) {
   const customer = c.data;
   // PMC-11：人物基础资料 Person 化（测试标记以 Person 权威名判断，已映射客户双源姓名一致）
   const ident = await loadPersonIdentity(rdb, customer);
+    Object.assign(customer, ident);
   const testCustomer = String(ident.name || '').includes(TEST_MARKER);
   const today = new Date().toISOString().slice(0, 10);
   const testReportType = TEST_MARKER + '虚构保单检视';

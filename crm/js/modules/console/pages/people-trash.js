@@ -14,12 +14,65 @@ function fmtTs(v) {
 }
 
 export function renderPeopleTrash(ctx) {
-  const state = { page: 1 };
+  const roles = ['customer', 'recruit', 'referrer', 'speaker', 'participant', 'partner', 'alumni', 'other'];
+  const priorityRoles = ['customer', 'recruit', 'referrer'];
+  const state = {
+    page: 1,
+    pending: { roles: [], customerPriorities: [], recruitPriorities: [], referralPriorities: [] },
+    applied: { roles: [], customerPriorities: [], recruitPriorities: [], referralPriorities: [] },
+  };
   const listEl = h('div', {});
+  const priorityFilters = h('div', { class: 'trash-priority-filters' });
   const metaEl = h('span', { class: 'foot-note' }, '');
   const prevBtn = h('button', { class: 'btn btn-ghost btn-sm', type: 'button' }, t('btn_prev'));
   const nextBtn = h('button', { class: 'btn btn-ghost btn-sm', type: 'button' }, t('btn_next'));
   const pageInfo = h('span', { class: 'pager-info' }, '');
+
+  const roleLabels = {
+    customer: t('customer'), recruit: t('recruit'), referrer: t('role_referrer'),
+    speaker: t('speaker'), participant: t('participant'), partner: t('role_partner'),
+    alumni: t('role_alumni'), other: t('role_other'),
+  };
+  function checkboxGroup(values, key, options, onChange) {
+    return h('div', { class: 'trash-filter-checks' }, options.map(([value, label]) => {
+      const input = h('input', { type: 'checkbox', checked: values.includes(value) });
+      input.addEventListener('change', () => onChange(value, input.checked));
+      return h('label', { class: 'trash-filter-check' }, [input, h('span', {}, label)]);
+    }));
+  }
+  function renderPriorityFilters() {
+    const selectedRoles = state.pending.roles;
+    const groups = [];
+    const defs = [
+      ['customer', 'customerPriorities', t('customer'), 'trash_customer_priority'],
+      ['recruit', 'recruitPriorities', t('recruit'), 'trash_recruit_priority'],
+      ['referrer', 'referralPriorities', t('role_referrer'), 'trash_referral_priority'],
+    ];
+    for (const [role, key, label, titleKey] of defs) {
+      if (!selectedRoles.includes(role)) continue;
+      groups.push(h('section', { class: 'trash-filter-group' }, [
+        h('div', { class: 'trash-filter-title' }, t(titleKey).replace('{role}', label)),
+        checkboxGroup(state.pending[key], key, ['A', 'B', 'C', 'D', 'E'].map(v => [v, v]), (value, checked) => {
+          const set = new Set(state.pending[key]);
+          checked ? set.add(value) : set.delete(value);
+          state.pending[key] = [...set];
+        }),
+      ]));
+    }
+    priorityFilters.replaceChildren(...groups);
+  }
+  const roleFilters = checkboxGroup(state.pending.roles, 'roles', roles.map(role => [role, roleLabels[role]]), (value, checked) => {
+    const set = new Set(state.pending.roles);
+    checked ? set.add(value) : set.delete(value);
+    state.pending.roles = [...set];
+    renderPriorityFilters();
+  });
+  const applyFilters = h('button', { class: 'btn btn-primary btn-sm', type: 'button', onclick: () => {
+    state.applied = Object.fromEntries(Object.entries(state.pending).map(([key, values]) => [key, [...values]]));
+    state.page = 1;
+    runQuery();
+  } }, t('btn_search'));
+  renderPriorityFilters();
 
   function openRestore(row) {
     const name = row.display_name || `#${row.id}`;
@@ -53,7 +106,7 @@ export function renderPeopleTrash(ctx) {
 
   function runQuery() {
     loadInto(listEl, async () => {
-      const res = await data.listPersonTrash(ctx, { page: state.page, pageSize: PAGE_SIZE });
+      const res = await data.listPersonTrash(ctx, { page: state.page, pageSize: PAGE_SIZE, ...state.applied });
       const rows = res.rows || [];
       pageInfo.textContent = `${res.page}`;
       prevBtn.disabled = res.page <= 1;
@@ -64,6 +117,7 @@ export function renderPeopleTrash(ctx) {
       }
       const thead = h('thead', {}, h('tr', {}, [
         h('th', {}, t('col_name')),
+        h('th', {}, t('trash_col_roles')),
         h('th', {}, t('trash_col_deleted_at')),
         h('th', {}, t('trash_col_customer')),
         h('th', {}, t('trash_col_action')),
@@ -75,6 +129,7 @@ export function renderPeopleTrash(ctx) {
           : '-';
         return h('tr', {}, [
           h('td', {}, h('span', { title: t('deleted_person_open_hint') }, name)),
+          h('td', { 'data-label': t('trash_col_roles') }, (r.roles || []).map(role => roleLabels[role] || role).join(' · ') || '-'),
           h('td', { 'data-label': t('trash_col_deleted_at') }, fmtTs(r.deleted_at)),
           h('td', { 'data-label': t('trash_col_customer') }, customerCell),
           h('td', { 'data-label': t('trash_col_action') }, h('button', {
@@ -95,11 +150,19 @@ export function renderPeopleTrash(ctx) {
       sub: t('sub_people_trash'),
       actions: [h('a', { class: 'btn btn-ghost', href: '#/people' }, [ic('users'), t('title_people')])],
     }),
-    h('section', { class: 'card' }, [
-      listEl,
-      h('div', { class: 'card-foot' }, [
-        metaEl,
-        h('div', { class: 'pager', style: 'margin-left:auto' }, [prevBtn, pageInfo, nextBtn]),
+    h('div', { class: 'people-trash-layout', style: 'display:grid;grid-template-columns:280px minmax(0,1fr);gap:14px;align-items:start' }, [
+      h('section', { class: 'card', style: 'padding:14px' }, [
+        h('div', { class: 'trash-filter-title' }, t('trash_filter_role')),
+        roleFilters,
+        priorityFilters,
+        h('div', { class: 'sheet-actions', style: 'justify-content:flex-start;margin-top:12px' }, [applyFilters]),
+      ]),
+      h('section', { class: 'card' }, [
+        listEl,
+        h('div', { class: 'card-foot' }, [
+          metaEl,
+          h('div', { class: 'pager', style: 'margin-left:auto' }, [prevBtn, pageInfo, nextBtn]),
+        ]),
       ]),
     ]),
   );
