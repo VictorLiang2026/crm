@@ -31,20 +31,62 @@ function langToggle() {
   }));
 }
 
-function passwordCard() {
-  let msg = '';
-  const btn = h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: async () => {
-    const { callFn } = await import('../data.js');
-    const r = await callFn('requestPasswordReset', {});
-    msg = r && r.ok ? t('setting_pwd_sent') : t('setting_pwd_fail');
-    status.textContent = msg;
-  } }, [ic('lock'), t('setting_password')]);
-  const status = h('p', { class: 'form-msg' });
+function passwordField(labelKey, name, autocomplete) {
+  const inputId = `console-${name}`;
+  const input = h('input', {
+    id: inputId, name, type: 'password', autocomplete,
+    required: true, class: 'input',
+  });
+  return {
+    input,
+    field: h('div', { class: 'settings-password-field' }, [
+      h('label', { for: inputId }, t(labelKey)), input,
+    ]),
+  };
+}
+
+function passwordCard(ctx) {
+  const oldPassword = passwordField('setting_pwd_old', 'account-old-password', 'current-password');
+  const newPassword = passwordField('setting_pwd_new', 'account-new-password', 'new-password');
+  const confirmation = passwordField('setting_pwd_confirm', 'account-confirm-password', 'new-password');
+  const submit = h('button', {
+    class: 'btn btn-ghost btn-sm', type: 'submit',
+  }, [ic('lock'), t('setting_password')]);
+  const status = h('p', { class: 'form-msg', role: 'status', 'aria-live': 'polite' });
+  const form = h('form', { class: 'settings-password-form', onsubmit: async (event) => {
+    event.preventDefault();
+    const oldValue = oldPassword.input.value;
+    const newValue = newPassword.input.value;
+    const confirmValue = confirmation.input.value;
+    status.className = 'form-msg';
+    if (!oldValue || !newValue || !confirmValue) {
+      status.textContent = t('setting_pwd_required'); return;
+    }
+    if (newValue.length < 8 || newValue.length > 64) {
+      status.textContent = t('setting_pwd_length'); return;
+    }
+    if (newValue === oldValue) {
+      status.textContent = t('setting_pwd_same'); return;
+    }
+    if (newValue !== confirmValue) {
+      status.textContent = t('setting_pwd_mismatch'); return;
+    }
+    submit.disabled = true;
+    status.textContent = t('setting_pwd_pending');
+    try {
+      await ctx.changePassword(oldValue, newValue);
+      status.textContent = t('setting_pwd_success');
+    } catch {
+      status.classList.add('error');
+      status.textContent = t('setting_pwd_fail');
+      submit.disabled = false;
+    }
+  } }, [oldPassword.field, newPassword.field, confirmation.field, submit, status]);
   return card({
     title: t('setting_password'), icon: 'lock',
     body: [
       h('p', { class: 'help' }, t('setting_pwd_help')),
-      h('div', { class: 'form-row' }, [btn, status]),
+      form,
     ],
   });
 }
@@ -61,17 +103,27 @@ function maintenanceCard() {
   });
 }
 
-function signOutCard() {
+function signOutCard(ctx) {
+  const status = h('p', { class: 'form-msg', role: 'status', 'aria-live': 'polite' });
+  const button = h('button', {
+    class: 'btn btn-ghost', type: 'button', onclick: async () => {
+      button.disabled = true;
+      status.className = 'form-msg';
+      status.textContent = t('setting_signout_pending');
+      try {
+        await ctx.signOut();
+      } catch {
+        status.classList.add('error');
+        status.textContent = t('setting_signout_fail');
+        button.disabled = false;
+      }
+    },
+  }, [ic('log-out'), t('setting_signout')]);
   return card({
     title: t('setting_signout'), icon: 'log-out',
     body: [
-      h('button', {
-        class: 'btn btn-ghost', type: 'button',
-        onclick: () => {
-          try { localStorage.clear(); sessionStorage.clear(); } catch (_) {}
-          location.href = 'console.html';
-        },
-      }, [ic('log-out'), t('setting_signout')]),
+      button,
+      status,
     ],
   });
 }
@@ -84,9 +136,9 @@ export function renderSettings(ctx) {
     }),
     h('div', { class: 'page-grid' }, [
       card({ title: t('setting_language'), icon: 'globe', body: [langToggle()] }),
-      passwordCard(),
+      passwordCard(ctx),
       maintenanceCard(),
-      signOutCard(),
+      signOutCard(ctx),
     ]),
   );
 }

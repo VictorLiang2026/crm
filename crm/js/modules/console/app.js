@@ -91,6 +91,16 @@ async function signOutCurrentAccount() {
   url.searchParams.set('_fresh', String(Date.now()));
   location.replace(url.href);
 }
+async function changeCurrentPassword(oldPassword, newPassword) {
+  if (!authInst || !authInst.resetPasswordForOld) {
+    throw new Error('当前认证组件不支持自行修改密码');
+  }
+  checkAuthResult(await authInst.resetPasswordForOld({
+    old_password: oldPassword,
+    new_password: newPassword,
+  }));
+  await signOutCurrentAccount();
+}
 
 // ---------- 路由 ----------
 function route() {
@@ -104,6 +114,7 @@ function route() {
     operator: CONFIG.operator || {},
     toast,
     signOut: signOutCurrentAccount,
+    changePassword: changeCurrentPassword,
   });
 }
 

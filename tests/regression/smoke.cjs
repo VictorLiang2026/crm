@@ -124,6 +124,51 @@ module.exports = async function smoke(root, test) {
       await b.wait(text('今日'));
       assert.equal(await b.evaluate("document.getElementById('view').innerText.includes('CRM 登录')"), false);
     });
+    await check('console.settings.password-signout', 'Console 设置沿用旧密码改密语义并复用 CloudBase 退出', async () => {
+      await b.openConsole('#/settings', 'authCase=1');
+      await b.wait("document.getElementById('console-main')?.innerText.includes('当前密码') === true");
+      for (const viewport of [{ width: 820, height: 1180 }, { width: 1180, height: 820 }]) {
+        await b.send('Emulation.setDeviceMetricsOverride', { ...viewport, deviceScaleFactor: 2, mobile: false });
+        assert.equal(await b.evaluate("document.documentElement.scrollWidth <= innerWidth + 1 && [...document.querySelectorAll('.settings-password-field input')].every(x => x.getBoundingClientRect().width > 0 && x.getBoundingClientRect().right <= innerWidth + 1)"), true);
+      }
+      await b.send('Emulation.clearDeviceMetricsOverride');
+      const changesBefore = await b.evaluate('window.__crmTest.passwordChanges');
+      await b.evaluate(`(() => {
+        document.querySelector('[name=account-old-password]').value='local-fixture-only';
+        document.querySelector('[name=account-new-password]').value='short';
+        document.querySelector('[name=account-confirm-password]').value='short';
+        document.querySelector('.settings-password-form').requestSubmit();
+      })()`);
+      await b.wait("document.querySelector('.settings-password-form .form-msg')?.textContent.includes('8 至 64') === true");
+      assert.equal(await b.evaluate('window.__crmTest.passwordChanges'), changesBefore);
+      await b.evaluate(`(() => {
+        document.querySelector('[name=account-new-password]').value='NewTestPass123!';
+        document.querySelector('[name=account-confirm-password]').value='NewTestPass123!';
+        document.querySelector('[name=account-old-password]').value='wrong';
+        document.querySelector('.settings-password-form').requestSubmit();
+      })()`);
+      await b.wait("document.querySelector('.settings-password-form .form-msg')?.textContent.includes('请核对当前密码') === true");
+      assert.equal(await b.evaluate('window.__crmTest.passwordChanges'), changesBefore + 1);
+      await b.evaluate("document.querySelector('[name=account-old-password]').value='local-fixture-only'; document.querySelector('.settings-password-form').requestSubmit()");
+      await b.wait("location.pathname.endsWith('/console.html') && document.querySelector('[name=username]')", 15000);
+      assert.equal(await b.evaluate("sessionStorage.getItem('crm_fixture_pw_changed')"), '1');
+      assert.equal(await b.evaluate("sessionStorage.getItem('crm_fixture_signed_out')"), '1');
+      await b.evaluate("document.querySelector('[name=username]').value='[CRM_TEST_ONLY]'; document.querySelector('[name=password]').value='NewTestPass123!'; document.querySelector('form').requestSubmit()");
+      await b.wait("document.getElementById('console-main') || document.querySelector('#app form')", 10000);
+      const loginState = await b.evaluate("({main:document.getElementById('console-main')?.innerText,login:document.querySelector('#app .form-msg')?.textContent})");
+      assert.ok(loginState.main?.includes('TODAY'), `Console sign-in did not complete: ${JSON.stringify(loginState)}`);
+      await b.evaluate("localStorage.setItem('console-fixture-preserve','1'); location.hash='#/settings'");
+      await b.wait("document.getElementById('console-main')?.innerText.includes('当前密码') === true");
+      await b.evaluate("[...document.querySelectorAll('#console-main button')].find(x=>x.textContent.includes('English')).click()");
+      await b.wait("document.getElementById('console-main')?.innerText.includes('Current Password') === true");
+      await b.evaluate("sessionStorage.setItem('crm_fixture_fail_signout','1'); [...document.querySelectorAll('#console-main button')].find(x=>x.textContent.includes('Sign Out')).click()");
+      await b.wait("document.getElementById('console-main')?.innerText.includes('Check your connection and try again.') === true");
+      assert.equal(await b.evaluate("localStorage.getItem('crm_lang')"), 'en');
+      await b.evaluate("sessionStorage.removeItem('crm_fixture_fail_signout'); [...document.querySelectorAll('#console-main button')].find(x=>x.textContent.includes('Sign Out')).click()");
+      await b.wait("location.pathname.endsWith('/console.html') && document.querySelector('[name=username]')", 15000);
+      assert.equal(await b.evaluate("localStorage.getItem('crm_lang')"), 'en');
+      assert.equal(await b.evaluate("localStorage.getItem('console-fixture-preserve')"), '1');
+    });
     await check('ai.search.entry', 'AI CRM 搜索独立页面展示固定示例，进入页面不执行搜索', async () => {
       await open('#/ai/search', 'AI CRM 搜索');
       await b.wait(text('最近三个月参加过活动'));

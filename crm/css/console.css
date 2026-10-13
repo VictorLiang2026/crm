@@ -338,6 +338,17 @@ body:has(.login), body.is-login { padding-top: env(safe-area-inset-top); }
 }
 .field input:focus { outline: none; border-color: var(--red); box-shadow: 0 0 0 3px rgba(211, 17, 69, .12); }
 .form-msg { color: #c0392b; margin-top: 10px; font-size: 13px; min-height: 18px; }
+.settings-password-form { display: flex; flex-direction: column; gap: 12px; max-width: 560px; }
+.settings-password-field { display: flex; flex-direction: column; gap: 6px; }
+.settings-password-field label { color: var(--ink-2); font-size: 13px; font-weight: 600; }
+.settings-password-field input {
+  box-sizing: border-box; width: 100%; min-height: 44px; padding: 8px 12px;
+  border: 1.5px solid var(--line); border-radius: 10px;
+  background: var(--card); color: var(--ink); font: inherit;
+}
+.settings-password-field input:focus { outline: none; border-color: var(--red); box-shadow: 0 0 0 3px rgba(211, 17, 69, .12); }
+.settings-password-form .form-msg { color: var(--muted); }
+.settings-password-form .form-msg.error, .card-body > .form-msg.error { color: #c0392b; }
 .page-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
 .lang-toggle { display: flex; gap: 8px; flex-wrap: wrap; }
 .lang-toggle .btn { min-width: 110px; }

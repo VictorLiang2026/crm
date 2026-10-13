@@ -21,6 +21,9 @@ class Browser {
     const sdk = /<script\s+src="https:\/\/static\.cloudbase\.net\/cloudbase-js-sdk\/3\.10\.1\/cloudbase\.full\.js"><\/script>/g;
     if ([...source.matchAll(sdk)].length !== 1) throw new Error('SDK injection anchor changed; refuse to serve production SDK');
     const html = source.replace(sdk, '<script src="/fixtures.js"></script>');
+    const consoleSource = fs.readFileSync(path.join(this.root, 'console.html'), 'utf8');
+    if ([...consoleSource.matchAll(sdk)].length !== 1) throw new Error('Console SDK injection anchor changed; refuse to serve production SDK');
+    const consoleHtml = consoleSource.replace(sdk, '<script src="/fixtures.js"></script>');
     this.server = http.createServer((req, res) => {
       const pathname = new URL(req.url, 'http://127.0.0.1').pathname;
       res.setHeader('Cache-Control', 'no-store');
@@ -30,6 +33,7 @@ class Browser {
         res.end(new URL(req.url, 'http://127.0.0.1').searchParams.get('v2') === '1'
           ? html.replace('quick_capture_v2: false', 'quick_capture_v2: true') : html);
       }
+      else if (pathname === '/console.html') { res.setHeader('Content-Type', 'text/html; charset=utf-8'); res.end(consoleHtml); }
       else if (pathname === '/fixtures.js') { res.setHeader('Content-Type', 'text/javascript; charset=utf-8'); res.end('(' + installFixtures.toString() + ')();'); }
       else if (pathname === '/crm/js/modules/person-360.js') { res.setHeader('Content-Type', 'text/javascript; charset=utf-8'); res.end(fs.readFileSync(path.join(this.root, 'crm/js/modules/person-360.js'))); }
       else if (pathname === '/crm/js/modules/work-items.js') { res.setHeader('Content-Type', 'text/javascript; charset=utf-8'); res.end(fs.readFileSync(path.join(this.root, 'crm/js/modules/work-items.js'))); }
@@ -160,6 +164,12 @@ class Browser {
     const target = this.origin + '/admin.html?' + query + '&run=' + Date.now() + hash;
     await this.send('Page.navigate', { url: target });
     await this.wait('location.href === ' + JSON.stringify(target) + ' && Boolean(window.__crmTest && document.getElementById("view"))', 25000);
+  }
+  async openConsole(hash = '#/today', query = '') {
+    this.runtimeErrors.length = 0;
+    const target = this.origin + '/console.html?' + query + '&run=' + Date.now() + hash;
+    await this.send('Page.navigate', { url: target });
+    await this.wait('location.href === ' + JSON.stringify(target) + ' && Boolean(window.__crmTest && document.getElementById("app"))', 25000);
   }
   async click(selector, text) {
     await this.evaluate(`(() => { const e = [...document.querySelectorAll(${JSON.stringify(selector)})].find(e => e.textContent.includes(${JSON.stringify(text)})); if (!e) throw new Error('Control not found: ' + ${JSON.stringify(text)}); e.click(); })()`);
