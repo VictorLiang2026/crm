@@ -45,7 +45,7 @@ export function renderPeople(ctx) {
   const prevBtn = h('button', { class: 'btn btn-ghost btn-sm', type: 'button' }, t('btn_prev'));
   const nextBtn = h('button', { class: 'btn btn-ghost btn-sm', type: 'button' }, t('btn_next'));
   const pageInfo = h('span', { class: 'pager-info' }, '');
-  const filterButton = h('button', { class: 'btn btn-ghost btn-sm people-filter-trigger', type: 'button' });
+  const filterButton = h('button', { class: 'btn btn-dark people-filter-trigger', type: 'button' });
   const filterPanel = h('div', { class: 'people-filter-panel', hidden: true });
   const priorityFilters = h('div', { class: 'people-filter-priorities' });
 

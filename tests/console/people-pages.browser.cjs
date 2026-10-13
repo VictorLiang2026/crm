@@ -65,6 +65,14 @@ test('People directory reveals role priorities and applies multi-select only on 
     await b.wait("document.querySelector('.people-filter-trigger')");
     await b.evaluate("document.head.insertAdjacentHTML('beforeend','<link rel=stylesheet href=/crm/css/console.css>')");
     assert.equal(await b.evaluate("document.querySelector('.people-filter-anchor').nextElementSibling.getAttribute('href')"), '#/people-trash');
+    const sizes = await b.evaluate(`(()=>{
+      const filter=document.querySelector('.people-filter-trigger');
+      const create=[...document.querySelectorAll('.toolbar button')].find(x=>x.textContent.includes('新建人物'));
+      return {filterHeight:getComputedStyle(filter).height,createHeight:getComputedStyle(create).height,
+        filterBackground:getComputedStyle(filter).backgroundColor,createBackground:getComputedStyle(create).backgroundColor};
+    })()`);
+    assert.equal(sizes.filterHeight, sizes.createHeight, 'filter control must match the create-person control size');
+    assert.notEqual(sizes.filterBackground, sizes.createBackground, 'filter control has a distinct background');
     const initialCount = await b.evaluate('window.peopleRequests.length');
     await b.evaluate("document.querySelector('.people-filter-trigger').click()");
     await b.evaluate(`document.querySelector('.people-filter-check[data-filter-value="recruit"] input').click()`);

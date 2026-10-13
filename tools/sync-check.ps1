@@ -8,6 +8,19 @@ function GitRead([string[]]$Arguments) {
   if ($LASTEXITCODE -ne 0) { throw "git $($Arguments -join ' ') failed." }
   return $result
 }
+function SourceFilesMatch([string]$Left, [string]$Right) {
+  if ((Get-FileHash -LiteralPath $Left -Algorithm SHA256).Hash -eq (Get-FileHash -LiteralPath $Right -Algorithm SHA256).Hash) { return $true }
+  $textExtensions = @('.js', '.cjs', '.mjs', '.ts', '.json', '.sql', '.md', '.txt', '.yml', '.yaml')
+  if ([IO.Path]::GetExtension($Left).ToLowerInvariant() -notin $textExtensions) { return $false }
+  $utf8 = [Text.UTF8Encoding]::new($false, $true)
+  try {
+    $leftText = $utf8.GetString([IO.File]::ReadAllBytes($Left)).Replace("`r`n", "`n")
+    $rightText = $utf8.GetString([IO.File]::ReadAllBytes($Right)).Replace("`r`n", "`n")
+    return $leftText -ceq $rightText
+  } catch {
+    return $false
+  }
+}
 try {
   $config = Get-Content (Join-Path $repo 'cloudbaserc.json') -Raw | ConvertFrom-Json
   if ($config.envId -ne 'crm-d1gkae8ddc930d151') { throw 'Unexpected environment.' }
@@ -69,7 +82,7 @@ try {
       $relative = $file.FullName.Substring($dir.FullName.Length + 1)
       $other = Join-Path $dest $relative
       if (!(Test-Path -LiteralPath $other)) { throw "Missing online: $($dir.Name)/$relative" }
-      if ((Get-FileHash -LiteralPath $file.FullName).Hash -ne (Get-FileHash -LiteralPath $other).Hash) { throw "Source differs: $($dir.Name)/$relative" }
+      if (!(SourceFilesMatch -Left $file.FullName -Right $other)) { throw "Source differs: $($dir.Name)/$relative" }
       $checked++
     }
     foreach ($file in $remoteFiles) {
