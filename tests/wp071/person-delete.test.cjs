@@ -14,7 +14,33 @@ Module._load = originalLoad;
 
 const key = '5d998643-4c9a-44a5-a9b3-7605904b7ed2';
 const previewId = 'a45da2ae-b2ed-42c0-992e-e68e53085acc';
-const batch = '53b62c8e-b28f-426d-94da-25100c83378b';
+
+test('person trash read RPC is explicitly allowlisted and keeps the public pagination contract', async () => {
+  const previousEnv = process.env.TCB_ENV;
+  const previousKey = process.env.CRM_PERSON360_DB_API_KEY;
+  const previousFetch = global.fetch;
+  const requests = [];
+  process.env.TCB_ENV = 'crm-d1gkae8ddc930d151';
+  process.env.CRM_PERSON360_DB_API_KEY = 'test-key';
+  global.fetch = async (url, init) => {
+    requests.push({ url: String(url), init });
+    return { ok: true, json: async () => ({ rows: [], page: 1, pageSize: 20, total: 0, totalPages: 1, hasMore: false }) };
+  };
+  try {
+    const result = await createService().listPersonTrash({ page: 1, pageSize: 20 });
+    assert.match(requests[0].url, /\/rpc\/person_trash_page_v1$/);
+    assert.deepEqual(JSON.parse(requests[0].init.body), {
+      p_page: 1, p_page_size: 20, p_roles: [],
+      p_customer_priorities: [], p_recruit_priorities: [], p_referral_priorities: [],
+    });
+    assert.equal(requests[0].init.headers['Content-Profile'], 'public');
+    assert.deepEqual(result.rows, []);
+  } finally {
+    global.fetch = previousFetch;
+    if (previousEnv === undefined) delete process.env.TCB_ENV; else process.env.TCB_ENV = previousEnv;
+    if (previousKey === undefined) delete process.env.CRM_PERSON360_DB_API_KEY; else process.env.CRM_PERSON360_DB_API_KEY = previousKey;
+  }
+});
 
 function fixture(rpcResult = { ok: true }) {
   const calls = [];
@@ -57,32 +83,21 @@ test('person restore rejects forged input and calls the scoped RPC', async () =>
   assert.equal(f.calls.length, 2);
 });
 
-test('person trash lists deleted persons with customer link and batch marker stripped', async () => {
-  const request = async (table, method, filters) => {
-    assert.equal(method, 'GET');
-    if (table === 'persons') {
-      assert.equal(filters.deleted_at, 'not.is.null');
-      assert.equal(filters.order, 'deleted_at.desc,id.desc');
-      return [
-        { id: 20, display_name: '甲', deleted_at: '2026-10-11 01:00', delete_batch_id: batch },
-        { id: 21, display_name: '乙', deleted_at: '2026-10-10 01:00', delete_batch_id: null },
-      ];
-    }
-    if (table === 'customers') {
-      assert.equal(filters.person_id, 'in.(20,21)');
-      return [{ Id: 910001, person_id: 20, deleted_at: '2026-10-11 01:00' }];
-    }
-    throw Error('Unexpected read');
-  };
-  const res = await createService({ request, rpc: async () => {} }).listPersonTrash({ page: 1, pageSize: 20 });
-  assert.equal(res.rows.length, 2);
-  assert.deepEqual(res.rows[0].customer_id, 910001);
-  assert.equal(res.rows[0].customer_deleted, true);
-  assert.equal(res.rows[0].batch_scoped, true);
-  assert.equal(res.rows[1].customer_id, null);
-  assert.equal(res.rows[1].batch_scoped, false);
-  assert.equal('delete_batch_id' in res.rows[0], false);
-  assert.equal(res.hasMore, false);
+test('person trash returns the existing public filtered RPC page unchanged', async () => {
+  const response = { rows: [
+    { id: 20, display_name: '甲', customer_id: 910001, customer_deleted: true, batch_scoped: true },
+    { id: 21, display_name: '乙', customer_id: null, customer_deleted: null, batch_scoped: false },
+  ], total: 2, page: 1, pageSize: 20, totalPages: 1, hasMore: false };
+  const calls = [];
+  const res = await createService({ rpc: async (name, params) => {
+    calls.push({ name, params });
+    return response;
+  } }).listPersonTrash({ page: 1, pageSize: 20 });
+  assert.deepEqual(calls, [{ name: 'person_trash_page_v1', params: {
+    p_page: 1, p_page_size: 20, p_roles: [], p_customer_priorities: [],
+    p_recruit_priorities: [], p_referral_priorities: [],
+  } }]);
+  assert.deepEqual(res, response);
 });
 
 test('person trash rejects an out-of-range page', async () => {

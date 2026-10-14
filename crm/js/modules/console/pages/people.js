@@ -172,7 +172,10 @@ export function renderPeople(ctx) {
   }
   function updateFilterButton() {
     const count = Object.values(state.filters).reduce((sum, values) => sum + values.length, 0);
-    filterButton.replaceChildren(t('people_filter'), count ? h('span', { class: 'people-filter-count' }, String(count)) : null);
+    filterButton.replaceChildren(
+      count ? t('people_filter') : `${t('people_filter')} ${t('filter_none')}`,
+      ...(count ? [h('span', { class: 'people-filter-count' }, String(count))] : []),
+    );
     filterButton.setAttribute('aria-expanded', String(!filterPanel.hidden));
   }
   function renderFilterPanel() {

@@ -902,6 +902,7 @@ const DICT = {
   'trash_col_action': { 'zh-CN': '操作', 'en': 'Action' },
   'trash_filter_role': { 'zh-CN': '按角色筛选', 'en': 'Filter by Role' },
   'people_filter': { 'zh-CN': '筛选', 'en': 'Filter' },
+  'filter_none': { 'zh-CN': '无', 'en': 'None' },
   'filter_role': { 'zh-CN': '角色', 'en': 'Role' },
   'filter_priority_for': { 'zh-CN': '{role}优先级', 'en': '{role} Priority' },
   'btn_reset': { 'zh-CN': '重置', 'en': 'Reset' },

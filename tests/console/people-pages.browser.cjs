@@ -63,6 +63,7 @@ test('People directory reveals role priorities and applies multi-select only on 
       renderPeople(ctx);
     })()`);
     await b.wait("document.querySelector('.people-filter-trigger')");
+    assert.equal(await b.evaluate("document.querySelector('.people-filter-trigger').textContent.trim()"), '筛选 无');
     await b.evaluate("document.head.insertAdjacentHTML('beforeend','<link rel=stylesheet href=/crm/css/console.css>')");
     assert.equal(await b.evaluate("document.querySelector('.people-filter-anchor').nextElementSibling.getAttribute('href')"), '#/people-trash');
     const sizes = await b.evaluate(`(()=>{
@@ -89,6 +90,7 @@ test('People directory reveals role priorities and applies multi-select only on 
     assert.deepEqual(request.args.recruitPriorities, ['A','C']);
     assert.deepEqual(request.args.customerPriorities, ['B']);
     assert.deepEqual(request.args.referralPriorities, []);
+    assert.equal(await b.evaluate("document.querySelector('.people-filter-count').textContent"), '5');
   } finally { await b.close(); }
 });
 

@@ -115,6 +115,7 @@ async function pgRequest(table, method, filters = {}, body) {
 
 async function pgRpc(name, body) {
   if (!new Set(['quick_capture_v2_commit', 'person_directory_page_v1', 'person_directory_filtered_page_v1',
+    'person_trash_page_v1',
     'person_identity_preview_v1', 'person_identity_execute_v1',
     'crm_person_only_recruit_delete_v1', 'crm_work_item_preview_v1',
     'crm_work_item_execute_v1', 'crm_opportunity_preview_v1',
