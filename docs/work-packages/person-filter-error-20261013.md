@@ -28,3 +28,16 @@
 
 - 页面：用发布前版本恢复并仅重新上传 `/crm/js/modules/console/pages/people.js`。
 - 数据库通知无持久化结构/数据影响；配对 rollback 文件为 `cloudbase/migrations/20261013100000_person_directory_rpc_schema_cache_reload.rollback.sql`，只重新发送缓存刷新通知。不要回滚任何既有业务迁移或数据。
+
+## 2026-10-14 继续诊断
+
+- 生产现状：筛选请求仍会返回通用错误；生产函数源码与仓库基线一致，CLS 已启用且函数日志绑定正常。17:50–18:42（北京时间）查询不到 `person_360` 请求记录；旧 `GetFunctionLogs` 查询接口已下线。
+- 之前已批准的诊断改动：`listPeople` 遇到 RPC HTTP 错误时，仅向界面返回 HTTP 状态码和经过白名单校验的 PostgREST / SQL 错误码；不返回数据库原始消息、SQL 或凭据。其他 action 保持原有通用错误。
+- 校验器：`tests/wp01/static.cjs` 对比内容前只把 CRLF 归一成 LF；线上 `console.html` 归一后与基线完全一致，其余内容仍逐字节对应文本比较。
+- 影响范围：`cloudfunctions/person_360/index.js`、`tests/wp01/static.cjs`。不改页面请求契约、业务数据、数据库结构或权限，也不触及 `pr` schema / 函数。
+- 回归：`node --check` 通过；人物目录与 People 浏览器测试 6/6 通过；错误码模拟验证通过（允许的 `PGRST202` 可见，非白名单码和原始响应消息不外泄）；WP01 108 PASS、0 FAIL、5 SKIP，匿名权限探针 61/61，发布门槛 `PASS_WITH_LIMITATIONS`。真实登录、service_role 运行时、写入及手机验收仍按门禁记录为未验证。
+- 根因仍未确认；部署后需让生产人物筛选再发出一次真实请求，使用界面返回的状态/错误码或 CLS 请求记录继续定位。不得将诊断改动描述为已修复根因。
+- 最新 CLS 查询（2026-10-14 22:00–23:15，北京时间）仍无 `person_360` 请求记录；用户尚未在该窗口触发新的筛选请求。
+- 部署：2026-10-14 23:35（北京时间）通过 `tools/deploy-function.ps1 -Function person_360` 更新生产函数；生产详情为 Active / CodeResult success，部署后源码检查确认新诊断逻辑存在。`sync-check.ps1 -CloudOnly` 通过：51 个页面/模块/样式资源、29 个 CRM 函数的 175 份源码/配置文件与云端一致。23:30–23:45 CLS 查询仍没有该函数请求。
+- Git 提交与发布标签在本节完成后追加；部署前标签为 `release-20261014-0117`。
+- 恢复方式：按发布前标签恢复 `person_360` 函数代码；校验器如需恢复，使用该标签的 `tests/wp01/static.cjs`。不涉及数据库回滚。

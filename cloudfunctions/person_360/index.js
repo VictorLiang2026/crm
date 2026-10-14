@@ -143,10 +143,12 @@ async function pgRpc(name, body) {
     if (!response.ok) {
       const problem = await response.json().catch(() => null);
       const message = typeof problem?.message === 'string' ? problem.message : '';
+      const code = typeof problem?.code === 'string' && /^(?:PGRST\d{3}|[0-9A-Z]{5})$/.test(problem.code)
+        ? problem.code : '';
       if (/^(Invalid |Selected Person|Same-name|Deleted identity|Customer |Preview |Identity candidates|Active Person|Person-only recruit|Test account|Test parent|Idempotency key|Unauthorized|Speaker profile|Work item|Action |Commitment |Opportunity |Person changed|Person not found|Activity |Outcome )/.test(message)) {
         throw new Error(message);
       }
-      throw new Error(`Database request failed (${response.status})`);
+      throw new Error(`Database request failed (${response.status}${code ? `, ${code}` : ''})`);
     }
     const result = await response.json();
     if (!result || typeof result !== 'object' || Array.isArray(result)) throw new Error('Unexpected database response');
@@ -931,7 +933,10 @@ exports.main = async event => {
       default: return { error: 'Unknown action' };
     }
   } catch (error) {
+    const diagnostic = event?.action === 'listPeople' &&
+      /^Database request failed \((\d{3})(?:, ((?:PGRST\d{3}|[0-9A-Z]{5})))?\)$/.exec(error.message);
     return { error: error.message === 'UNAUTHORIZED' ? 'UNAUTHORIZED' :
+      diagnostic ? `Person 360 request failed (HTTP ${diagnostic[1]}${diagnostic[2] ? `, ${diagnostic[2]}` : ''})` :
       /^(Invalid |Person |Person-only recruit|Activity |Attendance |Post-event |Participant |Speaker |This customer|Both people|Human confirmation|Selected Person|Household |Important facts|Could not|Same-name|Deleted identity|Customer |Preview |Identity candidates|Idempotency key|Test account|Test parent|Work item|Action |Commitment |Opportunity )/.test(error.message)
         ? error.message : 'Person 360 request failed' };
   }
