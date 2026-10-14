@@ -284,6 +284,7 @@ function installFixtures() {
       commitmentCandidates: [marker + '明确约定'], evidence: [marker + '原话依据'],
     } }) : fail('UNEXPECTED_LEGACY_AI_PARSE'),
     'customers:trashList': () => ({ ...rows([{ ...customer, Id: 910099, customer_name: marker + '已删除客户', deleted_at: '2026-09-20T01:00:00Z' }]), counts: {} }),
+    'ai_recommendations:listAll': () => rows([]),
     'recruit_candidates:rcMap': () => rows([{ id: candidate.candidate_id, customer_id: customer.Id, deleted_at: null }]),
     'recruit_candidates:list': () => rows([candidate]),
     'recruit_candidates:funnel': () => ({ funnel: { '新增人才': mode === 'empty' ? 0 : 1 }, total: mode === 'empty' ? 0 : 1 }),

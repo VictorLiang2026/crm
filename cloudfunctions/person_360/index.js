@@ -293,17 +293,60 @@ function createService({ request = pgRequest, rpc = pgRpc, disclosure = disclose
       || (referralPriorities.length && !roles.includes('referrer'))) {
       throw new Error('Priority filters require the matching role');
     }
-    const rpcName = roles.length || customerPriorities.length || recruitPriorities.length || referralPriorities.length
+    const hasFilters = roles.length || customerPriorities.length || recruitPriorities.length || referralPriorities.length;
+    const rpcName = hasFilters
       ? 'person_directory_filtered_page_v1' : 'person_directory_page_v1';
     const params = {
       p_page: page, p_page_size: pageSize, p_keyword: keyword,
       p_sort_field: sortField, p_sort_dir: sortDir,
     };
-    if (rpcName === 'person_directory_filtered_page_v1') Object.assign(params, {
+    if (hasFilters) Object.assign(params, {
       p_roles: roles, p_customer_priorities: customerPriorities,
       p_recruit_priorities: recruitPriorities, p_referral_priorities: referralPriorities,
     });
-    return rpc(rpcName, params);
+    try {
+      return await rpc(rpcName, params);
+    } catch (error) {
+      // CloudBase REST currently returns an untyped 404 for this array-argument RPC.
+      // Fall back to the already deployed scalar-argument RPC, filtering only on the
+      // server and preserving its sort order before applying the requested page.
+      if (!hasFilters || !/^Database request failed \(404(?:, PGRST\d{3})?\)$/.test(error?.message || '')) throw error;
+      const baseParams = {
+        p_page: 1, p_page_size: 50, p_keyword: keyword,
+        p_sort_field: sortField, p_sort_dir: sortDir,
+      };
+      const first = await rpc('person_directory_page_v1', baseParams);
+      const totalPages = Number(first?.totalPages);
+      if (!Number.isInteger(totalPages) || totalPages < 1 || totalPages > 200 || !Array.isArray(first?.rows)) {
+        throw new Error('Filtered directory fallback limit exceeded');
+      }
+      const rows = [...first.rows];
+      for (let start = 2; start <= totalPages; start += 4) {
+        const batch = await Promise.all(Array.from(
+          { length: Math.min(4, totalPages - start + 1) },
+          (_, index) => rpc('person_directory_page_v1', { ...baseParams, p_page: start + index }),
+        ));
+        for (const result of batch) {
+          if (!Array.isArray(result?.rows)) throw new Error('Unexpected directory response');
+          rows.push(...result.rows);
+        }
+      }
+      const matches = rows.filter(row => {
+        const personRoles = Array.isArray(row.roles) ? row.roles : [];
+        if (roles.length && !roles.some(role => personRoles.includes(role))) return false;
+        const hasPriorityFilters = customerPriorities.length || recruitPriorities.length || referralPriorities.length;
+        if (!hasPriorityFilters) return true;
+        return (customerPriorities.length && customerPriorities.includes(row.sales_priority))
+          || (recruitPriorities.length && recruitPriorities.includes(row.recruitment_priority))
+          || (referralPriorities.length && referralPriorities.includes(row.referral_priority));
+      });
+      const filteredTotalPages = Math.max(1, Math.ceil(matches.length / pageSize));
+      return {
+        rows: matches.slice((page - 1) * pageSize, page * pageSize),
+        page, pageSize, total: matches.length, totalPages: filteredTotalPages,
+        hasMore: page < filteredTotalPages, sortField, sortDir,
+      };
+    }
   }
 
   async function resolveIdentity(name) {

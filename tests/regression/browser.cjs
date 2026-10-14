@@ -28,7 +28,7 @@ class Browser {
       const pathname = new URL(req.url, 'http://127.0.0.1').pathname;
       res.setHeader('Cache-Control', 'no-store');
       res.setHeader('Content-Security-Policy', "default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src data:; connect-src 'none'; form-action 'none'; base-uri 'none'; frame-src 'none'");
-      if (pathname === '/admin.html') {
+      if (pathname === '/admin.html' || pathname === '/crm/admin.html') {
         res.setHeader('Content-Type', 'text/html; charset=utf-8');
         res.end(new URL(req.url, 'http://127.0.0.1').searchParams.get('v2') === '1'
           ? html.replace('quick_capture_v2: false', 'quick_capture_v2: true') : html);

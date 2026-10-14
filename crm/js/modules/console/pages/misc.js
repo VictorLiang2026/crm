@@ -150,6 +150,30 @@ const LEGACY_ENTRIES = [
   ['refresh', 'legacy_recruit_trash', '#/recruit/trash'],
 ];
 
+const ENTRY_KEYS = Object.fromEntries(LEGACY_ENTRIES.map(entry => [entry[1], entry]));
+const LEGACY_BUSINESS_GROUPS = [
+  ['legacy_customer_group', ['legacy_customers', 'legacy_followups']],
+  ['legacy_activity_group', ['legacy_activity_customer', 'legacy_activity_recruit', 'legacy_speakers', 'legacy_topics']],
+  ['legacy_recruit_group', ['legacy_recruit_goals']],
+];
+
+function moreEntry(entry, status) {
+  const [icon, key, hash] = entry;
+  return h('a', { class: 'tile', href: hash.startsWith('#/people-trash') ? hash : LEGACY_ADMIN + hash }, [
+    ic(icon), h('b', {}, t(key)), bdg(t(status), status === 'status_live' ? 'jade' : 'ink'),
+    h('span', {}, t(key + '_desc')),
+  ]);
+}
+
+function moreGroup(titleKey, descriptionKey, entries, actions = null) {
+  return h('section', { class: 'more-section' }, [
+    sectionTitle(t(titleKey)),
+    h('p', { class: 'foot-note', style: 'margin:0 0 12px' }, t(descriptionKey)),
+    h('div', { class: 'tile-grid' }, entries.map(entry => moreEntry(entry, 'status_legacy'))),
+    actions,
+  ]);
+}
+
 export function renderMore(ctx) {
   const tiles = [
     ['#/today', 'home', t('nav_today'), t('tile_today_desc')],
@@ -161,6 +185,15 @@ export function renderMore(ctx) {
     ['#/settings', 'gear', t('nav_settings'), t('tile_settings_desc')],
     [null, 'mic', t('nav_quick_record'), t('tile_quick_record_desc')],
   ];
+  const systemEntries = [ENTRY_KEYS.legacy_account, ENTRY_KEYS.legacy_test_scenario];
+  const knowledgeEntries = [
+    ENTRY_KEYS.legacy_funnels, ENTRY_KEYS.legacy_ai_suggestions, ENTRY_KEYS.legacy_policy_review,
+    ENTRY_KEYS.legacy_products, ENTRY_KEYS.legacy_gifts, ENTRY_KEYS.legacy_photos,
+  ];
+  const recycleEntries = [
+    ['refresh', 'person_trash_entry', '#/people-trash'],
+    ENTRY_KEYS.legacy_customers_trash, ENTRY_KEYS.legacy_recruit_trash,
+  ];
   ctx.main.replaceChildren(
     pageHead({ kicker: t('kicker_more'), title: t('title_more'), sub: t('sub_more') }),
     h('div', { class: 'tile-grid' }, tiles.map(([hash, icon, name, desc]) =>
@@ -168,26 +201,26 @@ export function renderMore(ctx) {
         ? h('a', { class: 'tile', href: hash }, [ic(icon), h('b', {}, name), h('span', {}, desc)])
         : h('button', { class: 'tile', type: 'button', onclick: () => openQuickCapture(ctx) }, [ic(icon), h('b', {}, name), h('span', {}, desc)]))),
     h('div', { style: 'height:16px' }),
-    card({
-      title: t('console_schedule_title'), icon: 'grid', tag: wpTag(t('ai_status_live')),
-      body: [
-        h('p', { class: 'foot-note', style: 'margin:0 0 10px' }, t('console_schedule_desc')),
-        h('ul', { class: 'plan-list' }, [
-          h('li', {}, [h('b', {}, t('wp2_title')), t('wp2_desc')]),
-          h('li', {}, [h('b', {}, t('wp3_title')), t('wp3_desc')]),
-        ]),
-      ],
-      foot: [
-        h('span', { class: 'foot-note' }, t('legacy_note')),
-        h('button', { class: 'btn btn-ghost', type: 'button', style: 'margin-left:auto', onclick: () => ctx.signOut() }, [ic('logout'), t('setting_signout')]),
-      ],
-    }),
-    h('div', { style: 'height:16px' }),
-    sectionTitle(t('legacy_section_title')),
-    h('p', { class: 'foot-note', style: 'margin:0 0 12px' }, t('legacy_section_desc')),
-    h('div', { class: 'tile-grid' }, LEGACY_ENTRIES.map(([icon, key, hash]) =>
-      h('a', { class: 'tile', href: LEGACY_ADMIN + hash }, [
-        ic(icon), h('b', {}, t(key)), h('span', {}, t(key + '_desc')),
-      ]))),
+    moreGroup('more_system_title', 'more_system_desc', systemEntries,
+      h('div', { class: 'more-actions' }, h('button', {
+        class: 'btn btn-ghost', type: 'button', onclick: () => ctx.signOut(),
+      }, [ic('logout'), t('setting_signout')]))),
+    moreGroup('more_knowledge_title', 'more_knowledge_desc', knowledgeEntries),
+    h('section', { class: 'more-section' }, [
+      sectionTitle(t('more_recycle_title')),
+      h('p', { class: 'foot-note', style: 'margin:0 0 12px' }, t('more_recycle_desc')),
+      h('div', { class: 'tile-grid' }, [
+        moreEntry(recycleEntries[0], 'status_live'),
+        ...recycleEntries.slice(1).map(entry => moreEntry(entry, 'status_legacy')),
+      ]),
+    ]),
+    h('section', { class: 'more-section' }, [
+      sectionTitle(t('more_legacy_title')),
+      h('p', { class: 'foot-note', style: 'margin:0 0 12px' }, t('more_legacy_desc')),
+      ...LEGACY_BUSINESS_GROUPS.map(([titleKey, keys]) => h('div', { class: 'more-business-group' }, [
+        h('h3', { class: 'more-business-title' }, t(titleKey)),
+        h('div', { class: 'tile-grid' }, keys.map(key => moreEntry(ENTRY_KEYS[key], 'status_legacy'))),
+      ])),
+    ]),
   );
 }

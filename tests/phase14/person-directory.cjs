@@ -49,6 +49,33 @@ test('people directory delegates bounded sorting, pagination, and filters to pub
   assert.equal(calls.length, 9);
 });
 
+test('people directory falls back to the working scalar RPC when filtered RPC returns an untyped 404', async () => {
+  const calls = [];
+  const allRows = [
+    { id: 1, roles: ['customer'], sales_priority: 'A', recruitment_priority: 'C' },
+    { id: 2, roles: ['recruit'], sales_priority: 'C', recruitment_priority: 'B' },
+    { id: 3, roles: ['participant'], sales_priority: 'A', recruitment_priority: null },
+    { id: 4, roles: ['customer','recruit'], sales_priority: 'C', recruitment_priority: 'B' },
+    { id: 5, roles: ['customer'], sales_priority: 'C', recruitment_priority: 'C' },
+  ];
+  const service = createService({ rpc: async (name, params) => {
+    calls.push({ name, params });
+    if (name === 'person_directory_filtered_page_v1') throw new Error('Database request failed (404)');
+    const rows = params.p_page === 1 ? allRows.slice(0, 3) : allRows.slice(3);
+    return { rows, page: params.p_page, pageSize: 50, total: 5, totalPages: 2 };
+  } });
+  const result = await service.listPeople({ page: 2, pageSize: 2, sortField: 'id', sortDir: 'asc',
+    roles: ['customer','recruit'], customerPriorities: ['A'], recruitPriorities: ['B'] });
+  assert.deepEqual(calls.map(call => call.name), [
+    'person_directory_filtered_page_v1', 'person_directory_page_v1', 'person_directory_page_v1',
+  ]);
+  assert.equal(calls[1].params.p_page_size, 50);
+  assert.equal(result.total, 3);
+  assert.equal(result.totalPages, 2);
+  assert.equal(result.page, 2);
+  assert.deepEqual(result.rows.map(row => row.id), [4]);
+});
+
 test('opportunity directory maps explicit Person links before legacy customer links', async () => {
   const calls = [];
   const service = createService({ request: async (table, method, filters) => {

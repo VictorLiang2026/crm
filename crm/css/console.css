@@ -294,9 +294,14 @@ h1, h2, h3, p, ul { margin: 0; }
   padding: 16px; display: flex; flex-direction: column; align-items: flex-start; gap: 8px;
   text-decoration: none; color: inherit; font: inherit; text-align: left; cursor: pointer;
 }
+.more-section + .more-section { margin-top: 22px; }
+.more-business-group { margin-top: 16px; }
+.more-business-title { margin: 0 0 10px; color: var(--ink-2); font-size: 13px; font-weight: 700; }
+.more-actions { display: flex; justify-content: flex-end; margin-top: 12px; }
 .tile .ic { color: var(--red); }
 .tile b { font-size: 14px; }
-.tile span { font-size: 12px; color: var(--muted); }
+.tile > span:not(.bdg) { font-size: 12px; color: var(--muted); }
+.tile .bdg { font-size: 11px; }
 .tile:active { transform: scale(.98); border-color: var(--red); }
 @media (hover: hover) and (pointer: fine) {
   .tile:hover { border-color: var(--red); }

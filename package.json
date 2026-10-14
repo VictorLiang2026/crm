@@ -6,6 +6,7 @@
     "test:people-pages": "node --test tests/console/people-pages.browser.cjs",
     "test:wp04": "node tests/wp04/run.cjs",
     "test:wp01": "node tests/wp01/run.cjs",
+    "test:pc03": "node --test tests/console/more-navigation.browser.cjs tests/wp01/static.test.cjs",
     "test:wp01:login": "node tests/wp01/login.cjs",
     "check:release-gate": "node tests/wp01/run.cjs --assert-release",
     "build:shared": "node tools/sync-shared.cjs --sync",
