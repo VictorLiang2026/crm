@@ -18,8 +18,9 @@ const ROLE_BADGE = () => ({
   other: [t('role_other'), 'gray'],
 });
 
-const SORT_COLUMNS = () => ([
+const SORT_COLUMNS = (customerView = false) => ([
   { field: 'display_name', label: t('col_name') },
+  ...(customerView ? [{ field: 'customer_stage', label: t('customer_view_stage'), sortable: false }] : []),
   { field: 'sales_priority', label: t('col_customer_priority') },
   { field: 'recruitment_priority', label: t('col_recruit_priority') },
   { field: 'referral_priority', label: t('col_referral_priority') },
@@ -46,6 +47,7 @@ export function renderPeople(ctx) {
   const nextBtn = h('button', { class: 'btn btn-ghost btn-sm', type: 'button' }, t('btn_next'));
   const pageInfo = h('span', { class: 'pager-info' }, '');
   const filterButton = h('button', { class: 'btn btn-dark people-filter-trigger', type: 'button' });
+  const customerViewButton = h('button', { class: 'btn btn-soft', type: 'button' });
   const filterPanel = h('div', { class: 'people-filter-panel', hidden: true });
   const priorityFilters = h('div', { class: 'people-filter-priorities' });
 
@@ -56,10 +58,11 @@ export function renderPeople(ctx) {
 
   function runQuery() {
     loadInto(listEl, async () => {
+      const customerView = state.filters.roles.length === 1 && state.filters.roles[0] === 'customer';
       const res = await data.listPeople(ctx, {
         page: state.page, pageSize: PAGE_SIZE, keyword: state.keyword,
         sortField: state.sortField, sortDir: state.sortDir,
-        ...state.filters,
+        ...state.filters, includeCustomerStage: customerView,
       });
       const rows = res.rows || [];
       metaEl.textContent = state.keyword
@@ -71,7 +74,8 @@ export function renderPeople(ctx) {
       if (!rows.length) {
         return h('div', { class: 'card-body' }, [emptyNote(t('empty_no_people'), state.keyword ? t('empty_people_hint') : t('empty_people_note'))]);
       }
-      const thead = h('thead', {}, h('tr', {}, SORT_COLUMNS().map((col) => {
+      const columns = SORT_COLUMNS(customerView);
+      const thead = h('thead', {}, h('tr', {}, columns.map((col) => {
         const th = h('th', {
           class: col.sortable === false ? '' : 'sortable-th',
           title: col.full || undefined,
@@ -94,7 +98,7 @@ export function renderPeople(ctx) {
           return bdg(label, tone);
         });
         if (p.recruit_id) badges.push(bdg(t('badge_recruiting'), 'gold'));
-        const cols = SORT_COLUMNS();
+        const cols = columns;
         const hasCustomer = (p.roles || []).includes('customer');
         const hasRecruit = (p.roles || []).includes('recruit') || !!p.recruit_id;
         const convertCell = (kind, active) => h('td', {}, active
@@ -108,6 +112,7 @@ export function renderPeople(ctx) {
           }, t(kind === 'customer' ? 'btn_convert_customer' : 'btn_convert_recruit')));
         const cells = [
           h('td', {}, h('a', {}, [p.display_name, h('span', { class: 'badge-stack' }, badges)])),
+          ...(customerView ? [h('td', {}, p.customer_stage ? translateEnum('customer_stage', p.customer_stage) : '-') ] : []),
           h('td', {}, p.sales_priority ? translateEnum('sales_priority', p.sales_priority) : '-'),
           h('td', {}, p.recruitment_priority ? translateEnum('sales_priority', p.recruitment_priority) : '-'),
           h('td', {}, p.referral_priority ? translateEnum('sales_priority', p.referral_priority) : '-'),
@@ -133,6 +138,7 @@ export function renderPeople(ctx) {
     state.page = 1;
     filterPanel.hidden = true;
     updateFilterButton();
+    updateCustomerViewButton();
     runQuery();
   };
   input.addEventListener('keydown', (e) => { if (e.key === 'Enter') doSearch(); });
@@ -178,6 +184,23 @@ export function renderPeople(ctx) {
     );
     filterButton.setAttribute('aria-expanded', String(!filterPanel.hidden));
   }
+  function updateCustomerViewButton() {
+    const active = state.filters.roles.length === 1 && state.filters.roles[0] === 'customer';
+    customerViewButton.textContent = active ? t('people_all_view') : t('people_customer_view');
+    customerViewButton.className = active ? 'btn btn-dark' : 'btn btn-soft';
+    customerViewButton.setAttribute('aria-pressed', String(active));
+  }
+  customerViewButton.onclick = () => {
+    const active = state.filters.roles.length === 1 && state.filters.roles[0] === 'customer';
+    const next = active ? emptyFilters() : { ...emptyFilters(), roles: ['customer'] };
+    state.filters = next;
+    state.pendingFilters = Object.fromEntries(Object.entries(next).map(([key, values]) => [key, [...values]]));
+    state.page = 1;
+    filterPanel.hidden = true;
+    updateFilterButton();
+    updateCustomerViewButton();
+    runQuery();
+  };
   function renderFilterPanel() {
     const roleFilters = checkboxGroup(state.pendingFilters.roles, roles.map(role => [role, roleLabels[role]]), (value, checked) => {
       const set = new Set(state.pendingFilters.roles);
@@ -223,6 +246,7 @@ export function renderPeople(ctx) {
         h('button', { class: 'btn btn-primary btn-sm', type: 'button', onclick: doSearch }, t('btn_search')),
       ]),
       h('div', { class: 'people-filter-anchor' }, [filterButton, filterPanel]),
+      customerViewButton,
       h('a', {
         class: 'btn btn-ghost', href: '#/people-trash',
       }, [ic('trash'), t('btn_trash')]),
@@ -239,5 +263,6 @@ export function renderPeople(ctx) {
       ]),
     ]),
   );
+  updateCustomerViewButton();
   runQuery();
 }

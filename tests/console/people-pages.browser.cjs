@@ -65,7 +65,7 @@ test('People directory reveals role priorities and applies multi-select only on 
     await b.wait("document.querySelector('.people-filter-trigger')");
     assert.equal(await b.evaluate("document.querySelector('.people-filter-trigger').textContent.trim()"), '筛选 无');
     await b.evaluate("document.head.insertAdjacentHTML('beforeend','<link rel=stylesheet href=/crm/css/console.css>')");
-    assert.equal(await b.evaluate("document.querySelector('.people-filter-anchor').nextElementSibling.getAttribute('href')"), '#/people-trash');
+    assert.equal(await b.evaluate("document.querySelector('.toolbar a[href=\"#/people-trash\"]')?.getAttribute('href')"), '#/people-trash');
     const sizes = await b.evaluate(`(()=>{
       const filter=document.querySelector('.people-filter-trigger');
       const create=[...document.querySelectorAll('.toolbar button')].find(x=>x.textContent.includes('新建人物'));

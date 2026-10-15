@@ -162,8 +162,12 @@ async function update(event) {
     }
   }
 
-  const r = assertOk(await rdb.from('recruit_candidates').update(payload).eq('id', id).select('id'));
+  let candidateUpdate = rdb.from('recruit_candidates').update(payload).eq('id', id);
+  const expectedUpdatedAt = String(event.expectedUpdatedAt || '');
+  if (expectedUpdatedAt) candidateUpdate = candidateUpdate.eq('updated_at', expectedUpdatedAt);
+  const r = assertOk(await candidateUpdate.select('id'));
   const n = (r.data || []).length;
+  if (!n && expectedUpdatedAt) return { ok: false, conflict: true, code: 'RECRUIT_CONFLICT' };
   return { ok: n === 1, updated: n };
 }
 

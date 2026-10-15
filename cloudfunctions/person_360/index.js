@@ -265,6 +265,19 @@ function createService({ request = pgRequest, rpc = pgRpc, disclosure = disclose
     return { personId: String(person.id) };
   }
 
+  async function addCustomerStages(result, includeCustomerStage) {
+    if (!includeCustomerStage || !Array.isArray(result?.rows) || !result.rows.length) return result;
+    const ids = result.rows.filter(row => (row.roles || []).includes('customer')).map(row => String(row.id));
+    if (!ids.length) return result;
+    const people = await request('persons', 'GET', {
+      select: 'id,customer_stage', id: `in.(${ids.join(',')})`, deleted_at: 'is.null', limit: 50,
+    });
+    const stages = new Map(people.map(row => [String(row.id), row.customer_stage ?? null]));
+    return { ...result, rows: result.rows.map(row => ({
+      ...row, customer_stage: stages.get(String(row.id)) ?? null,
+    })) };
+  }
+
   async function listPeople(event = {}) {
     const { page, pageSize } = directoryPage(event);
     const keyword = String(event.keyword || '').trim();
@@ -289,6 +302,7 @@ function createService({ request = pgRequest, rpc = pgRpc, disclosure = disclose
     const customerPriorities = priorities(event.customerPriorities);
     const recruitPriorities = priorities(event.recruitPriorities);
     const referralPriorities = priorities(event.referralPriorities);
+    const includeCustomerStage = event.includeCustomerStage === true && roles.length === 1 && roles[0] === 'customer';
     if ((customerPriorities.length && !roles.includes('customer'))
       || (recruitPriorities.length && !roles.includes('recruit'))
       || (referralPriorities.length && !roles.includes('referrer'))) {
@@ -305,8 +319,9 @@ function createService({ request = pgRequest, rpc = pgRpc, disclosure = disclose
       p_roles: roles, p_customer_priorities: customerPriorities,
       p_recruit_priorities: recruitPriorities, p_referral_priorities: referralPriorities,
     });
+    let result;
     try {
-      return await rpc(rpcName, params);
+      result = await rpc(rpcName, params);
     } catch (error) {
       // CloudBase REST currently returns an untyped 404 for this array-argument RPC.
       // Fall back to the already deployed scalar-argument RPC, filtering only on the
@@ -342,12 +357,13 @@ function createService({ request = pgRequest, rpc = pgRpc, disclosure = disclose
           || (referralPriorities.length && referralPriorities.includes(row.referral_priority));
       });
       const filteredTotalPages = Math.max(1, Math.ceil(matches.length / pageSize));
-      return {
+      return addCustomerStages({
         rows: matches.slice((page - 1) * pageSize, page * pageSize),
         page, pageSize, total: matches.length, totalPages: filteredTotalPages,
         hasMore: page < filteredTotalPages, sortField, sortDir,
-      };
+      }, includeCustomerStage);
     }
+    return addCustomerStages(result, includeCustomerStage);
   }
 
   async function resolveIdentity(name) {

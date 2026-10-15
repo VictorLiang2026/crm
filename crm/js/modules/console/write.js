@@ -902,7 +902,22 @@ export function openPersonEdit(ctx, { personId, onDone } = {}) {
     ], f.marital_status || '');
     const firstContactInput = h('input', { class: 'sheet-input', type: 'date', value: String(f.first_contact_date || '').slice(0, 10) });
     const notesTa = h('textarea', { class: 'sheet-textarea', style: 'min-height:64px', maxlength: '2000' }, f.person_notes || '');
-    const body = h('div', {}, [
+    const hasCustomer = profile.status === 'linked' && !!profile.customerId;
+    const customerProfile = f.profile && typeof f.profile === 'object' && !Array.isArray(f.profile) ? f.profile : {};
+    const customerTags = h('textarea', { class: 'sheet-textarea', maxlength: '2000' }, f.tags || '');
+    const customerNotes = h('textarea', { class: 'sheet-textarea', maxlength: '4000' }, f.additional_info || '');
+    const incomeInput = h('input', { class: 'sheet-input', type: 'number', min: '0', step: '1', value: f.annual_income ?? '' });
+    const householdIncome = h('input', { class: 'sheet-input', maxlength: '120', value: f.household_income || '' });
+    const propertiesInfo = h('textarea', { class: 'sheet-textarea', maxlength: '2000' }, f.properties_info || '');
+    const mbtiInput = h('input', { class: 'sheet-input', maxlength: '20', value: f.mbti || '' });
+    const profileInputs = Object.fromEntries(['family', 'children', 'parents', 'career', 'needs', 'relationship'].map(key => [
+      key, h('textarea', { class: 'sheet-textarea', maxlength: '2000' }, customerProfile[key] || ''),
+    ]));
+    const profileEvents = h('textarea', { class: 'sheet-textarea', style: 'min-height:76px', maxlength: '4000' },
+      JSON.stringify(Array.isArray(customerProfile.events) ? customerProfile.events : [], null, 2));
+    const customerPriorityOptions = [['', '—'], ...['A', 'B', 'C', 'D', 'E'].map(v => [v, t(`priority_${v.toLowerCase()}`)])];
+    const recruitPrioritySel = sel(customerPriorityOptions, f.recruitment_priority || '');
+    const nodes = [
       fieldRow(t('field_name'), nameInput),
       h('div', { style: 'display:flex;gap:10px' }, [
         h('div', { class: 'sheet-field', style: 'flex:1' }, [h('label', {}, t('field_phone')), phoneInput]),
@@ -933,8 +948,38 @@ export function openPersonEdit(ctx, { personId, onDone } = {}) {
         h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => sheet.overlay.remove() }, t('cancel')),
         h('button', { class: 'btn btn-primary', type: 'button', onclick: (e) => doSave(e.currentTarget) }, t('btn_save')),
       ]),
-    ]);
-    sheet.swap(body);
+    ];
+    nodes.push(h('hr', { class: 'sheet-divider' }));
+    nodes.push(h('h3', { class: 'sheet-section-title' }, t('sec_customer_business')));
+    if (hasCustomer) {
+      nodes.push(
+        fieldRow(t('field_customer_tags'), customerTags),
+        fieldRow(t('field_customer_notes'), customerNotes),
+        h('div', { style: 'display:flex;gap:10px;flex-wrap:wrap' }, [
+          h('div', { class: 'sheet-field', style: 'flex:1;min-width:220px' }, [h('label', {}, t('field_income')), incomeInput]),
+          h('div', { class: 'sheet-field', style: 'flex:1;min-width:220px' }, [h('label', {}, t('field_household_income')), householdIncome]),
+        ]),
+        fieldRow(t('field_properties'), propertiesInfo),
+        fieldRow(t('field_mbti'), mbtiInput),
+        ...Object.entries(profileInputs).map(([key, input]) => fieldRow(t(`profile_${key}`), input)),
+        fieldRow(t('field_customer_profile_json'), profileEvents, t('customer_profile_json_hint')),
+        h('div', { class: 'sheet-actions' }, [
+          h('button', { class: 'btn btn-soft', type: 'button', onclick: (e) => saveCustomer(e.currentTarget) }, t('btn_save_customer_profile')),
+        ]),
+      );
+    } else {
+      nodes.push(h('p', { class: 'sheet-note' }, t('customer_profile_unavailable_note')));
+    }
+    if (f.recruit_id) {
+      nodes.push(
+        h('h3', { class: 'sheet-section-title' }, t('col_recruit_priority')),
+        fieldRow(t('col_recruit_priority'), recruitPrioritySel),
+        h('div', { class: 'sheet-actions' }, [
+          h('button', { class: 'btn btn-soft', type: 'button', onclick: (e) => saveRecruitPriority(e.currentTarget) }, t('btn_save_recruit_priority')),
+        ]),
+      );
+    }
+    sheet.swap(h('div', {}, nodes));
 
     async function doSave(btn) {
       // linked 人物的 f.updated_at 属于 customers 行；乐观锁必须使用 persons 版本号 person_updated_at
@@ -969,6 +1014,85 @@ export function openPersonEdit(ctx, { personId, onDone } = {}) {
         ctx.toast(t('person_saved'), 'ok');
         if (onDone) onDone();
       } catch (err) { busy(btn, false, t('btn_save')); sheet.showErr(err.message); }
+    }
+
+    async function saveCustomer(btn) {
+      if (!hasCustomer || !profile.customerId) { sheet.showErr(t('customer_profile_unavailable_note')); return; }
+      const changed = {};
+      const put = (key, val, orig) => { if (String(val ?? '') !== String(orig ?? '')) changed[key] = val; };
+      put('tags', customerTags.value.trim() || null, f.tags);
+      put('additional_info', customerNotes.value.trim() || null, f.additional_info);
+      put('household_income', householdIncome.value.trim() || null, f.household_income);
+      put('properties_info', propertiesInfo.value.trim() || null, f.properties_info);
+      put('mbti', mbtiInput.value.trim() || null, f.mbti);
+      if (incomeInput.value.trim() === '') {
+        put('annual_income', null, f.annual_income);
+      } else {
+        const income = Number(incomeInput.value);
+        if (!Number.isSafeInteger(income) || income < 0) { sheet.showErr(t('customer_income_invalid')); return; }
+        put('annual_income', income, f.annual_income);
+      }
+      const nextProfile = { ...customerProfile };
+      let profileChanged = false;
+      for (const [key, input] of Object.entries(profileInputs)) {
+        const value = input.value.trim() || null;
+        if (String(value ?? '') !== String(customerProfile[key] ?? '')) {
+          nextProfile[key] = value;
+          profileChanged = true;
+        }
+      }
+      let events;
+      try {
+        events = JSON.parse(profileEvents.value || '[]');
+        if (!Array.isArray(events)) throw new Error('events must be an array');
+      } catch (_) { sheet.showErr(t('customer_profile_json_invalid')); return; }
+      if (JSON.stringify(events) !== JSON.stringify(Array.isArray(customerProfile.events) ? customerProfile.events : [])) {
+        nextProfile.events = events;
+        profileChanged = true;
+      }
+      if (profileChanged) changed.profile = nextProfile;
+      if (!Object.keys(changed).length) { sheet.showErr(t('edit_no_changes')); return; }
+      busy(btn, true, t('saving'));
+      try {
+        const res = await ctx.api.call('customers', {
+          action: 'update', id: String(profile.customerId), data: changed,
+          expectedUpdatedAt: f.updated_at, editSource: 'form',
+        });
+        if (res?.conflict || res?.code === 'CUSTOMER_CONFLICT') {
+          busy(btn, false, t('btn_save_customer_profile')); sheet.showErr(t('customer_profile_conflict')); return;
+        }
+        if (res?.error || !res || res.ok === false) throw new Error(res?.error || t('customer_profile_save_failed'));
+        sheet.overlay.remove();
+        ctx.toast(t('customer_profile_saved'), 'ok');
+        if (onDone) onDone();
+      } catch (err) {
+        busy(btn, false, t('btn_save_customer_profile'));
+        sheet.showErr(`${t('customer_profile_save_failed')}: ${err.message || ''}`);
+      }
+    }
+
+    async function saveRecruitPriority(btn) {
+      if (!f.recruit_id) { sheet.showErr(t('recruit_priority_unavailable')); return; }
+      if (String(recruitPrioritySel.value || '') === String(f.recruitment_priority || '')) {
+        sheet.showErr(t('edit_no_changes')); return;
+      }
+      busy(btn, true, t('saving'));
+      try {
+        const res = await ctx.api.call('recruit_candidates', {
+          action: 'update', id: String(f.recruit_id), data: { recruitment_priority: recruitPrioritySel.value || null },
+          expectedUpdatedAt: f.recruit_updated_at,
+        });
+        if (res?.conflict || res?.code === 'RECRUIT_CONFLICT') {
+          busy(btn, false, t('btn_save_recruit_priority')); sheet.showErr(t('recruit_priority_conflict')); return;
+        }
+        if (res?.error || !res || res.ok === false) throw new Error(res?.error || t('customer_profile_save_failed'));
+        sheet.overlay.remove();
+        ctx.toast(t('recruit_priority_saved'), 'ok');
+        if (onDone) onDone();
+      } catch (err) {
+        busy(btn, false, t('btn_save_recruit_priority'));
+        sheet.showErr(`${t('customer_profile_save_failed')}: ${err.message || ''}`);
+      }
     }
   })();
 }

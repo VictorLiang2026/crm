@@ -20,11 +20,15 @@ async function getCustomerProfile(personId, { request, disclose = testData.discl
     }),
     request('person_roles', 'GET', { select: 'id,role,origin', person_id: `eq.${id}`, order: 'id.asc', limit: 50 }),
     request('recruit_candidates', 'GET', {
-      select: 'id,recruitment_priority', person_id: `eq.${id}`, deleted_at: 'is.null', order: 'id.desc', limit: 1,
+      select: 'id,recruitment_priority,updated_at', person_id: `eq.${id}`, deleted_at: 'is.null', order: 'id.desc', limit: 1,
     }),
   ]);
   const customer = customers[0] || null;
-  const linked = customer != null;
+  const customerRole = roles.some(role => role.role === 'customer');
+  const deletedCustomers = customer ? [] : await request('customers', 'GET', {
+    select: 'Id,person_id,deleted_at', person_id: `eq.${id}`, deleted_at: 'not.is.null', order: 'Id.desc', limit: 1,
+  });
+  const hasDeletedCustomer = deletedCustomers.length > 0;
   const summary = await disclose([
     ...testData.refsForRows('persons', [person]), ...testData.refsForRows('customers', customers),
     ...testData.refsForRows('person_roles', roles),
@@ -54,18 +58,19 @@ async function getCustomerProfile(personId, { request, disclose = testData.discl
   };
   const fields = Object.assign(customer
     ? Object.assign({}, customer, personIdentity)
-    : (linked ? {} : Object.assign({}, personFields, personIdentity)), {
+    : Object.assign({}, personFields, personIdentity), {
     recruitment_priority: recruits[0]?.recruitment_priority ?? null,
     recruit_id: recruits[0]?.id == null ? null : String(recruits[0].id),
+    recruit_updated_at: recruits[0]?.updated_at ?? null,
   });
   const marked = [person.display_name, fields.customer_name, fields.source, fields.additional_info,
     fields.person_notes, customer?.additional_info]
     .some(value => typeof value === 'string' && (value.includes(testData.MARKER) || value.startsWith('crm_test_')));
   return { personId: id, customerId: customer ? String(customer.Id) : null,
-    status: customer ? 'linked' : linked ? 'customer_unavailable' : 'person_only',
-    source: linked && !customer ? null : 'public.persons',
+    status: customer ? 'linked' : customerRole || hasDeletedCustomer ? 'customer_unavailable' : 'person_only',
+    source: customerRole && !customer || hasDeletedCustomer ? null : 'public.persons',
     fields, roles, testData: summary,
-    contactAllowed: !!(!linked || customer) && summary?.status === 'verified' && summary.containsTestData === false && !marked,
+    contactAllowed: !!((!customerRole && !hasDeletedCustomer) || customer) && summary?.status === 'verified' && summary.containsTestData === false && !marked,
   };
 }
 module.exports = { getCustomerProfile, CUSTOMER_FIELDS };

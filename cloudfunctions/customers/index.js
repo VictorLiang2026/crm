@@ -341,9 +341,14 @@ async function update(event) {
   let n = 0;
   if (Object.keys(payload).length > 1 || !bridgeFieldsInPayload.length) {
     // 有业务字段（payload 至少含 updated_at + 一个业务键）或无基础字段时照常更新 customers
-    const r = assertOk(await rdb.from('customers').update(payload).eq('Id', id).select('Id'));
+    let customerUpdate = rdb.from('customers').update(payload).eq('Id', id);
+    const expectedUpdatedAt = String(event.expectedUpdatedAt || '');
+    if (expectedUpdatedAt) customerUpdate = customerUpdate.eq('updated_at', expectedUpdatedAt);
+    const r = assertOk(await customerUpdate.select('Id'));
     n = (r.data || []).length;
-    if (!n) return { ok: false, updated: 0, error: 'not found or no change', customerId: id };
+    if (!n) return expectedUpdatedAt
+      ? { ok: false, updated: 0, conflict: true, code: 'CUSTOMER_CONFLICT', customerId: id }
+      : { ok: false, updated: 0, error: 'not found or no change', customerId: id };
   } else if (personResult) {
     // 仅基础字段：边界已完成 persons+投影写入，customers.updated_at 已由投影刷新
     n = 1;

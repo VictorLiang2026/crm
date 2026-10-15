@@ -53,6 +53,16 @@ function overviewNode(ctx, id, setName) {
     const activeWorks = (works.rows || []).filter((r) =>
       (r.kind === 'action' && (r.status === 'open' || r.status === 'in_progress')) ||
       (r.kind === 'commitment' && r.status === 'open'));
+    const businessProfile = f.profile && typeof f.profile === 'object' ? f.profile : {};
+    const customerInfoPairs = [
+      [t('field_customer_tags'), f.tags], [t('field_customer_notes'), f.additional_info],
+      [t('field_income'), f.annual_income], [t('field_household_income'), f.household_income],
+      [t('field_properties'), f.properties_info], [t('field_mbti'), f.mbti],
+      ...['family', 'children', 'parents', 'career', 'needs', 'relationship'].map(key => [t(`profile_${key}`), businessProfile[key]]),
+      [t('field_customer_profile_json'), Array.isArray(businessProfile.events)
+        ? businessProfile.events.map(event => typeof event === 'string' ? event : JSON.stringify(event)).join(' · ')
+        : ''],
+    ];
     return h('div', { class: 'tab-stack' }, [
       h('div', { class: 'stack-head' }, [
         sectionTitle(t('sec_person_info')),
@@ -61,6 +71,15 @@ function overviewNode(ctx, id, setName) {
           : bdg(t('badge_customer_linked'), 'jade'),
       ]),
       kvGrid(infoPairs),
+      profile.status === 'linked' ? h('div', { class: 'tab-stack' }, [
+        h('div', { class: 'stack-head' }, [
+          sectionTitle(t('sec_customer_specific_info')),
+          h('button', { class: 'btn btn-soft btn-sm', type: 'button',
+            onclick: () => openPersonEdit(ctx, { personId: String(id), onDone: ctx.onWriteDone }) }, t('btn_edit_customer_profile')),
+        ]),
+        kvGrid(customerInfoPairs),
+      ]) : profile.status === 'customer_unavailable'
+        ? h('p', { class: 'sheet-note' }, t('customer_profile_unavailable_note')) : null,
       sectionTitle(t('sec_todos')),
       rowsBlock(activeWorks.slice(0, 8), (r) => h('div', { class: 'list-row' }, [
         h('div', { style: 'flex:1;min-width:0' }, [

@@ -614,6 +614,8 @@ body:has(.login), body.is-login { padding-top: env(safe-area-inset-top); }
 .kv-line { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 4px 0; font-size: 13.5px; }
 .kv-k { min-width: 52px; color: var(--muted); font-size: 12px; font-weight: 700; }
 .sheet-note { font-size: 12px; color: var(--muted); }
+.sheet-divider { border: 0; border-top: 1px solid var(--line); margin: 18px 0 12px; }
+.sheet-section-title { margin: 14px 0 8px; color: var(--ink); font-size: 14px; font-weight: 650; }
 .sheet-err {
   font-size: 13px; color: var(--red); background: var(--red-50);
   border-radius: 9px; padding: 8px 10px; margin-top: 10px;
