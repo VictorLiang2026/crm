@@ -6,6 +6,7 @@ import { h } from '../dom.js';
 import { ic } from '../icons.js';
 import { data } from '../data.js';
 import { openContextItemAction } from '../context-actions.js';
+import { renderFamily } from '../family-actions.js';
 import { openWorkItemEditor, openWorkItemTransition, openOpportunityAdvance, openQuickCapture, openPersonEdit, openPersonDelete,
   openPersonInteraction, openPersonFollowup } from '../write.js';
 import {
@@ -215,28 +216,7 @@ function factsNode(ctx, id) {
 }
 
 function familyNode(ctx, id) {
-  return data.personHome(ctx, id).then((home) => {
-    const household = home.household;
-    const members = home.members || [];
-    return h('div', { class: 'tab-stack' }, [
-      sectionTitle(t('sec_family_facts')),
-      household?.important_facts
-        ? h('p', { class: 'fact-text' }, household.important_facts)
-        : emptyNote(t('empty_no_family_facts'), ''),
-      sectionTitle(t('sec_family_members')),
-      rowsBlock(members, (m) => h('a', {
-        class: 'list-row data-row',
-        href: m.person ? `#/person/${m.person.id}` : '#',
-        onclick: m.person ? null : (e) => e.preventDefault(),
-      }, [
-        h('div', { style: 'flex:1;min-width:0' }, [
-          h('div', { class: 'row-title' }, m.person ? m.person.display_name : t('label_member')),
-          h('div', { class: 'row-sub' }, m.relationship_to_anchor || t('label_no_relation')),
-        ]),
-        m.confirmed_at ? bdg(t('badge_confirmed'), 'jade') : bdg(t('badge_to_confirm'), 'gold'),
-      ]), t('empty_no_family')),
-    ]);
-  });
+  return renderFamily(ctx, id, ctx.onWriteDone);
 }
 
 function provenanceRow(title, sub, badge) {

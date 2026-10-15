@@ -6,7 +6,11 @@ import { mountOpportunityWorkflow } from './opportunity-workflow.js';
 // Isolated Person 360 view. All data requests use the existing authenticated callFn bridge.
 import { renderOpportunityCandidates } from './opportunity-candidates.js';
 import { t } from './console/i18n.js';
-const ROLE_LABELS = { spouse: '配偶', child: '子女', parent: '父母', sibling: '兄弟姐妹', other: '其他' };
+const ROLE_LABELS = {
+  spouse: t('family_relationship_spouse'), child: t('family_relationship_child'),
+  parent: t('family_relationship_parent'), sibling: t('family_relationship_sibling'),
+  other: t('family_relationship_other'),
+};
 
 function node(tag, className, value) {
   const element = document.createElement(tag);
@@ -29,6 +33,20 @@ export async function renderPerson360({ root, personId, callFn, openLegacyTab })
     const result = await callFn('person_360', { action, ...data });
     if (!result || result.error) throw new Error(result?.error || '请求失败');
     return result;
+  };
+  const reviewHousehold = async (operation, payload, summary) => {
+    const idempotencyKey = window.crypto?.randomUUID?.() || 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,
+      char => { const n = Math.random() * 16 | 0; return (char === 'x' ? n : (n & 3 | 8)).toString(16); });
+    const preview = await request('previewHousehold', { personId, operation,
+      data: { ...payload, idempotencyKey } });
+    const before = preview.preview?.before || {};
+    const after = preview.preview?.after || {};
+    const detail = [summary, `\n${t('family_before')}: ${before.personName || before.facts || t('family_none')}`,
+      `${t('family_after')}: ${after.memberName || after.facts || after.relationship || t('family_none')}`,
+      `${t('family_preview_expiry')}: ${String(preview.expiresAt || '').replace('T', ' ').slice(0, 16)}`].join('\n');
+    if (!window.confirm(`${t('family_review_note')}\n${detail}`)) return false;
+    await request('executeHousehold', { previewId: preview.previewId });
+    return true;
   };
   let model;
   try { model = await request('get', { personId }); }
@@ -228,38 +246,39 @@ export async function renderPerson360({ root, personId, callFn, openLegacyTab })
   }
 
   const family = node('section', 'card person360-card');
-  family.append(node('h3', '', '家庭成员'));
-  if (!model.members.length) family.append(node('p', 'person360-muted', '尚未关联家庭成员。只可选择已有 Person，且需人工确认。'));
+  family.append(node('h3', '', t('sec_family_members')));
+  if (!model.members.length) family.append(node('p', 'person360-muted', t('family_unknown_note')));
   for (const member of model.members) {
     const row = node('div', 'person360-member');
     const name = member.person?.display_name || '已删除的 Person';
-    row.append(node('span', '', `${ROLE_LABELS[member.relationship_to_anchor] || '其他'} · ${name}`));
-    row.append(button('移除', async () => {
-      if (!window.confirm(`确认移除 ${name} 的家庭关联？Person 记录不会删除。`)) return;
+    row.append(node('span', '', `${t(`family_relationship_${member.relationship_to_anchor}`) || ROLE_LABELS[member.relationship_to_anchor] || 'Other'} · ${name}`));
+    row.append(button(t('family_remove_member'), async () => {
       try {
-        await request('removeMember', { personId, membershipId: member.id, confirmed: true });
+        const changed = await reviewHousehold('remove_member', { householdId: String(model.household.id),
+          membershipId: String(member.id) }, `${name} · ${t('family_remove_member')}`);
+        if (!changed) return;
         await renderPerson360({ root, personId, callFn, openLegacyTab });
-      } catch (error) { window.alert(`移除失败：${error.message}`); }
+      } catch (error) { window.alert(`${t('family_action_failed')}: ${error.message}`); }
     }, 'person360-remove'));
     family.append(row);
   }
 
   const add = node('div', 'person360-add');
-  add.append(node('h4', '', '关联已有 Person'));
+  add.append(node('h4', '', t('family_add_member')));
   const searchInput = node('input');
   searchInput.type = 'search';
-  searchInput.placeholder = '输入完整姓名，例如 张玮（电信）';
+  searchInput.placeholder = t('family_member_search');
   searchInput.maxLength = 160;
   const searchLine = node('div', 'person360-row');
   const candidateList = node('div', 'person360-candidates');
   let chosen = null;
-  const searchButton = button('查找', async () => {
+  const searchButton = button(t('family_resolve'), async () => {
     chosen = null;
     candidateList.replaceChildren();
     try {
-      const result = await request('search', { name: searchInput.value.trim() });
+      const result = await request('resolveHouseholdMember', { name: searchInput.value.trim() });
       if (!result.candidates.length) {
-        candidateList.append(node('p', 'person360-muted', '没有匹配的现有 Person；此处不会自动新建。'));
+        candidateList.append(node('p', 'person360-muted', t('family_no_match')));
         return;
       }
       for (const candidate of result.candidates) {
@@ -282,33 +301,34 @@ export async function renderPerson360({ root, personId, callFn, openLegacyTab })
     role.append(option);
   }
   const attachLine = node('div', 'person360-row');
-  attachLine.append(role, button('确认关联', async () => {
-    if (!chosen) { window.alert('请先查找并选择一位已有 Person。'); return; }
-    if (!window.confirm(`确认把 ${chosen.display_name} 作为 ${ROLE_LABELS[role.value]} 关联到 ${model.person.display_name} 的家庭？`)) return;
+  attachLine.append(role, button(t('family_add_member'), async () => {
+    if (!chosen) { window.alert(t('family_identity_note')); return; }
     try {
-      await request('addMember', {
-        personId, memberId: chosen.id, relationship: role.value,
-        selectedDisplayName: chosen.display_name, confirmed: true,
-      });
+      const changed = await reviewHousehold('add_member', { householdId: model.household?.id || null,
+        memberId: String(chosen.id), memberName: chosen.displayName || chosen.display_name, relationship: role.value },
+      `${chosen.displayName || chosen.display_name} · ${ROLE_LABELS[role.value]}`);
+      if (!changed) return;
       await renderPerson360({ root, personId, callFn, openLegacyTab });
-    } catch (error) { window.alert(`关联失败：${error.message}`); }
+    } catch (error) { window.alert(`${t('family_action_failed')}: ${error.message}`); }
   }, 'btn-primary'));
   add.append(attachLine);
   family.append(add);
   wrap.append(family);
 
   const facts = node('section', 'card person360-card');
-  facts.append(node('h3', '', '重要家庭事实'));
+  facts.append(node('h3', '', t('sec_family_facts')));
   const textarea = node('textarea', 'person360-facts');
   textarea.value = model.household?.important_facts || '';
   textarea.maxLength = 2000;
-  textarea.placeholder = '只记录有助于了解家庭关系的事实；不记录资产、收入或理财建议。';
-  facts.append(textarea, node('p', 'person360-muted', '人工记录，最多 2000 字。'));
-  facts.append(button('保存事实', async () => {
+  textarea.placeholder = t('family_facts_placeholder');
+  facts.append(textarea, node('p', 'person360-muted', t('family_facts_confirm_note')));
+  facts.append(button(t('family_review_and_save'), async () => {
     try {
-      await request('saveFacts', { personId, facts: textarea.value });
+      if (!model.household?.id) throw new Error(t('family_no_household_facts'));
+      const changed = await reviewHousehold('save_facts', { householdId: String(model.household.id), facts: textarea.value }, textarea.value);
+      if (!changed) return;
       await renderPerson360({ root, personId, callFn, openLegacyTab });
-    } catch (error) { window.alert(`保存失败：${error.message}`); }
+    } catch (error) { window.alert(`${t('family_action_failed')}: ${error.message}`); }
   }, 'btn-primary'));
   wrap.append(facts);
   root.replaceChildren(wrap);

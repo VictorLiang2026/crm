@@ -4,6 +4,7 @@
 const { InteractionService } = require('./interaction-service');
 const { InsuranceContextService } = require('./insurance-context-service');
 const { classifyContextItems } = require('./context-facts');
+const { HouseholdContextService } = require('./household-context');
 
 const OPEN_OPPORTUNITY_STATUSES = new Set(['成交', '关闭']);
 const SOURCE = table => ({ schema: 'public', table });
@@ -34,12 +35,9 @@ class MeetingPrepContextBuilder {
     const customerRow = (await read('customers', { select: 'Id', person_id: `eq.${id}`,
       deleted_at: 'is.null', limit: 1 }))[0] || null;
     const customerId = customerRow?.Id ?? null;
-    const [ownedHouseholds, memberships, outgoing, incoming, contextItems,
-      storedOpportunities, legacyOpportunities, actions, commitments, interactions, insurance] = await Promise.all([
-      read('households', { select: 'id,anchor_person_id,important_facts',
-        anchor_person_id: `eq.${id}`, deleted_at: 'is.null', limit: 1 }),
-      read('household_members', { select: 'id,household_id', person_id: `eq.${id}`,
-        deleted_at: 'is.null', order: 'id.desc', limit: 1 }),
+    const [outgoing, incoming, contextItems,
+      storedOpportunities, legacyOpportunities, actions, commitments, interactions, insurance,
+      householdContext] = await Promise.all([
       // PMC-15: only human-confirmed edges enter review context; pending candidates stay out.
       read('relationships', { select: 'id,to_person_id,relationship_type,relationship_stage,strength,trust_level,trend,last_meaningful_interaction_at,status,source',
         from_person_id: `eq.${id}`, deleted_at: 'is.null', status: 'eq.confirmed', order: 'updated_at.desc,id.desc', limit: 5 }),
@@ -57,35 +55,13 @@ class MeetingPrepContextBuilder {
         person_id: `eq.${id}`, status: 'eq.open', order: 'due_at.asc.nullslast,id.desc', limit: 10 }),
       this.listInteractions(id),
       this.insuranceContext(person),
+      new HouseholdContextService({ request: this.request }).build(id),
     ]);
-
-    let household = ownedHouseholds[0] || null;
-    if (!household && memberships[0]) {
-      household = (await read('households', { select: 'id,anchor_person_id,important_facts',
-        id: `eq.${idOf(memberships[0].household_id)}`, deleted_at: 'is.null', limit: 1 }))[0] || null;
-    }
-    let householdMembers = [];
-    if (household) {
-      const members = await read('household_members', {
-        select: 'id,person_id,relationship_to_anchor,confirmed_at', household_id: `eq.${idOf(household.id)}`,
-        deleted_at: 'is.null', order: 'id.asc', limit: 20,
-      });
-      const memberIds = [...new Set([household.anchor_person_id, ...members.map(row => row.person_id)].map(idOf))];
-      const people = memberIds.length ? await read('persons', { select: 'id,display_name',
-        id: `in.(${memberIds.join(',')})`, deleted_at: 'is.null', limit: 21 }) : [];
-      const names = new Map(people.map(row => [String(row.id), clip(row.display_name, 120)]));
-      householdMembers = members.filter(row => row.confirmed_at).map(row => ({
-        person_id: row.person_id, display_name: names.get(String(row.person_id)) || null,
-        relationship_to_anchor: row.relationship_to_anchor,
-        source: { ...SOURCE('household_members'), id: row.id },
-      }));
-      if (String(household.anchor_person_id) !== id) householdMembers.unshift({
-        person_id: household.anchor_person_id,
-        display_name: names.get(String(household.anchor_person_id)) || null,
-        relationship_to_anchor: 'anchor',
-        source: { ...SOURCE('households'), id: household.id },
-      });
-    }
+    const householdGroups = (householdContext.households || []).slice().sort((a, b) =>
+      Number(String(b.anchor_person_id) === id) - Number(String(a.anchor_person_id) === id));
+    const primaryHousehold = householdGroups[0] || null;
+    const primaryFacts = (householdContext.facts || []).find(row =>
+      String(row.source?.id) === String(primaryHousehold?.id)) || null;
 
     const relationshipRows = outgoing.map(row => ({ ...row, direction: 'outgoing', other_person_id: row.to_person_id }))
       .concat(incoming.map(row => ({ ...row, direction: 'incoming', other_person_id: row.from_person_id })));
@@ -110,8 +86,11 @@ class MeetingPrepContextBuilder {
       person: { data: { id: person.id, display_name: clip(person.display_name, 120),
         occupation: clip(person.occupation, 120), organization: clip(person.organization, 120) },
       source: { ...SOURCE('persons'), id: person.id } },
-      household: household ? { important_facts: clip(household.important_facts, 500),
-        members: householdMembers, source: { ...SOURCE('households'), id: household.id } } : null,
+      household: primaryHousehold ? { important_facts: primaryFacts?.content || '',
+        members: householdContext.members, households: householdGroups.map(group => ({ ...group,
+          important_facts: (householdContext.facts || []).find(row =>
+            String(row.source?.id) === String(group.id))?.content || '' })),
+        source: primaryHousehold.source } : null,
       relationship: relationshipRows.map(row => ({ direction: row.direction,
         other_person_id: row.other_person_id, other_name: otherNames.get(String(row.other_person_id)) || null,
         type: row.relationship_type, stage: row.relationship_stage, strength: row.strength,

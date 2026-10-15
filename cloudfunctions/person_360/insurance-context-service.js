@@ -14,6 +14,7 @@ const CATEGORIES = {
 const INSURANCE_TEXT = /保险|保单|保障|保额|重疾|医疗|寿险|年金|意外|养老|保费/i;
 const NEED_TEXT = /希望|需要|想要|想了解|关注|比较|询问|咨询/;
 const { classifyContextItems } = require('./context-facts');
+const { HouseholdContextService } = require('./household-context');
 
 function idOf(value) {
   const id = String(value ?? '');
@@ -62,7 +63,7 @@ class InsuranceContextService {
       deleted_at: 'is.null', limit: 1 }))[0] || null;
     const customerId = customerRow?.Id ?? null;
     const [products, reports, ocr, photos, ownOpportunities, legacyOpportunities,
-      actions, links, interactions, facts] = await Promise.all([
+      actions, links, interactions, facts, householdContext] = await Promise.all([
       customerId ? read('products', { select: 'id,items,created_at,' + Object.keys(CATEGORIES).join(','),
         customer_id: `eq.${customerId}`, deleted_at: 'is.null', order: 'id.desc', limit: 3 }) : [],
       customerId ? read('policy_review_reports', {
@@ -86,6 +87,7 @@ class InsuranceContextService {
       read('context_items', { select: 'id,item_type,category,content,confirmed,valid_from,valid_to,created_at,last_verified_at',
         person_id: `eq.${personId}`, item_type: 'eq.fact',
         order: 'created_at.desc,id.desc', limit: 30 }),
+      new HouseholdContextService({ request: this.request }).build(personId),
     ]);
     const opportunityById = new Map();
     for (const row of ownOpportunities.concat(legacyOpportunities)) {
@@ -152,6 +154,7 @@ class InsuranceContextService {
         status: row.status, progress: clip(row.last_progress, 200), observedAt: row.updated_at,
         source: { type: 'opportunities', id: row.id } })),
       nextActions: nextActions.slice(0, 20),
+      householdContext,
       evidenceStatus: hasEvidence ? 'recorded' : 'unknown',
       legacyCustomerId: customerId,
     };

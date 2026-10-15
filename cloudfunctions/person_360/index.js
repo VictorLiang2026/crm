@@ -18,6 +18,7 @@ const { getCustomerProfile } = require('./customer-profile-service');
 const { PersonInsightsService } = require('./person-insights-service');
 const { MeetingPrepContextBuilder } = require('./meeting-prep-context');
 const { ContextItemLifecycleService } = require('./context-item-lifecycle-service');
+const { HouseholdService } = require('./household-service');
 
 const app = cloudbase.init({ env: process.env.TCB_ENV });
 const LEGACY_INTERACTION_TABLES = new Set([
@@ -123,7 +124,8 @@ async function pgRpc(name, body) {
     'crm_opportunity_execute_v1','crm_activity_review_preview_v1',
     'crm_activity_review_execute_v1','crm_person_delete_preview_v1',
     'crm_person_delete_execute_v1','crm_person_restore_v1',
-    'crm_context_item_preview_v1','crm_context_item_execute_v1']).has(name)) throw new Error('Invalid RPC');
+    'crm_context_item_preview_v1','crm_context_item_execute_v1',
+    'crm_household_preview_v1','crm_household_execute_v1']).has(name)) throw new Error('Invalid RPC');
   const env = process.env.TCB_ENV;
   const key = process.env.CRM_PERSON360_DB_API_KEY;
   if (!/^crm-[a-z0-9]+$/.test(env || '') || !key) throw new Error('Person 360 is not configured');
@@ -151,7 +153,7 @@ async function pgRpc(name, body) {
       if (code === '42501' && name.startsWith('crm_context_item_')) {
         throw new Error('Context item permission denied');
       }
-      if (/^(Invalid |Selected Person|Same-name|Deleted identity|Customer |Preview |Identity candidates|Active Person|Person-only recruit|Test account|Test parent|Idempotency key|Unauthorized|Speaker profile|Work item|Action |Commitment |Opportunity |Person changed|Person not found|Activity |Outcome |Context item)/.test(message)) {
+      if (/^(Invalid |Selected Person|Same-name|Deleted identity|Customer |Preview |Identity candidates|Active Person|Person-only recruit|Test account|Test parent|Idempotency key|Unauthorized|Speaker profile|Work item|Action |Commitment |Opportunity |Person changed|Person not found|Activity |Outcome |Context item|Household |Household member|Test household)/.test(message)) {
         throw new Error(message);
       }
       throw new Error(`Database request failed (${response.status}${code ? `, ${code}` : ''})`);
@@ -237,23 +239,9 @@ function createService({ request = pgRequest, rpc = pgRpc, disclosure = disclose
   async function get(personId) {
     const person = await findPerson(personId);
     if (!person) throw new Error('Person not found');
-    const household = await findHousehold(person.id);
     const customerId = await findCustomerId(person.id);
-    if (!household) return { person, customerId, household: null, members: [] };
-    const members = await request('household_members', 'GET', {
-      select: 'id,person_id,relationship_to_anchor,confirmed_at',
-      household_id: `eq.${idOf(household.id)}`, deleted_at: 'is.null', order: 'id.asc', limit: 50,
-    });
-    const ids = members.map(member => idOf(member.person_id));
-    const people = ids.length ? await request('persons', 'GET', {
-      select: 'id,display_name',
-      id: `in.(${ids.join(',')})`, deleted_at: 'is.null', limit: 50,
-    }) : [];
-    const names = new Map(people.map(item => [String(item.id), item]));
-    return {
-      person, customerId, household,
-      members: members.map(member => ({ ...member, person: names.get(String(member.person_id)) || null })),
-    };
+    const family = await new HouseholdService({ request, rpc }).listForPerson(person.id);
+    return { person, customerId, ...family };
   }
 
   async function lookupCustomer(customerId) {
@@ -849,53 +837,15 @@ function createService({ request = pgRequest, rpc = pgRpc, disclosure = disclose
   }
 
   async function saveFacts(personId, facts) {
-    if (typeof facts !== 'string' || facts.length > 2000) throw new Error('Important facts must be at most 2000 characters');
-    const person = await findPerson(personId);
-    if (!person) throw new Error('Person not found');
-    const household = await findHousehold(person.id);
-    const value = facts.trim() || null;
-    if (household) {
-      await request('households', 'PATCH', { id: `eq.${idOf(household.id)}` },
-        { important_facts: value, updated_at: new Date().toISOString() });
-    } else if (value) {
-      await request('households', 'POST', {}, { anchor_person_id: Number(person.id), important_facts: value });
-    }
-    return get(person.id);
+    throw new Error('Preview required for household facts');
   }
 
   async function addMember(personId, memberId, relationship, selectedDisplayName, confirmed, uid) {
-    if (confirmed !== true || !uid) throw new Error('Human confirmation is required');
-    if (!ROLES.has(relationship)) throw new Error('Invalid family relationship');
-    const anchor = await findPerson(personId);
-    const member = await findPerson(memberId);
-    if (!anchor || !member) throw new Error('Both people must already exist');
-    if (String(anchor.id) === String(member.id)) throw new Error('Person cannot be their own family member');
-    if (selectedDisplayName !== member.display_name) throw new Error('Selected Person changed; search again');
-    let household = await findHousehold(anchor.id);
-    if (!household) {
-      household = one(await request('households', 'POST', {}, { anchor_person_id: Number(anchor.id) }));
-      if (!household) throw new Error('Could not create household');
-    }
-    await request('household_members', 'POST', {}, {
-      household_id: Number(household.id), person_id: Number(member.id),
-      relationship_to_anchor: relationship,
-      confirmed_at: new Date().toISOString(), confirmed_by_uid: uid,
-    });
-    return get(anchor.id);
+    throw new Error('Preview required for household membership');
   }
 
   async function removeMember(personId, membershipId, confirmed) {
-    if (confirmed !== true) throw new Error('Human confirmation is required');
-    const anchor = await findPerson(personId);
-    if (!anchor) throw new Error('Person not found');
-    const household = await findHousehold(anchor.id);
-    if (!household) throw new Error('Household not found');
-    const rows = await request('household_members', 'PATCH', {
-      id: `eq.${idOf(membershipId)}`, household_id: `eq.${idOf(household.id)}`,
-      deleted_at: 'is.null',
-    }, { deleted_at: new Date().toISOString(), updated_at: new Date().toISOString() });
-    if (rows.length !== 1) throw new Error('Household member not found');
-    return get(anchor.id);
+    throw new Error('Preview required for household membership');
   }
 
   return { get, lookupCustomer, search, saveFacts, addMember, removeMember,
@@ -917,6 +867,13 @@ exports.main = async event => {
     const service = createService();
     switch (event?.action) {
       case 'get': return await service.get(event.personId);
+      case 'resolveHouseholdMember':
+        return await new HouseholdService({request: pgRequest, rpc: pgRpc}).resolveMemberName(event.name);
+      case 'previewHousehold':
+        return await new HouseholdService({request: pgRequest, rpc: pgRpc})
+          .preview(event.personId, event.operation, event.data, uid);
+      case 'executeHousehold':
+        return await new HouseholdService({request: pgRequest, rpc: pgRpc}).execute(event.previewId, uid);
       case 'getCustomerProfile': return await getCustomerProfile(event.personId, { request: pgRequest });
       case 'lookupCustomer': return await service.lookupCustomer(event.customerId);
       case 'listPeople': return await service.listPeople(event);
@@ -954,11 +911,9 @@ exports.main = async event => {
       case 'removeOpportunity':
         return {error:'PREVIEW_REQUIRED',message:'请通过服务端预览并人工确认机会变更'};
       case 'search': return await service.search(event.name);
-      case 'saveFacts': return await service.saveFacts(event.personId, event.facts);
-      case 'addMember': return await service.addMember(
-        event.personId, event.memberId, event.relationship,
-        event.selectedDisplayName, event.confirmed, uid);
-      case 'removeMember': return await service.removeMember(event.personId, event.membershipId, event.confirmed);
+      case 'saveFacts':
+      case 'addMember':
+      case 'removeMember': return {error:'PREVIEW_REQUIRED',message:'请先预览并确认家庭变更'};
       case 'listInteractions': return await new InteractionService({ request: pgRequest })
         .listForPerson(event.personId, { limit: event.limit });
       case 'getTimelinePage': return await new PersonInsightsService({ request: pgRequest })

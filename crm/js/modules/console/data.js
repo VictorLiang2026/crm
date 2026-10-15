@@ -36,6 +36,9 @@ export const data = {
 
   // ---------- Person 360 ----------
   personHome: (ctx, personId) => p360(ctx, 'get', { personId }),
+  resolveHouseholdMember: (ctx, name) => p360(ctx, 'resolveHouseholdMember', { name }),
+  previewHousehold: (ctx, personId, operation, data) => p360(ctx, 'previewHousehold', { personId, operation, data }),
+  executeHousehold: (ctx, previewId) => p360(ctx, 'executeHousehold', { previewId }),
   customerProfile: (ctx, personId) => p360(ctx, 'getCustomerProfile', { personId }),
   personWorkItems: (ctx, personId) => p360(ctx, 'listPersonWorkItems', { personId }),
   personInteractions: (ctx, personId, limit) =>

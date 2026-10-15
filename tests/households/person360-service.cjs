@@ -73,29 +73,15 @@ test('Person 360 reads an empty family without creating people or a household', 
   assert.ok(calls.every(call => call.method === 'GET'));
 });
 
-test('manual confirmation and exact existing Person selection are mandatory', async () => {
+test('legacy one-step family writes are refused in favor of reviewed commands', async () => {
   const { service, calls } = fixture();
-  await assert.rejects(service.addMember(11, 22, 'spouse', '李宁', false, 'test-uid'), /Human confirmation/);
-  await assert.rejects(service.addMember(11, 22, 'spouse', '错误的人', true, 'test-uid'), /Selected Person changed/);
-  await assert.rejects(service.addMember(11, 999, 'spouse', '不存在', true, 'test-uid'), /already exist/);
+  await assert.rejects(service.addMember(11, 22, 'spouse', '李宁', true, 'test-uid'), /Preview required/);
+  await assert.rejects(service.removeMember(11, 1, true), /Preview required/);
   assert.ok(calls.every(call => call.method === 'GET'));
 });
 
-test('confirmed membership links only existing Persons and records the actor', async () => {
+test('legacy one-step family facts are refused in favor of reviewed commands', async () => {
   const { service, calls } = fixture();
-  const result = await service.addMember(11, 22, 'spouse', '李宁', true, 'test-uid');
-  assert.equal(result.members[0].person.display_name, '李宁');
-  assert.equal(result.members[0].relationship_to_anchor, 'spouse');
-  const insert = calls.find(call => call.table === 'household_members' && call.method === 'POST');
-  assert.equal(insert.body.confirmed_by_uid, 'test-uid');
-  assert.ok(insert.body.confirmed_at);
-  assert.ok(calls.every(call => call.table !== 'persons' || call.method === 'GET'));
-});
-
-test('facts stay bounded and do not create a Person', async () => {
-  const { service, calls } = fixture();
-  await assert.rejects(service.saveFacts(11, 'x'.repeat(2001)), /2000/);
-  const result = await service.saveFacts(11, '有两个孩子');
-  assert.equal(result.household.important_facts, '有两个孩子');
+  await assert.rejects(service.saveFacts(11, '有两个孩子'), /Preview required/);
   assert.ok(calls.every(call => call.table !== 'persons' || call.method === 'GET'));
 });
