@@ -1,4 +1,4 @@
-// Person 360（WP2）：八页签；总览/时间线/事实/家庭/保险/活动只读，
+// Person 360（WP2）：九页签；关系边通过服务端预览与人工确认维护，
 // 「机会与行动」页签接入写入闭环（完成行动/承诺、推进/关闭机会）。
 // 「活动」页签按 G5 证据口径：activities.listByPerson 仅支持 legacy 数字 ID，
 // 故 canonical 人物的活动参与记录取 getTimelinePage 已合并的 activity_participants 数据。
@@ -7,6 +7,7 @@ import { ic } from '../icons.js';
 import { data } from '../data.js';
 import { openContextItemAction } from '../context-actions.js';
 import { renderFamily } from '../family-actions.js';
+import { relationshipNode } from '../relationship-actions.js';
 import { openWorkItemEditor, openWorkItemTransition, openOpportunityAdvance, openQuickCapture, openPersonEdit, openPersonDelete,
   openPersonInteraction, openPersonFollowup } from '../write.js';
 import {
@@ -15,7 +16,7 @@ import {
 } from '../ui.js';
 import { t, translateEnum } from '../i18n.js';
 
-const TABS = () => [t('tab_overview'), t('tab_timeline'), t('tab_facts'), t('tab_family'), t('tab_insurance'), t('tab_opportunities'), t('tab_recruit'), t('tab_activities')];
+const TABS = () => [t('tab_overview'), t('tab_timeline'), t('tab_facts'), t('tab_family'), t('tab_relationships'), t('tab_insurance'), t('tab_opportunities'), t('tab_recruit'), t('tab_activities')];
 const TYPE_LABEL = () => ({
   followup: t('type_followup'), recruit_followup: t('type_recruit_followup'), activity_participant: t('type_activity_participant'),
   meeting: t('type_meeting'), call: t('type_call'), message: t('type_message'), note: t('type_note'),
@@ -379,7 +380,7 @@ function activitiesNode(ctx, id) {
   });
 }
 
-const BUILDERS = [overviewNode, timelineNode, factsNode, familyNode, insuranceNode, opportunitiesNode, recruitNode, activitiesNode];
+const BUILDERS = [overviewNode, timelineNode, factsNode, familyNode, (ctx, id) => relationshipNode(ctx, id), insuranceNode, opportunitiesNode, recruitNode, activitiesNode];
 
 // ---------- 页面 ----------
 export function renderPerson(ctx, id) {
@@ -409,7 +410,7 @@ export function renderPerson(ctx, id) {
   // Refresh the active tab now and invalidate the other affected tabs for next visit.
   const wctx = Object.assign({}, ctx, {
     onWriteDone: () => {
-      [0, 1, 7, cur].forEach((index) => loaded.delete(index));
+      [0, 1, 8, cur].forEach((index) => loaded.delete(index));
       select(cur);
     },
   });

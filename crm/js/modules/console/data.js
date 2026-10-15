@@ -39,6 +39,10 @@ export const data = {
   resolveHouseholdMember: (ctx, name) => p360(ctx, 'resolveHouseholdMember', { name }),
   previewHousehold: (ctx, personId, operation, data) => p360(ctx, 'previewHousehold', { personId, operation, data }),
   executeHousehold: (ctx, previewId) => p360(ctx, 'executeHousehold', { previewId }),
+  relationships: (ctx, personId, includeDeleted = false) => p360(ctx, 'listRelationships', { personId, includeDeleted }),
+  resolveRelationshipName: (ctx, name) => p360(ctx, 'resolveRelationshipName', { name }),
+  previewRelationship: (ctx, personId, operation, payload) => p360(ctx, 'previewRelationship', { personId, operation, data: payload }),
+  executeRelationship: (ctx, previewId) => p360(ctx, 'executeRelationship', { previewId }),
   customerProfile: (ctx, personId) => p360(ctx, 'getCustomerProfile', { personId }),
   personWorkItems: (ctx, personId) => p360(ctx, 'listPersonWorkItems', { personId }),
   personInteractions: (ctx, personId, limit) =>

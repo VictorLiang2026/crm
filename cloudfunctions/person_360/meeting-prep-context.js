@@ -39,9 +39,9 @@ class MeetingPrepContextBuilder {
       storedOpportunities, legacyOpportunities, actions, commitments, interactions, insurance,
       householdContext] = await Promise.all([
       // PMC-15: only human-confirmed edges enter review context; pending candidates stay out.
-      read('relationships', { select: 'id,to_person_id,relationship_type,relationship_stage,strength,trust_level,trend,last_meaningful_interaction_at,status,source',
+      read('relationships', { select: 'id,to_person_id,relationship_type,relationship_stage,strength,trust_level,trend,importance,last_meaningful_interaction_at,status,source',
         from_person_id: `eq.${id}`, deleted_at: 'is.null', status: 'eq.confirmed', order: 'updated_at.desc,id.desc', limit: 5 }),
-      read('relationships', { select: 'id,from_person_id,relationship_type,relationship_stage,strength,trust_level,trend,last_meaningful_interaction_at,status,source',
+      read('relationships', { select: 'id,from_person_id,relationship_type,relationship_stage,strength,trust_level,trend,importance,last_meaningful_interaction_at,status,source',
         to_person_id: `eq.${id}`, deleted_at: 'is.null', status: 'eq.confirmed', order: 'updated_at.desc,id.desc', limit: 5 }),
       read('context_items', { select: 'id,item_type,category,content,confidence,confirmed,valid_from,valid_to,last_verified_at,source_type,source_id',
         person_id: `eq.${id}`, order: 'created_at.desc,id.desc', limit: 30 }),
@@ -94,7 +94,7 @@ class MeetingPrepContextBuilder {
       relationship: relationshipRows.map(row => ({ direction: row.direction,
         other_person_id: row.other_person_id, other_name: otherNames.get(String(row.other_person_id)) || null,
         type: row.relationship_type, stage: row.relationship_stage, strength: row.strength,
-        trust_level: row.trust_level, trend: row.trend,
+        trust_level: row.trust_level, trend: row.trend, importance: row.importance ?? null,
         last_meaningful_interaction_at: row.last_meaningful_interaction_at,
         source: { ...SOURCE('relationships'), id: row.id } })),
       recent_interactions: recent.slice(0, 6).map(row => ({

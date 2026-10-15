@@ -19,6 +19,7 @@ const { PersonInsightsService } = require('./person-insights-service');
 const { MeetingPrepContextBuilder } = require('./meeting-prep-context');
 const { ContextItemLifecycleService } = require('./context-item-lifecycle-service');
 const { HouseholdService } = require('./household-service');
+const { RelationshipService } = require('./relationship-service');
 
 const app = cloudbase.init({ env: process.env.TCB_ENV });
 const LEGACY_INTERACTION_TABLES = new Set([
@@ -125,7 +126,8 @@ async function pgRpc(name, body) {
     'crm_activity_review_execute_v1','crm_person_delete_preview_v1',
     'crm_person_delete_execute_v1','crm_person_restore_v1',
     'crm_context_item_preview_v1','crm_context_item_execute_v1',
-    'crm_household_preview_v1','crm_household_execute_v1']).has(name)) throw new Error('Invalid RPC');
+    'crm_household_preview_v1','crm_household_execute_v1',
+    'crm_relationship_preview_v1','crm_relationship_execute_v1']).has(name)) throw new Error('Invalid RPC');
   const env = process.env.TCB_ENV;
   const key = process.env.CRM_PERSON360_DB_API_KEY;
   if (!/^crm-[a-z0-9]+$/.test(env || '') || !key) throw new Error('Person 360 is not configured');
@@ -153,7 +155,7 @@ async function pgRpc(name, body) {
       if (code === '42501' && name.startsWith('crm_context_item_')) {
         throw new Error('Context item permission denied');
       }
-      if (/^(Invalid |Selected Person|Same-name|Deleted identity|Customer |Preview |Identity candidates|Active Person|Person-only recruit|Test account|Test parent|Idempotency key|Unauthorized|Speaker profile|Work item|Action |Commitment |Opportunity |Person changed|Person not found|Activity |Outcome |Context item|Household |Household member|Test household)/.test(message)) {
+      if (/^(Invalid |Selected Person|Same-name|Deleted identity|Customer |Preview |Identity candidates|Active Person|Person-only recruit|Test account|Test parent|Idempotency key|Unauthorized|Speaker profile|Work item|Action |Commitment |Opportunity |Person changed|Person not found|Activity |Outcome |Context item|Household |Household member|Test household|Relationship |Active relationship)/.test(message)) {
         throw new Error(message);
       }
       throw new Error(`Database request failed (${response.status}${code ? `, ${code}` : ''})`);
@@ -874,6 +876,14 @@ exports.main = async event => {
           .preview(event.personId, event.operation, event.data, uid);
       case 'executeHousehold':
         return await new HouseholdService({request: pgRequest, rpc: pgRpc}).execute(event.previewId, uid);
+      case 'listRelationships':
+        return await new RelationshipService({request:pgRequest,rpc:pgRpc}).listForPerson(event.personId,{includeDeleted:event.includeDeleted===true});
+      case 'resolveRelationshipName':
+        return await new RelationshipService({request:pgRequest,rpc:pgRpc}).resolveName(event.name);
+      case 'previewRelationship':
+        return await new RelationshipService({request:pgRequest,rpc:pgRpc}).preview(event.personId,event.operation,event.data,uid);
+      case 'executeRelationship':
+        return await new RelationshipService({request:pgRequest,rpc:pgRpc}).execute(event.previewId,uid);
       case 'getCustomerProfile': return await getCustomerProfile(event.personId, { request: pgRequest });
       case 'lookupCustomer': return await service.lookupCustomer(event.customerId);
       case 'listPeople': return await service.listPeople(event);
