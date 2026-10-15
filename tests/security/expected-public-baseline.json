@@ -588,6 +588,68 @@
     },
     {
       "kind": "relation",
+      "name": "crm_context_item_commands",
+      "detail": {
+        "rls": true,
+        "type": "r",
+        "policies": [
+          {
+            "name": "crm_context_item_commands_service_only",
+            "roles": [
+              "service_role"
+            ],
+            "command": "*",
+            "check_hash": "b326b5062b2f0e69046810717534cb09",
+            "permissive": true,
+            "using_hash": "b326b5062b2f0e69046810717534cb09"
+          }
+        ],
+        "force_rls": true,
+        "privileges": {
+          "anon": [],
+          "service_role": [
+            "INSERT",
+            "SELECT",
+            "UPDATE"
+          ],
+          "authenticated": []
+        },
+        "security_invoker": false
+      }
+    },
+    {
+      "kind": "relation",
+      "name": "crm_household_commands",
+      "detail": {
+        "rls": true,
+        "type": "r",
+        "policies": [
+          {
+            "name": "crm_household_commands_service_only",
+            "roles": [
+              "service_role"
+            ],
+            "command": "*",
+            "check_hash": "b326b5062b2f0e69046810717534cb09",
+            "permissive": true,
+            "using_hash": "b326b5062b2f0e69046810717534cb09"
+          }
+        ],
+        "force_rls": true,
+        "privileges": {
+          "anon": [],
+          "service_role": [
+            "INSERT",
+            "SELECT",
+            "UPDATE"
+          ],
+          "authenticated": []
+        },
+        "security_invoker": false
+      }
+    },
+    {
+      "kind": "relation",
       "name": "crm_opportunity_action_links",
       "detail": {
         "rls": true,
@@ -2302,6 +2364,26 @@
     },
     {
       "kind": "routine",
+      "name": "crm_context_item_execute_v1(p_actor_uid text, p_preview_id uuid)",
+      "detail": {
+        "anon_execute": false,
+        "service_execute": true,
+        "security_definer": false,
+        "authenticated_execute": false
+      }
+    },
+    {
+      "kind": "routine",
+      "name": "crm_context_item_preview_v1(p_actor_uid text, p_idempotency_key uuid, p_person_id bigint, p_item_id bigint, p_operation text, p_payload jsonb)",
+      "detail": {
+        "anon_execute": false,
+        "service_execute": true,
+        "security_definer": false,
+        "authenticated_execute": false
+      }
+    },
+    {
+      "kind": "routine",
       "name": "crm_customers_page_v1(p_page integer, p_page_size integer, p_keyword text, p_sort_field text, p_sort_dir text, p_today date, p_exact_name text)",
       "detail": {
         "anon_execute": true,
@@ -2315,6 +2397,26 @@
       "name": "crm_delete_batch(p_kind text, p_action text, p_ids bigint[])",
       "detail": {
         "anon_execute": true,
+        "service_execute": true,
+        "security_definer": false,
+        "authenticated_execute": false
+      }
+    },
+    {
+      "kind": "routine",
+      "name": "crm_household_execute_v1(p_actor_uid text, p_preview_id uuid)",
+      "detail": {
+        "anon_execute": false,
+        "service_execute": true,
+        "security_definer": false,
+        "authenticated_execute": false
+      }
+    },
+    {
+      "kind": "routine",
+      "name": "crm_household_preview_v1(p_actor_uid text, p_idempotency_key uuid, p_person_id bigint, p_operation text, p_payload jsonb)",
+      "detail": {
+        "anon_execute": false,
         "service_execute": true,
         "security_definer": false,
         "authenticated_execute": false
@@ -2522,7 +2624,7 @@
     },
     {
       "kind": "routine",
-      "name": "person_directory_page_v1(p_page integer, p_page_size integer, p_keyword text, p_sort_field text, p_sort_dir text)",
+      "name": "person_directory_filtered_page_v1(p_page integer, p_page_size integer, p_keyword text, p_sort_field text, p_sort_dir text, p_roles text[], p_customer_priorities text[], p_recruit_priorities text[], p_referral_priorities text[])",
       "detail": {
         "anon_execute": false,
         "service_execute": true,
@@ -2532,7 +2634,7 @@
     },
     {
       "kind": "routine",
-      "name": "person_directory_filtered_page_v1(p_page integer, p_page_size integer, p_keyword text, p_sort_field text, p_sort_dir text, p_roles text[], p_customer_priorities text[], p_recruit_priorities text[], p_referral_priorities text[])",
+      "name": "person_directory_page_v1(p_page integer, p_page_size integer, p_keyword text, p_sort_field text, p_sort_dir text)",
       "detail": {
         "anon_execute": false,
         "service_execute": true,

@@ -9,7 +9,8 @@ const origin = 'https://crm-d1gkae8ddc930d151-1434199662.tcloudbaseapp.com';
 const sha = x => crypto.createHash('sha256').update(x).digest('hex');
 const PAGES = ['admin.html', 'console.html'];
 function comparable(file, contents) {
-  if (!/\.(?:js|css)$/.test(file)) return contents;
+  // Static hosting can normalize CRLF to LF for HTML as well as JS/CSS.
+  if (!/\.(?:html|js|css)$/.test(file)) return contents;
   return Buffer.from(contents.toString('utf8').replace(/\r\n/g, '\n'), 'utf8');
 }
 function matches(file, remote, local) {

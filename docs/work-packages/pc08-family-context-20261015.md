@@ -27,8 +27,12 @@
 - `npm run test:quick-capture-v2`：5 项通过，身份确认契约未变。
 - `npm run test:interactions` 输出 26 项通过，但 Node 测试进程未退出，人工终止；该命令记为不完整，不作为全通过证据。PC08 未修改互动写服务；Person 360 `get` 兼容检查本身已通过。
 - 已通过修改文件的 Node 语法检查、`git diff --check` 和 `npm run check:shared`（58 份共享副本一致）。
+- WP01 release gate：通过（`PASS_WITH_LIMITATIONS`）；public catalog 863 项无权限/对象漂移，身份映射只读审计 PASS_WITH_EXCEPTIONS，匿名 gateway 63/63，Legacy/相邻回归 108 项通过、5 项预设跳过。登录、service_role runtime、真实业务写入及移动端仍是明确未验证项。
+- 修正回归台账中三条仍要求旧页面内嵌家庭维护的断言：旧 Person 360 只验证回退入口及加载无写入，家庭操作由 PC08 专项 Console 浏览器测试验证。静态资产检查现将 HTML/JS/CSS 的 CRLF/LF 视为相同文本，仍对内容差异严格失败；原因是托管服务返回的 `console.html` 与本地只有换行格式差异。
 
-## 尚待实测与发布
+## 部署与发布状态
 
-- 生产 Person 家庭页面登录读取、用户真实点击确认后的虚构测试关系新增/解除、删除恢复联动及线上中英文页面待隔离测试会话验证。不得使用真实客户建立测试关系。
-- `person_360` 云函数和本包静态文件尚待按受影响产物部署；GitHub 提交、发布标签及三端同步校验尚未完成。
+- 生产 migration 已完成；`person_360` 以共享副本校验后部署成功；仅上传 5 个受影响静态文件：`console/family-actions.js`、`console/pages/person.js`、`console/i18n.js`、`console/data.js`、`person-360.js`。
+- `sync-check.ps1 -CloudOnly` 通过：`admin.html` SHA 一致，53 个可达 HTML/JS/CSS 资源一致，29 个 CRM 云函数的 180 个源码/配置文件一致；证据目录 `D:\Temp\crm-cloud-audit-dcfa67b570bb41b1bce3b703971e0560`。
+- 本包未新增 Person、家庭关系或种子数据。生产 Person 家庭页面登录读取、用户真实点击确认后的虚构测试关系新增/解除、删除恢复联动及线上中英文人工页面检查仍待隔离测试会话验证；不得使用真实客户建立测试关系。
+- 本文记录时，GitHub release commit/tag 和完整三端核对尚未完成；云端已先部署，仍需完成 Git 发布与发布后 sync-check。
