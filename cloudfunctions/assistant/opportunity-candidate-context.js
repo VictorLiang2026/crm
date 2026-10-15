@@ -1,6 +1,8 @@
 /** Bounded, attributed CRM evidence. Missing records never mean a confirmed need. */
 'use strict';
 
+const { classifyContextItems } = require('./context-facts');
+
 const ID = /^[1-9][0-9]*$/;
 const clip = (value, size = 300) => typeof value === 'string' ? value.trim().slice(0,size) : '';
 function idOf(value) {
@@ -30,8 +32,8 @@ async function buildCandidateContext(data, personId) {
   const [interactions, items, participants, recruit, opportunities] = await Promise.all([
     read('interactions', { select: 'id,interaction_at,summary,importance,source_type,source_id',
       person_id: `eq.${id}`, order: 'interaction_at.desc,id.desc', limit: 5 }),
-    read('context_items', { select: 'id,item_type,content,confidence,confirmed,valid_from,valid_to,created_at',
-      person_id: `eq.${id}`, order: 'created_at.desc,id.desc', limit: 5 }),
+    read('context_items', { select: 'id,item_type,category,content,confidence,confirmed,valid_from,valid_to,created_at',
+      person_id: `eq.${id}`, order: 'created_at.desc,id.desc', limit: 30 }),
     read('activity_participants', { select: 'id,activity_id,status,relationship_note,created_at',
       canonical_person_id: `eq.${id}`, status: 'eq.attended', deleted_at: 'is.null',
       order: 'created_at.desc,id.desc', limit: 3 }),
@@ -79,13 +81,15 @@ async function buildCandidateContext(data, personId) {
     add(evidence,'followups',{id:row.Id},
       row.interaction_summary || row.followup_notes,true,row.followup_date,'legacy_followup');
   }
-  for (const row of items) {
-    if (row.valid_from && Date.parse(row.valid_from) > Date.now()) continue;
-    if (row.valid_to && Date.parse(row.valid_to) < Date.now()) continue;
+  const classifiedItems = classifyContextItems(items, new Date(), { truncated: items.length >= 30 });
+  const trustedIds = new Set(classifiedItems.trustedFacts.map(row => String(row.id)));
+  for (const row of classifiedItems.current) {
+    const isTrusted = trustedIds.has(String(row.id));
+    if (row.item_type === 'fact' && !isTrusted) continue;
+    const certainty = isTrusted ? 'confirmed_current_fact'
+      : row.item_type === 'signal' ? 'unverified_signal' : 'uncertain_inference';
     add(evidence,'context_items',row,`${row.item_type}: ${row.content}`,
-      (row.item_type==='fact' && row.confirmed===true) ||
-      (row.item_type==='signal' && Number(row.confidence)>=0.6),
-      row.created_at, row.confirmed ? 'confirmed_fact' : row.item_type);
+      isTrusted, row.created_at, certainty);
   }
   for (const row of attended) {
     const activity=activityById.get(String(row.activity_id));
@@ -116,7 +120,7 @@ async function buildCandidateContext(data, personId) {
     evidence:deduped,
     existing_opportunities:opportunities.map(o=>({id:o.id,type:o.opportunity_type,
       status:o.status,reason:clip(o.last_progress,160)})),
-    guidance:{ rules:'只提出一个有具体正面证据的待审核机会；无证据则 insufficient_evidence。报名不等于到场，到场本身不等于需求。已有保单或缺少记录不等于保障缺口。未核实的 OCR、AI 报告或推断不能单独支持机会。sourceRefs 只能引用所给 evidence.ref，不能创造人员或事实。' },
+    guidance:{ rules:'只提出一个有具体正面证据的待审核机会；无证据则 insufficient_evidence。报名不等于到场，到场本身不等于需求。已有保单或缺少记录不等于保障缺口。未确认事实候选、冲突事实、Signal、Inference、OCR 或 AI 报告只能作为待核验线索，不得作为已核实事实或由模型选边。sourceRefs 只能引用所给 evidence.ref，不能创造人员或事实。' },
   };
 }
 

@@ -13,6 +13,7 @@ const CATEGORIES = {
 };
 const INSURANCE_TEXT = /保险|保单|保障|保额|重疾|医疗|寿险|年金|意外|养老|保费/i;
 const NEED_TEXT = /希望|需要|想要|想了解|关注|比较|询问|咨询/;
+const { classifyContextItems } = require('./context-facts');
 
 function idOf(value) {
   const id = String(value ?? '');
@@ -82,8 +83,8 @@ class InsuranceContextService {
         person_id: `eq.${personId}`, order: 'created_at.desc', limit: 100 }),
       read('interactions', { select: 'id,summary,interaction_at',
         person_id: `eq.${personId}`, order: 'interaction_at.desc,id.desc', limit: 30 }),
-      read('context_items', { select: 'id,item_type,content,confirmed,created_at,last_verified_at',
-        person_id: `eq.${personId}`, confirmed: 'eq.true', item_type: 'eq.fact',
+      read('context_items', { select: 'id,item_type,category,content,confirmed,valid_from,valid_to,created_at,last_verified_at',
+        person_id: `eq.${personId}`, item_type: 'eq.fact',
         order: 'created_at.desc,id.desc', limit: 30 }),
     ]);
     const opportunityById = new Map();
@@ -112,7 +113,8 @@ class InsuranceContextService {
       }
     }
     const latestReport = reports[0] || null;
-    const knownNeeds = facts.filter(row => INSURANCE_TEXT.test(row.content || ''))
+    const classifiedItems = classifyContextItems(facts, new Date(), { truncated: facts.length >= 30 });
+    const knownNeeds = classifiedItems.trustedFacts.filter(row => INSURANCE_TEXT.test(row.content || ''))
       .map(row => ({ content: clip(row.content, 500), observedAt: row.last_verified_at || row.created_at,
         source: { type: 'context_items', id: row.id }, provenance: '已确认的事实记录；需求仍以原文为准' }));
     for (const row of interactions) {

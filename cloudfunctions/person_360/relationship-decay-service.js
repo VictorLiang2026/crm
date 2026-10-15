@@ -4,6 +4,7 @@
 const { InteractionService } = require('./interaction-service');
 const testData = require('./test-data');
 const { evaluateRelationshipDecay } = require('./relationship-decay-core');
+const { classifyContextItems } = require('./context-facts');
 
 const PRIORITY_IMPORTANCE = { A: 5, B: 4, C: 3, D: 2, E: 1 };
 const CADENCE_TYPES = new Set(['followup', 'recruit_followup', 'manual']);
@@ -14,7 +15,10 @@ const idOf = value => {
 };
 
 function current(row, nowMs) {
-  return row.confirmed === true && (!row.valid_to || Date.parse(row.valid_to) > nowMs);
+  const from = row.valid_from ? Date.parse(row.valid_from) : null;
+  const to = row.valid_to ? Date.parse(row.valid_to) : null;
+  return row.confirmed === true && (!Number.isFinite(from) || from <= nowMs) &&
+    (!Number.isFinite(to) || to >= nowMs);
 }
 
 function factValue(row) {
@@ -42,7 +46,7 @@ class RelationshipDecayService {
       id: `eq.${id}`, deleted_at: 'is.null', limit: 1 }))[0];
     if (!person) throw new Error('Person not found');
     const [facts, customers, timeline] = await Promise.all([
-      read('context_items', { select: 'id,item_type,category,content,structured_value,confirmed,valid_to,created_at',
+      read('context_items', { select: 'id,item_type,category,content,structured_value,confirmed,valid_from,valid_to,created_at',
         person_id: `eq.${id}`, item_type: 'in.(fact,inference)', confirmed: 'eq.true',
         category: 'in.(relationship_strength,relationship_importance,last_meaningful_interaction_at)',
         order: 'created_at.desc,id.desc', limit: 30 }),
@@ -52,8 +56,15 @@ class RelationshipDecayService {
         deleted_at: 'is.null', limit: 1 }),
       this.listInteractions(id),
     ]);
-    const assessed = facts.filter(row => current(row, now.getTime()));
-    const latest = (category, type) => assessed.find(row => row.category === category && row.item_type === type);
+    const classified = classifyContextItems(facts, now, { truncated: facts.length >= 30 });
+    const trustedFactIds = new Set(classified.trustedFacts.map(row => String(row.id)));
+    const assessed = facts.filter(row => current(row, now.getTime()) &&
+      (row.item_type === 'fact' ? trustedFactIds.has(String(row.id)) : row.item_type === 'inference'));
+    const latest = (category, type) => {
+      const candidates = assessed.filter(row => row.category === category && row.item_type === type);
+      const values = new Set(candidates.map(row => String(factValue(row)).trim().toLocaleLowerCase()));
+      return values.size === 1 ? candidates[0] : null;
+    };
     // Strength and importance are human assessments, not asserted facts.
     const strengthFact = latest('relationship_strength', 'inference');
     const importanceFact = latest('relationship_importance', 'inference');

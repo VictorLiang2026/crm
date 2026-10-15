@@ -17,6 +17,7 @@ const { RelationshipDecayService } = require('./relationship-decay-service');
 const { getCustomerProfile } = require('./customer-profile-service');
 const { PersonInsightsService } = require('./person-insights-service');
 const { MeetingPrepContextBuilder } = require('./meeting-prep-context');
+const { ContextItemLifecycleService } = require('./context-item-lifecycle-service');
 
 const app = cloudbase.init({ env: process.env.TCB_ENV });
 const LEGACY_INTERACTION_TABLES = new Set([
@@ -26,7 +27,7 @@ const LEGACY_INTERACTION_TABLES = new Set([
 const INSURANCE_READ_TABLES = new Set([
   'products', 'policy_review_reports', 'ocr_records', 'photos', 'actions',
 ]);
-const RELATIONSHIP_READ_TABLES = new Set(['context_items', 'person_roles', 'relationships']);
+const RELATIONSHIP_READ_TABLES = new Set(['context_items', 'crm_context_item_commands', 'person_roles', 'relationships']);
 const RECRUIT_READ_TABLES = new Set([
   'v_recruit_candidates_person_only', 'v_recruit_candidates_person_only_trash',
   'recruit_milestones',
@@ -121,7 +122,8 @@ async function pgRpc(name, body) {
     'crm_work_item_execute_v1', 'crm_opportunity_preview_v1',
     'crm_opportunity_execute_v1','crm_activity_review_preview_v1',
     'crm_activity_review_execute_v1','crm_person_delete_preview_v1',
-    'crm_person_delete_execute_v1','crm_person_restore_v1']).has(name)) throw new Error('Invalid RPC');
+    'crm_person_delete_execute_v1','crm_person_restore_v1',
+    'crm_context_item_preview_v1','crm_context_item_execute_v1']).has(name)) throw new Error('Invalid RPC');
   const env = process.env.TCB_ENV;
   const key = process.env.CRM_PERSON360_DB_API_KEY;
   if (!/^crm-[a-z0-9]+$/.test(env || '') || !key) throw new Error('Person 360 is not configured');
@@ -146,7 +148,10 @@ async function pgRpc(name, body) {
       const message = typeof problem?.message === 'string' ? problem.message : '';
       const code = typeof problem?.code === 'string' && /^(?:PGRST\d{3}|[0-9A-Z]{5})$/.test(problem.code)
         ? problem.code : '';
-      if (/^(Invalid |Selected Person|Same-name|Deleted identity|Customer |Preview |Identity candidates|Active Person|Person-only recruit|Test account|Test parent|Idempotency key|Unauthorized|Speaker profile|Work item|Action |Commitment |Opportunity |Person changed|Person not found|Activity |Outcome )/.test(message)) {
+      if (code === '42501' && name.startsWith('crm_context_item_')) {
+        throw new Error('Context item permission denied');
+      }
+      if (/^(Invalid |Selected Person|Same-name|Deleted identity|Customer |Preview |Identity candidates|Active Person|Person-only recruit|Test account|Test parent|Idempotency key|Unauthorized|Speaker profile|Work item|Action |Commitment |Opportunity |Person changed|Person not found|Activity |Outcome |Context item)/.test(message)) {
         throw new Error(message);
       }
       throw new Error(`Database request failed (${response.status}${code ? `, ${code}` : ''})`);
@@ -960,6 +965,10 @@ exports.main = async event => {
         .timeline(event.personId, { page: event.page, pageSize: event.pageSize });
       case 'getContextGroups': return await new PersonInsightsService({ request: pgRequest })
         .context(event.personId);
+      case 'previewContextItem': return await new ContextItemLifecycleService({ rpc: pgRpc })
+        .preview(event.data, uid);
+      case 'executeContextItem': return await new ContextItemLifecycleService({ rpc: pgRpc })
+        .execute(event.previewId, uid);
       case 'listActivityData': return await listActivityData(event);
       case 'getMeetingPrepContext': return await new MeetingPrepContextBuilder({ request: pgRequest })
         .build(event.personId);
@@ -997,7 +1006,7 @@ exports.main = async event => {
       /^Database request failed \((\d{3})(?:, ((?:PGRST\d{3}|[0-9A-Z]{5})))?\)$/.exec(error.message);
     return { error: error.message === 'UNAUTHORIZED' ? 'UNAUTHORIZED' :
       diagnostic ? `Person 360 request failed (HTTP ${diagnostic[1]}${diagnostic[2] ? `, ${diagnostic[2]}` : ''})` :
-      /^(Invalid |Person |Person-only recruit|Activity |Attendance |Post-event |Participant |Speaker |This customer|Both people|Human confirmation|Selected Person|Household |Important facts|Could not|Same-name|Deleted identity|Customer |Preview |Identity candidates|Idempotency key|Test account|Test parent|Work item|Action |Commitment |Opportunity )/.test(error.message)
+      /^(Invalid |Person |Person-only recruit|Activity |Attendance |Post-event |Participant |Speaker |This customer|Both people|Human confirmation|Selected Person|Household |Important facts|Could not|Same-name|Deleted identity|Customer |Preview |Identity candidates|Idempotency key|Test account|Test parent|Work item|Action |Commitment |Opportunity |Context item)/.test(error.message)
         ? error.message : 'Person 360 request failed' };
   }
 };

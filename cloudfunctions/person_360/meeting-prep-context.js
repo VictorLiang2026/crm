@@ -3,6 +3,7 @@
 
 const { InteractionService } = require('./interaction-service');
 const { InsuranceContextService } = require('./insurance-context-service');
+const { classifyContextItems } = require('./context-facts');
 
 const OPEN_OPPORTUNITY_STATUSES = new Set(['成交', '关闭']);
 const SOURCE = table => ({ schema: 'public', table });
@@ -44,7 +45,7 @@ class MeetingPrepContextBuilder {
         from_person_id: `eq.${id}`, deleted_at: 'is.null', status: 'eq.confirmed', order: 'updated_at.desc,id.desc', limit: 5 }),
       read('relationships', { select: 'id,from_person_id,relationship_type,relationship_stage,strength,trust_level,trend,last_meaningful_interaction_at,status,source',
         to_person_id: `eq.${id}`, deleted_at: 'is.null', status: 'eq.confirmed', order: 'updated_at.desc,id.desc', limit: 5 }),
-      read('context_items', { select: 'id,item_type,category,content,confidence,confirmed,valid_to,last_verified_at,source_type,source_id',
+      read('context_items', { select: 'id,item_type,category,content,confidence,confirmed,valid_from,valid_to,last_verified_at,source_type,source_id',
         person_id: `eq.${id}`, order: 'created_at.desc,id.desc', limit: 30 }),
       read('opportunities', { select: 'id,opportunity_type,status,last_progress,next_action,next_action_date,updated_at',
         person_id: `eq.${id}`, deleted_at: 'is.null', order: 'updated_at.desc,id.desc', limit: 30 }),
@@ -92,8 +93,7 @@ class MeetingPrepContextBuilder {
     const others = otherIds.length ? await read('persons', { select: 'id,display_name',
       id: `in.(${otherIds.join(',')})`, deleted_at: 'is.null', limit: 10 }) : [];
     const otherNames = new Map(others.map(row => [String(row.id), clip(row.display_name, 120)]));
-    const validAt = this.now().getTime();
-    const currentItems = contextItems.filter(row => !row.valid_to || Date.parse(row.valid_to) > validAt);
+    const classifiedItems = classifyContextItems(contextItems, this.now(), { truncated: contextItems.length >= 30 });
     const contextItem = row => ({ content: clip(row.content, 500), category: clip(row.category, 80),
       confidence: row.confidence, confirmed: row.confirmed, last_verified_at: row.last_verified_at,
       source: { ...SOURCE('context_items'), id: row.id, original_type: row.source_type,
@@ -123,9 +123,11 @@ class MeetingPrepContextBuilder {
         summary: clip(row.summary, 500), importance: row.importance,
         source: { ...SOURCE(row.virtual ? row.source_type : 'interactions'), id: row.source_id || row.id },
       })),
-      facts: currentItems.filter(row => row.item_type === 'fact' && row.confirmed === true)
-        .slice(0, 10).map(contextItem),
-      signals: currentItems.filter(row => row.item_type === 'signal').slice(0, 10).map(contextItem),
+      facts: classifiedItems.trustedFacts.slice(0, 10).map(contextItem),
+      signals: [
+        ...classifiedItems.signals.map(row => ({ ...contextItem(row), certainty: 'unverified_signal' })),
+        ...classifiedItems.inferences.map(row => ({ ...contextItem(row), certainty: 'uncertain_inference' })),
+      ].slice(0, 10),
       open_opportunities: openOpportunities.map(row => ({ type: row.opportunity_type,
         status: row.status, last_progress: clip(row.last_progress, 300),
         next_action: clip(row.next_action, 300), next_action_date: row.next_action_date,

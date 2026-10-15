@@ -9,6 +9,7 @@
     "test:pc03": "node --test tests/console/more-navigation.browser.cjs tests/wp01/static.test.cjs",
     "test:pc04": "node --test tests/pc04/person-customer-operations.test.cjs tests/pc04/optimistic-update-boundaries.test.cjs tests/console/person-customer-operations.browser.cjs",
     "test:pc05": "node --test tests/pc05/person-timeline-writes.browser.cjs",
+    "test:pc07": "node --test tests/context-items-lifecycle.test.cjs tests/pc07/context-builders.test.cjs tests/pc07/context-insights.test.cjs tests/pc07/context-lifecycle.browser.cjs",
     "test:wp01:login": "node tests/wp01/login.cjs",
     "check:release-gate": "node tests/wp01/run.cjs --assert-release",
     "build:shared": "node tools/sync-shared.cjs --sync",

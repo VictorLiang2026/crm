@@ -5,6 +5,7 @@
 import { h } from '../dom.js';
 import { ic } from '../icons.js';
 import { data } from '../data.js';
+import { openContextItemAction } from '../context-actions.js';
 import { openWorkItemEditor, openWorkItemTransition, openOpportunityAdvance, openQuickCapture, openPersonEdit, openPersonDelete,
   openPersonInteraction, openPersonFollowup } from '../write.js';
 import {
@@ -174,18 +175,40 @@ function factsNode(ctx, id) {
       const rows = (res.groups && res.groups[key]) || [];
       if (!rows.length) return;
       blocks.push(sectionTitle(label, bdg(String(rows.length), tone)));
-      blocks.push(h('div', {}, rows.slice(0, 15).map((r) => h('div', { class: 'list-row' }, [
-        h('div', { style: 'flex:1;min-width:0' }, [
-          h('div', { class: 'row-title' }, [
-            r.category ? bdg(translateEnum('fact_category', r.category), 'ink') : null,
-            h('span', { style: 'margin-left:8px' }, r.content),
+      blocks.push(h('div', {}, rows.slice(0, 15).map((r) => {
+        const active = r.validity === 'current';
+        const stateBadge = r.lifecycle === 'withdraw' ? bdg(t('context_withdrawn'), 'red')
+          : r.validity === 'expired' ? bdg(t('context_expired'), 'gray')
+          : r.validity === 'future' ? bdg(t('context_not_yet_valid'), 'gold')
+          : r.confirmed ? bdg(t('badge_confirmed'), 'jade') : bdg(t('badge_pending'), 'gray');
+        const operations = key === 'fact'
+          ? [...(!r.confirmed ? ['confirm'] : []), 'correct', 'expire', 'withdraw']
+          : ['promote', 'expire', 'withdraw'];
+        return h('div', { class: 'list-row', style: 'align-items:flex-start' }, [
+          h('div', { style: 'flex:1;min-width:0' }, [
+            h('div', { class: 'row-title' }, [
+              r.category ? bdg(translateEnum('fact_category', r.category), 'ink') : null,
+              h('span', { style: 'margin-left:8px' }, r.content),
+            ]),
+            h('div', { class: 'row-sub' }, `${r.origin ? `${t('label_origin')} ${r.origin} · ` : ''}${t('label_updated_short')} ${fmtDate(r.updatedAt)}`),
+            r.sourceInteraction?.summary ? h('div', { class: 'row-sub', style: 'margin-top:5px' },
+              `${t('context_source_text')}: ${r.sourceInteraction.summary}`) : null,
+            r.sourceInteraction?.rawNote ? h('details', {}, [
+              h('summary', { class: 'row-sub' }, t('context_show_original_note')),
+              h('p', { class: 'sheet-note' }, String(r.sourceInteraction.rawNote).slice(0, 2000)),
+            ]) : null,
+            r.derivedFrom ? h('div', { class: 'row-sub' }, `${t('context_derived_from')} #${r.derivedFrom.id}: ${r.derivedFrom.content}`) : null,
+            r.needsReview ? h('p', { class: 'sheet-note', style: 'margin:6px 0 0' }, t('context_conflict_review')) : null,
+            r.interactionId && !r.sourceInteraction ? h('p', { class: 'sheet-note', style: 'margin:6px 0 0' }, t('context_source_missing')) : null,
+            active ? h('div', { class: 'row-actions', style: 'margin-top:7px' }, operations.map(operation => h('button', {
+              class: operation === 'withdraw' ? 'btn btn-ghost btn-sm' : 'btn btn-soft btn-sm',
+              type: 'button', onclick: () => openContextItemAction(ctx, { personId: String(id), item: r,
+                operation, onDone: ctx.onWriteDone }),
+            }, t(`context_action_${operation}`)))) : null,
           ]),
-          h('div', { class: 'row-sub' }, r.origin
-            ? `${t('label_origin')} ${r.origin} · ${t('label_updated_short')} ${fmtDate(r.updatedAt)}`
-            : `${t('label_updated_short')} ${fmtDate(r.updatedAt)}`),
-        ]),
-        r.confirmed ? bdg(t('badge_confirmed'), 'jade') : bdg(t('badge_pending'), 'gray'),
-      ]))));
+          h('div', { class: 'sheet-stack' }, [stateBadge, r.needsReview ? bdg(t('context_verify'), 'gold') : null]),
+        ]);
+      })));
     });
     return h('div', { class: 'tab-stack' }, blocks.length ? blocks : [emptyNote(t('empty_no_facts'), t('empty_facts_note'))]);
   });
