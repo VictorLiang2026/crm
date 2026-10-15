@@ -7,6 +7,7 @@ function fixture() {
   const calls = [];
   const tables = {
     persons: [{ id: 11, legacy_customer_id: 101 }, { id: 12, legacy_customer_id: 102 }],
+    customers: [{ Id: 101, person_id: 11, deleted_at: null }, { Id: 102, person_id: 12, deleted_at: null }],
     opportunities: [{ id: 21, customer_id: 101 }, { id: 22, customer_id: 102 },
       { id: 23, customer_id: null, person_id: 11 }],
     interactions: [{ id: 31, person_id: 11 }, { id: 32, person_id: 12 }],

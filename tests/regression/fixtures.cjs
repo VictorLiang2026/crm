@@ -18,12 +18,24 @@ function installFixtures() {
     status: mode === 'activity-ended' ? 'ended' : 'preparing',
     description: marker + '活动说明', topic_ids: [], deleted_at: null };
   const calls = [], violations = [], errors = [];
+  let workItems = mode === 'empty' ? [] : [
+    { id: 990301, person_id: 980001, person_name: marker + '客户甲', kind: 'action',
+      title: marker + '整理反馈', description: marker + '先核对需求', status: 'open', priority: 'medium',
+      source: 'ai_quick_capture_v2', due_at: null, updated_at: '2026-10-03T01:00:00Z' },
+    { id: 990302, person_id: 980001, person_name: marker + '客户甲', kind: 'commitment',
+      content: marker + '核对资料', commitment_type: 'THEY_PROMISED', status: 'open',
+      source: 'manual', due_at: '2026-10-16T01:00:00Z', updated_at: '2026-10-03T01:00:00Z' },
+    { id: 990303, person_id: 980001, person_name: marker + '客户甲', kind: 'action',
+      title: marker + '已完成的测试行动', status: 'completed', priority: 'low', completed_at: '2026-10-03T02:00:00Z',
+      source: 'manual', due_at: null, updated_at: '2026-10-03T02:00:00Z' },
+  ];
+  let workPreview = null;
   let actionCommandStage = null;
   let qcV2Stage = null;
   let activityReviewPreview = null;
   let loggedIn = params.get('login') !== 'required' &&
     !(params.get('authCase') && sessionStorage.getItem('crm_fixture_signed_out') === '1');
-  window.__crmTest = { calls, violations, errors, loginAttempts: 0, signOutAttempts: 0, passwordChanges: 0 };
+  window.__crmTest = { calls, violations, errors, getWorkItems: () => structuredClone(workItems), loginAttempts: 0, signOutAttempts: 0, passwordChanges: 0 };
   addEventListener('error', e => errors.push(e.message));
   addEventListener('unhandledrejection', e => errors.push(String(e.reason)));
   addEventListener('securitypolicyviolation', e => violations.push('CSP: ' + e.blockedURI));
@@ -185,19 +197,50 @@ function installFixtures() {
       person_name: marker + '客户甲', commitment_type: 'MUTUAL', content: marker + '即将到期承诺',
       due_at: '2026-09-28T01:00:00Z' }], hasMoreOverdue: false, hasMoreDueSoon: false }),
     'person_360:listPersonWorkItems': () => ({personId:980001,personName:marker+'客户甲',
-      rows:mode==='empty'?[]:[{id:990301,person_id:980001,kind:'action',
-        title:'【系统测试·勿联系】整理反馈',status:'open',priority:'medium',
-        source:'ai_quick_capture_v2',due_at:null,updated_at:'2026-10-03T01:00:00Z'}],
-      limit:50,hasMore:false,testData:{status:'verified',containsTestData:mode!=='empty',
-        recordCount:mode==='empty'?0:1,sources:mode==='empty'?[]:[
-          {batchKey:'crm_test_fixture',table:'actions',count:1}]}}),
-    'person_360:listTodayWorkItems': () => ({rows:mode==='empty'?[]:[{
-      id:990301,person_id:980001,person_name:marker+'客户甲',kind:'action',
-      title:'【系统测试·勿联系】整理反馈',status:'open',priority:'medium',
-      source:'ai_quick_capture_v2',due_at:null,updated_at:'2026-10-03T01:00:00Z'}],
-      limit:50,hasMore:false,asOf:'2026-10-04T01:00:00Z',
-      testData:{status:'verified',containsTestData:mode!=='empty',recordCount:mode==='empty'?0:1,
-        sources:mode==='empty'?[]:[{batchKey:'crm_test_fixture',table:'actions',count:1}]}}),
+      rows:structuredClone(workItems),limit:50,hasMore:false,
+      testData:{status:'verified',containsTestData:mode!=='empty',recordCount:workItems.length,
+        sources:workItems.length?[{batchKey:'crm_test_fixture',table:'actions',count:1},
+          {batchKey:'crm_test_fixture',table:'commitments',count:1}]:[]}}),
+    'person_360:listTodayWorkItems': () => ({rows:structuredClone(workItems),limit:50,hasMore:false,
+      asOf:'2026-10-04T01:00:00Z',testData:{status:'verified',containsTestData:mode!=='empty',
+        recordCount:workItems.length,sources:workItems.length?[{batchKey:'crm_test_fixture',table:'actions',count:1},
+          {batchKey:'crm_test_fixture',table:'commitments',count:1}]:[]}}),
+    'person_360:previewWorkItem': event => {
+      const draft = event.data;
+      const row = workItems.find(item => String(item.id) === String(draft.itemId));
+      const before = row ? {id:row.id,title:row.title,description:row.description,content:row.content,
+        dueAt:row.due_at,priority:row.priority,commitmentType:row.commitment_type,
+        status:row.status,completedAt:row.completed_at,source:row.source} : null;
+      const after = draft.operation === 'create' || draft.operation === 'edit' ? draft.draft
+        : {status:draft.operation === 'complete' ? 'completed' : draft.operation === 'cancel' ? 'cancelled' : 'open'};
+      workPreview = {previewId:'aa000000-0000-4000-8000-000000000001',draft,
+        preview:{kind:draft.kind,operation:draft.operation,personId:Number(draft.personId),
+          personName:marker+'客户甲',itemId:row?.id || null,before,after}};
+      return {previewId:workPreview.previewId,status:'preview',preview:workPreview.preview,
+        expiresAt:'2026-10-04T15:00:00+08:00',businessDataWritten:false};
+    },
+    'person_360:executeWorkItem': event => {
+      if (!workPreview || event.previewId !== workPreview.previewId) return fail('INVALID_WORK_PREVIEW');
+      const {draft} = workPreview;
+      let row = workItems.find(item => String(item.id) === String(draft.itemId));
+      const stamp = '2026-10-04T07:00:00Z';
+      if (draft.operation === 'create') {
+        row = {id:990399,person_id:Number(draft.personId),person_name:marker+'客户甲',kind:draft.kind,
+          ...(draft.kind === 'action' ? {title:draft.draft.title,description:draft.draft.description,
+            due_at:draft.draft.dueAt,priority:draft.draft.priority} : {content:draft.draft.content,
+            due_at:draft.draft.dueAt,commitment_type:draft.draft.commitmentType}),
+          status:'open',source:'manual',updated_at:stamp};
+        workItems.push(row);
+      }
+      if (draft.operation === 'edit') Object.assign(row, draft.kind === 'action'
+        ? {title:draft.draft.title,description:draft.draft.description,due_at:draft.draft.dueAt,priority:draft.draft.priority}
+        : {content:draft.draft.content,due_at:draft.draft.dueAt,commitment_type:draft.draft.commitmentType});
+      if (draft.operation === 'complete') { row.status='completed'; row.completed_at=stamp; }
+      if (draft.operation === 'cancel') { row.status='cancelled'; row.completed_at=null; }
+      if (draft.operation === 'reopen') { row.status='open'; row.completed_at=null; }
+      row.updated_at=stamp;
+      return {kind:draft.kind,itemId:row.id,item:structuredClone(row),replayed:false};
+    },
     'person_360:get': () => ({ person: { id: 980001, display_name: marker + '客户甲' },
       customerId: String(customer.Id),
       household: mode === 'family' ? { id: 981001, important_facts: marker + '周末一起探望父母' } : null,
@@ -406,16 +449,22 @@ function installFixtures() {
       const key = name + ':' + data.action;
       if (key === 'person_360:previewOpportunity' && window.__crmTest.rejectPreview)
         throw {code:'SDK_NETWORK_TEST'};
+      if (key === 'person_360:executeWorkItem' && window.__crmTest.rejectWorkItemExecuteOnce) {
+        window.__crmTest.rejectWorkItemExecuteOnce = false;
+        calls.push({name,action:data.action,previewId:data.previewId,rejected:true});
+        return {result:{error:'Work item changed; preview again'}};
+      }
       if (!Object.hasOwn(replies, key)) return fail('UNEXPECTED_OR_WRITE_ACTION: ' + key);
       calls.push({ name, action: data.action, view: data.view, guidance: data.guidance,
-        operation: data.operation, stage: data.stage, id: data.id,
+        operation: data.operation || data.data?.operation, stage: data.stage, id: data.id,
         customer_id: data.customer_id, candidate_id: data.candidate_id,
         page: data.page, pageSize: data.pageSize, keyword: data.keyword, exactName: data.exactName,
         sortField: data.sortField, sortDir: data.sortDir,
-        candidateId:data.candidateId, personId: data.personId, version: data.version,
+        candidateId:data.candidateId, personId: data.personId || data.data?.personId, version: data.version,
+        previewId:data.previewId,
         payload: ['assistant:quickCaptureV2', 'person_360:commitQuickCaptureV2', 'person_360:addCanonicalParticipant', 'person_360:recordActivityInteraction', 'person_360:createOpportunity',
           'person_360:updateOpportunity', 'person_360:createSpeakerProfile',
-          'person_360:previewOpportunity',
+          'person_360:previewOpportunity','person_360:previewWorkItem','person_360:executeWorkItem',
           'person_360:previewIdentity','person_360:executeIdentity',
           'person_360:previewActivityReview','activity_speakers:update',
           'policy_review_reports:update',

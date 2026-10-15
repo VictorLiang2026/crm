@@ -5,7 +5,7 @@ import { h } from '../dom.js';
 import { ic } from '../icons.js';
 import { data } from '../data.js';
 import { t, getLang, translateEnum } from '../i18n.js';
-import { openWorkItemDone, openCandidate } from '../write.js';
+import { openWorkItemEditor, openWorkItemTransition, openCandidate } from '../write.js';
 import {
   wpTag, sk, pageHead, card, emptyNote, loadInto, bdg, avatar,
   dueLabel, dayDiffFromToday, textOf,
@@ -109,10 +109,48 @@ function actionRow(ctx, item, onDone) {
       h('div', { class: 'row-sub' }, `${name} · ${dueLabel(item._due)}`),
     ]),
     bdg(text, tone),
-    h('button', {
-      class: 'btn btn-ghost btn-sm', type: 'button',
-      onclick: () => openWorkItemDone(ctx, { row: item, onDone }),
-    }, [ic('check'), t('done')]),
+    item.status === 'completed' || item.status === 'cancelled'
+      ? h('button', { class: 'btn btn-ghost btn-sm', type: 'button',
+        onclick: () => openWorkItemTransition(ctx, { row: item, operation: 'reopen', onDone }) }, t('work_reopen'))
+      : h('div', { class: 'row-actions' }, [
+        h('button', { class: 'btn btn-ghost btn-sm', type: 'button',
+          onclick: () => openWorkItemEditor(ctx, { kind: 'action', row: item, personId: item.person_id, personName: name, onDone }) }, t('btn_edit')),
+        h('button', { class: 'btn btn-ghost btn-sm', type: 'button',
+          onclick: () => openWorkItemTransition(ctx, { row: item, operation: 'complete', onDone }) }, [ic('check'), t('done')]),
+        h('button', { class: 'btn btn-ghost btn-sm', type: 'button',
+          onclick: () => openWorkItemTransition(ctx, { row: item, operation: 'cancel', onDone }) }, t('work_cancel')),
+      ]),
+  ]);
+}
+
+function dueCommitmentRows(rows) {
+  const now = new Date();
+  const beijingNow = new Date(now.getTime() + 8 * 60 * 60 * 1000);
+  const horizon = Date.UTC(beijingNow.getUTCFullYear(), beijingNow.getUTCMonth(),
+    beijingNow.getUTCDate() + 4) - 8 * 60 * 60 * 1000;
+  return rows.filter((row) => row.kind === 'commitment' && row.status === 'open' && row.due_at &&
+    Date.parse(row.due_at) < horizon);
+}
+
+function commitmentRow(ctx, row, onDone, closed = false) {
+  const typeMap = { THEY_PROMISED: [t('commit_they_promised'), 'gold'], I_PROMISED: [t('commit_i_promised'), 'ink'], MUTUAL: [t('commit_mutual'), 'red'] };
+  const [label, tone] = typeMap[row.commitment_type] || [t('commitment'), 'gray'];
+  return h('div', { class: 'list-row' }, [
+    h('div', { style: 'flex:1;min-width:0' }, [
+      h('div', { class: 'row-title' }, row.content || t('no_content')),
+      h('div', { class: 'row-sub' }, `${row.person_name || t('unnamed')} · ${dueLabel(String(row.due_at || '').slice(0, 10))}${closed ? ` · ${translateEnum('work_status', row.status)}` : ''}`),
+    ]),
+    bdg(label, tone),
+    closed ? h('button', { class: 'btn btn-ghost btn-sm', type: 'button',
+      onclick: () => openWorkItemTransition(ctx, { row, operation: 'reopen', onDone }) }, t('work_reopen'))
+      : h('div', { class: 'row-actions' }, [
+        h('button', { class: 'btn btn-ghost btn-sm', type: 'button',
+          onclick: () => openWorkItemEditor(ctx, { kind: 'commitment', row, personId: row.person_id, personName: row.person_name, onDone }) }, t('btn_edit')),
+        h('button', { class: 'btn btn-ghost btn-sm', type: 'button',
+          onclick: () => openWorkItemTransition(ctx, { row, operation: 'complete', onDone }) }, [ic('check'), t('done')]),
+        h('button', { class: 'btn btn-ghost btn-sm', type: 'button',
+          onclick: () => openWorkItemTransition(ctx, { row, operation: 'cancel', onDone }) }, t('work_cancel')),
+      ]),
   ]);
 }
 
@@ -129,7 +167,6 @@ export function renderToday(ctx) {
   // 一次并发拉取，多张卡片共享同一批 Promise；失败隔离到单卡，可单独重试。
   const pools = {
     work: settled(data.todayWorkItems(ctx)),
-    due: settled(data.dueCommitments(ctx)),
     pending: settled(data.pendingOpportunities(ctx)),
     opps: settled(data.opportunityDirectory(ctx, { page: 1, pageSize: 5 })),
     acts: settled(data.activities(ctx)),
@@ -147,12 +184,12 @@ export function renderToday(ctx) {
   function reload() { renderToday(ctx); }
 
   loadInto(statsEl, async () => {
-    const [work, due, pending, acts] =
-      await Promise.all([pools.work, pools.due, pools.pending, pools.acts]);
+    const [work, pending, acts] =
+      await Promise.all([pools.work, pools.pending, pools.acts]);
     const activeCount = work.ok
       ? work.v.rows.filter((r) => r.kind === 'action' && (r.status === 'open' || r.status === 'in_progress')).length
       : null;
-    const dueCount = due.ok ? due.v.overdue.length + due.v.dueSoon.length : null;
+    const dueCount = work.ok ? dueCommitmentRows(work.v.rows || []).length : null;
     const pendingCount = pending.ok ? pending.v.rows.length : null;
     const upcomingCount = acts.ok
       ? acts.v.rows.filter((a) => { const d = dayDiffFromToday(a.activity_date); return d !== null && d >= 0 && d <= 7; }).length
@@ -176,10 +213,24 @@ export function renderToday(ctx) {
   loadInto(today5El, async () => {
     const work = await pools.work;
     if (!work.ok) throw work.e;
-    const picks = rankActions(work.v.rows);
+    const rows = work.v.rows || [];
+    const picks = rankActions(rows);
+    const closed = rows.filter((r) => r.kind === 'action' && ['completed', 'cancelled'].includes(r.status))
+      .sort((a, b) => String(b.completed_at || b.updated_at || '').localeCompare(String(a.completed_at || a.updated_at || '')))
+      .slice(0, 3);
     return card({
       title: t('priority_actions'), icon: 'chevron', tag: wpTag(t('fact')),
-      body: picks.length ? picks.map((r) => actionRow(ctx, r, reload)) : [emptyNote(t('no_actions_today'), t('no_actions_note'))],
+      body: [
+        h('div', { class: 'sheet-actions' }, [
+          h('button', { class: 'btn btn-primary btn-sm', type: 'button',
+            onclick: () => openWorkItemEditor(ctx, { kind: 'action', onDone: reload }) }, t('create_action')),
+        ]),
+        ...(picks.length ? picks.map((r) => actionRow(ctx, r, reload)) : [emptyNote(t('no_actions_today'), t('no_actions_note'))]),
+        closed.length ? h('details', {}, [
+          h('summary', { class: 'row-sub' }, `${t('work_recent_closed')} (${closed.length})`),
+          ...closed.map((r) => actionRow(ctx, r, reload)),
+        ]) : null,
+      ],
       foot: [
         h('span', { class: 'foot-note' }, t('today_foot')),
       ],
@@ -236,31 +287,25 @@ export function renderToday(ctx) {
   });
 
   loadInto(commitEl, async () => {
-    const due = await pools.due;
-    if (!due.ok) throw due.e;
-    const rows = [...due.v.overdue.map((r) => ({ ...r, _grp: 'overdue' })),
-      ...due.v.dueSoon.map((r) => ({ ...r, _grp: 'dueSoon' }))].slice(0, 4);
-    const typeMap = { THEY_PROMISED: [t('commit_they_promised'), 'gold'], I_PROMISED: [t('commit_i_promised'), 'ink'], MUTUAL: [t('commit_mutual'), 'red'] };
+    const work = await pools.work;
+    if (!work.ok) throw work.e;
+    const rows = dueCommitmentRows(work.v.rows || []).slice(0, 4);
+    const closed = (work.v.rows || []).filter((r) => r.kind === 'commitment' && ['completed', 'cancelled'].includes(r.status))
+      .sort((a, b) => String(b.completed_at || b.updated_at || '').localeCompare(String(a.completed_at || a.updated_at || '')))
+      .slice(0, 3);
     return card({
       title: t('mutual_commitments'), icon: 'shield', tag: wpTag(t('fact')),
-      body: rows.length ? rows.map((r) => {
-        const [label, tone] = typeMap[r.commitment_type] || [t('commitment'), 'gray'];
-        return h('div', { class: 'list-row' }, [
-          h('div', { style: 'flex:1;min-width:0' }, [
-            h('div', { class: 'row-title' }, r.content || t('no_content')),
-            h('div', { class: 'row-sub' }, `${r.person_name || t('unnamed')} · ${dueLabel(String(r.due_at || '').slice(0, 10))}`),
-          ]),
-          bdg(label, tone),
-          h('button', {
-            class: 'btn btn-ghost btn-sm', type: 'button',
-            onclick: () => openWorkItemDone(ctx, {
-              row: { kind: 'commitment', id: r.id, person_id: r.person_id,
-                content: r.content, due_at: r.due_at },
-              onDone: reload,
-            }),
-          }, [ic('check'), t('done')]),
-        ]);
-      }) : [emptyNote(t('no_due_commitments'), '')],
+      body: [
+        h('div', { class: 'sheet-actions' }, [
+          h('button', { class: 'btn btn-primary btn-sm', type: 'button',
+            onclick: () => openWorkItemEditor(ctx, { kind: 'commitment', onDone: reload }) }, t('create_commitment')),
+        ]),
+        ...(rows.length ? rows.map((row) => commitmentRow(ctx, row, reload)) : [emptyNote(t('no_due_commitments'), '')]),
+        closed.length ? h('details', {}, [
+          h('summary', { class: 'row-sub' }, `${t('work_recent_closed')} (${closed.length})`),
+          ...closed.map((row) => commitmentRow(ctx, row, reload, true)),
+        ]) : null,
+      ],
     });
   });
 

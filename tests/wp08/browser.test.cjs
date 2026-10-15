@@ -30,7 +30,8 @@ test('Person work item remains unchanged until human preview confirmation, then 
         }
         throw Error('Unexpected call');
       };
-      mountPersonWorkItems({root:document.getElementById('view'),personId:783,
+      const root=document.createElement('div'); root.id='wp08-work-item-host'; document.body.append(root);
+      mountPersonWorkItems({root,personId:783,
         personName:'【系统测试·勿联系】虚构体验甲',callFn:wp08Call,isCurrent:()=>true});
     })()`);
     await browser.wait("document.querySelector('.wi-row')?.innerText.includes('已逾期')");

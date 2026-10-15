@@ -9,7 +9,7 @@
 import { h } from './dom.js';
 import { ic } from './icons.js';
 import { bdg, fmtDate, dueLabel, textOf } from './ui.js';
-import { t, translateEnum } from './i18n.js';
+import { t, getLang, translateEnum } from './i18n.js';
 import { data } from './data.js';
 
 // ---------- 调用与错误归一 ----------
@@ -218,6 +218,217 @@ export function openWorkItemDone(ctx, { row, onDone }) {
         ? t('state_changed')
         : (err.message || t('preview_failed')))]));
   });
+}
+
+function workItemLocalDateTime(value) {
+  if (!value || !Number.isFinite(Date.parse(value))) return '';
+  const date = new Date(value);
+  const part = (number) => String(number).padStart(2, '0');
+  return `${date.getFullYear()}-${part(date.getMonth() + 1)}-${part(date.getDate())}T${part(date.getHours())}:${part(date.getMinutes())}`;
+}
+
+function workItemSource(row) {
+  if (!row) return null;
+  const sourceName = row.activity_id ? t('work_source_activity')
+    : row.opportunity_id ? t('work_source_opportunity')
+    : row.interaction_id ? t('work_source_interaction')
+    : row.source ? translateEnum('work_source', row.source) : t('work_source_manual');
+  const label = row.opportunity_id ? `${sourceName} #${row.opportunity_id}` : sourceName;
+  const href = row.activity_id ? `#/activity/${row.activity_id}`
+    : row.opportunity_id ? '#/opportunities' : null;
+  return href
+    ? h('a', { class: 'sheet-note', href, title: label }, label)
+    : h('span', { class: 'sheet-note' }, label);
+}
+
+function workItemDueLabel(value) {
+  if (!value || !Number.isFinite(Date.parse(value))) return t('no_date');
+  const locale = getLang() === 'en' ? 'en-US' : 'zh-CN';
+  return new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
+}
+
+function workItemSummary(kind, draft, row) {
+  if (kind === 'action') return [
+    [t('field_title'), draft.title || row?.title],
+    [t('field_description'), draft.description || row?.description],
+    [t('field_due'), draft.dueAt || row?.due_at ? workItemDueLabel(draft.dueAt || row?.due_at) : t('no_date')],
+    [t('field_priority'), translateEnum('work_priority', draft.priority || row?.priority)],
+  ];
+  return [
+    [t('field_content'), draft.content || row?.content],
+    [t('field_due'), draft.dueAt || row?.due_at ? workItemDueLabel(draft.dueAt || row?.due_at) : t('no_date')],
+    [t('field_commitment_type'), translateEnum('commitment_type', draft.commitmentType || row?.commitment_type)],
+  ];
+}
+
+function workItemValues(kind, draft, row) {
+  return workItemSummary(kind, draft, row).map(([label, value]) =>
+    value ? h('div', { class: 'kv-line' }, [h('span', { class: 'kv-k' }, label), h('span', {}, String(value))]) : null);
+}
+
+/** Native Person/Today work item editor. All writes remain preview → confirm → execute. */
+export function openWorkItemEditor(ctx, { kind = 'action', row = null, personId = null,
+  personName = '', onDone } = {}) {
+  const isAction = kind === 'action';
+  const initialPerson = row?.person_id || personId || '';
+  const chosen = { id: initialPerson ? String(initialPerson) : '', name: row?.person_name || personName || '' };
+  const title = row ? t(isAction ? 'edit_action' : 'edit_commitment')
+    : t(isAction ? 'create_action' : 'create_commitment');
+  const text = isAction ? h('input', { class: 'sheet-input', maxlength: 200, value: row?.title || '' })
+    : h('textarea', { class: 'sheet-textarea', maxlength: 4000, rows: 3 }, row?.content || '');
+  const description = isAction ? h('textarea', { class: 'sheet-textarea', maxlength: 4000, rows: 2 }, row?.description || '') : null;
+  const priority = isAction ? sel([
+    ['low', t('priority_low')], ['medium', t('priority_medium')],
+    ['high', t('priority_high')], ['urgent', t('priority_urgent')],
+  ], row?.priority || 'medium', { 'aria-label': t('field_priority') }) : null;
+  const commitmentType = !isAction ? sel([
+    ['I_PROMISED', t('commit_i_promised')], ['THEY_PROMISED', t('commit_they_promised')],
+    ['MUTUAL', t('commit_mutual')],
+  ], row?.commitment_type || 'I_PROMISED', { 'aria-label': t('field_commitment_type') }) : null;
+  const due = h('input', { class: 'sheet-input', type: 'datetime-local', value: workItemLocalDateTime(row?.due_at) });
+  const personSearch = h('input', { class: 'sheet-input', type: 'search', maxlength: 80, placeholder: t('work_person_search') });
+  const personMatches = h('div', { class: 'sheet-stack' });
+  const personChoice = h('div', { class: 'sheet-note' }, chosen.id
+    ? `${chosen.name || t('person')} · #${chosen.id}` : t('work_person_required'));
+  const searchButton = h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: async () => {
+    personMatches.replaceChildren(h('div', { class: 'sheet-note' }, t('loading')));
+    try {
+      const result = await data.listPeople(ctx, { keyword: personSearch.value.trim(), page: 1, pageSize: 20 });
+      const candidates = result.rows || [];
+      personMatches.replaceChildren(...(candidates.length ? candidates.map((candidate) => h('button', {
+        class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => {
+          chosen.id = String(candidate.id); chosen.name = candidate.display_name;
+          personChoice.textContent = `${candidate.display_name} · #${candidate.id}`;
+          personMatches.replaceChildren();
+        },
+      }, `${candidate.display_name} · #${candidate.id}`)) : [h('div', { class: 'sheet-note' }, t('work_person_no_matches'))]));
+    } catch (error) { sheet.showErr(error.message || t('work_person_search_failed')); }
+  } }, t('work_person_find'));
+  const body = h('div', {}, [
+    !chosen.id ? h('div', { class: 'sheet-stack' }, [
+      fieldRow(t('person'), personSearch), searchButton, personChoice, personMatches,
+    ]) : h('div', { class: 'sheet-note' }, `${chosen.name || t('person')} · #${chosen.id}`),
+    fieldRow(t(isAction ? 'field_title' : 'field_content'), text),
+    isAction ? fieldRow(t('field_description'), description) : null,
+    isAction ? fieldRow(t('field_priority'), priority) : fieldRow(t('field_commitment_type'), commitmentType),
+    fieldRow(t('field_due'), due, t('work_due_note')),
+    h('div', { class: 'sheet-actions' }, [
+      h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => sheet.overlay.remove() }, t('cancel')),
+      h('button', { class: 'btn btn-primary', type: 'button', onclick: (event) => preview(event.currentTarget) }, t('generate_preview')),
+    ]),
+  ]);
+  const sheet = openSheet({ title, sub: t('work_preview_note'), body });
+  document.body.appendChild(sheet.overlay);
+
+  async function preview(button) {
+    if (!chosen.id) { sheet.showErr(t('work_person_required')); return; }
+    if (!text.value.trim()) { sheet.showErr(t('work_title_required')); return; }
+    const dueAt = due.value ? new Date(due.value).toISOString() : null;
+    const draft = isAction ? { title: text.value.trim(), description: description.value,
+      dueAt, priority: priority.value }
+      : { content: text.value.trim(), dueAt, commitmentType: commitmentType.value };
+    busy(button, true, t('previewing'));
+    try {
+      const operation = row ? 'edit' : 'create';
+      const result = await p360(ctx, 'previewWorkItem', { data: {
+        idempotencyKey: uuid(), kind, operation, personId: chosen.id,
+        itemId: row?.id || null, draft,
+      } });
+      const preview = result.preview || {};
+      sheet.swap(h('div', {}, [
+        h('p', { class: 'sheet-note' }, t('work_preview_note')),
+        previewBlock([
+          kvRow(t('person'), `${preview.personName || chosen.name || t('person')} · #${chosen.id}`),
+          kvRow(t('work_record_id'), row ? `#${preview.itemId || row.id}` : t('work_new_item')),
+          preview.itemId && row ? h('div', { class: 'kv-line' }, [h('span', { class: 'kv-k' }, t('work_source')), workItemSource(row)]) : null,
+          h('div', { class: 'sheet-preview-label' }, t('work_before')),
+          ...(row ? workItemValues(kind, preview.before || {}, row) : [h('div', { class: 'sheet-note' }, t('work_new_item'))]),
+          h('div', { class: 'sheet-preview-label' }, t('work_after')),
+          ...workItemValues(kind, { ...draft, ...(preview.after || {}) }, null),
+          preview.after?.status ? h('div', { class: 'kv-line' }, [h('span', { class: 'kv-k' }, t('status')),
+            bdg(translateEnum('work_status', preview.after.status), 'gold')]) : null,
+          result.expiresAt ? h('div', { class: 'sheet-note' }, `${t('preview_valid_until')} ${fmtDate(String(result.expiresAt).slice(0, 10))}`) : null,
+          h('div', { class: 'sheet-note' }, t('work_version_binding')),
+        ]),
+        h('div', { class: 'sheet-actions' }, [
+          h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => sheet.swap(body) }, t('back_to_edit')),
+          h('button', { class: 'btn btn-primary', type: 'button', onclick: async (event) => {
+            busy(event.currentTarget, true, t('writing'));
+            try {
+              const saved = await p360(ctx, 'executeWorkItem', { previewId: result.previewId });
+              sheet.overlay.remove();
+              ctx.toast(t(saved.replayed ? 'work_item_replayed' : 'work_item_saved'), 'ok');
+              if (onDone) onDone(saved);
+            } catch (error) {
+              busy(button, false, t('generate_preview'));
+              sheet.swap(body);
+              sheet.showErr((error.message || '').toLowerCase().includes('changed') ? t('state_changed') : error.message || t('write_failed'));
+            }
+          } }, t('confirm_write')),
+        ]),
+      ]));
+    } catch (error) {
+      busy(button, false, t('generate_preview'));
+      sheet.showErr((error.message || '').toLowerCase().includes('changed') ? t('state_changed') : error.message || t('preview_failed'));
+    }
+  }
+}
+
+export function openWorkItemTransition(ctx, { row, operation, onDone } = {}) {
+  const kind = row.kind === 'commitment' ? 'commitment' : 'action';
+  const verb = { complete: 'complete', cancel: 'cancel', reopen: 'reopen' }[operation];
+  const label = t(operation === 'complete' ? (kind === 'action' ? 'complete_action' : 'complete_commitment')
+    : operation === 'cancel' ? (kind === 'action' ? 'work_cancel_action' : 'work_cancel_commitment')
+      : (kind === 'action' ? 'work_reopen_action' : 'work_reopen_commitment'));
+  const source = workItemSource(row);
+  const body = h('div', {}, [h('p', { class: 'sheet-note' }, t('work_preview_note')),
+      h('div', { class: 'sheet-actions' }, [
+        h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => sheet.overlay.remove() }, t('cancel')),
+        h('button', { class: 'btn btn-primary', type: 'button', onclick: (event) => preview(event.currentTarget) }, t('generate_preview')),
+      ])]);
+  const sheet = openSheet({ title: label, sub: row.title || row.content || t('work_item'), body });
+  document.body.appendChild(sheet.overlay);
+  async function preview(button) {
+    busy(button, true, t('previewing'));
+    try {
+      const result = await p360(ctx, 'previewWorkItem', { data: {
+        idempotencyKey: uuid(), kind, operation, personId: String(row.person_id), itemId: String(row.id), draft: {},
+      } });
+      const pv = result.preview || {};
+      sheet.swap(h('div', {}, [previewBlock([
+        kvRow(t('person'), `${pv.personName || row.person_name || t('person')} · #${row.person_id}`),
+        kvRow(t('work_record_id'), `#${pv.itemId || row.id}`),
+        h('div', { class: 'kv-line' }, [h('span', { class: 'kv-k' }, t('work_source')), source]),
+        h('div', { class: 'sheet-preview-label' }, t('work_before')),
+        ...workItemValues(kind, pv.before || {}, row),
+        h('div', { class: 'sheet-preview-label' }, t('work_after')),
+        ...workItemValues(kind, { ...row, ...(pv.after || {}) }, null),
+        kvRow(t('status'), translateEnum('work_status', pv.after?.status)),
+        result.expiresAt ? h('div', { class: 'sheet-note' }, `${t('preview_valid_until')} ${fmtDate(String(result.expiresAt).slice(0, 10))}`) : null,
+        h('div', { class: 'sheet-note' }, t('work_version_binding')),
+      ]), h('div', { class: 'sheet-actions' }, [
+        h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => sheet.overlay.remove() }, t('cancel')),
+        h('button', { class: 'btn btn-primary', type: 'button', onclick: async (event) => {
+          busy(event.currentTarget, true, t('writing'));
+          try {
+            const saved = await p360(ctx, 'executeWorkItem', { previewId: result.previewId });
+            sheet.overlay.remove();
+            ctx.toast(t(saved.replayed ? 'work_item_replayed' : operation === 'complete'
+              ? (kind === 'action' ? 'action_completed' : 'commitment_fulfilled') : `work_${verb}_done`), 'ok');
+            if (operation === 'complete' && kind === 'action') ctx.toast(t('work_outcome_reminder'), { type: 'info', duration: 6000 });
+            if (onDone) onDone(saved);
+          } catch (error) {
+            busy(button, false, t('generate_preview'));
+            sheet.swap(body);
+            sheet.showErr((error.message || '').toLowerCase().includes('changed') ? t('state_changed') : error.message || t('write_failed'));
+          }
+        } }, t('confirm_write')),
+      ])]));
+    } catch (error) {
+      busy(button, false, t('generate_preview'));
+      sheet.showErr((error.message || '').toLowerCase().includes('changed') ? t('state_changed') : error.message || t('preview_failed'));
+    }
+  }
 }
 
 // ---------- 机会：推进 / 关闭 ----------

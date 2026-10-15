@@ -5,7 +5,7 @@
 import { h } from '../dom.js';
 import { ic } from '../icons.js';
 import { data } from '../data.js';
-import { openWorkItemDone, openOpportunityAdvance, openQuickCapture, openPersonEdit, openPersonDelete,
+import { openWorkItemEditor, openWorkItemTransition, openOpportunityAdvance, openQuickCapture, openPersonEdit, openPersonDelete,
   openPersonInteraction, openPersonFollowup } from '../write.js';
 import {
   wpTag, pageHead, emptyNote, loadInto, bdg, kvGrid, sectionTitle,
@@ -289,6 +289,26 @@ function opportunitiesNode(ctx, id) {
         (r.kind === 'action' && (r.status === 'open' || r.status === 'in_progress')) ||
         (r.kind === 'commitment' && r.status === 'open'));
       const onDone = ctx.onWriteDone || null;
+      const closedWorks = (works.rows || []).filter((r) => ['completed', 'cancelled'].includes(r.status));
+      const renderWorkRows = (items, closed = false) => rowsBlock(items, (sourceRow) => {
+        const r = { ...sourceRow, person_name: works.personName };
+        return h('div', { class: 'list-row' }, [
+          h('div', { style: 'flex:1;min-width:0' }, [
+            h('div', { class: 'row-title' }, r.kind === 'action' ? (r.title || t('unnamed_action')) : (r.content || t('unnamed_commitment'))),
+            h('div', { class: 'row-sub' }, `${translateEnum('work_status', r.status)} · ${dueLabel(String(r.due_at || '').slice(0, 10))}${r.kind === 'action' ? ` · ${translateEnum('work_priority', r.priority)}` : ''}`),
+            r.completed_at ? h('div', { class: 'row-sub' }, `${t('work_completed_at')} ${fmtDate(r.completed_at)}`) : null,
+          ]),
+          bdg(r.kind === 'action' ? t('label_action') : translateEnum('commitment_type', r.commitment_type), r.kind === 'action' ? 'ink' : 'gold'),
+          !closed ? h('button', { class: 'btn btn-ghost btn-sm', type: 'button',
+            onclick: () => openWorkItemEditor(ctx, { kind: r.kind, row: r, personId: id, personName: works.personName, onDone }) }, t('btn_edit')) : null,
+          !closed ? h('button', { class: 'btn btn-ghost btn-sm', type: 'button',
+            onclick: () => openWorkItemTransition(ctx, { row: r, operation: 'complete', onDone }) }, t('work_complete')) : null,
+          !closed ? h('button', { class: 'btn btn-ghost btn-sm', type: 'button',
+            onclick: () => openWorkItemTransition(ctx, { row: r, operation: 'cancel', onDone }) }, t('work_cancel')) :
+            h('button', { class: 'btn btn-ghost btn-sm', type: 'button',
+              onclick: () => openWorkItemTransition(ctx, { row: r, operation: 'reopen', onDone }) }, t('work_reopen')),
+        ]);
+      }, t('work_no_items'));
       return h('div', { class: 'tab-stack' }, [
         sectionTitle(`${t('sec_opportunities')}（${rows.length}）`),
         rowsBlock(rows, (r) => h('div', { class: 'list-row' }, [
@@ -303,17 +323,17 @@ function opportunitiesNode(ctx, id) {
           }, t('btn_advance_close')) : null,
         ]), t('empty_no_opps')),
         sectionTitle(t('sec_actions_commitments')),
-        rowsBlock(activeWorks, (r) => h('div', { class: 'list-row' }, [
-          h('div', { style: 'flex:1;min-width:0' }, [
-            h('div', { class: 'row-title' }, r.kind === 'action' ? (r.title || t('unnamed_action')) : (r.content || t('unnamed_commitment'))),
-            h('div', { class: 'row-sub' }, `${translateEnum('work_status', r.status)} · ${dueLabel(String(r.due_at || '').slice(0, 10))}`),
-          ]),
-          bdg(r.kind === 'action' ? t('label_action') : t('label_commitment'), r.kind === 'action' ? 'ink' : 'gold'),
-          h('button', {
-            class: 'btn btn-ghost btn-sm', type: 'button',
-            onclick: () => openWorkItemDone(ctx, { row: r, onDone }),
-          }, [ic('check'), t('btn_done')]),
-        ]), t('empty_no_open_actions_only')),
+        h('div', { class: 'sheet-actions' }, [
+          h('button', { class: 'btn btn-primary btn-sm', type: 'button',
+            onclick: () => openWorkItemEditor(ctx, { kind: 'action', personId: id, personName: works.personName, onDone }) }, t('create_action')),
+          h('button', { class: 'btn btn-ghost btn-sm', type: 'button',
+            onclick: () => openWorkItemEditor(ctx, { kind: 'commitment', personId: id, personName: works.personName, onDone }) }, t('create_commitment')),
+        ]),
+        activeWorks.length ? renderWorkRows(activeWorks) : emptyNote(t('work_no_items'), ''),
+        closedWorks.length ? h('details', {}, [
+          h('summary', { class: 'row-sub' }, `${t('work_recent_closed')} (${closedWorks.length})`),
+          renderWorkRows(closedWorks, true),
+        ]) : null,
       ]);
     });
 }
