@@ -28,4 +28,6 @@
 - 静态托管：仅 `/crm/js/modules/console/data.js`、`i18n.js`、`pages/person.js`、`care-materials.js` 和 `/crm/css/console.css`。
 - 不部署 `admin.html`、整个项目目录、测试或文档；线上页面入口保持 [CRM Console](https://crm-d1gkae8ddc930d151-1434199662.tcloudbaseapp.com/crm/console.html)。
 - 代码恢复基于本轮前标签 `release-20261015-210613` 创建恢复提交，只恢复上述 7 个业务产物并重新部署；不强推、不回退数据库序列、不改任何用户数据。
-- Git 提交、发布标签、发布后本地/GitHub/CloudBase 三端核验结果在最终发布后补记。
+- 代码发布提交：`85c4f5f2da73e5c7483419e8b7f12c3fd44918f1`；标签：`release-20261015-222100`，已推送 GitHub `master`。
+- 发布脚本完成提交/标签原子推送及后置完整 sync-check。证据目录：`C:\Temp\crm-pc11-release-audit\crm-cloud-audit-1c7b16a968a74ead9684a31c23ac7b69`；本地、GitHub、CloudBase 静态资源及 29 个函数/182 个源码配置文件一致。
+- 云端代码证据：发布前后 `admin.html` HTTP 200 且 SHA-256 一致；56 个可达页面/模块/样式资源及本轮两个函数哈希一致。
