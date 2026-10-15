@@ -1,7 +1,7 @@
 # PC04 Person 资料与客户经营操作原生整合
 
 日期：2026-10-15  
-状态：实现、部署与隔离回归完成；Git 提交/标签发布正在执行。  
+状态：实现、部署、Git 发布和三端核验完成。  
 范围：人物编辑、人物目录客户视图及相邻 Person 360 客户画像；不含其他 PC 包。
 
 ## 本轮基线与证据
@@ -9,6 +9,7 @@
 - 修改前 `master`：`e28383ccb84bc03e1d98eab426c2eb06f32f21c1`；本地分支为 `master`，origin 为项目规定的 GitHub 仓库。
 - 修改前发布标签：`release-20261015-005645`（PC04 开始时基线）。
 - PC04 发布前本地与 GitHub 已同步到相邻修复 `3c46b877f490f9a9b983e317ccd6d6ffd5002b7b`；PC04 变更在该最新提交之上叠加，没有回退该修复。
+- PC04 代码提交：`17dae4275c1f7c689e2b8cda72f13077e6fe0017`；实现与部署标签：`release-20261015-080902`。
 - PC04 没有执行 public 数据写入或迁移；业务代码已按下文清单部署到生产。
 - 修改前工作区已有 PC02 文档修改，以及 PC01/计划相关未跟踪文件。本轮未改写这些文件；发布脚本会将跟踪文件统一暂存，不能直接用于本轮发布。
 - 线上契约复核限定 `public`：Person 基础/经营字段由 `persons` 权威保存；客户专属信息在 `customers`；招募优先级在已有关联的 `recruit_candidates`。未查询或调用 `pr`/`pr_*`。
@@ -68,7 +69,7 @@ WP01 证据刷新后，`tools/release.ps1` 与三个函数部署门禁均通过 
 
 - 静态文件：`crm/js/modules/console/i18n.js`、`pages/people.js`、`pages/person.js`、`write.js`、`crm/css/console.css`。
 - 云函数：`customers`、`person_360`、`recruit_candidates`（按项目函数部署脚本逐个发布，并遵循其共享副本核验）。
-- WP01 门禁和部署后 CloudOnly 核对已通过。GitHub 提交、标签和发布后完整三端 sync-check 后补录 SHA/tag。
+- WP01 门禁、部署后 CloudOnly、提交前与提交后的完整三端 sync-check 均通过。代码提交/标签为 `17dae4275c1f7c689e2b8cda72f13077e6fe0017` / `release-20261015-080902`。本报告关闭记录随 `release-20261015-081930` 发布，未触发额外云端变更。
 - 代码回退基于 PC04 发布标签恢复对应静态文件和三个函数并重新部署；无数据库回滚，因为没有迁移。
 
 ## 后续准入
