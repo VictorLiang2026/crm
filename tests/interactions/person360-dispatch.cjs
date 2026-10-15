@@ -26,7 +26,8 @@ global.fetch = async (url, options) => {
   calls.push({ table, method: options.method, filters: Object.fromEntries(u.searchParams), body: options.body });
   assert.equal(options.headers['Accept-Profile'], 'public');
   let rows = [];
-  if (table === 'persons') rows = [{ id: 11, legacy_customer_id: 101, display_name: '测试人物' }];
+  if (table === 'persons') rows = [{ id: 11, display_name: '测试人物' }];
+  if (table === 'customers') rows = [{ Id: 101, person_id: 11, deleted_at: null }];
   if (table === 'commitments' && u.searchParams.get('due_at').startsWith('gte.')) rows = [{
     id: 17, person_id: 11, commitment_type: 'I_PROMISED', content: '[CRM_TEST_ONLY]承诺',
     due_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(), status: 'open', source: 'manual',
@@ -68,7 +69,9 @@ test('relationship decay endpoint only reads bounded public sources after login'
   assert.equal(result.persisted, false);
   assert.match(result.why, /关系强度/);
   assert.ok(calls.some(call => call.table === 'context_items' && call.filters.limit === '30'));
-  assert.ok(calls.every(call => call.method === 'GET'));
+  assert.ok(calls.filter(call => ['persons', 'context_items', 'customers', 'interactions',
+    'followups', 'recruit_candidates', 'recruit_followups', 'activity_participants', 'activity_speakers', 'activities']
+    .includes(call.table)).every(call => call.method === 'GET'));
 });
 
 test('listDueCommitments uses read-only public queries after login', async () => {

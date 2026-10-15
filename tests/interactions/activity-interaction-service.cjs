@@ -10,7 +10,8 @@ function fixture({ type = 'customer', status = 'ended', legacyFollowup = false, 
     canonical_person_id: canonical ? 11 : null, participant_role: type === 'speaker' ? 'speaker' : 'attendee' };
   const tables = {
     activity_participants: [participant], activities: [{ id: 7, name: '测试活动', status }],
-    persons: [{ id: 11, display_name: '[CRM_TEST_ONLY]人物', legacy_customer_id: 101 }],
+    persons: [{ id: 11, display_name: '[CRM_TEST_ONLY]人物', deleted_at: null }],
+    customers: [{ Id: 101, person_id: 11, deleted_at: null }],
     recruit_candidates: [{ id: 201, customer_id: 101 }],
     activity_speakers: [{ id: 301, person_id: 11, customer_id: 101 }],
     interactions: [], followups: legacyFollowup ? [{ Id: 9, customer_id: 101, activity_id: 7,

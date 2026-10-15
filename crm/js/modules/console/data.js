@@ -1,5 +1,5 @@
 // Console 只读数据层（WP1）：所有调用经 ctx.api（core/createApi：校验函数名、拒绝 pr_*）。
-// 只封装 admin.html / person_360 已上线的只读 action，不新增任何云函数与数据库对象。
+// 只封装已上线的 CRM action，不新增任何云函数与数据库对象。
 async function call(ctx, name, params) {
   const res = await ctx.api.call(name, params || {});
   if (res == null || typeof res !== 'object') throw new Error('服务无响应');
@@ -40,8 +40,15 @@ export const data = {
   personWorkItems: (ctx, personId) => p360(ctx, 'listPersonWorkItems', { personId }),
   personInteractions: (ctx, personId, limit) =>
     p360(ctx, 'listInteractions', { personId, ...(limit ? { limit } : {}) }),
+  createInteraction: (ctx, personId, payload) =>
+    p360(ctx, 'createInteraction', { personId, data: payload }),
   timeline: (ctx, personId, page, pageSize) =>
     p360(ctx, 'getTimelinePage', { personId, page, pageSize }),
+  customerFollowups: (ctx, customerId) => call(ctx, 'followups', { action: 'list', customer_id: Number(customerId) }),
+  customerRecommendations: (ctx, customerId) => call(ctx, 'ai_recommendations', { action: 'list', customer_id: Number(customerId) }),
+  createCustomerFollowup: (ctx, payload) => call(ctx, 'followups', { action: 'create', data: payload }),
+  updateCustomerFollowup: (ctx, id, payload) => call(ctx, 'followups', { action: 'update', id: Number(id), data: payload }),
+  removeCustomerFollowup: (ctx, id) => call(ctx, 'followups', { action: 'remove', id: Number(id) }),
   contextGroups: (ctx, personId) => p360(ctx, 'getContextGroups', { personId }),
   insurance: (ctx, personId) => p360(ctx, 'getInsuranceContext', { personId }),
   personOpportunities: (ctx, personId) => p360(ctx, 'listOpportunities', { personId }),

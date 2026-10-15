@@ -10,6 +10,8 @@ function installFixtures() {
   const followup = { Id: 920001, customer_id: customer.Id, customer_name: customer.customer_name,
     followup_notes: marker + '跟进内容', followup_date: '2026-09-20',
     next_followup_date: '2026-09-25', next_action: marker + '预约沟通', deleted_at: null };
+  const followups = [followup];
+  const manualInteractions = [];
   const candidate = { candidate_id: 930001, customer_id: customer.Id,
     customer_name: marker + '候选人甲', stage: '新增人才', phone: 'TEST-0002', idle_days: 1 };
   const activity = { id: 940001, name: marker + '活动甲', activity_date: '2026-09-25',
@@ -205,13 +207,26 @@ function installFixtures() {
       source:'public.customers', fields:{...customer}, roles:[{role:'customer',origin:'legacy_backfill'}],
       contactAllowed:false, testData:{status:'verified',containsTestData:true,recordCount:1,
         sources:[{batchKey:'crm_test_fixture',table:'customers',count:1}]} }),
-    'person_360:getTimelinePage': () => ({ rows: mode === 'empty' ? [] : [{
-      id:'followups:920001', type:'followup', at:'2026-09-28T08:00:00Z',
-      summary:marker+'虚构客户跟进', source:'public.followups#920001', customerId:String(customer.Id) }],
+    'person_360:getTimelinePage': () => ({ rows: mode === 'empty' ? [] : [
+      ...followups.map(row => ({ id:`followups:${row.Id}`, type:'followup',
+        at:String(row.Id) === '920001' ? '2026-09-28T08:00:00Z' : row.followup_date,
+        summary:String(row.Id) === '920001' ? marker+'虚构客户跟进' : row.interaction_summary || row.followup_notes,
+        source:`public.followups#${row.Id}`,
+        customerId:String(customer.Id), activityId:row.activity_id || null })),
+      ...manualInteractions.map(row => ({ id:row.id, type:row.interaction_type, at:row.interaction_at,
+        summary:row.summary, source:`public.interactions#${row.id}`, activityId:row.activity_id || null })),
+    ],
       page:1,pageSize:10,hasMore:false,testData:{status:'verified',containsTestData:mode !== 'empty',
         recordCount:mode === 'empty'?0:1,sources:mode === 'empty'?[]:[{batchKey:'crm_test_fixture',table:'followups',count:1}]} }),
+    'person_360:listInteractions': () => ({ rows: manualInteractions.slice().reverse(), limit:5, hasMore:false }),
+    'person_360:createInteraction': data => {
+      const interaction = { id: 990401 + manualInteractions.length, person_id:data.personId,
+        ...data.data, source_type:'manual', source_id:null };
+      manualInteractions.push(interaction); return { interaction };
+    },
     'person_360:getContextGroups': () => ({ groups:{fact:[],signal:[],inference:[]},
       testData:{status:'verified',containsTestData:false,recordCount:0,sources:[]} }),
+    'assistant:conversationPlaybookHistory': () => ({ ok:true, hasResult:false, rows:[] }),
     'person_360:getRelationshipDecay': () => mode === 'empty' ? ({
       status: 'insufficient_evidence', why: '缺少明确的关系强度、最近一次重要互动，暂不能判断关系是否衰减。',
       confidence: 0, recommended_action: '先核实并补录真实的关系和互动信息，不要仅因经过的天数打扰对方。',
@@ -291,7 +306,23 @@ function installFixtures() {
     'recruit_candidates:get': () => ({ candidate, milestones: [] }),
     'recruit_candidates:trashList': () => ({ ...rows([{ ...candidate, candidate_id: 930099, customer_name: marker + '已删除候选人', candidate_deleted_at: '2026-09-20T01:00:00Z', customer_deleted_at: null }]), counts: {} }),
     'recruit_followups:list': () => rows([{ id: 950001, candidate_id: candidate.candidate_id, followup_date: '2026-09-20', followup_notes: marker + '增员跟进' }]),
-    'followups:list': () => rows([followup]),
+    'followups:list': () => rows(followups),
+    'followups:create': data => {
+      const row = { Id:920001 + followups.length, ...data.data, deleted_at:null };
+      followups.push(row); return { id:row.Id };
+    },
+    'followups:update': data => {
+      const row = followups.find(item => String(item.Id) === String(data.id));
+      if (!row) return { ok:false };
+      Object.assign(row, data.data); return { ok:true };
+    },
+    'followups:remove': data => {
+      const index = followups.findIndex(item => String(item.Id) === String(data.id));
+      if (index < 0) return { ok:false };
+      followups.splice(index, 1); return { ok:true };
+    },
+    'ai_recommendations:list': () => rows([{ id:932001, recommendation_date:'2026-10-10',
+      suggested_followup_goal:'【CRM_TEST_ONLY】再次沟通', suggested_message:'【CRM_TEST_ONLY】建议沟通内容' }]),
     'opportunities:list': () => rows([{ id: 960001, customer_id: customer.Id, opportunity_type: '家庭保障', status: '沟通', notes: marker + '机会说明' }]),
     'activities:list': () => rows([activity]),
     'activities:get': () => ({ activity, participants: [{ id: 970001, person_type: 'customer', person_id: customer.Id, person_name: customer.customer_name, status: 'invited' }] }),
@@ -388,7 +419,8 @@ function installFixtures() {
           'person_360:previewIdentity','person_360:executeIdentity',
           'person_360:previewActivityReview','activity_speakers:update',
           'policy_review_reports:update',
-          'person_360:linkSpeakerPerson'].includes(key) ? (key==='assistant:quickCaptureV2'?data:data.data) : null });
+          'person_360:linkSpeakerPerson','person_360:createInteraction',
+          'followups:create','followups:update'].includes(key) ? (key==='assistant:quickCaptureV2'?data:data.data) : null });
       if (!loggedIn) return fail('CALL_BEFORE_LOGIN: ' + key);
       if (mode === 'error' && (!params.get('fail') || params.get('fail') === key)) return { result: { error: 'TEST_API_FAILURE' } };
       const result = structuredClone(replies[key](data));

@@ -5,7 +5,8 @@
 import { h } from '../dom.js';
 import { ic } from '../icons.js';
 import { data } from '../data.js';
-import { openWorkItemDone, openOpportunityAdvance, openQuickCapture, openPersonEdit, openPersonDelete } from '../write.js';
+import { openWorkItemDone, openOpportunityAdvance, openQuickCapture, openPersonEdit, openPersonDelete,
+  openPersonInteraction, openPersonFollowup } from '../write.js';
 import {
   wpTag, pageHead, emptyNote, loadInto, bdg, kvGrid, sectionTitle,
   fmtDate, weekdayCN, dueLabel, toneByDue, textOf,
@@ -102,8 +103,11 @@ function overviewNode(ctx, id, setName) {
 function timelineNode(ctx, id) {
   let page = 1;
   const list = h('div', {});
+  const actions = h('div', { class: 'stack-head' }, []);
   const moreBtn = h('button', { class: 'btn btn-ghost btn-sm', type: 'button', style: 'margin-top:10px' }, t('btn_load_more'));
+  const profilePromise = data.customerProfile(ctx, id).catch(() => null);
   function renderRow(r) {
+    const followupMatch = /^public\.followups#([1-9]\d*)$/.exec(String(r.source || ''));
     const typeLabel = TYPE_LABEL()[r.type] || r.type || t('interaction_default');
     const fullLabel = r.type === 'recruit_followup' ? t('type_recruit_followup_full')
       : r.type === 'activity_participant' ? t('type_activity_participant_full')
@@ -115,21 +119,34 @@ function timelineNode(ctx, id) {
         h('div', { class: 'row-sub', title: fullLabel || undefined },
           `${fmtDate(r.at)} ${weekdayCN(r.at)} · ${typeLabel}${r.channel ? ' · ' + translateEnum('channel', r.channel) : ''}`),
         h('div', { class: 'row-source' }, r.source || ''),
+        followupMatch && r.customerId ? h('div', { class: 'sheet-actions', style: 'justify-content:flex-start;margin-top:6px' }, [
+          h('button', { class: 'btn btn-ghost btn-sm', type: 'button',
+            onclick: () => openPersonFollowup(ctx, { personId: String(id), customerId: String(r.customerId),
+              followupId: followupMatch[1], onDone: ctx.onWriteDone }) }, t('btn_edit')),
+        ]) : null,
       ]),
       r.activityId ? h('a', { class: 'btn btn-ghost btn-sm', href: `#/activity/${r.activityId}` }, t('btn_activity')) : null,
     ]);
   }
   async function loadPage() {
-    const res = await data.timeline(ctx, id, page, 20);
+    const [res, profile] = await Promise.all([data.timeline(ctx, id, page, 20), profilePromise]);
     const rows = res.rows || [];
     if (page === 1) {
-      list.replaceChildren(rows.length
+      list.replaceChildren(...(rows.length
         ? rows.map(renderRow)
-        : emptyNote(t('empty_no_timeline'), t('empty_timeline_note')));
+        : [emptyNote(t('empty_no_timeline'), t('empty_timeline_note'))]));
     } else {
       rows.forEach((r) => list.appendChild(renderRow(r)));
     }
     moreBtn.style.display = res.hasMore ? '' : 'none';
+    const customerId = profile?.status === 'linked' ? profile.customerId : null;
+    const actionButtons = [
+      h('button', { class: 'btn btn-soft btn-sm', type: 'button',
+        onclick: () => openPersonInteraction(ctx, { personId: String(id), onDone: ctx.onWriteDone }) }, t('btn_add_interaction')),
+      customerId ? h('button', { class: 'btn btn-soft btn-sm', type: 'button',
+        onclick: () => openPersonFollowup(ctx, { personId: String(id), customerId: String(customerId), onDone: ctx.onWriteDone }) }, t('btn_add_customer_followup')) : null,
+    ].filter(Boolean);
+    actions.replaceChildren(...actionButtons);
   }
   moreBtn.onclick = async () => {
     moreBtn.disabled = true;
@@ -144,7 +161,7 @@ function timelineNode(ctx, id) {
       moreBtn.disabled = false;
     }
   };
-  return loadPage().then(() => h('div', { class: 'tab-stack' }, [list, moreBtn]));
+  return loadPage().then(() => h('div', { class: 'tab-stack' }, [actions, list, moreBtn]));
 }
 
 function factsNode(ctx, id) {
@@ -365,9 +382,13 @@ export function renderPerson(ctx, id) {
     }
   }
 
-  // 写入闭环：写入成功后重载当前页签；写操作经 wctx 拿到 onWriteDone。
+  // A Person write can affect the overview, timeline and activity-linked view.
+  // Refresh the active tab now and invalidate the other affected tabs for next visit.
   const wctx = Object.assign({}, ctx, {
-    onWriteDone: () => { loaded.delete(cur); select(cur); },
+    onWriteDone: () => {
+      [0, 1, 7, cur].forEach((index) => loaded.delete(index));
+      select(cur);
+    },
   });
 
   // AI 人物摘要（WP3.2b）

@@ -18,7 +18,8 @@ test('deployed InteractionService and Legacy Adapter copies match shared sources
 function fixture({ materialized = false, standalone = false } = {}) {
   const calls = [];
   const tables = {
-    persons: [{ id: 11, legacy_customer_id: standalone ? null : 101 }],
+    persons: [{ id: 11, deleted_at: null }],
+    customers: standalone ? [] : [{ Id: 101, person_id: 11, deleted_at: null }],
     interactions: [{ id: 1, person_id: 11, interaction_type: 'meeting',
       interaction_at: '2026-09-15T10:00:00Z', summary: '人工记录', source_type: 'manual', source_id: null },
       ...(materialized ? [{ id: 2, person_id: 11, interaction_type: 'followup',
@@ -107,7 +108,7 @@ test('standalone Person reads only their direct interactions', async () => {
   const { service, calls } = fixture({ standalone: true });
   const result = await service.listForPerson(11);
   assert.deepEqual(result.rows.map(row => row.source_type), ['manual']);
-  assert.ok(calls.every(call => ['persons', 'interactions', 'activity_participants', 'activity_speakers'].includes(call.table)));
+  assert.ok(calls.every(call => ['persons', 'customers', 'interactions', 'activity_participants', 'activity_speakers'].includes(call.table)));
   assert.ok(calls.filter(call => call.table === 'activity_participants')
     .every(call => call.filters.canonical_person_id === 'eq.11' && call.filters.status === 'eq.attended'));
 });

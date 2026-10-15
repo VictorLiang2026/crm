@@ -10,6 +10,7 @@ import { h } from './dom.js';
 import { ic } from './icons.js';
 import { bdg, fmtDate, dueLabel, textOf } from './ui.js';
 import { t, translateEnum } from './i18n.js';
+import { data } from './data.js';
 
 // ---------- 调用与错误归一 ----------
 async function p360(ctx, action, extra) {
@@ -1155,4 +1156,175 @@ export function openPersonDelete(ctx, { personId, displayName, onDone } = {}) {
       if (onDone) onDone();
     } catch (err) { busy(btn, false, t('btn_confirm_delete')); sheet.showErr(err.message); }
   }
+}
+
+// Person 360 timeline writes. Legacy follow-ups remain in followups; manual events use
+// the existing person_360.createInteraction action and are never mirrored to followups.
+const localDate = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+const localDateTime = () => {
+  const d = new Date(Date.now() - new Date().getTimezoneOffset() * 60000);
+  return d.toISOString().slice(0, 16);
+};
+export function openPersonInteraction(ctx, { personId, onDone } = {}) {
+  if (!/^[1-9]\d*$/.test(String(personId || ''))) return;
+  const type = sel([
+    ['meeting', t('interaction_type_meet')], ['call', t('interaction_type_call')],
+    ['message', t('interaction_type_wechat')], ['note', t('interaction_type_other')],
+  ], 'meeting');
+  const at = h('input', { class: 'sheet-input', type: 'datetime-local', value: localDateTime(), required: true });
+  const channel = sel([
+    ['', t('channel_none')], ['in_person', t('interaction_type_meet')],
+    ['phone', t('interaction_type_call')], ['wechat', t('interaction_type_wechat')],
+    ['email', t('channel_email')], ['other', t('interaction_type_other')],
+  ], '');
+  const summary = h('textarea', { class: 'sheet-textarea', maxlength: '2000', required: true });
+  const rawNote = h('textarea', { class: 'sheet-textarea', maxlength: '10000' });
+  const submit = h('button', { class: 'btn btn-primary', type: 'button', onclick: save }, t('btn_save'));
+  const sheet = openSheet({ title: t('interaction_create_title'), sub: `Person #${personId}`, body: h('div', {}, [
+    fieldRow(t('interaction_type_label'), type), fieldRow(t('interaction_at_label'), at),
+    fieldRow(t('interaction_channel_label'), channel), fieldRow(t('followup_summary_label'), summary),
+    fieldRow(t('interaction_raw_note_label'), rawNote),
+    h('div', { class: 'sheet-actions' }, [
+      h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => sheet.overlay.remove() }, t('cancel')),
+      submit,
+    ]),
+  ]) });
+  document.body.appendChild(sheet.overlay);
+
+  async function save() {
+    if (submit.disabled) return;
+    if (!at.value || !Number.isFinite(new Date(at.value).getTime()) || !summary.value.trim()) {
+      sheet.showErr(t('save_failed')); return;
+    }
+    busy(submit, true, t('saving'));
+    try {
+      const result = await data.createInteraction(ctx, String(personId), {
+        interaction_type: type.value, interaction_at: new Date(at.value).toISOString(),
+        channel: channel.value || null, summary: summary.value.trim(), raw_note: rawNote.value.trim() || null,
+      });
+      if (!result.interaction?.id) throw new Error(t('save_failed'));
+      sheet.overlay.remove();
+      ctx.toast(t('interaction_recorded'), 'ok');
+      onDone?.();
+    } catch (err) { busy(submit, false, t('btn_save')); sheet.showErr(err.message || t('save_failed')); }
+  }
+}
+
+export function openPersonFollowup(ctx, { personId, customerId, followupId = null, onDone } = {}) {
+  if (!/^[1-9]\d*$/.test(String(personId || '')) || !/^[1-9]\d*$/.test(String(customerId || ''))) return;
+  const editing = followupId != null;
+  const title = editing ? t('followup_edit_title') : t('followup_create_title');
+  const sheet = openSheet({ title, sub: `Person #${personId} · Customer #${customerId}`,
+    body: h('div', { class: 'muted' }, t('edit_loading')) });
+  document.body.appendChild(sheet.overlay);
+  (async () => {
+    try {
+      const [followupResult, recommendationResult] = await Promise.all([
+        editing ? data.customerFollowups(ctx, customerId) : Promise.resolve({ rows: [] }),
+        data.customerRecommendations(ctx, customerId).catch(() => ({ rows: [] })),
+      ]);
+      const rows = Array.isArray(followupResult.rows) ? followupResult.rows : [];
+      const source = editing ? rows.find(row => String(row.Id) === String(followupId) &&
+        String(row.customer_id) === String(customerId) && row.deleted_at == null) : null;
+      if (editing && !source) throw new Error(t('followup_source_unavailable'));
+      const recommendations = Array.isArray(recommendationResult.rows) ? recommendationResult.rows : [];
+      const recOptions = [['', t('recommendation_none')], ...recommendations.map(row => {
+        const label = [row.recommendation_date, row.suggested_followup_goal,
+          row.suggested_message].filter(Boolean).join(' · ').slice(0, 100);
+        return [String(row.id), `#${row.id}${label ? ` · ${label}` : ''}`];
+      })];
+      const currentRec = source?.recommendation_id == null ? '' : String(source.recommendation_id);
+      if (currentRec && !recOptions.some(([id]) => id === currentRec)) recOptions.push([currentRec, `#${currentRec}`]);
+      const followupDate = h('input', { class: 'sheet-input', type: 'date', required: true,
+        value: String(source?.followup_date || localDate()).slice(0, 10) });
+      const followupNotes = h('textarea', { class: 'sheet-textarea', maxlength: '10000' }, source?.followup_notes || '');
+      const interactionSummary = h('textarea', { class: 'sheet-textarea', maxlength: '2000' }, source?.interaction_summary || '');
+      const nextDate = h('input', { class: 'sheet-input', type: 'date', value: String(source?.next_followup_date || '').slice(0, 10) });
+      const nextGoal = h('input', { class: 'sheet-input', maxlength: '1000', value: source?.next_followup_goal || '' });
+      const recommendation = sel(recOptions, currentRec);
+      const activityId = h('input', { class: 'sheet-input', type: 'number', min: '1', step: '1', value: source?.activity_id ?? '' });
+      const nextAction = h('input', { class: 'sheet-input', maxlength: '1000', value: source?.next_action || '' });
+      const nextActionDate = h('input', { class: 'sheet-input', type: 'date', value: String(source?.next_action_date || '').slice(0, 10) });
+      const saveButton = h('button', { class: 'btn btn-primary', type: 'button', onclick: save }, t('btn_save'));
+      const form = h('div', {}, [
+        fieldRow(t('followup_date_label'), followupDate),
+        fieldRow(t('followup_summary_label'), interactionSummary),
+        fieldRow(t('followup_notes_label'), followupNotes),
+        h('div', { class: 'sheet-note' }, t('recommendation_link_preserved')),
+        fieldRow(t('followup_recommendation_label'), recommendation),
+        fieldRow(t('followup_activity_label'), activityId),
+        h('div', { style: 'display:flex;gap:10px;flex-wrap:wrap' }, [
+          h('div', { class: 'sheet-field', style: 'flex:1;min-width:220px' }, [h('label', {}, t('followup_next_date_label')), nextDate]),
+          h('div', { class: 'sheet-field', style: 'flex:1;min-width:220px' }, [h('label', {}, t('followup_next_goal_label')), nextGoal]),
+        ]),
+        fieldRow(t('followup_next_action_label'), nextAction),
+        fieldRow(t('followup_next_action_date_label'), nextActionDate),
+        h('div', { class: 'sheet-actions' }, [
+          editing ? h('button', { class: 'btn btn-ghost', type: 'button', style: 'color:var(--red)',
+            onclick: confirmDelete }, t('delete_followup')) : null,
+          h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => sheet.overlay.remove() }, t('cancel')),
+          saveButton,
+        ]),
+      ]);
+      sheet.swap(form);
+
+      async function save() {
+        if (saveButton.disabled) return;
+        if (!followupDate.value || (!followupNotes.value.trim() && !interactionSummary.value.trim())) {
+          sheet.showErr(t('followup_content_required')); return;
+        }
+        const numericActivity = activityId.value.trim();
+        if (numericActivity && !/^[1-9]\d*$/.test(numericActivity)) {
+          sheet.showErr(t('followup_invalid_activity')); return;
+        }
+        const payload = {
+          followup_date: followupDate.value,
+          interaction_summary: interactionSummary.value.trim() || null,
+          followup_notes: followupNotes.value.trim() || null,
+          next_followup_date: nextDate.value || null,
+          next_followup_goal: nextGoal.value.trim() || null,
+          recommendation_id: recommendation.value ? Number(recommendation.value) : null,
+          activity_id: numericActivity ? Number(numericActivity) : null,
+          next_action: nextAction.value.trim() || null,
+          next_action_date: nextActionDate.value || null,
+        };
+        busy(saveButton, true, t('saving'));
+        try {
+          const result = editing
+            ? await data.updateCustomerFollowup(ctx, source.Id, payload)
+            : await data.createCustomerFollowup(ctx, { ...payload, customer_id: Number(customerId) });
+          if (editing ? result.ok !== true : !result.id) throw new Error(t('save_failed'));
+          sheet.overlay.remove();
+          ctx.toast(editing ? t('followup_updated') : t('followup_saved'), 'ok');
+          onDone?.();
+        } catch (err) { busy(saveButton, false, t('btn_save')); sheet.showErr(err.message || t('save_failed')); }
+      }
+
+      function confirmDelete() {
+        const confirmButton = h('button', { class: 'btn btn-primary', type: 'button', style: 'background:var(--red)',
+          onclick: remove }, t('delete_followup'));
+        sheet.swap(h('div', {}, [
+          h('p', { class: 'sheet-note' }, t('followup_delete_confirm')),
+          h('div', { class: 'sheet-actions' }, [
+            h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => sheet.swap(form) }, t('cancel')),
+            confirmButton,
+          ]),
+        ]));
+        async function remove() {
+          if (confirmButton.disabled) return;
+          busy(confirmButton, true, t('deleting'));
+          try {
+            const result = await data.removeCustomerFollowup(ctx, source.Id);
+            if (result.ok !== true) throw new Error(t('followup_source_unavailable'));
+            sheet.overlay.remove();
+            ctx.toast(t('followup_deleted'), 'ok');
+            onDone?.();
+          } catch (err) { busy(confirmButton, false, t('delete_followup')); sheet.showErr(err.message || t('delete_failed')); }
+        }
+      }
+    } catch (err) { sheet.showErr(err.message || t('save_failed')); }
+  })();
 }
