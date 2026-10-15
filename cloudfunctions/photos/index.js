@@ -39,16 +39,30 @@ async function list(event) {
   if (category === 'photo' || category === 'attachment') {
     q = q.eq('category', category);
   }
-  const r = assertOk(await q
-    .order('sort_order', { ascending: true })
-    .order('id', { ascending: true }));
+  q = q.order('sort_order', { ascending: true }).order('id', { ascending: true });
+  if (event.limit !== undefined || event.offset !== undefined) {
+    const limit = Number.parseInt(event.limit, 10);
+    const offset = Number.parseInt(event.offset || 0, 10);
+    if (!Number.isInteger(limit) || limit < 1 || !Number.isInteger(offset) || offset < 0) {
+      return { error: 'invalid pagination' };
+    }
+    const pageSize = Math.min(limit, 50);
+    const r = assertOk(await q.range(offset, offset + pageSize));
+    const rows = r.data || [];
+    return { rows: rows.slice(0, pageSize), hasMore: rows.length > pageSize, nextOffset: offset + Math.min(rows.length, pageSize) };
+  }
+  const r = assertOk(await q);
   return { rows: r.data || [] };
 }
 
 async function get(event) {
   const id = parseInt(event.id, 10);
   if (!id) return { error: 'id required' };
-  const r = assertOk(await rdb.from('photos').select().eq('id', id).maybeSingle());
+  const customerId = event.customer_id == null ? null : parseInt(event.customer_id, 10);
+  if (event.customer_id != null && !customerId) return { error: 'invalid customer_id' };
+  let q = rdb.from('photos').select().eq('id', id);
+  if (customerId) q = q.eq('customer_id', customerId);
+  const r = assertOk(await q.maybeSingle());
   if (!r.data) return { error: 'not found' };
   return { photo: r.data };
 }
@@ -59,6 +73,9 @@ async function create(event) {
   if (!customerId) return { error: 'customer_id required' };
   const imageBase64 = data.image_base64;
   if (!imageBase64) return { error: 'image_base64 required' };
+  if (data.category != null && data.category !== 'photo' && data.category !== 'attachment') {
+    return { error: 'invalid category' };
+  }
   let customerName = data.customer_name;
   if (!customerName) {
     // PMC-20：customers.customer_name 已退出（CL-02）；照片/附件快照名取 Person 当前 display_name
@@ -96,19 +113,27 @@ async function create(event) {
 async function update(event) {
   const id = parseInt(event.id, 10);
   if (!id) return { error: 'id required' };
+  const customerId = event.customer_id == null ? null : parseInt(event.customer_id, 10);
+  if (event.customer_id != null && !customerId) return { error: 'invalid customer_id' };
   const data = event.data || {};
   const payload = {};
   if (Object.prototype.hasOwnProperty.call(data, 'photo_notes')) {
     payload.photo_notes = data.photo_notes || null;
   }
   if (!Object.keys(payload).length) return { error: 'no fields to update' };
-  const r = assertOk(await rdb.from('photos').update(payload).eq('id', id).select('id'));
+  let q = rdb.from('photos').update(payload).eq('id', id);
+  if (customerId) q = q.eq('customer_id', customerId);
+  const r = assertOk(await q.select('id'));
   return { ok: (r.data || []).length === 1 };
 }
 
 async function remove(event) {
   const id = parseInt(event.id, 10);
   if (!id) return { error: 'id required' };
-  const r = assertOk(await rdb.from('photos').delete().eq('id', id).select('id'));
+  const customerId = event.customer_id == null ? null : parseInt(event.customer_id, 10);
+  if (event.customer_id != null && !customerId) return { error: 'invalid customer_id' };
+  let q = rdb.from('photos').delete().eq('id', id);
+  if (customerId) q = q.eq('customer_id', customerId);
+  const r = assertOk(await q.select('id'));
   return { ok: (r.data || []).length === 1 };
 }

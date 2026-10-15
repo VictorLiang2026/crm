@@ -50,6 +50,30 @@ export const data = {
   previewRelationship: (ctx, personId, operation, payload) => p360(ctx, 'previewRelationship', { personId, operation, data: payload }),
   executeRelationship: (ctx, previewId) => p360(ctx, 'executeRelationship', { previewId }),
   customerProfile: (ctx, personId) => p360(ctx, 'getCustomerProfile', { personId }),
+  // ---------- 客户关怀与资料（仅 Person 关联的 customer_id） ----------
+  gifts: (ctx, customerId, paging = {}) => call(ctx, 'gifts', {
+    action: 'list', customer_id: Number(customerId), ...(paging || {}),
+  }),
+  createGift: (ctx, payload) => call(ctx, 'gifts', { action: 'create', data: payload }),
+  updateGift: (ctx, id, customerId, payload) => call(ctx, 'gifts', {
+    action: 'update', id: Number(id), customer_id: Number(customerId), data: payload,
+  }),
+  removeGift: (ctx, id, customerId) => call(ctx, 'gifts', {
+    action: 'remove', id: Number(id), customer_id: Number(customerId),
+  }),
+  photos: (ctx, customerId, paging = {}) => call(ctx, 'photos', {
+    action: 'list', customer_id: Number(customerId), ...(paging || {}),
+  }),
+  createPhoto: (ctx, payload) => call(ctx, 'photos', { action: 'create', data: payload }),
+  getPhoto: (ctx, id, customerId) => call(ctx, 'photos', {
+    action: 'get', id: Number(id), customer_id: Number(customerId),
+  }),
+  updatePhoto: (ctx, id, customerId, payload) => call(ctx, 'photos', {
+    action: 'update', id: Number(id), customer_id: Number(customerId), data: payload,
+  }),
+  removePhoto: (ctx, id, customerId) => call(ctx, 'photos', {
+    action: 'remove', id: Number(id), customer_id: Number(customerId),
+  }),
   personWorkItems: (ctx, personId) => p360(ctx, 'listPersonWorkItems', { personId }),
   personInteractions: (ctx, personId, limit) =>
     p360(ctx, 'listInteractions', { personId, ...(limit ? { limit } : {}) }),

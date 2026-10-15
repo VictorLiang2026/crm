@@ -671,3 +671,29 @@ body:has(.login), body.is-login { padding-top: env(safe-area-inset-top); }
   }
   .sk::after { display: none; }
 }
+
+/* PC11: customer-scoped gifts and file metadata in Person 360. */
+.care-materials-grid { display: grid; grid-template-columns: 1fr; gap: 14px; }
+.care-materials-section { min-width: 0; padding: 16px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); }
+.care-section-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
+.care-section-head .section-title { margin: 0; }
+.care-section-note { color: var(--muted); font-size: 13px; margin: 4px 0 12px; }
+.care-status { min-height: 0; margin: 5px 0; color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
+.care-materials-list { display: grid; gap: 9px; }
+.care-record { min-width: 0; padding: 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--card); }
+.care-record-main { display: flex; align-items: flex-start; gap: 9px; flex-wrap: wrap; }
+.care-record-title { min-width: 0; overflow-wrap: anywhere; }
+.care-record-quantity { color: var(--muted); font-size: 13px; }
+.care-record-meta { margin-top: 5px; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.care-record-notes { margin-top: 8px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.care-record-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 9px; }
+.care-record-actions .care-delete { color: var(--red); }
+.care-category { flex: none; padding: 2px 8px; border-radius: 999px; background: var(--red-50); color: var(--red); font-size: 12px; }
+.care-filters { display: flex; flex-wrap: wrap; gap: 7px; margin: 8px 0; }
+.care-preview { max-height: 68vh; overflow: auto; text-align: center; }
+.care-preview img { max-width: 100%; height: auto; object-fit: contain; border-radius: var(--radius-sm); }
+.care-form { display: grid; gap: 12px; }
+.care-file-input { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); }
+@media (min-width: 1024px) {
+  .care-materials-grid { grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr); align-items: start; }
+}

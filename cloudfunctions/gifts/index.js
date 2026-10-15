@@ -31,9 +31,21 @@ exports.main = async (event, context) => {
 async function list(event) {
   const customerId = parseInt(event.customer_id, 10);
   if (!customerId) return { error: 'customer_id required' };
-  const r = assertOk(await rdb.from('gifts').select().eq('customer_id', customerId).is('deleted_at', null)
+  let q = rdb.from('gifts').select().eq('customer_id', customerId).is('deleted_at', null)
     .order('given_date', { ascending: false, nullsFirst: false })
-    .order('Id', { ascending: false }));
+    .order('Id', { ascending: false });
+  if (event.limit !== undefined || event.offset !== undefined) {
+    const limit = Number.parseInt(event.limit, 10);
+    const offset = Number.parseInt(event.offset || 0, 10);
+    if (!Number.isInteger(limit) || limit < 1 || !Number.isInteger(offset) || offset < 0) {
+      return { error: 'invalid pagination' };
+    }
+    const pageSize = Math.min(limit, 50);
+    const r = assertOk(await q.range(offset, offset + pageSize));
+    const rows = r.data || [];
+    return { rows: rows.slice(0, pageSize), hasMore: rows.length > pageSize, nextOffset: offset + Math.min(rows.length, pageSize) };
+  }
+  const r = assertOk(await q);
   return { rows: r.data || [] };
 }
 
@@ -61,15 +73,23 @@ async function create(event) {
 async function update(event) {
   const id = parseInt(event.id, 10);
   if (!id) return { error: 'id required' };
+  const customerId = event.customer_id == null ? null : parseInt(event.customer_id, 10);
+  if (event.customer_id != null && !customerId) return { error: 'invalid customer_id' };
   const payload = normFields(event.data || {}, FIELDS);
   if (!Object.keys(payload).length) return { ok: true, updated: false };
-  const r = assertOk(await rdb.from('gifts').update(payload).eq('Id', id).select('Id'));
+  let q = rdb.from('gifts').update(payload).eq('Id', id);
+  if (customerId) q = q.eq('customer_id', customerId);
+  const r = assertOk(await q.select('Id'));
   return { ok: (r.data || []).length === 1 };
 }
 
 async function remove(event) {
   const id = parseInt(event.id, 10);
   if (!id) return { error: 'id required' };
-  const r = assertOk(await rdb.from('gifts').delete().eq('Id', id).select('Id'));
+  const customerId = event.customer_id == null ? null : parseInt(event.customer_id, 10);
+  if (event.customer_id != null && !customerId) return { error: 'invalid customer_id' };
+  let q = rdb.from('gifts').delete().eq('Id', id);
+  if (customerId) q = q.eq('customer_id', customerId);
+  const r = assertOk(await q.select('Id'));
   return { ok: (r.data || []).length === 1 };
 }
