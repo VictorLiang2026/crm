@@ -9,4 +9,4 @@
 - [x] Add migration, service, UI and consumer regressions.
 - [x] Run release gate and deploy only affected database, function and static artifacts.
 - [x] Record actual anonymous function guard evidence and explicitly leave authenticated production relationship writes unverified.
-- [ ] Commit, tag and verify local/CloudBase/GitHub sync.
+- [x] Commit, tag and verify local/CloudBase/GitHub sync (`383eb745f3bfb9a3a6c501503d060aa0b974eb7b`, `release-20261015-193800`).

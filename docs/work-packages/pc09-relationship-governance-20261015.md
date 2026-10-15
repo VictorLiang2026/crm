@@ -34,3 +34,5 @@
 ## 当前发布状态
 
 CloudBase migration、函数和静态产物已部署；Git 提交、发布标签和部署后三端 sync-check 由本次发布流程完成。最新主干的 People 页面与 `people_badge_recruit` 双语文案已纳入合并后的发布基线。真实登录后的关系生命周期及 AI 消费仍待人工验收。
+
+代码发布提交：`383eb745f3bfb9a3a6c501503d060aa0b974eb7b`；发布标签：`release-20261015-193800`。发布后已确认 GitHub `master`、标签、CloudBase 静态文件和 29 个云函数的 181 个源码/配置文件与本地一致。
