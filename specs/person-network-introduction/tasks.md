@@ -7,5 +7,5 @@
 - [x] Add service, AI-boundary, migration-zero, permission and regression tests.
 - [x] Run PC10 and adjacent PC04/PC08/PC09/AI Gateway regression, release gate, and code review.
 - [x] Deploy `person_360` and the five changed PC10 static modules; the user-approved online `today.js` compatibility line is synchronized in source without redeployment.
-- [ ] Commit, push, tag, and verify local/GitHub/CloudBase consistency.
+- [x] Commit, push, tag, and verify local/GitHub/CloudBase consistency (`release-20261015-205604`, `d4d5e1dc83dd7733a4c45195038e78b1c4076083`; 29 functions / 182 source-config files and 55 reachable static assets match).
 - [ ] Record production authenticated AI/path verification limitations and any unexecuted live flows.
