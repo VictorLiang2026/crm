@@ -94,10 +94,12 @@ export function renderPeople(ctx) {
       })));
       const tbody = h('tbody', {}, rows.map((p) => {
         const badges = (p.roles || []).map((role) => {
-          const [label, tone] = ROLE_BADGE()[role] || [role, 'gray'];
+          const [label, tone] = role === 'recruit'
+            ? [t('people_badge_recruit'), 'gold']
+            : (ROLE_BADGE()[role] || [role, 'gray']);
           return bdg(label, tone);
         });
-        if (p.recruit_id) badges.push(bdg(t('badge_recruiting'), 'gold'));
+        if (p.recruit_id && !(p.roles || []).includes('recruit')) badges.push(bdg(t('people_badge_recruit'), 'gold'));
         const cols = columns;
         const hasCustomer = (p.roles || []).includes('customer');
         const hasRecruit = (p.roles || []).includes('recruit') || !!p.recruit_id;

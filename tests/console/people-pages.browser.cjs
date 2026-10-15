@@ -94,6 +94,30 @@ test('People directory reveals role priorities and applies multi-select only on 
   } finally { await b.close(); }
 });
 
+test('People directory shows one 招募 badge for converted recruits without changing global labels', async () => {
+  const b = new Browser(path.resolve(__dirname, '../..'));
+  try {
+    await b.start();
+    await b.open('#/more');
+    await b.evaluate(`(async()=>{
+      const {renderPeople}=await import('/crm/js/modules/console/pages/people.js');
+      const ctx={main:document.getElementById('view'),toast(){},api:{call:async()=>({rows:[
+        {id:7,display_name:'已转招募',roles:['recruit'],recruit_id:73},
+        {id:8,display_name:'招募关联人物',roles:[],recruit_id:74},
+      ],page:1,pageSize:20,total:2,totalPages:1,hasMore:false})}};
+      renderPeople(ctx);
+    })()`);
+    await b.wait("document.querySelectorAll('.people-table .badge-stack').length===2");
+    const badges = await b.evaluate("[...document.querySelectorAll('.people-table .badge-stack')].map(x=>[...x.children].map(b=>b.textContent.trim()))");
+    assert.deepEqual(badges, [['招募'], ['招募']]);
+    const sharedLabels = await b.evaluate(`(async()=>{
+      const {t}=await import('/crm/js/modules/console/i18n.js');
+      return [t('recruit'),t('badge_recruiting')];
+    })()`);
+    assert.deepEqual(sharedLabels, ['增员', '在增员']);
+  } finally { await b.close(); }
+});
+
 test('Recycle bin remains simple and has no directory filters', async () => {
   const b = new Browser(path.resolve(__dirname, '../..'));
   try {

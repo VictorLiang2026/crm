@@ -582,6 +582,7 @@ const DICT = {
   'btn_prev': { 'zh-CN': '上一页', 'en': 'Prev' },
   'btn_next': { 'zh-CN': '下一页', 'en': 'Next' },
   'badge_recruiting': { 'zh-CN': '在增员', 'en': 'Recruiting' },
+  'people_badge_recruit': { 'zh-CN': '招募', 'en': 'Recruit' },
   'empty_no_people': { 'zh-CN': '没有匹配的人物', 'en': 'No matching people' },
   'empty_people_note': { 'zh-CN': '尚无人物记录。', 'en': 'No people records yet.' },
   'empty_people_hint': { 'zh-CN': '换个姓名关键词试试。', 'en': 'Try a different name keyword.' },
