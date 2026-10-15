@@ -101,7 +101,8 @@ function rankActions(rows) {
 function actionRow(ctx, item, onDone) {
   const name = item.person_name || t('unnamed');
   const labelMap = { M: [t('must_do'), 'red'], R: [t('should_do'), 'ink'], O: [t('can_do'), 'gray'] };
-  const [text, tone] = labelMap[item.level];
+  const [text, tone] = labelMap[item.level] ||
+    [translateEnum('work_status', item.status) || t('fact'), 'gray'];
   return h('div', { class: 'list-row' }, [
     avatar(name),
     h('div', { style: 'flex:1;min-width:0' }, [

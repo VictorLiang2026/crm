@@ -101,8 +101,11 @@ test('PC06 Person and Today share preview-confirmed Action and Commitment operat
     await browser.evaluate("location.hash='#/today'");
     await browser.wait("window.__crmTest.calls.some(call=>call.action==='listTodayWorkItems')");
     await browser.wait("document.getElementById('app')?.innerText.includes('核对资料')");
+    await browser.evaluate("[...document.querySelectorAll('details')].find(node=>node.innerText.includes('最近结束'))?.setAttribute('open','')");
     const today = await browser.evaluate("({text:document.getElementById('app')?.innerText,legacyDue:window.__crmTest.calls.some(call=>call.action==='listDueCommitments'),workCalls:window.__crmTest.calls.filter(call=>call.action==='listTodayWorkItems').length})");
     assert.ok(today.text.includes('我承诺') || today.text.includes('对方承诺'), JSON.stringify(today));
+    assert.ok(today.text.includes('已完成的测试行动'), JSON.stringify(today));
+    assert.ok(!today.text.includes('数据加载失败'), JSON.stringify(today));
     assert.equal(today.legacyDue, false, 'Today commitments use the canonical work item read');
     await browser.evaluate(`(() => {
       const row=[...document.querySelectorAll('.list-row')].find(node=>node.innerText.includes('核对资料'));
