@@ -35,4 +35,5 @@
 - 生产 migration 已完成；`person_360` 以共享副本校验后部署成功；仅上传 5 个受影响静态文件：`console/family-actions.js`、`console/pages/person.js`、`console/i18n.js`、`console/data.js`、`person-360.js`。
 - `sync-check.ps1 -CloudOnly` 通过：`admin.html` SHA 一致，53 个可达 HTML/JS/CSS 资源一致，29 个 CRM 云函数的 180 个源码/配置文件一致；证据目录 `D:\Temp\crm-cloud-audit-dcfa67b570bb41b1bce3b703971e0560`。
 - 本包未新增 Person、家庭关系或种子数据。生产 Person 家庭页面登录读取、用户真实点击确认后的虚构测试关系新增/解除、删除恢复联动及线上中英文人工页面检查仍待隔离测试会话验证；不得使用真实客户建立测试关系。
-- 本文记录时，GitHub release commit/tag 和完整三端核对尚未完成；云端已先部署，仍需完成 Git 发布与发布后 sync-check。
+- 功能发布：提交 `4ed005ecb3a3cad879674d6d7a27680d74729023`，标签 `release-20261015-132423`；GitHub `master`、本地和 CloudBase 源码已核对一致。
+- 本次实施及发布记录已纳入该提交。真实家庭关系新增/解除、删除恢复联动和生产页面人工检查仍按上一节列为未验证，不因代码发布而推断通过。
