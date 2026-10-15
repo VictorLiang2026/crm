@@ -40,6 +40,12 @@ export const data = {
   previewHousehold: (ctx, personId, operation, data) => p360(ctx, 'previewHousehold', { personId, operation, data }),
   executeHousehold: (ctx, previewId) => p360(ctx, 'executeHousehold', { previewId }),
   relationships: (ctx, personId, includeDeleted = false) => p360(ctx, 'listRelationships', { personId, includeDeleted }),
+  relationshipNetwork: (ctx, personId, page = 1) => p360(ctx, 'listRelationshipNetwork', { personId, page }),
+  expandRelationshipNetwork: (ctx, personId, neighborPersonId, page = 1) =>
+    p360(ctx, 'expandRelationshipNetwork', { personId, neighborPersonId, page }),
+  relationshipIntroductionPaths: (ctx, personId) => p360(ctx, 'listRelationshipIntroductionPaths', { personId }),
+  suggestRelationshipIntroduction: (ctx, personId, targetPersonId, edgeIds) =>
+    p360(ctx, 'suggestRelationshipIntroduction', { personId, targetPersonId, edgeIds }),
   resolveRelationshipName: (ctx, name) => p360(ctx, 'resolveRelationshipName', { name }),
   previewRelationship: (ctx, personId, operation, payload) => p360(ctx, 'previewRelationship', { personId, operation, data: payload }),
   executeRelationship: (ctx, previewId) => p360(ctx, 'executeRelationship', { previewId }),

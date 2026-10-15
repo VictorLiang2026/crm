@@ -20,6 +20,8 @@ const { MeetingPrepContextBuilder } = require('./meeting-prep-context');
 const { ContextItemLifecycleService } = require('./context-item-lifecycle-service');
 const { HouseholdService } = require('./household-service');
 const { RelationshipService } = require('./relationship-service');
+const { RelationshipNetworkService } = require('./relationship-network-service');
+const aiStandards = require('./ai');
 
 const app = cloudbase.init({ env: process.env.TCB_ENV });
 const LEGACY_INTERACTION_TABLES = new Set([
@@ -155,7 +157,7 @@ async function pgRpc(name, body) {
       if (code === '42501' && name.startsWith('crm_context_item_')) {
         throw new Error('Context item permission denied');
       }
-      if (/^(Invalid |Selected Person|Same-name|Deleted identity|Customer |Preview |Identity candidates|Active Person|Person-only recruit|Test account|Test parent|Idempotency key|Unauthorized|Speaker profile|Work item|Action |Commitment |Opportunity |Person changed|Person not found|Activity |Outcome |Context item|Household |Household member|Test household|Relationship |Active relationship)/.test(message)) {
+      if (/^(Invalid |Selected Person|Same-name|Deleted identity|Customer |Preview |Identity candidates|Active Person|Person-only recruit|Test account|Test parent|Idempotency key|Unauthorized|Speaker profile|Work item|Action |Commitment |Opportunity |Person changed|Person not found|Activity |Outcome |Context item|Household |Household member|Test household|Relationship |Active relationship|Person is not a confirmed direct neighbor|Selected introduction path|AI Gateway)/.test(message)) {
         throw new Error(message);
       }
       throw new Error(`Database request failed (${response.status}${code ? `, ${code}` : ''})`);
@@ -878,6 +880,25 @@ exports.main = async event => {
         return await new HouseholdService({request: pgRequest, rpc: pgRpc}).execute(event.previewId, uid);
       case 'listRelationships':
         return await new RelationshipService({request:pgRequest,rpc:pgRpc}).listForPerson(event.personId,{includeDeleted:event.includeDeleted===true});
+      case 'listRelationshipNetwork': {
+        const service = new RelationshipNetworkService({ request: pgRequest });
+        const [adjacency, family] = await Promise.all([
+          service.listAdjacency(event.personId, event.page), service.listFamilyMemberships(event.personId),
+        ]);
+        return { adjacency, family };
+      }
+      case 'expandRelationshipNetwork':
+        return await new RelationshipNetworkService({ request: pgRequest })
+          .expandNeighbor(event.personId, event.neighborPersonId, event.page);
+      case 'listRelationshipIntroductionPaths':
+        return await new RelationshipNetworkService({ request: pgRequest }).listIntroductionPaths(event.personId);
+      case 'suggestRelationshipIntroduction': {
+        // Load the Gateway adapter only for this AI action so non-AI Person 360
+        // callers and existing isolated service tests do not initialize it.
+        const { generateText, extractJson } = require('./db');
+        return await new RelationshipNetworkService({ request: pgRequest, generateText, extractJson,
+          guardrails: aiStandards.GUARDRAILS }).suggestIntroduction(event.personId, event.targetPersonId, event.edgeIds);
+      }
       case 'resolveRelationshipName':
         return await new RelationshipService({request:pgRequest,rpc:pgRpc}).resolveName(event.name);
       case 'previewRelationship':

@@ -8,6 +8,7 @@ import { data } from '../data.js';
 import { openContextItemAction } from '../context-actions.js';
 import { renderFamily } from '../family-actions.js';
 import { relationshipNode } from '../relationship-actions.js';
+import { relationshipNetworkNode } from '../relationship-network.js';
 import { openWorkItemEditor, openWorkItemTransition, openOpportunityAdvance, openQuickCapture, openPersonEdit, openPersonDelete,
   openPersonInteraction, openPersonFollowup } from '../write.js';
 import {
@@ -380,7 +381,12 @@ function activitiesNode(ctx, id) {
   });
 }
 
-const BUILDERS = [overviewNode, timelineNode, factsNode, familyNode, (ctx, id) => relationshipNode(ctx, id), insuranceNode, opportunitiesNode, recruitNode, activitiesNode];
+function relationshipsNode(ctx, id) {
+  return Promise.all([relationshipNode(ctx, id), relationshipNetworkNode(ctx, id)])
+    .then(([management, network]) => { management.append(network); return management; });
+}
+
+const BUILDERS = [overviewNode, timelineNode, factsNode, familyNode, relationshipsNode, insuranceNode, opportunitiesNode, recruitNode, activitiesNode];
 
 // ---------- 页面 ----------
 export function renderPerson(ctx, id) {
