@@ -13,6 +13,7 @@ Module._load = originalLoad;
 function fixture(customerId = 101) {
   const calls = [];
   const rows = {
+    customers: customerId == null ? [] : [{ Id: customerId, person_id: 11, deleted_at: null }],
     persons: [{ id: 11, display_name: '【系统测试·勿联系】虚构甲', legacy_customer_id: customerId }],
     products: [{ id: 1, created_at: '2026-09-19T00:00:00Z',
       items: JSON.stringify([{ key: 'ap_ci', amount: '100000', premium: '3000', update_date: '2026-09-20' }]) }],
@@ -69,6 +70,15 @@ test('insurance context merges existing sources without raw files, OCR text or d
   assert.ok(calls.every(call => call.method === 'GET'));
   assert.ok(!calls.some(call => /photo_url|raw_text|customer_snapshot|\braw\b/.test(call.filters.select || '')));
   assert.ok(!JSON.stringify(result).includes('MUST_NOT_READ'));
+});
+
+test('insurance context prefers the bigint column returned as text over JSON values', async () => {
+  const { service, calls, rows } = fixture();
+  rows.products[0].ap_ci = '9223372036854775807';
+  const result = await service.getInsuranceContext(11);
+  assert.equal(result.existingCoverage[0].amount, '9223372036854775807');
+  assert.equal(result.existingCoverage[0].premium, '3000');
+  assert.ok(calls.find(call => call.table === 'products').filters.select.includes('ap_ci::text'));
 });
 
 test('Person without legacy customer reads only Person opportunities and actions', async () => {

@@ -10,6 +10,7 @@ import { renderFamily } from '../family-actions.js';
 import { relationshipNode } from '../relationship-actions.js';
 import { relationshipNetworkNode } from '../relationship-network.js';
 import { careMaterialsNode } from '../care-materials.js';
+import { renderInsuranceEditor } from '../insurance-editor.js';
 import { openWorkItemEditor, openWorkItemTransition, openOpportunityAdvance, openQuickCapture, openPersonEdit, openPersonDelete,
   openPersonInteraction, openPersonFollowup } from '../write.js';
 import {
@@ -233,12 +234,13 @@ function provenanceRow(title, sub, badge) {
 }
 
 function insuranceNode(ctx, id) {
-  return data.insurance(ctx, id).then((d) => {
+  return Promise.all([data.insurance(ctx, id), renderInsuranceEditor(ctx, id)]).then(([d, editor]) => {
     const blocks = [];
     blocks.push(h('div', { class: 'stack-head' }, [
       sectionTitle(t('sec_insurance_overview')),
       bdg(d.evidenceStatus === 'recorded' ? t('badge_has_evidence') : t('badge_no_evidence'), d.evidenceStatus === 'recorded' ? 'jade' : 'gray'),
     ]));
+    blocks.push(editor);
     const cov = d.existingCoverage || [];
     if (cov.length) {
       blocks.push(sectionTitle(t('sec_coverage')));

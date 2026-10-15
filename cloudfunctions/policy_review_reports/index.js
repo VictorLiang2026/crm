@@ -196,7 +196,7 @@ async function generate(event) {
 
   // 拉上下文：保单、跟进、礼品、历史检视报告、照片
   const [prod, fol, gif, hist, photos] = await Promise.all([
-    rdb.from('products').select().eq('customer_id', customerId),
+    rdb.from('products').select('id::text,items,ap_ipa::text,ap_ppa::text,ap_ltc::text,ap_ann::text,ap_life::text,ap_term::text,ap_wl::text,ap_pa::text,ap_ci::text,ap_hi::text,ap_all::text').eq('customer_id', customerId),
     rdb.from('followups').select().eq('customer_id', customerId)
       .order('followup_date', { ascending: false, nullsFirst: false })
       .order('Id', { ascending: false })

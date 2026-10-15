@@ -697,3 +697,12 @@ body:has(.login), body.is-login { padding-top: env(safe-area-inset-top); }
 @media (min-width: 1024px) {
   .care-materials-grid { grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr); align-items: start; }
 }
+.insurance-editor { min-width: 0; padding: 14px 0; border-top: 1px solid var(--line, #d9e0e8); border-bottom: 1px solid var(--line, #d9e0e8); }
+.insurance-editor .section-title { margin-bottom: 8px; }
+.insurance-category { padding: 12px 2px; border-bottom: 1px solid var(--line, #e4e8ee); }
+.insurance-category summary { color: var(--text, #202a35); font-weight: 600; cursor: pointer; padding: 4px 0; }
+.insurance-category summary:focus-visible { outline: 2px solid var(--accent, #2e6b63); outline-offset: 3px; }
+@media (min-width: 768px) {
+  .insurance-editor { padding: 18px 4px; }
+  .insurance-category { padding: 14px 4px; }
+}

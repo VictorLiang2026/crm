@@ -88,6 +88,10 @@ export const data = {
   removeCustomerFollowup: (ctx, id) => call(ctx, 'followups', { action: 'remove', id: Number(id) }),
   contextGroups: (ctx, personId) => p360(ctx, 'getContextGroups', { personId }),
   insurance: (ctx, personId) => p360(ctx, 'getInsuranceContext', { personId }),
+  personProducts: (ctx, personId) => call(ctx, 'products', { action: 'list', personId: String(personId) }),
+  savePersonProducts: (ctx, personId, expectedVersion, payload) => call(ctx, 'products', {
+    action: 'upsert', personId: String(personId), expectedVersion: String(expectedVersion), data: payload,
+  }),
   personOpportunities: (ctx, personId) => p360(ctx, 'listOpportunities', { personId }),
   recruitContext: (ctx, personId) => p360(ctx, 'listRecruitContext', { personId }),
   lookupCustomer: (ctx, customerId) => p360(ctx, 'lookupCustomer', { customerId }),

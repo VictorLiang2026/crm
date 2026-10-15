@@ -39,10 +39,13 @@ function coverageFrom(row) {
     .map(item => [item.key, item]));
   return Object.entries(CATEGORIES).flatMap(([key, label]) => {
     const item = byKey.get(key) || {};
-    const amount = item.amount !== '' && item.amount != null ? item.amount : row[key];
+    // bigint ap_* is the exact canonical amount; prefer it over a JSON number that
+    // a JavaScript parser could round. The legacy details remain the fallback.
+    const amount = row[key] != null ? row[key] : item.amount;
     const premium = item.premium;
     if ((amount == null || amount === '') && (premium == null || premium === '')) return [];
-    return [{ label, amount: amount ?? null, premium: premium ?? null,
+    return [{ label, amount: amount == null ? null : String(amount),
+      premium: premium == null || premium === '' ? null : String(premium),
       observedAt: item.update_date || row.created_at || null,
       provenance: '手工录入的保障明细，保单真实性待核实',
       source: { type: 'products', id: row.id } }];
@@ -64,7 +67,7 @@ class InsuranceContextService {
     const customerId = customerRow?.Id ?? null;
     const [products, reports, ocr, photos, ownOpportunities, legacyOpportunities,
       actions, links, interactions, facts, householdContext] = await Promise.all([
-      customerId ? read('products', { select: 'id,items,created_at,' + Object.keys(CATEGORIES).join(','),
+      customerId ? read('products', { select: 'id::text,items,created_at,' + Object.keys(CATEGORIES).map(key => `${key}::text`).join(','),
         customer_id: `eq.${customerId}`, deleted_at: 'is.null', order: 'id.desc', limit: 3 }) : [],
       customerId ? read('policy_review_reports', {
         select: 'id,report_date,report_type,summary,edited_summary,gaps_found,edited_gaps,edited_recommendations,next_action,edited_next_action,updated_at',
