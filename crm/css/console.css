@@ -826,3 +826,26 @@ body:has(.login), body.is-login { padding-top: env(safe-area-inset-top); }
 .act-task-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; width: 100%; }
 .act-task-actions .btn { min-height: 40px; }
 .act-danger { background: var(--red) !important; border-color: var(--red) !important; color: #fff !important; }
+.act-people, .act-resources { gap: 12px; }
+.act-note-row, .act-resource-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.act-note-row { align-items: flex-start; }
+.act-note-row > .sheet-note { flex: 1; margin: 0; }
+.act-resource-main { flex: 1; min-width: 0; }
+.act-resource-main .row-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.act-resource-actions { display: flex; align-items: center; justify-content: flex-end; gap: 6px; flex-wrap: wrap; }
+.act-person-link { color: var(--ink); font-weight: 650; text-decoration: none; }
+.act-person-results { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.act-person-candidate { min-height: 44px; text-align: left; justify-content: flex-start; }
+.act-person-candidate.sel { border-color: var(--red); background: rgba(211, 17, 69, .07); }
+.act-warning { border: 1px solid rgba(168, 122, 30, .35); border-radius: 10px; background: rgba(168, 122, 30, .08); color: var(--ink-2); padding: 10px 12px; }
+.act-topic-picks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.act-topic-pick { display: flex; align-items: flex-start; gap: 9px; border: 1px solid var(--line); border-radius: 12px; padding: 10px; }
+.act-topic-pick input, .act-missing-confirm input { width: 18px; height: 18px; margin-top: 2px; accent-color: var(--red); }
+.act-topic-pick span { display: grid; gap: 3px; min-width: 0; }
+.act-topic-pick small { color: var(--muted); }
+.act-missing-confirm { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.act-topics-save { justify-content: flex-end; }
+@media (min-width: 768px) and (max-width: 900px) {
+  .act-resource-row { align-items: flex-start; flex-direction: column; }
+  .act-resource-actions { justify-content: flex-start; }
+}

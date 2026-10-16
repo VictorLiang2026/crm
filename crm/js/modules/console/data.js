@@ -142,6 +142,33 @@ export const data = {
   removeActivityTask: (ctx, id, activityId, expectedUpdatedAt) => call(ctx, 'activity_tasks', {
     action: 'removeConsole', id: Number(id), activity_id: Number(activityId), expectedUpdatedAt,
   }),
+  updateActivityParticipant: (ctx, id, activityId, expectedUpdatedAt, expectedStatus, status) => call(ctx, 'activities', {
+    action: 'updateParticipantConsole', id: Number(id), activity_id: Number(activityId),
+    expectedUpdatedAt, expectedStatus, status,
+  }),
+  resolveActivityPerson: (ctx, name) => p360(ctx, 'resolveIdentity', { name }),
+  addCanonicalParticipant: (ctx, payload) => p360(ctx, 'addCanonicalParticipant', { data: payload }),
+  linkCanonicalParticipant: (ctx, payload) => p360(ctx, 'linkCanonicalParticipant', { data: payload }),
+  addTemporaryParticipant: (ctx, payload) => call(ctx, 'activities', { action: 'addParticipant', data: payload }),
+  activitySpeakers: (ctx, params = {}) => call(ctx, 'activity_speakers', { action: 'list', ...params }),
+  updateActivitySpeaker: (ctx, id, payload) => call(ctx, 'activity_speakers', { action: 'update', id: Number(id), data: payload }),
+  createPersonSpeaker: (ctx, payload) => p360(ctx, 'createSpeakerProfile', { data: payload }),
+  linkSpeakerPerson: (ctx, payload) => p360(ctx, 'linkSpeakerPerson', { data: payload }),
+  previewRemoveSpeaker: (ctx, id) => call(ctx, 'activity_speakers', { action: 'previewRemoveConsole', id: Number(id) }),
+  removeSpeaker: (ctx, id, expectedUpdatedAt, expectedParticipantRows) => call(ctx, 'activity_speakers', {
+    action: 'removeConsole', id: Number(id), expectedUpdatedAt, expectedParticipantRows,
+  }),
+  activityTopics: (ctx) => call(ctx, 'activity_topics', { action: 'list' }),
+  createActivityTopic: (ctx, payload) => call(ctx, 'activity_topics', { action: 'create', data: payload }),
+  updateActivityTopic: (ctx, id, payload) => call(ctx, 'activity_topics', { action: 'update', id: Number(id), data: payload }),
+  previewRemoveTopic: (ctx, id) => call(ctx, 'activity_topics', { action: 'previewRemoveConsole', id: Number(id) }),
+  removeActivityTopic: (ctx, id, expectedUpdatedAt, expectedActivityReferences) => call(ctx, 'activity_topics', {
+    action: 'removeConsole', id: Number(id), expectedUpdatedAt, expectedActivityReferences,
+  }),
+  applyActivityTopics: (ctx, activityId, topicIds, expectedUpdatedAt, expectedTopicIds) => call(ctx, 'activities', {
+    action: 'applyTopicsConsole', id: Number(activityId), topic_ids: topicIds,
+    expectedUpdatedAt, expectedTopicIds,
+  }),
   activityPostReviewV2: (ctx, activityId) =>
     call(ctx, 'ai_activity', { action: 'postReviewV2', activity_id: Number(activityId) }),
   activityData: (ctx, activityId) =>

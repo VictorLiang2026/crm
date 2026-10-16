@@ -1,5 +1,4 @@
-// 活动工作台（WP1 只读）：活动列表（日期条筛选）+ 详情「流程」「签到与到场」两页签。
-// 互动名单/机会候选/复盘（WP2 写、WP3 AI）、伴手礼与照片（G4 无数据源）保留骨架。
+// 活动工作台：活动、筹备任务、签到与资源使用原生管理；旧日报及未覆盖入口继续保留。
 import { h } from '../dom.js';
 import { ic } from '../icons.js';
 import { data } from '../data.js';
@@ -7,13 +6,14 @@ import {
   changeActivityTaskStatus, confirmActivityRemoval, confirmActivityTaskRemoval,
   openActivityEditor, openActivityTaskEditor,
 } from '../activities-write.js';
+import { renderActivityParticipants, renderActivityResources } from '../activity-people.js';
 import { t, translateEnum } from '../i18n.js';
 import {
   wpTag, pageHead, emptyNote, loadInto, bdg, kvGrid, sectionTitle,
   fmtDate, weekdayCN, dayDiffFromToday, textOf,
 } from '../ui.js';
 
-const ACT_TABS = ['act_tab_flow', 'act_tab_attend', 'act_tab_acts', 'act_tab_candidates', 'act_tab_gifts', 'act_tab_photos', 'act_tab_review'];
+const ACT_TABS = ['act_tab_flow', 'act_tab_attend', 'act_tab_acts', 'act_tab_candidates', 'act_tab_gifts', 'act_tab_photos', 'act_tab_review', 'act_tab_resources'];
 
 // 枚举翻译统一走 i18n.js 集中注册表
 const actStatusLabel = (s) => translateEnum('activity_status', s);
@@ -22,11 +22,6 @@ const TASK_STATUS = {
   pending: ['status_pending', 'gray'], in_progress: ['status_in_progress', 'gold'],
   completed: ['status_completed', 'jade'], skipped: ['status_skipped', 'gray'],
 };
-const PART_STATUS = {
-  invited: ['part_invited', 'ink'], attended: ['part_attended', 'jade'], absent: ['part_absent', 'red'],
-};
-const PART_TYPE = { customer: 'customer', recruit: 'recruit', speaker: 'speaker' };
-
 // ---------- 列表 ----------
 export function renderActivities(ctx) {
   const listEl = h('div', {});
@@ -145,36 +140,11 @@ function flowNode(ctx, id) {
   });
 }
 
-function attendanceNode(ctx, id) {
+function attendanceNode(ctx, id, onDone) {
   return data.activityDetail(ctx, id).then((detail) => {
     const parts = detail.participants || [];
-    const groups = [
-      ['attended', t('act_attended'), 'jade'], ['invited', t('act_invited'), 'ink'], ['absent', t('act_absent'), 'red'],
-    ];
-    const blocks = [];
-    groups.forEach(([key, label]) => {
-      const rows = parts.filter((p) => (p.status || 'invited') === key);
-      if (!rows.length) return;
-      blocks.push(sectionTitle(label, bdg(String(rows.length), key === 'absent' ? 'red' : key === 'attended' ? 'jade' : 'ink')));
-      blocks.push(h('div', {}, rows.map((p) => {
-        const label = p.person_name || (p.person_id ? `${t(PART_TYPE[p.person_type] || 'act_person')} #${p.person_id}` : t('act_temp_name'));
-        const nameNode = p.canonical_person_id
-          ? h('a', { href: `#/person/${p.canonical_person_id}`, style: 'margin-left:8px;color:var(--ink);font-weight:600' }, label)
-          : h('span', { style: 'margin-left:8px' }, label);
-        return h('div', { class: 'list-row' }, [
-          h('div', { style: 'flex:1;min-width:0' }, [
-            h('div', { class: 'row-title' }, [
-              bdg(t(PART_TYPE[p.person_type] || 'act_person'), p.person_type === 'recruit' ? 'gold' : 'ink'),
-              nameNode,
-            ]),
-            p.relationship_note ? h('div', { class: 'row-sub' }, p.relationship_note) : null,
-          ]),
-          p.canonical_person_id ? ic('chevron', 'mut') : null,
-        ]);
-      })));
-    });
-    return h('div', { class: 'tab-stack' },
-      blocks.length ? blocks : [emptyNote(t('act_no_participants'), t('act_participants_note'))]);
+    if (!detail.activity) throw new Error(t('act_activity_not_found'));
+    return renderActivityParticipants(ctx, detail.activity, parts, onDone);
   });
 }
 
@@ -319,10 +289,13 @@ export function renderActivity(ctx, id) {
     if (loaded.has(i)) return;
     loaded.add(i);
     if (i === 0) loadInto(bodies[i], async () => h('div', { class: 'card-body' }, [await flowNode(ctx, id)]));
-    else if (i === 1) loadInto(bodies[i], async () => h('div', { class: 'card-body' }, [await attendanceNode(ctx, id)]));
+    else if (i === 1) loadInto(bodies[i], async () => h('div', { class: 'card-body' }, [await attendanceNode(ctx, id, () => {
+      loaded.delete(1); select(1);
+    })]));
     else if (i === 6) loadInto(bodies[i], async () => h('div', { class: 'card-body' }, [await reviewNode(ctx, id)]));
     else if (i === 2) loadInto(bodies[i], async () => h('div', { class: 'card-body' }, [await interactionNode(ctx, id)]));
     else if (i === 3) loadInto(bodies[i], async () => h('div', { class: 'card-body' }, [await candidateNode(ctx, id)]));
+    else if (i === 7) loadInto(bodies[i], async () => h('div', { class: 'card-body' }, [await renderActivityResources(ctx, id)]));
     else bodies[i].replaceChildren(h('div', { class: 'card-body' }, placeholder(i)));
   }
 

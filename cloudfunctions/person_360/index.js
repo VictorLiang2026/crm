@@ -1003,6 +1003,8 @@ exports.main = async event => {
       case 'resolveQuickCaptureName': return await service.resolveQuickCaptureName(event.name);
       case 'addCanonicalParticipant': return await new ParticipantService({ request: pgRequest })
         .add(event.data, uid);
+      case 'linkCanonicalParticipant': return await new ParticipantService({ request: pgRequest })
+        .link(event.data, uid);
       case 'createSpeakerProfile': return await new SpeakerProfileService({ request: pgRequest })
         .create(event.data, uid);
       case 'linkSpeakerPerson': return await new SpeakerProfileService({ request: pgRequest })

@@ -91,6 +91,70 @@ class ParticipantService {
     if (rows.length !== 1) throw new Error('Participant could not be saved');
     return { id: rows[0].id, linked: true, canonicalPersonId: personId, legacyLinked: !!legacyId };
   }
+
+  async link(data, uid) {
+    if (!uid || data?.confirmed !== true) throw new Error('Human confirmation is required');
+    if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('Invalid participant data');
+    const participantId = idOf(data.participantId);
+    const activityId = idOf(data.activityId);
+    const personId = idOf(data.canonicalPersonId);
+    const expectedUpdatedAt = typeof data.expectedUpdatedAt === 'string' ? data.expectedUpdatedAt : '';
+    if (!expectedUpdatedAt || !Number.isFinite(Date.parse(expectedUpdatedAt)) ||
+        typeof data.selectedDisplayName !== 'string') throw new Error('Participant version and selected Person are required');
+
+    const resolution = await this.personService.resolveName(data.selectedDisplayName);
+    if (!resolution.candidates.some(candidate => candidate.id === personId &&
+        candidate.displayName === data.selectedDisplayName)) {
+      throw new Error('Selected Person changed; resolve identity again');
+    }
+    const activity = await this.request('activities', 'GET', {
+      select: 'id', id: `eq.${activityId}`, deleted_at: 'is.null', limit: 1,
+    });
+    if (activity.length !== 1) throw new Error('Activity not found');
+    const rows = await this.request('activity_participants', 'GET', {
+      select: 'id,activity_id,person_type,person_id,canonical_person_id,updated_at',
+      id: `eq.${participantId}`, activity_id: `eq.${activityId}`, deleted_at: 'is.null', limit: 1,
+    });
+    const participant = rows[0];
+    if (!participant || participant.canonical_person_id != null ||
+        participant.updated_at !== expectedUpdatedAt || !TYPES.has(participant.person_type)) {
+      throw new Error('Participant changed or unavailable');
+    }
+    const personRows = await this.request('persons', 'GET', {
+      select: 'id,display_name', id: `eq.${personId}`, deleted_at: 'is.null', limit: 1,
+    });
+    const person = personRows[0];
+    if (!person || person.display_name !== data.selectedDisplayName) {
+      throw new Error('Selected Person changed; resolve identity again');
+    }
+    const duplicates = await this.request('activity_participants', 'GET', {
+      select: 'id', activity_id: `eq.${activityId}`, canonical_person_id: `eq.${personId}`,
+      deleted_at: 'is.null', limit: 1,
+    });
+    if (duplicates.some(row => String(row.id) !== participantId)) throw new Error('Participant already added');
+
+    const legacyId = await this.legacyId(person, participant.person_type);
+    if (participant.person_id != null && String(participant.person_id) !== String(legacyId)) {
+      throw new Error('Legacy identity does not match the selected Person');
+    }
+    if (legacyId) {
+      const legacyDuplicates = await this.request('activity_participants', 'GET', {
+        select: 'id', activity_id: `eq.${activityId}`,
+        person_type: `eq.${participant.person_type}`, person_id: `eq.${legacyId}`,
+        deleted_at: 'is.null', limit: 1,
+      });
+      if (legacyDuplicates.some(row => String(row.id) !== participantId)) throw new Error('Participant already added');
+    }
+    const saved = await this.request('activity_participants', 'PATCH', {
+      id: `eq.${participantId}`, activity_id: `eq.${activityId}`,
+      canonical_person_id: 'is.null', deleted_at: 'is.null', updated_at: `eq.${expectedUpdatedAt}`,
+    }, {
+      canonical_person_id: Number(personId), person_id: legacyId ? Number(legacyId) : null,
+      person_name: person.display_name, updated_at: new Date().toISOString(),
+    });
+    if (saved.length !== 1) throw new Error('Participant changed; resolve and confirm again');
+    return { ok: true, canonicalPersonId: personId, legacyLinked: !!legacyId };
+  }
 }
 
 module.exports = { ParticipantService };

@@ -59,9 +59,11 @@ exports.main = async (event, context) => {
       case 'searchPerson':      return await searchPerson(event);
       case 'linkParticipant':   return await linkParticipant(event);
       case 'updateParticipant':  return await updateParticipant(event);
+      case 'updateParticipantConsole': return await updateParticipantConsole(event);
       case 'removeParticipant':  return await removeParticipant(event);
       case 'listByPerson':        return await listByPerson(event);
       case 'applyTopics':         return await applyTopics(event);
+      case 'applyTopicsConsole':  return await applyTopics(event, true);
       case 'getActivityData':     return await getActivityData(event);
       default: return { error: 'unknown action: ' + action };
     }
@@ -426,6 +428,26 @@ async function updateParticipant(event) {
   return { ok: (r.data || []).length === 1 };
 }
 
+// Console status changes are activity-scoped and reject stale participant versions.
+// Attendance remains a participation fact; this action never creates an Interaction.
+async function updateParticipantConsole(event) {
+  const id = parseInt(event.id, 10), activityId = parseInt(event.activity_id, 10);
+  const expectedUpdatedAt = String(event.expectedUpdatedAt || ''), expectedStatus = event.expectedStatus;
+  const status = event.status;
+  if (!Number.isSafeInteger(id) || id < 1 || !Number.isSafeInteger(activityId) || activityId < 1 ||
+      !expectedUpdatedAt || !Number.isFinite(Date.parse(expectedUpdatedAt)) ||
+      ST_ENUM.indexOf(expectedStatus) < 0 || ST_ENUM.indexOf(status) < 0) {
+    return { error: 'participant activity scope and version required' };
+  }
+  const activity = assertOk(await rdb.from('activities').select('id')
+    .eq('id', activityId).is('deleted_at', null).maybeSingle());
+  if (!activity.data) return { error: 'activity not found' };
+  const saved = assertOk(await rdb.from('activity_participants').update({ status, updated_at: nowIso() })
+    .eq('id', id).eq('activity_id', activityId).eq('status', expectedStatus)
+    .eq('updated_at', expectedUpdatedAt).is('deleted_at', null).select('id'));
+  return (saved.data || []).length === 1 ? { ok: true } : { error: 'participant changed or unavailable' };
+}
+
 async function removeParticipant(event) {
   const id = parseInt(event.id, 10);
   if (!id) return { error: 'id required' };
@@ -457,7 +479,7 @@ async function listByPerson(event) {
 // 保存活动主题（v1.7.4 Activity Topic Pool）：
 // 更新 activities.topic_ids；对"新采用"的主题 use_count+1、last_used_date=活动日期（无日期取今天）。
 // 移除主题不回退计数（保留历史使用事实）；同一活动重复保存不重复计数（差集计算）。
-async function applyTopics(event) {
+async function applyTopics(event, consoleScoped) {
   const id = parseInt(event.id, 10);
   if (!id) return { error: 'id required' };
   // 规范化 topic_ids：正整数数组、去重
@@ -466,9 +488,19 @@ async function applyTopics(event) {
   ids = Array.from(new Set(ids));
 
   // 活动存在且未删除
-  const a = assertOk(await rdb.from('activities').select('id, topic_ids, activity_date')
+  const a = assertOk(await rdb.from('activities').select('id, topic_ids, activity_date, updated_at')
     .eq('id', id).is('deleted_at', null).maybeSingle());
   if (!a.data) return { error: 'activity not found' };
+  if (consoleScoped) {
+    const expectedUpdatedAt = String(event.expectedUpdatedAt || '');
+    const expectedTopicIds = Array.isArray(event.expectedTopicIds) ? event.expectedTopicIds.map(Number) : null;
+    const currentIds = Array.isArray(a.data.topic_ids) ? a.data.topic_ids.map(Number) : [];
+    if (!expectedUpdatedAt || !Number.isFinite(Date.parse(expectedUpdatedAt)) ||
+        a.data.updated_at !== expectedUpdatedAt || !expectedTopicIds ||
+        currentIds.length !== expectedTopicIds.length || currentIds.some((value, index) => value !== expectedTopicIds[index])) {
+      return { error: 'activity topics changed; reload before saving' };
+    }
+  }
 
   // 过滤掉已删除/不存在的主题 id
   let validIds = ids;
@@ -481,8 +513,11 @@ async function applyTopics(event) {
   }
 
   // 更新活动 topic_ids
-  assertOk(await rdb.from('activities').update({ topic_ids: validIds, updated_at: nowIso() })
-    .eq('id', id));
+  let activityUpdate = rdb.from('activities').update({ topic_ids: validIds, updated_at: nowIso() })
+    .eq('id', id).is('deleted_at', null);
+  if (consoleScoped) activityUpdate = activityUpdate.eq('updated_at', String(event.expectedUpdatedAt));
+  const updated = assertOk(await activityUpdate.select('id'));
+  if (!(updated.data || []).length) return { error: 'activity topics changed; reload before saving' };
 
   // 差集：本次新采用的主题才计数
   const oldIds = Array.isArray(a.data.topic_ids)

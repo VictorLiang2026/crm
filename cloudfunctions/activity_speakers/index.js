@@ -31,6 +31,8 @@ exports.main = async (event, context) => {
       case 'create':  return await create(event);
       case 'update':  return await update(event);
       case 'remove':  return await remove(event);
+      case 'previewRemoveConsole': return await previewRemoveConsole(event);
+      case 'removeConsole': return await removeConsole(event);
       case 'search':  return await search(event);
       default: return { error: 'unknown action: ' + action };
     }
@@ -187,6 +189,47 @@ async function remove(event) {
     .update({ deleted_at: nowIso(), updated_at: nowIso() })
     .eq('id', id));
   return { ok: true };
+}
+
+async function participantReferenceCount(id) {
+  let total = 0, offset = 0;
+  for (;;) {
+    const result = assertOk(await rdb.from('activity_participants').select('id')
+      .eq('person_type', 'speaker').eq('person_id', id).order('id', { ascending: true })
+      .range(offset, offset + 500));
+    const rows = result.data || [];
+    total += Math.min(rows.length, 500);
+    if (rows.length <= 500) return total;
+    offset += 500;
+    if (offset >= 100000) throw new Error('Speaker references exceed preview limit');
+  }
+}
+
+async function previewRemoveConsole(event) {
+  const id = parseInt(event.id, 10);
+  if (!Number.isSafeInteger(id) || id < 1) return { error: 'speaker id required' };
+  const result = assertOk(await rdb.from('activity_speakers').select('id,name,person_id,status,updated_at')
+    .eq('id', id).is('deleted_at', null).maybeSingle());
+  if (!result.data) return { error: 'speaker not found' };
+  return { speaker: result.data, impact: { participantRows: await participantReferenceCount(id) } };
+}
+
+async function removeConsole(event) {
+  const id = parseInt(event.id, 10), expectedUpdatedAt = String(event.expectedUpdatedAt || '');
+  const expectedParticipantRows = Number(event.expectedParticipantRows);
+  if (!Number.isSafeInteger(id) || id < 1 || !expectedUpdatedAt ||
+      !Number.isFinite(Date.parse(expectedUpdatedAt)) || !Number.isInteger(expectedParticipantRows) ||
+      expectedParticipantRows < 0) return { error: 'speaker impact preview required' };
+  const current = assertOk(await rdb.from('activity_speakers').select('id,updated_at')
+    .eq('id', id).is('deleted_at', null).maybeSingle());
+  if (!current.data || current.data.updated_at !== expectedUpdatedAt) return { error: 'speaker changed; reload the impact preview' };
+  const count = await participantReferenceCount(id);
+  if (count !== expectedParticipantRows) return { error: 'speaker references changed; reload the impact preview' };
+  if (count > 0) return { error: 'speaker has participant records; set inactive to retain the history' };
+  const now = nowIso();
+  const saved = assertOk(await rdb.from('activity_speakers').update({ deleted_at: now, updated_at: now })
+    .eq('id', id).is('deleted_at', null).eq('updated_at', expectedUpdatedAt).select('id'));
+  return (saved.data || []).length === 1 ? { ok: true } : { error: 'speaker changed; reload the impact preview' };
 }
 
 // 联想搜索（供 openPersonPickerModal 下拉）：姓名/机构/专业/主题

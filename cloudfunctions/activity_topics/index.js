@@ -31,6 +31,8 @@ exports.main = async (event, context) => {
       case 'create':  return await create(event);
       case 'update':  return await update(event);
       case 'remove':  return await remove(event);
+      case 'previewRemoveConsole': return await previewRemoveConsole(event);
+      case 'removeConsole': return await removeConsole(event);
       case 'search':  return await search(event);
       default: return { error: 'unknown action: ' + action };
     }
@@ -125,6 +127,47 @@ async function remove(event) {
     .update({ deleted_at: nowIso(), updated_at: nowIso() })
     .eq('id', id));
   return { ok: true };
+}
+
+async function activityReferenceCount(topicId) {
+  let total = 0, offset = 0;
+  for (;;) {
+    const result = assertOk(await rdb.from('activities').select('id,topic_ids')
+      .order('id', { ascending: true }).range(offset, offset + 500));
+    const rows = result.data || [];
+    total += rows.filter(activity => Array.isArray(activity.topic_ids) &&
+      activity.topic_ids.some(value => String(value) === String(topicId))).length;
+    if (rows.length <= 500) return total;
+    offset += 500;
+    if (offset >= 100000) throw new Error('Topic references exceed preview limit');
+  }
+}
+
+async function previewRemoveConsole(event) {
+  const id = parseInt(event.id, 10);
+  if (!Number.isSafeInteger(id) || id < 1) return { error: 'topic id required' };
+  const result = assertOk(await rdb.from('activity_topics').select('id,topic_name,status,updated_at')
+    .eq('id', id).is('deleted_at', null).maybeSingle());
+  if (!result.data) return { error: 'topic not found' };
+  return { topic: result.data, impact: { activityReferences: await activityReferenceCount(id) } };
+}
+
+async function removeConsole(event) {
+  const id = parseInt(event.id, 10), expectedUpdatedAt = String(event.expectedUpdatedAt || '');
+  const expectedActivityReferences = Number(event.expectedActivityReferences);
+  if (!Number.isSafeInteger(id) || id < 1 || !expectedUpdatedAt ||
+      !Number.isFinite(Date.parse(expectedUpdatedAt)) || !Number.isInteger(expectedActivityReferences) ||
+      expectedActivityReferences < 0) return { error: 'topic impact preview required' };
+  const current = assertOk(await rdb.from('activity_topics').select('id,updated_at')
+    .eq('id', id).is('deleted_at', null).maybeSingle());
+  if (!current.data || current.data.updated_at !== expectedUpdatedAt) return { error: 'topic changed; reload the impact preview' };
+  const count = await activityReferenceCount(id);
+  if (count !== expectedActivityReferences) return { error: 'topic references changed; reload the impact preview' };
+  if (count > 0) return { error: 'topic is used by activities; set inactive to retain historical references' };
+  const now = nowIso();
+  const saved = assertOk(await rdb.from('activity_topics').update({ deleted_at: now, updated_at: now })
+    .eq('id', id).is('deleted_at', null).eq('updated_at', expectedUpdatedAt).select('id'));
+  return (saved.data || []).length === 1 ? { ok: true } : { error: 'topic changed; reload the impact preview' };
 }
 
 // 联想搜索（供活动选择主题弹窗）：全字段匹配；仅 active；返回精简字段
