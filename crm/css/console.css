@@ -702,7 +702,29 @@ body:has(.login), body.is-login { padding-top: env(safe-area-inset-top); }
 .insurance-category { padding: 12px 2px; border-bottom: 1px solid var(--line, #e4e8ee); }
 .insurance-category summary { color: var(--text, #202a35); font-weight: 600; cursor: pointer; padding: 4px 0; }
 .insurance-category summary:focus-visible { outline: 2px solid var(--accent, #2e6b63); outline-offset: 3px; }
+.policy-reports { min-width: 0; padding: 16px 0; border-bottom: 1px solid var(--line); }
+.policy-report-list { display: grid; gap: 10px; margin-top: 10px; }
+.policy-report-item { min-width: 0; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--card); }
+.policy-report-summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; color: var(--ink); font-weight: 700; cursor: pointer; }
+.policy-report-summary::marker { color: var(--red); }
+.policy-report-summary-hint { flex: none; color: var(--muted); font-size: 12px; font-weight: 500; }
+.policy-report-body { display: grid; gap: 14px; padding: 0 16px 16px; }
+.policy-report-meta { display: flex; flex-wrap: wrap; gap: 8px 18px; padding-bottom: 10px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+.policy-report-field { min-width: 0; padding-left: 12px; border-left: 3px solid var(--red-50); }
+.policy-report-field h4 { margin: 0 0 5px; font-size: 14px; }
+.policy-report-current-label { color: var(--red); font-size: 12px; font-weight: 700; }
+.policy-report-text { margin: 4px 0 0; color: var(--ink-2); white-space: pre-wrap; overflow-wrap: anywhere; }
+.policy-report-original { margin-top: 7px; color: var(--muted); font-size: 12px; }
+.policy-report-original summary, .policy-report-raw summary { cursor: pointer; }
+.policy-report-label { display: grid; gap: 6px; font-size: 13px; font-weight: 600; }
+.policy-report-input { width: 100%; min-height: 96px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); color: var(--ink); font: inherit; resize: vertical; }
+.policy-report-input:focus { outline: 2px solid var(--red-50); border-color: var(--red); }
+.policy-report-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.policy-report-raw { min-width: 0; padding-top: 8px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+.policy-report-raw pre { max-height: 320px; overflow: auto; padding: 10px; border-radius: var(--radius-sm); background: var(--bg); color: var(--ink-2); white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
+.policy-report-status { color: var(--muted); font-size: 13px; }
 @media (min-width: 768px) {
   .insurance-editor { padding: 18px 4px; }
   .insurance-category { padding: 14px 4px; }
+  .policy-report-body { padding: 0 20px 20px; }
 }

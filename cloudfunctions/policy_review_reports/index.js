@@ -25,7 +25,7 @@ const EDIT_FIELDS = [
 const CREATE_FIELDS = [
   'customer_id', 'customer_name', 'report_date', 'report_type',
   'gaps_found', 'recommendations', 'asset_allocation', 'next_action',
-  'summary', 'raw',
+  'summary', 'raw', 'input_products_version',
 ];
 
 const OPERATOR_DEFAULT = { name: 'Victor', gender: '男', birthday: '1976-10' };
@@ -196,7 +196,7 @@ async function generate(event) {
 
   // 拉上下文：保单、跟进、礼品、历史检视报告、照片
   const [prod, fol, gif, hist, photos] = await Promise.all([
-    rdb.from('products').select('id::text,items,ap_ipa::text,ap_ppa::text,ap_ltc::text,ap_ann::text,ap_life::text,ap_term::text,ap_wl::text,ap_pa::text,ap_ci::text,ap_hi::text,ap_all::text').eq('customer_id', customerId),
+    rdb.from('products').select('id::text,version,items,ap_ipa::text,ap_ppa::text,ap_ltc::text,ap_ann::text,ap_life::text,ap_term::text,ap_wl::text,ap_pa::text,ap_ci::text,ap_hi::text,ap_all::text').eq('customer_id', customerId),
     rdb.from('followups').select().eq('customer_id', customerId)
       .order('followup_date', { ascending: false, nullsFirst: false })
       .order('Id', { ascending: false })
@@ -206,7 +206,7 @@ async function generate(event) {
       .order('Id', { ascending: false })
       .limit(3),
     rdb.from('policy_review_reports').select(
-      'id,report_date,report_type,summary,gaps_found,recommendations,asset_allocation,next_action'
+      'id,report_date,report_type,summary,gaps_found,recommendations,asset_allocation,next_action,edited_summary,edited_gaps,edited_recommendations,edited_asset_allocation,edited_next_action'
     ).eq('customer_id', customerId)
       .order('report_date', { ascending: false, nullsFirst: false })
       .order('id', { ascending: false })
@@ -233,6 +233,8 @@ async function generate(event) {
       items_detail: items,
     };
   });
+  // PC13 captures the PC12 product edit version as provenance; it is not a snapshot of customer data.
+  const inputProductsVersion = prodRows.length ? prodRows[0].version : null;
 
   // 操作员信息
   const opIn = testCustomer ?
@@ -268,8 +270,10 @@ async function generate(event) {
     history_reports: histRows.map(function (h) {
       return {
         date: h.report_date, type: h.report_type,
-        summary: h.summary, gaps: h.gaps_found, recs: h.recommendations,
-        asset: h.asset_allocation, next: h.next_action,
+        summary: h.edited_summary || h.summary, gaps: h.edited_gaps || h.gaps_found,
+        recs: h.edited_recommendations || h.recommendations,
+        asset: h.edited_asset_allocation || h.asset_allocation,
+        next: h.edited_next_action || h.next_action,
       };
     }),
   };
@@ -294,6 +298,7 @@ async function generate(event) {
     customer_name: ident.name,
     report_date: today,
     report_type: '保单年度检视',
+    input_products_version: inputProductsVersion,
     summary: parsed.summary || null,
     gaps_found: parsed.gaps_found || null,
     recommendations: parsed.recommendations || null,

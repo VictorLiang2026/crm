@@ -92,6 +92,18 @@ export const data = {
   savePersonProducts: (ctx, personId, expectedVersion, payload) => call(ctx, 'products', {
     action: 'upsert', personId: String(personId), expectedVersion: String(expectedVersion), data: payload,
   }),
+  policyReports: (ctx, customerId) => call(ctx, 'policy_review_reports', {
+    action: 'list', customer_id: Number(customerId),
+  }),
+  policyReport: (ctx, reportId) => call(ctx, 'policy_review_reports', {
+    action: 'get', id: Number(reportId),
+  }),
+  generatePolicyReport: (ctx, customerId) => call(ctx, 'policy_review_reports', {
+    action: 'generate', customer_id: Number(customerId),
+  }),
+  updatePolicyReport: (ctx, reportId, payload) => call(ctx, 'policy_review_reports', {
+    action: 'update', id: Number(reportId), data: payload,
+  }),
   personOpportunities: (ctx, personId) => p360(ctx, 'listOpportunities', { personId }),
   recruitContext: (ctx, personId) => p360(ctx, 'listRecruitContext', { personId }),
   lookupCustomer: (ctx, customerId) => p360(ctx, 'lookupCustomer', { customerId }),

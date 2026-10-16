@@ -11,6 +11,7 @@ import { relationshipNode } from '../relationship-actions.js';
 import { relationshipNetworkNode } from '../relationship-network.js';
 import { careMaterialsNode } from '../care-materials.js';
 import { renderInsuranceEditor } from '../insurance-editor.js';
+import { renderInsuranceReports } from '../insurance-reports.js';
 import { openWorkItemEditor, openWorkItemTransition, openOpportunityAdvance, openQuickCapture, openPersonEdit, openPersonDelete,
   openPersonInteraction, openPersonFollowup } from '../write.js';
 import {
@@ -241,6 +242,7 @@ function insuranceNode(ctx, id) {
       bdg(d.evidenceStatus === 'recorded' ? t('badge_has_evidence') : t('badge_no_evidence'), d.evidenceStatus === 'recorded' ? 'jade' : 'gray'),
     ]));
     blocks.push(editor);
+    blocks.push(renderInsuranceReports(ctx, d.legacyCustomerId));
     const cov = d.existingCoverage || [];
     if (cov.length) {
       blocks.push(sectionTitle(t('sec_coverage')));
@@ -253,7 +255,7 @@ function insuranceNode(ctx, id) {
       const r = review.latest;
       blocks.push(sectionTitle(t('sec_latest_review')));
       blocks.push(kvGrid([[t('label_date'), fmtDate(r.report_date)], [t('label_type'), r.report_type],
-        [t('label_summary'), r.summary || r.edited_summary], [t('label_next_step'), r.next_action || r.edited_next_action]]));
+        [t('label_summary'), r.edited_summary || r.summary], [t('label_next_step'), r.edited_next_action || r.next_action]]));
     }
     const needs = d.knownNeeds || [];
     if (needs.length) {
