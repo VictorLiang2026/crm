@@ -22,3 +22,5 @@
 
 
 2026-10-16 PC19 更新：已核对两个 public.crm_recruit_candidate_*_v1 RPC 的签名及有效执行权限，均为 SECURITY DEFINER 且仅 service_role 可执行；anon 与 authenticated 均无执行权。仅将这两个精确签名加入预期快照。
+
+2026-10-17 PC24 更新：已核对 `public.crm_search_people_v2(jsonb,integer,integer)` 为 SECURITY INVOKER，只授予 `service_role` 执行；`anon` 与 `authenticated` 均不可执行。只将该固定只读 RPC 签名加入预期快照。

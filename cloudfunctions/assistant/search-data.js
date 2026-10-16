@@ -73,13 +73,35 @@ function createSearchData({ env, key, fetchImpl = fetch } = {}) {
     return value;
   }
 
+  async function searchV2(filters, limit = 30, offset = 0) {
+    if (!filters || typeof filters !== 'object' || Array.isArray(filters) ||
+        !Number.isInteger(limit) || limit < 1 || limit > 50 ||
+        !Number.isInteger(offset) || offset < 0 || offset > 500) {
+      throw new Error('Invalid CRM search criteria');
+    }
+    const value = await request('rpc/crm_search_people_v2', 'POST', {},
+      { p_filters: filters, p_limit: limit, p_offset: offset });
+    if (!value || typeof value !== 'object' || Array.isArray(value) ||
+        !Array.isArray(value.rows) || !Number.isInteger(value.total) ||
+        value.rows.length > limit || !Array.isArray(value.filterLabels)) {
+      throw new Error('Invalid CRM search response');
+    }
+    return value;
+  }
+
+  async function resolveName(name) {
+    const { PersonService } = require('./person-service');
+    return new PersonService({ request: (table, method, filters, body) =>
+      request(table, method, filters, body) }).resolveName(name);
+  }
+
   async function linkTestAudit(taskId,refs) {
     if(!/^[1-9][0-9]*$/.test(String(taskId)) || !Array.isArray(refs) || refs.length>2000) throw Error('Invalid audit provenance');
     const result=await request('rpc/crm_test_link_ai_v1','POST',{}, {p_task_id:taskId,p_refs:refs});
     if(result?.ok!==true) throw Error('Audit provenance was not saved');
     return result;
   }
-  return { auditRdb, search, linkTestAudit };
+  return { auditRdb, search, searchV2, resolveName, linkTestAudit };
 }
 
 module.exports = { createSearchData };

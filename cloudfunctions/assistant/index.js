@@ -80,6 +80,15 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
         return { ok: false, error: { code, message: 'CRM search could not be completed' } };
       }
     }
+    if (event?.action === 'searchV2') {
+      try { return await require('./search-v2-service').runSearchV2({query:event.query,language:event.language,
+        selectedPersonId:event.selectedPersonId,page:event.page}); }
+      catch (error) {
+        const code = ['INVALID_INPUT','INVALID_RESULT','INVALID_CONFIG','RATE_LIMIT','TIMEOUT',
+          'UPSTREAM_UNAVAILABLE','PERSISTENCE_ERROR','AI_REQUEST_FAILED'].includes(error?.code) ? error.code : 'SEARCH_FAILED';
+        return {ok:false,error:{code,message:'CRM combination search could not be completed'}};
+      }
+    }
     if (event?.action === 'summarize') {
       try { return await require('./summarize-service').runSummarize(event); }
       catch (error) {

@@ -34,27 +34,37 @@ function evidenceFor(row, template) {
 function searchPanel(ctx) {
   const out = h('div', {});
   let queryInput;
-  function doSearch() {
+  let selectedPersonId = null;
+  let currentPage = 1;
+  async function runSearch(page = 1) {
     const q = queryInput.value.trim();
     if (!q) { ctx.toast(t('toast_enter_search')); return; }
     loadInto(out, async () => {
-      const res = await data.aiSearch(ctx, q);
+      const res = await data.aiSearchV2(ctx, { query:q, page, ...(selectedPersonId ? {selectedPersonId} : {}) });
       if (!res.ok) throw new Error(res.error?.code || 'SEARCH_FAILED');
       if (res.status === 'unsupported') {
-        return h('div', { class: 'muted' }, res.notice || t('search_unsupported'));
+        return h('div', { class: 'muted' }, t('search_v2_unsupported'));
+      }
+      if (res.status === 'person_not_found') return h('div', {class:'muted'}, t('search_v2_person_missing'));
+      if (res.status === 'needs_person_selection') {
+        if (!Array.isArray(res.candidates) || !res.candidates.length) throw new Error('INVALID_RESULT');
+        const select = h('select', {class:'sheet-input', 'aria-label':t('search_v2_choose_person')}, [
+          h('option', {value:''}, t('search_v2_choose_person')),
+          ...res.candidates.map(p => h('option', {value:p.id}, [p.displayName, p.organization ? ` · ${p.organization}` : '', p.occupation ? ` · ${p.occupation}` : ''])),
+        ]);
+        const submit = h('button', {class:'btn btn-soft', type:'button', onclick:() => {
+          if (!/^[1-9][0-9]*$/.test(String(select.value))) { ctx.toast(t('search_v2_person_required')); return; }
+          selectedPersonId=String(select.value); currentPage=1; runSearch(1);
+        }}, t('btn_confirm'));
+        return h('div', {}, [h('p', {class:'foot-note'}, t('search_v2_person_required')), select, submit]);
       }
       if (res.status !== 'complete' || !Array.isArray(res.rows)) throw new Error('INVALID_RESULT');
-      const tpl = res.criteria?.template || '';
-      const months = res.criteria?.months || 0;
+      currentPage = res.page || page;
       const rows = (res.rows || []).filter((r) => /^[1-9][0-9]*$/.test(String(r.person_id)));
       const body = [];
-      body.push(h('div', { class: 'search-summary' }, [
-        bdg(searchLabels()[tpl] || t('search_restricted'), 'ink'),
-        h('span', { class: 'muted' }, t('search_recent_months_prefix') + months + t('search_recent_months_suffix') + res.total + t('search_people_suffix')),
-      ]));
-      for (const notice of res.notices || []) {
-        body.push(h('p', { class: 'foot-note' }, notice));
-      }
+      body.push(h('div', {class:'search-summary'}, [bdg(t('search_v2_interpretation'),'ink'), h('span',{class:'muted'},res.interpretation || '')]));
+      if (res.testData?.status === 'unverified') body.push(h('p',{class:'foot-note'},t('search_v2_unverified')));
+      else if (res.testData?.containsTestData) body.push(h('p',{class:'foot-note'},t('search_v2_test_data')));
       if (!rows.length) {
         body.push(h('p', { class: 'muted' }, t('search_no_matches')));
       } else {
@@ -62,18 +72,29 @@ function searchPanel(ctx) {
           h('a', { class: 'list-row data-row', href: `#/person/${r.person_id}` }, [
             h('div', { style: 'flex:1;min-width:0' }, [
               h('div', { class: 'row-title' }, r.display_name || `Person #${r.person_id}`),
-              h('div', { class: 'row-sub' }, evidenceFor(r, tpl)),
+              h('div', { class: 'row-sub' }, [
+                r.customer_id ? `Person #${r.person_id} · Customer #${r.customer_id}` : `Person #${r.person_id}`,
+                ...(r.matchReasons||[]).map(reason=>h('div',{class:'foot-note'},[
+                  t('search_v2_condition_'+reason.condition)+': '+(reason.records||[]).map(ref=>`public.${ref.table} #${ref.id}`).join(', '),
+                  (reason.evidence||[]).length ? ' · '+JSON.stringify(reason.evidence) : (reason.verifiedAbsence ? ' · '+t('search_v2_no_recent_followup') : ''),
+                ])),
+              ]),
             ]),
             ic('chevron'),
           ]))));
       }
-      if (res.total > rows.length) {
-        body.push(h('p', { class: 'muted' }, t('search_show_first_prefix') + rows.length + t('search_show_first_suffix')));
-      }
+      body.push(h('div',{class:'search-summary'},[
+        h('span',{class:'muted'},`${t('search_v2_page')} ${res.page} · ${res.total} ${t('search_v2_total')}`),
+        res.page>1 ? h('button',{class:'btn btn-ghost btn-sm',type:'button',onclick:()=>runSearch(res.page-1)},t('search_v2_previous')) : null,
+        res.hasMore && res.page<11 ? h('button',{class:'btn btn-ghost btn-sm',type:'button',onclick:()=>runSearch(res.page+1)},t('search_v2_next')) : null,
+      ].filter(Boolean)));
+      if (res.truncated) body.push(h('p',{class:'foot-note'},t('search_v2_limit_reached')));
+      body.push(h('p',{class:'foot-note'},t('search_v2_time_note')));
       body.push(h('p', { class: 'foot-note' }, t('search_source_note')));
       return h('div', {}, body);
     }, h('div', { class: 'muted' }, [sk('100%'), h('div', { style: 'height:8px' }), sk('70%')]));
   }
+  function doSearch() { selectedPersonId=null; currentPage=1; runSearch(1); }
   queryInput = h('textarea', {
     class: 'sheet-input', rows: '3', maxlength: '1000',
     placeholder: t('search_placeholder'),

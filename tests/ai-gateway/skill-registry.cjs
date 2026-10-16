@@ -9,6 +9,7 @@ const { defaultRegistry: assistantRegistry } = require('../../cloudfunctions/ass
 const names = ['quick_capture', 'person_summary', 'meeting_prep', 'today_coach',
   'opportunity_analysis', 'opportunity_candidate', 'activity_prepare', 'activity_review', 'recruit_coach',
   'conversation_playbook', 'ai_search', 'crm_search_parse'];
+names.push('crm_search_query_v2');
 
 test('all versioned contracts are model-independent and immutable', () => {
   assert.deepEqual(defaultRegistry.list().map(item => item.name), names);
@@ -27,6 +28,15 @@ test('all versioned contracts are model-independent and immutable', () => {
 test('deployed assistant registry carries the same Recruit Coach v2 contract', () => {
   const shared=defaultRegistry.get('recruit_coach');
   const assistant=assistantRegistry.get('recruit_coach');
+  assert.equal(shared.version,'2.0.0');
+  assert.equal(assistant.version,shared.version);
+  assert.deepEqual(assistant.outputSchema,shared.outputSchema);
+  assert.deepEqual(assistant.contextRecipe,shared.contextRecipe);
+});
+
+test('deployed assistant registry carries the same PC24 search v2 contract', () => {
+  const shared=defaultRegistry.get('crm_search_query_v2');
+  const assistant=assistantRegistry.get('crm_search_query_v2');
   assert.equal(shared.version,'2.0.0');
   assert.equal(assistant.version,shared.version);
   assert.deepEqual(assistant.outputSchema,shared.outputSchema);
@@ -78,6 +88,10 @@ test('every initial skill accepts a representative input, context and output', (
     crm_search_parse: [{ query: '最近三个月参加过活动但没有继续跟进的人' },
       { guidance: { supportedTemplates: ['activity_no_followup'] } },
       { template: 'activity_no_followup', months: 3 }],
+    crm_search_query_v2: [{query:'最近参加活动且有近期跟进的客户',language:'zh-CN'}, {guidance:{}},
+      {status:'supported',interpretation:'筛选近期活动参与并有跟进的客户。',personMention:null,
+        filters:{roles:['customer'],relationshipTypes:null,fact:null,attendanceMonths:3,
+          followupState:'recent',followupMonths:3,opportunityStatuses:null,opportunityTypes:null,recruitStages:null}}],
   };
   for (const name of names) {
     const [input, context, output] = examples[name];

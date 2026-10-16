@@ -200,6 +200,28 @@ const SKILLS = [
     }, ['template', 'months']),
     confirmationLevel: 'review', timeoutClass: 'short',
   },
+  {
+    name: 'crm_search_query_v2', version: '2.0.0', capability: 'structured_extraction',
+    contextRecipe: recipe(['guidance']),
+    inputSchema: object({ query: text(1000), language: { type: 'string', enum: ['zh-CN','en'] } }, ['query','language']),
+    outputSchema: object({
+      status: { type: 'string', enum: ['supported','unsupported'] },
+      interpretation: text(500),
+      personMention: { anyOf: [text(160), { type: 'null' }] },
+      filters: object({
+        roles: { anyOf: [{ type: 'array', items: { type: 'string', enum: ['customer','recruit','speaker','participant'] }, minItems: 1, maxItems: 4, uniqueItems: true }, { type: 'null' }] },
+        relationshipTypes: { anyOf: [{ type: 'array', items: { type: 'string', enum: ['family','friend','colleague','business','referral','other'] }, minItems: 1, maxItems: 6, uniqueItems: true }, { type: 'null' }] },
+        fact: { anyOf: [object({ category: { anyOf: [text(64), { type: 'null' }] }, contains: { anyOf: [text(80), { type: 'null' }] } }, ['category','contains']), { type: 'null' }] },
+        attendanceMonths: { anyOf: [{ type: 'integer', minimum: 1, maximum: 24 }, { type: 'null' }] },
+        followupState: { anyOf: [{ type: 'string', enum: ['recent','none'] }, { type: 'null' }] },
+        followupMonths: { anyOf: [{ type: 'integer', minimum: 1, maximum: 24 }, { type: 'null' }] },
+        opportunityStatuses: { anyOf: [{ type: 'array', items: { type: 'string', enum: ['发现','沟通','方案','潜在线索','已介绍','已联系','已建立关系','成交','关闭'] }, minItems: 1, maxItems: 6, uniqueItems: true }, { type: 'null' }] },
+        opportunityTypes: { anyOf: [{ type: 'array', items: { type: 'string', enum: ['insurance','recruit','referral','activity','speaker','partnership','service','relationship','医疗保障','重疾保障','养老规划','教育规划','财富规划','家庭保障','转介绍'] }, minItems: 1, maxItems: 6, uniqueItems: true }, { type: 'null' }] },
+        recruitStages: { anyOf: [{ type: 'array', items: { type: 'string', enum: ['新增人才','互动暖客','初次面谈','增员活动','精准面谈','入职申请','签约入司','流失','名单','接触','面谈1','面谈2','创说会','报考','入司','转正'] }, minItems: 1, maxItems: 6, uniqueItems: true }, { type: 'null' }] },
+      }, ['roles','relationshipTypes','fact','attendanceMonths','followupState','followupMonths','opportunityStatuses','opportunityTypes','recruitStages']),
+    }, ['status','interpretation','personMention','filters']),
+    confirmationLevel: 'review', timeoutClass: 'short',
+  },
 ];
 
 const DEFINITION_SCHEMA = object({

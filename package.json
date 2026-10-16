@@ -29,6 +29,7 @@
     "test:pc21": "node --test tests/recruit-goals/transactional-save.cjs tests/wp02/run.test.cjs tests/pc16/activity-management.test.cjs tests/pc16/activity-management.browser.cjs tests/pc21/*.browser.cjs",
     "test:pc22": "node --test tests/pc22/*.test.cjs tests/pc22/*.browser.cjs tests/ai-gateway/meeting-prep.cjs tests/ai-gateway/conversation-playbook.cjs",
     "test:pc23": "node --test tests/pc23/*.test.cjs tests/pc23/*.browser.cjs tests/ai-gateway/meeting-prep.cjs tests/ai-gateway/conversation-playbook.cjs",
+    "test:pc24": "node --test tests/pc24/*.test.cjs tests/pc24/*.browser.cjs tests/ai-gateway/skill-registry.cjs",
     "test:pc09": "node --test tests/relationships/*.test.cjs tests/pc09/*.test.cjs tests/pc09/relationship-ui.browser.cjs",
     "test:pc10": "node --test tests/relationships/relationship-network-service.test.cjs tests/pc10/relationship-network-ui.browser.cjs",
     "test:pc11": "node --test tests/pc11/*.test.cjs tests/pc11/*.browser.cjs",
