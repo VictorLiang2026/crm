@@ -19,3 +19,6 @@
 目录检查包括：表 RLS 与策略、所有视图的 `security_invoker`、`anon`/`authenticated`/`service_role` 的有效关系授权、序列授权、数据库函数执行授权及 `SECURITY DEFINER` 漂移。它会拒绝截断结果、缺失对象和未经审阅的新对象。匿名网关探针补充验证当前公开 Key 的实际读路径；仍不能证明真实登录用户路径、服务端身份或 RPC 网关是否执行函数授权。这些路径应按 `tests/permissions/README.md` 用隔离账号/记录验证。
 
 旧业务表对 `anon` 的授权、旧序列对 `authenticated` 的授权，以及部分触发器函数对 `anon` 的执行授权被记录为现状；不能由此推断匿名客户端可读取客户行。未经单独评估和兼容回归，不直接收紧旧授权。
+
+
+2026-10-16 PC19 更新：已核对两个 public.crm_recruit_candidate_*_v1 RPC 的签名及有效执行权限，均为 SECURITY DEFINER 且仅 service_role 可执行；anon 与 authenticated 均无执行权。仅将这两个精确签名加入预期快照。

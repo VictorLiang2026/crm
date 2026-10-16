@@ -3,6 +3,7 @@
 import { h } from '../dom.js';
 import { ic } from '../icons.js';
 import { data } from '../data.js';
+import { openRecruitCandidateCreate } from '../recruit-write.js';
 import { wpTag, pageHead, emptyNote, loadInto, bdg, fmtDate, dayDiffFromToday, textOf } from '../ui.js';
 import { t, translateEnum } from '../i18n.js';
 
@@ -141,7 +142,9 @@ export function renderRecruit(ctx) {
       sub: t('sub_recruit'),
       actions: [
         h('button', { class: 'btn btn-ghost', type: 'button', title: t('goals_title'), onclick: () => ctx.toast(t('toast_goals_wp2')) }, [ic('calendar'), t('goals_short')]),
-        h('button', { class: 'btn btn-primary', type: 'button', title: t('new_recruit'), onclick: () => ctx.toast(t('toast_new_recruit_wp2')) }, [ic('plus'), t('new_recruit_short')]),
+        h('button', { class: 'btn btn-primary', type: 'button', title: t('new_recruit'), onclick: () => openRecruitCandidateCreate(ctx, {
+          onDone: personId => { location.hash = `#/person/${personId}`; },
+        }) }, [ic('plus'), t('new_recruit_short')]),
       ],
     }),
     h('div', { class: 'today-grid' }, [

@@ -111,6 +111,11 @@ function route() {
     main: shell.main,
     api,
     callFn,
+    recruitFiles: {
+      upload: (path, file, options) => app.storage.from('recruit').upload(path, file, options),
+      createSignedUrl: (path, expiresIn) => app.storage.from('recruit').createSignedUrl(path, expiresIn),
+      remove: paths => app.storage.from('recruit').remove(paths),
+    },
     operator: CONFIG.operator || {},
     toast,
     signOut: signOutCurrentAccount,

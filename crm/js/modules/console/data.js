@@ -183,6 +183,16 @@ export const data = {
   // ---------- 招募 ----------
   recruitList: (ctx, params) => call(ctx, 'recruit_candidates', { action: 'list', ...(params || {}) }),
   recruitPersonOnly: (ctx) => p360(ctx, 'listPersonOnlyRecruits'),
+  resolveRecruitCandidateName: (ctx, name) => p360(ctx, 'resolveRecruitCandidateName', { name }),
+  createRecruitCandidate: (ctx, payload) => p360(ctx, 'createRecruitCandidate', { data: payload }),
+  recruitCandidateDetails: (ctx, candidateId, personId) => p360(ctx, 'getRecruitCandidate', { candidateId, personId }),
+  transitionRecruitStage: (ctx, payload) => p360(ctx, 'transitionRecruitStage', { data: payload }),
+  updateRecruitCandidate: (ctx, id, expectedUpdatedAt, payload) => call(ctx, 'recruit_candidates', {
+    action: 'update', id: String(id), expectedUpdatedAt, data: payload,
+  }),
+  recruitFollowups: (ctx, candidateId) => call(ctx, 'recruit_followups', { action: 'list', candidate_id: String(candidateId) }),
+  createRecruitFollowup: (ctx, payload) => call(ctx, 'recruit_followups', { action: 'create', data: payload }),
+  updateRecruitFollowup: (ctx, id, payload) => call(ctx, 'recruit_followups', { action: 'update', id: String(id), data: payload }),
   recruitFunnel: (ctx) => call(ctx, 'recruit_candidates', { action: 'funnel' }),
   recruitProgress: (ctx, startMonth, endMonth) =>
     call(ctx, 'recruit_goals', { action: 'getProgress', startMonth, endMonth }),

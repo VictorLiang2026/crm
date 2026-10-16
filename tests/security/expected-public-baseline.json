@@ -2606,6 +2606,26 @@
     },
     {
       "kind": "routine",
+      "name": "crm_recruit_candidate_create_v1(p_actor_uid text, p_person_id bigint, p_selected_display_name text, p_operator text)",
+      "detail": {
+        "anon_execute": false,
+        "service_execute": true,
+        "security_definer": true,
+        "authenticated_execute": false
+      }
+    },
+    {
+      "kind": "routine",
+      "name": "crm_recruit_candidate_transition_v1(p_actor_uid text, p_candidate_id bigint, p_person_id bigint, p_expected_updated_at timestamp with time zone, p_to_stage text, p_note text, p_operator text)",
+      "detail": {
+        "anon_execute": false,
+        "service_execute": true,
+        "security_definer": true,
+        "authenticated_execute": false
+      }
+    },
+    {
+      "kind": "routine",
       "name": "crm_recruit_goals_save_v1(p_goal_month text, p_goals jsonb, p_operator text)",
       "detail": {
         "anon_execute": true,

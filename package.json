@@ -24,6 +24,7 @@
     "test:person-service": "node --test tests/persons/person-service.cjs",
     "test:households": "node --test tests/households/person360-service.cjs",
     "test:pc08": "node --test tests/households/person360-service.cjs tests/households/lifecycle.test.cjs tests/pc08/meeting-prep-context.test.cjs tests/pc08/family-ui.browser.cjs tests/pc08/migration-contract.test.cjs",
+    "test:pc19": "node --test tests/pc19/recruit-candidate-service.test.cjs tests/pc19/recruit-write.browser.cjs",
     "test:pc09": "node --test tests/relationships/*.test.cjs tests/pc09/*.test.cjs tests/pc09/relationship-ui.browser.cjs",
     "test:pc10": "node --test tests/relationships/relationship-network-service.test.cjs tests/pc10/relationship-network-ui.browser.cjs",
     "test:pc11": "node --test tests/pc11/*.test.cjs tests/pc11/*.browser.cjs",

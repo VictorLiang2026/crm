@@ -22,6 +22,7 @@ const { HouseholdService } = require('./household-service');
 const { RelationshipService } = require('./relationship-service');
 const { RelationshipNetworkService } = require('./relationship-network-service');
 const { OcrReviewService } = require('./ocr-review-service');
+const { RecruitCandidateService } = require('./recruit-candidate-service');
 const aiStandards = require('./ai');
 
 const app = cloudbase.init({ env: process.env.TCB_ENV });
@@ -137,7 +138,8 @@ async function pgRpc(name, body) {
     'crm_context_item_preview_v1','crm_context_item_execute_v1',
     'crm_household_preview_v1','crm_household_execute_v1',
     'crm_relationship_preview_v1','crm_relationship_execute_v1',
-    'crm_ocr_parse_preview_v1','crm_ocr_parse_undo_preview_v1','crm_ocr_parse_execute_v1']).has(name)) throw new Error('Invalid RPC');
+    'crm_ocr_parse_preview_v1','crm_ocr_parse_undo_preview_v1','crm_ocr_parse_execute_v1',
+    'crm_recruit_candidate_create_v1','crm_recruit_candidate_transition_v1']).has(name)) throw new Error('Invalid RPC');
   const env = process.env.TCB_ENV;
   const key = process.env.CRM_PERSON360_DB_API_KEY;
   if (!/^crm-[a-z0-9]+$/.test(env || '') || !key) throw new Error('Person 360 is not configured');
@@ -812,6 +814,9 @@ function createService({ request = pgRequest, rpc = pgRpc, disclosure = disclose
   }
 
   const personService = new PersonService({ request });
+  const recruitCandidateService = new RecruitCandidateService({
+    request, rpc, resolveName: name => personService.resolveName(name),
+  });
   async function resolveQuickCaptureName(name) {
     return personService.resolveName(name);
   }
@@ -865,6 +870,10 @@ function createService({ request = pgRequest, rpc = pgRpc, disclosure = disclose
     updatePerson, previewPersonDelete, executePersonDelete, restorePerson, listPersonTrash,
     listPersonOnlyRecruits, getPersonOnlyRecruit, listPersonOnlyRecruitTrash,
     changePersonOnlyRecruit,
+    resolveRecruitCandidateName: name => recruitCandidateService.resolveRecruitName(name),
+    createRecruitCandidate: (data, uid) => recruitCandidateService.create(data, uid),
+    getRecruitCandidate: (candidateId, personId) => recruitCandidateService.details(candidateId, personId),
+    transitionRecruitStage: (data, uid) => recruitCandidateService.transition(data, uid),
     listOpportunities, listRecruitContext, createOpportunity, updateOpportunity, closeOpportunity, removeOpportunity,
     getInsuranceContext,
     resolveQuickCaptureName, commitQuickCaptureV2 };
@@ -921,6 +930,10 @@ exports.main = async event => {
       case 'listPersonOnlyRecruitTrash': return await service.listPersonOnlyRecruitTrash();
       case 'removePersonOnlyRecruit': return await service.changePersonOnlyRecruit('remove', [event.id], uid);
       case 'restorePersonOnlyRecruit': return await service.changePersonOnlyRecruit('restore', event.ids, uid);
+      case 'resolveRecruitCandidateName': return await service.resolveRecruitCandidateName(event.name);
+      case 'createRecruitCandidate': return await service.createRecruitCandidate(event.data, uid);
+      case 'getRecruitCandidate': return await service.getRecruitCandidate(event.candidateId, event.personId);
+      case 'transitionRecruitStage': return await service.transitionRecruitStage(event.data, uid);
       case 'resolveIdentity': return await service.resolveIdentity(event.name);
       case 'previewIdentity': return await service.previewIdentity(event.data, uid);
       case 'executeIdentity': return await service.executeIdentity(event.data, uid);

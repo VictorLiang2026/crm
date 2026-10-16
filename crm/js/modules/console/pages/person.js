@@ -6,6 +6,7 @@ import { h } from '../dom.js';
 import { ic } from '../icons.js';
 import { data } from '../data.js';
 import { openContextItemAction } from '../context-actions.js';
+import { renderRecruitSection } from '../recruit-write.js';
 import { renderFamily } from '../family-actions.js';
 import { relationshipNode } from '../relationship-actions.js';
 import { relationshipNetworkNode } from '../relationship-network.js';
@@ -350,24 +351,7 @@ function opportunitiesNode(ctx, id) {
 }
 
 function recruitNode(ctx, id) {
-  return data.recruitContext(ctx, id).then((res) => {
-    const rows = res.rows || [];
-    return h('div', { class: 'tab-stack' }, [
-      rowsBlock(rows, (r) => h('div', { class: 'recruit-block' }, [
-        h('div', { class: 'list-row' }, [
-          h('div', { style: 'flex:1;min-width:0' }, [
-            h('div', { class: 'row-title' }, [bdg(stageLabel(r.stage) || t('stage_unknown'), 'gold'), r.potentialScore != null ? bdg(t('label_score') + ' ' + r.potentialScore, 'ink') : null]),
-            h('div', { class: 'row-sub' }, `${t('label_motivation')}：${textOf(r.motivation) || '—'}；${t('label_concerns')}：${textOf(r.concerns) || '—'}`),
-            h('div', { class: 'row-sub' }, `${t('label_career_plan')}：${textOf(r.careerPlan) || '—'}`),
-          ]),
-        ]),
-        r.recentFollowups && r.recentFollowups.length
-          ? h('div', { class: 'sub-followups' }, r.recentFollowups.slice(0, 3).map((f) =>
-            h('div', { class: 'row-sub' }, `· ${fmtDate(f.date)} ${f.summary}`)))
-          : null,
-      ]), t('empty_no_recruit'), t('empty_recruit_note')),
-    ]);
-  });
+  return renderRecruitSection(ctx, id, ctx.onWriteDone);
 }
 
 function activitiesNode(ctx, id) {
