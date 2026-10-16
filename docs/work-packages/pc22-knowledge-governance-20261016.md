@@ -20,6 +20,8 @@
 - 部署前 CloudBase 静态托管 7 个文件上传成功；`assistant`、`person_360` 函数分别部署成功。`sync-check.ps1 -CloudOnly` 核验 admin.html 一致、66 个可达静态资源一致、29 个云函数的 186 个源码/配置文件一致。
 - Catalog 实际查询确认审核 RPC 为 `SECURITY DEFINER`，仅 `service_role` 有 execute；新增 governance constraints 均存在。两张治理表目前均为空。
 
-## 尚未完成的线上步骤
+## 线上样例完成核验
 
-经已登录的治理页面人工确认，创建三条带“勿联系”标记的派生样例（已核验 Evidence、未核验 Evidence、引用 Evidence 的 Playbook），并核对 `crm_test_records` 来源关系。页面按钮及服务端幂等流程已部署，浏览器回归使用隔离 mock 验证；当前没有可复用的生产用户会话，因此尚未执行真实登录/写入，也未声称样例已存在。该步骤完成后再标记 PC22 完成并自动进入 PC23。
+用户经已登录治理页面确认创建样例后，2026-10-16 对生产 `public` 数据进行只读核验：`knowledge_items` 有2条指定来源 Evidence，其中1条 `verified=true/lifecycle_status=verified/confidence=0.910`，另1条 `verified=false/lifecycle_status=draft/confidence=0.350`；`playbooks` 有1条 `lifecycle_status=verified` 的 PC22 Playbook，其 `evidence_refs={1}` 指向已核验 Evidence。三条记录在 `crm_test_records` 中均为 `crm_test_main_v1` 批次的 `derived` 记录，父记录为 `persons:783`，没有占用 `initial_slot`。Person 783 名称及备注均带“系统测试·勿联系”标记，来源为既有 `crm_test_main_v1` 测试人物，未改动人物资料。
+
+因此 PC22 线上样例验收完成。以上数据库核验只读；实际写入由已登录用户通过治理页面的确认动作完成。本次补记发布为文档变更，业务页面、云函数和数据库对象均未改变。
