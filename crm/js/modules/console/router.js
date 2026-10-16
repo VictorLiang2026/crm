@@ -21,11 +21,15 @@ const EXACT = new Map([
 ]);
 
 const PATTERNS = [
-  { re: /^#\/person\/(\d+)(?:\/(timeline|insurance|recruit|care|ocr))?$/, nav: '#/people', render: (ctx, id, section) => renderPerson(ctx, id, section) },
+  { re: /^#\/person\/(\d+)(?:\/(timeline|insurance|opportunities|relationships|recruit|care|ocr))?$/, nav: '#/people', render: (ctx, id, section) => renderPerson(ctx, id, section) },
   { re: /^#\/activity\/(\d+)$/, nav: '#/activities', render: renderActivity },
   { re: /^#\/activity-report\/(customer|recruit)(?:\?(.*))?$/, nav: '#/today', render: (ctx, type, query) => {
     const params = new URLSearchParams(query || '');
     return renderActivityReport(ctx, type, { startDate: params.get('startDate'), endDate: params.get('endDate') });
+  } },
+  { re: /^#\/knowledge-governance(?:\?(.*))?$/, nav: '#/more', render: (ctx, query) => {
+    const params = new URLSearchParams(query || '');
+    return renderKnowledgeGovernance(ctx, { focusItemId: params.get('item') });
   } },
 ];
 

@@ -36,6 +36,8 @@ async function runMeetingPrep(event) {
     taskType: 'meeting_prep',
     skill: 'meeting_prep',
     capability: 'planning',
+    subjectType: 'person',
+    subjectId: personId,
     input: { person_id: personId },
     context,
     contextSnapshot: {
@@ -54,6 +56,11 @@ async function runMeetingPrep(event) {
     possibleObjections: task.result.possibleObjections,
     questionsToConfirm: task.result.questionsToConfirm,
     avoid: task.result.avoid,
+    sources: [
+      ...(context.reliable_evidence || []).map(item => ({ ...item.reference, label: item.source, at: item.source_date || null })),
+      ...(context.facts || []).map(item => ({ ...item.source, label: item.category || 'fact', at: item.last_verified_at || null })),
+      ...(context.recent_interactions || []).map(item => ({ ...item.source, label: item.summary || item.type || 'interaction', at: item.at || null })),
+    ],
     taskId: task.taskId,
     resultId: task.resultId,
     skillVersion: task.skillVersion,

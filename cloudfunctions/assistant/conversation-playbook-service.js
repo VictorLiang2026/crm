@@ -76,6 +76,11 @@ async function runConversationPlaybook(event) {
     responseLogic: task.result.responseLogic,
     evidenceRefs: [...new Set((Array.isArray(task.result.evidenceRefs) ? task.result.evidenceRefs : []).map(String))]
       .filter(id => evidence.some(row => String(row.id ?? row.reference?.id) === id)).map(Number),
+    evidenceSources: evidence.filter(row => (Array.isArray(task.result.evidenceRefs) ? task.result.evidenceRefs : [])
+      .some(id => String(id) === String(row.id ?? row.reference?.id))).map(row => ({
+      ...row.reference, label: row.source, source_date: row.source_date || null,
+      confidence: row.confidence,
+    })),
     nextObjective: task.result.nextObjective,
     doNotSay: task.result.doNotSay,
     taskId: task.taskId,

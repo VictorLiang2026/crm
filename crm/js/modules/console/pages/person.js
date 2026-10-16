@@ -38,6 +38,74 @@ function rowsBlock(rows, renderRow, emptyTitle, emptyNoteText) {
   return h('div', {}, rows.map(renderRow));
 }
 
+function aiSourceHref(source, personId) {
+  const id = String(source?.id || '');
+  if (!/^[1-9]\d*$/.test(id)) return `#/person/${personId}`;
+  if (source.table === 'knowledge_items') return `#/knowledge-governance?item=${encodeURIComponent(id)}`;
+  if (source.table === 'interactions' || source.table === 'followups' || source.table === 'recruit_followups') return `#/person/${personId}/timeline`;
+  if (source.table === 'opportunities') return `#/person/${personId}/opportunities`;
+  if (source.table === 'relationships') return `#/person/${personId}/relationships`;
+  return `#/person/${personId}`;
+}
+
+function aiSourcesNode(sources, personId, labelKey = 'sec_ai_sources') {
+  const rows = [...new Map((Array.isArray(sources) ? sources : []).filter(source => source?.schema === 'public' && source.table && source.id != null)
+    .map(source => [`${source.table}:${source.id}`, source])).values()].slice(0, 20);
+  if (!rows.length) return null;
+  return h('div', { class: 'summary-section ai-sources' }, [
+    h('b', { class: 'summary-label' }, t(labelKey)),
+    h('ul', { class: 'summary-list' }, rows.map(source => h('li', {}, h('a', {
+      href: aiSourceHref(source, personId), title: `${source.schema}.${source.table}#${source.id}`,
+    }, `${source.label || source.table} · ${source.table} #${source.id}${source.at || source.source_date ? ` · ${fmtDate(source.at || source.source_date)}` : ''}`)))),
+  ]);
+}
+
+function aiHistoryNode(ctx, id, result) {
+  const generated = Array.isArray(result.generated) ? result.generated : [];
+  const legacy = Array.isArray(result.legacy) ? result.legacy : [];
+  const generatedCards = generated.map(row => {
+    const data = row.result || {};
+    const title = ({ person_summary: t('sec_summary'), meeting_prep: t('btn_meeting_prep_full'),
+      conversation_playbook: t('btn_playbook') })[row.taskType] || row.taskType;
+    const fieldLabels = {
+      summary: 'sec_summary', signals: 'sec_key_signals', gaps: 'sec_info_gaps', nextActions: 'sec_suggested_next', evidence: 'sec_evidence',
+      brief30Seconds: 'sec_brief30', recentChanges: 'sec_recent_changes', suggestedObjective: 'sec_suggested_objective',
+      openingAngles: 'sec_opening_angles', possibleObjections: 'sec_possible_objections', questionsToConfirm: 'sec_questions_to_confirm', avoid: 'sec_avoid',
+      possibleUnderlyingReasons: 'sec_underlying_reasons', clarifyingQuestions: 'sec_clarifying_questions', responseLogic: 'sec_response_logic',
+      evidenceRefs: 'sec_evidence', nextObjective: 'sec_next_objective', doNotSay: 'sec_do_not_say',
+    };
+    const resultFields = Object.entries(data).filter(([key]) => fieldLabels[key]);
+    return h('article', { class: 'list-row ai-history-row' }, [
+      h('div', { class: 'row-title' }, title),
+      h('div', { class: 'row-sub' }, `${fmtDate(row.createdAt)} · ${t('label_ai_task')} #${row.id}${row.skillVersion ? ` · v${row.skillVersion}` : ''}`),
+      ...resultFields.map(([key, value]) => h('div', { class: 'summary-section' }, [
+        h('b', { class: 'summary-label' }, t(fieldLabels[key])),
+        Array.isArray(value) ? h('ul', { class: 'summary-list' }, value.map(item => h('li', {}, typeof item === 'string' ? item : JSON.stringify(item))))
+          : h('p', { class: 'summary-text' }, String(value ?? '')),
+      ])),
+      aiSourcesNode(row.sources, id),
+    ]);
+  });
+  const legacyCards = legacy.map(row => h('article', { class: 'list-row ai-history-row' }, [
+    h('div', { class: 'row-title' }, `${t('sec_ai_legacy')} · ${fmtDate(row.recommendationDate || row.createdAt)}`),
+    row.suggestedMessage ? h('p', { class: 'summary-text' }, row.suggestedMessage) : null,
+    row.suggestedStrategy ? h('p', { class: 'row-sub' }, row.suggestedStrategy) : null,
+    row.suggestedFollowupDate ? h('small', {}, `${t('ai_legacy_followup')}: ${fmtDate(row.suggestedFollowupDate)}`) : null,
+    row.suggestedCustomerStage ? h('small', {}, `${t('ai_legacy_stage')}: ${row.suggestedCustomerStage}`) : null,
+    row.suggestedFollowupGoal ? h('small', {}, `${t('ai_legacy_goal')}: ${row.suggestedFollowupGoal}`) : null,
+    row.nba ? h('div', { class: 'summary-section' }, Object.entries(row.nba).map(([key, value]) => h('p', { class: 'row-sub' }, [
+      `${t(`ai_nba_${key === 'suggested_date' ? 'date' : key}`)}: `,
+      Array.isArray(value) ? value.join(' · ') : value,
+    ]))) : null,
+    h('small', {}, `public.ai_recommendations #${row.id}`),
+  ]));
+  if (!generatedCards.length && !legacyCards.length) return emptyNote(t('ai_history_empty'));
+  return h('div', { class: 'tab-stack' }, [
+    generatedCards.length ? h('section', {}, [sectionTitle(t('sec_ai_generated')), ...generatedCards]) : null,
+    legacyCards.length ? h('section', {}, [sectionTitle(t('sec_ai_legacy')), ...legacyCards]) : null,
+  ]);
+}
+
 // ---------- 各页签内容构造（返回 Node） ----------
 function overviewNode(ctx, id, setName) {
   return Promise.all([
@@ -446,6 +514,7 @@ export function renderPerson(ctx, id, initialSection) {
         h('b', { class: 'summary-label' }, t('sec_evidence')),
         h('ul', { class: 'summary-list evidence' }, res.evidence.map((s) => h('li', {}, s))),
       ]));
+      blocks.push(aiSourcesNode(res.sources, id));
       blocks.push(h('p', { class: 'foot-note' }, t('summary_foot').replace('{taskId}', res.taskId)));
       return h('div', { class: 'card-body' }, blocks);
     }, h('div', { class: 'card-body muted' }, t('generating')));
@@ -493,6 +562,7 @@ export function renderPerson(ctx, id, initialSection) {
         h('b', { class: 'summary-label' }, t('sec_avoid')),
         h('ul', { class: 'summary-list evidence' }, res.avoid.map((s) => h('li', {}, s))),
       ]));
+      blocks.push(aiSourcesNode(res.sources, id));
       blocks.push(h('p', { class: 'foot-note' }, t('prep_foot').replace('{taskId}', res.taskId)));
       return h('div', { class: 'card-body' }, blocks);
     }, h('div', { class: 'card-body muted' }, t('generating')));
@@ -526,6 +596,7 @@ export function renderPerson(ctx, id, initialSection) {
       h('b', { class: 'summary-label' }, t('sec_do_not_say')),
       h('ul', { class: 'summary-list evidence' }, res.doNotSay.map((s) => h('li', {}, s))),
     ]));
+    blocks.push(aiSourcesNode(res.evidenceSources, id, 'sec_ai_cited_sources'));
     if (res.createdAt) blocks.push(h('p', { class: 'foot-note' }, t('generated_at').replace('{time}', res.createdAt)));
     else if (res.taskId) blocks.push(h('p', { class: 'foot-note' }, t('playbook_foot').replace('{taskId}', res.taskId)));
     blocks.push(h('div', { style: 'margin-top:10px' }, [
@@ -558,6 +629,18 @@ export function renderPerson(ctx, id, initialSection) {
       playbookPanel.style.display = 'none';
     }
   }
+  const aiHistoryPanel = h('div', { class: 'card summary-card', style: 'display:none;margin-bottom:12px' });
+  function openAIHistory() {
+    aiHistoryPanel.style.display = '';
+    loadInto(aiHistoryPanel, async () => {
+      const result = await data.personAIHistory(ctx, id);
+      if (!result.ok) throw new Error(result.error?.message || t('ai_history_failed'));
+      return h('div', { class: 'card-body' }, [
+        sectionTitle(t('sec_ai_history')),
+        aiHistoryNode(ctx, id, result),
+      ]);
+    });
+  }
   function runPlaybook(objection) {
     if (!objection) { ctx.toast(t('toast_input_objection')); return; }
     playbookPanel.replaceChildren(h('div', { class: 'card-body muted' }, t('generating')));
@@ -565,28 +648,41 @@ export function renderPerson(ctx, id, initialSection) {
       let res;
       try { res = await data.conversationPlaybook(ctx, id, objection); }
       catch (e) {
-        playbookPanel.replaceChildren(h('div', { class: 'card-body' }, h('div', { class: 'empty' }, `${t('playbook_failed_prefix')}${e.message || 'PLAYBOOK_FAILED'}`)));
+        playbookPanel.replaceChildren(h('div', { class: 'card-body' }, [
+          h('div', { class: 'empty' }, `${t('playbook_failed_prefix')}${e.message || 'PLAYBOOK_FAILED'}`),
+          h('button', { class: 'btn btn-soft btn-sm', type: 'button', onclick: () => runPlaybook(objection) }, t('btn_retry_ai')),
+        ]));
         return;
       }
       if (!res.ok) {
         const code = res.error?.code || 'PLAYBOOK_FAILED';
         const msg = res.error?.message || '';
-        playbookPanel.replaceChildren(h('div', { class: 'card-body' }, h('div', { class: 'empty' }, `${code}${msg ? ': ' + msg : ''}`)));
+        playbookPanel.replaceChildren(h('div', { class: 'card-body' }, [
+          h('div', { class: 'empty' }, `${code}${msg ? ': ' + msg : ''}`),
+          h('button', { class: 'btn btn-soft btn-sm', type: 'button', onclick: () => runPlaybook(objection) }, t('btn_retry_ai')),
+        ]));
         return;
       }
       renderPlaybookResult(res);
     })();
   }
   // 页面加载时自动拉取最近一次对话策略结果
-  (async () => {
+  async function loadPlaybookHistory() {
     try {
       const hist = await data.conversationPlaybookHistory(ctx, id);
       if (hist.ok && hist.hasResult) {
         playbookPanel.style.display = '';
         renderPlaybookResult(hist);
-      }
-    } catch (_) { /* ignore history load failure */ }
-  })();
+      } else if (!hist.ok) throw new Error(hist.error?.message || t('playbook_history_failed'));
+    } catch (_) {
+      playbookPanel.style.display = '';
+      playbookPanel.replaceChildren(h('div', { class: 'card-body' }, [
+        h('div', { class: 'empty' }, t('playbook_history_failed')),
+        h('button', { class: 'btn btn-soft btn-sm', type: 'button', onclick: loadPlaybookHistory }, t('btn_retry_ai')),
+      ]));
+    }
+  }
+  loadPlaybookHistory();
 
   ctx.main.replaceChildren(
     pageHead({
@@ -625,12 +721,16 @@ export function renderPerson(ctx, id, initialSection) {
         }, [ic('file'), t('btn_full_profile')]),
       ],
     }),
+    h('div', { class: 'ai-history-toolbar', style: 'display:flex;justify-content:flex-end;margin-bottom:10px' }, [
+      h('button', { class: 'btn btn-soft btn-sm', type: 'button', onclick: openAIHistory }, [ic('clock'), t('btn_ai_history')]),
+    ]),
     summaryPanel,
     prepPanel,
     playbookPanel,
+    aiHistoryPanel,
     h('div', { class: 'tabs' }, btns),
     h('section', { class: 'card tabs-body' }, bodies),
   );
-  const initialIndex = { timeline: 1, insurance: 5, recruit: 7, care: 9, ocr: 10 }[initialSection] ?? 0;
+  const initialIndex = { timeline: 1, insurance: 5, opportunities: 6, relationships: 4, recruit: 7, care: 9, ocr: 10 }[initialSection] ?? 0;
   select(initialIndex);
 }

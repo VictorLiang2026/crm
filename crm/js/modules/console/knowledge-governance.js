@@ -13,7 +13,7 @@ const select = () => h('select', { name: 'item_type' }, [
 ]);
 
 function status(row) { return text(`status_${row.lifecycle_status || (row.verified ? 'verified' : 'draft')}`); }
-function renderRow(ctx, table, row, reload, onRevision, resolveRef) {
+function renderRow(ctx, table, row, reload, onRevision, resolveRef, focusItemId) {
   const content = table === 'playbooks' ? `${row.scenario} · ${row.objection}\n${row.response_logic}` : row.content;
   const controls = [];
   if (row.lifecycle_status === 'draft' || (!row.lifecycle_status && !row.verified)) {
@@ -32,7 +32,7 @@ function renderRow(ctx, table, row, reload, onRevision, resolveRef) {
       await reload();
     } }, text('invalidate')));
   }
-  return h('article', { class: 'kg-row' }, [
+  return h('article', { class: 'kg-row', 'data-kg-id': String(row.id), ...(String(row.id) === String(focusItemId || '') ? { id: 'kg-focused-item' } : {}) }, [
     h('div', { class: 'kg-row-head' }, [h('b', {}, table === 'playbooks' ? text('playbook') : text(row.item_type || 'evidence')),
       h('span', { class: `kg-status kg-${row.lifecycle_status || (row.verified ? 'verified' : 'draft')}` }, status(row))]),
     h('p', { class: 'kg-copy' }, content || ''),
@@ -46,11 +46,12 @@ function renderRow(ctx, table, row, reload, onRevision, resolveRef) {
   ]);
 }
 
-export function renderKnowledgeGovernance(ctx) {
+export function renderKnowledgeGovernance(ctx, { focusItemId = null } = {}) {
   const main = ctx.main;
   let records = { knowledge: [], playbooks: [] };
   let typeFilter = 'all'; let statusFilter = 'all';
-  const refresh = async () => { records = await data.knowledgeGovernance(ctx); draw(); };
+  const refresh = async () => { records = await data.knowledgeGovernance(ctx); draw();
+    if (focusItemId) requestAnimationFrame(() => document.getElementById('kg-focused-item')?.scrollIntoView({ behavior: 'smooth', block: 'center' })); };
   const form = h('form', { class: 'kg-form', onsubmit: async event => {
     event.preventDefault();
     const fd = new FormData(event.currentTarget);
@@ -135,11 +136,11 @@ export function renderKnowledgeGovernance(ctx) {
             form.elements.confidence.value = String(row.confidence ?? 0.8);
             form.elements.content.value = row.content || '';
             form.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          }, (_type, id) => String(id))),
+          }, (_type, id) => String(id), focusItemId)),
           ...visiblePlaybooks.map(row => renderRow(ctx, 'playbooks', row, refresh, null, (type, id) => {
             const item = records.knowledge.find(entry => String(entry.id) === String(id));
             return item ? `#${id} · ${item.source || item.content?.slice(0, 80) || ''}` : `#${id} · ${text(`${type}_missing`)}`;
-          })),
+          }, focusItemId)),
         ]),
       ]));
   };

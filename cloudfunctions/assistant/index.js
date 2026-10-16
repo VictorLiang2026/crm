@@ -109,6 +109,13 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
         return { ok: false, error: { code, message: detail || 'Could not load conversation playbook history' } };
       }
     }
+    if (event?.action === 'personAIHistory') {
+      try { return await require('./person-ai-history-service').getPersonAIHistory(event); }
+      catch (error) {
+        const code = ['INVALID_INPUT', 'NOT_FOUND'].includes(error?.code) ? error.code : 'AI_HISTORY_FAILED';
+        return { ok: false, error: { code, message: 'Could not load AI history' } };
+      }
+    }
     // CloudBase may add transport metadata to the event. Only route the declared request fields.
     try { return routeIntent({ intent: event?.intent, subject: event?.subject, input: event?.input }); }
     catch (error) {
