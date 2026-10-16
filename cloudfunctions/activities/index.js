@@ -49,9 +49,12 @@ exports.main = async (event, context) => {
       case 'get':             return await get(event);
       case 'create':          return await create(event);
       case 'update':          return await update(event);
+      case 'updateConsole':   return await update(event, true);
       case 'updateStatus':    return await updateStatus(event);
       case 'getSummary':      return await getSummary(event);
       case 'remove':          return await remove(event);
+      case 'previewRemove':   return await previewRemove(event);
+      case 'removeConsole':   return await removeConsole(event);
       case 'addParticipant':     return await addParticipant(event);
       case 'searchPerson':      return await searchPerson(event);
       case 'linkParticipant':   return await linkParticipant(event);
@@ -155,9 +158,13 @@ async function create(event) {
   return { id: r.data[0].id };
 }
 
-async function update(event) {
+async function update(event, consoleScoped) {
   const id = parseInt(event.id, 10);
   if (!id) return { error: 'id required' };
+  const expectedUpdatedAt = consoleScoped ? String(event.expectedUpdatedAt || '') : '';
+  if (consoleScoped && (!expectedUpdatedAt || !Number.isFinite(Date.parse(expectedUpdatedAt)))) {
+    return { error: 'activity version required' };
+  }
   const data = Object.assign({}, event.data || {});
   // 校验 status
   if (data.status && ACT_STATUS_ENUM.indexOf(data.status) < 0) return { error: '无效 status，允许: ' + ACT_STATUS_ENUM.join('/') };
@@ -187,8 +194,10 @@ async function update(event) {
     ACT_FIELDS.concat(['updated_at'])
   );
   if (!Object.keys(payload).length) return { ok: true, updated: false };
-  const r = assertOk(await rdb.from('activities').update(payload).eq('id', id).select('id'));
-  return { ok: (r.data || []).length === 1 };
+  let query = rdb.from('activities').update(payload).eq('id', id).is('deleted_at', null);
+  if (consoleScoped) query = query.eq('updated_at', expectedUpdatedAt);
+  const r = assertOk(await query.select('id'));
+  return (r.data || []).length === 1 ? { ok: true } : { error: 'activity changed or unavailable' };
 }
 
 // 更新活动状态（切到 reviewed 时自动记录 reviewed_at）
@@ -246,6 +255,49 @@ async function remove(event) {
   await rdb.from('activity_participants')
     .update({ deleted_at: nowIso() }).eq('activity_id', id);
   return { ok: (r.data || []).length === 1 };
+}
+
+// Console deletion preview keeps the legacy remove action untouched. The new page
+// presents the server-computed participant cascade and names records left intact.
+async function previewRemove(event) {
+  const id = parseInt(event.id, 10);
+  if (!Number.isSafeInteger(id) || id < 1) return { error: 'id required' };
+  const activity = assertOk(await rdb.from('activities').select('id,name,activity_date,updated_at')
+    .eq('id', id).is('deleted_at', null).maybeSingle());
+  if (!activity.data) return { error: 'activity not found' };
+  const [participants, tasks, actions] = await Promise.all([
+    rdb.from('activity_participants').select('id').eq('activity_id', id),
+    rdb.from('activity_tasks').select('id').eq('activity_id', id),
+    rdb.from('actions').select('id').eq('activity_id', id),
+  ]);
+  const participantRows = assertOk(participants).data || [];
+  const taskRows = assertOk(tasks).data || [];
+  const actionRows = assertOk(actions).data || [];
+  return { activity: activity.data, impact: {
+    participantsSoftDeleted: participantRows.length,
+    preparationTasksRetained: taskRows.length,
+    actionsRetained: actionRows.length,
+  } };
+}
+
+async function removeConsole(event) {
+  const id = parseInt(event.id, 10);
+  const expectedUpdatedAt = String(event.expectedUpdatedAt || '');
+  const expectedParticipantCount = Number(event.expectedParticipantCount);
+  if (!Number.isSafeInteger(id) || id < 1 || !expectedUpdatedAt ||
+      !Number.isFinite(Date.parse(expectedUpdatedAt)) || !Number.isInteger(expectedParticipantCount) ||
+      expectedParticipantCount < 0) return { error: 'activity impact preview required' };
+  const current = assertOk(await rdb.from('activities').select('id,updated_at')
+    .eq('id', id).is('deleted_at', null).maybeSingle());
+  if (!current.data || current.data.updated_at !== expectedUpdatedAt) {
+    return { error: 'activity changed; reload the impact preview' };
+  }
+  const participants = assertOk(await rdb.from('activity_participants').select('id')
+    .eq('activity_id', id));
+  if ((participants.data || []).length !== expectedParticipantCount) {
+    return { error: 'participants changed; reload the impact preview' };
+  }
+  return remove({ id });
 }
 
 // 搜索人员（姓名/电话模糊），供前端添加参与者时联想

@@ -33,9 +33,12 @@ exports.main = async (event, context) => {
       case 'get':      return await get(event);
       case 'create':   return await create(event);
       case 'update':   return await update(event);
+      case 'updateConsole': return await update(event, true);
       case 'complete': return await complete(event, 'completed');
       case 'skip':     return await complete(event, 'skipped');
       case 'remove':   return await remove(event);
+      case 'transitionConsole': return await transitionConsole(event);
+      case 'removeConsole': return await remove(event, true);
       default: return { error: 'unknown action: ' + action };
     }
   } catch (e) {
@@ -166,9 +169,17 @@ async function create(event) {
   return { id: r.data[0].id };
 }
 
-async function update(event) {
+async function update(event, consoleScoped) {
   const id = parseInt(event.id, 10);
   if (!id) return { error: 'id required' };
+  const activityId = consoleScoped ? parseInt(event.activity_id, 10) : null;
+  const expectedUpdatedAt = consoleScoped ? String(event.expectedUpdatedAt || '') : '';
+  if (consoleScoped && (!Number.isSafeInteger(activityId) || activityId < 1 || !expectedUpdatedAt ||
+      !Number.isFinite(Date.parse(expectedUpdatedAt)))) return { error: 'task scope and version required' };
+  if (consoleScoped) {
+    const activity = await assertActivity(activityId);
+    if (activity.error) return activity;
+  }
   const data = Object.assign({}, event.data || {});
   // 不允许通过 update 改 activity_id（任务归属活动不可变）
   delete data.activity_id;
@@ -188,11 +199,29 @@ async function update(event) {
   }
   // 改为未完成状态时清空 completed_at
   if (data.status && OPEN_STATUS.indexOf(data.status) >= 0) data.completed_at = null;
+  // Console 原生编辑允许直接调整状态；完成/跳过必须保留完成时间语义。
+  if (consoleScoped && ['completed', 'skipped'].includes(data.status)) data.completed_at = nowIso();
   data.updated_at = nowIso();
   const payload = normFields(data, TASK_FIELDS.concat(['updated_at']));
   if (!Object.keys(payload).length) return { ok: true, updated: false };
-  const r = assertOk(await rdb.from('activity_tasks').update(payload).eq('id', id).select('id'));
-  return { ok: (r.data || []).length === 1 };
+  let query = rdb.from('activity_tasks').update(payload).eq('id', id);
+  if (consoleScoped) query = query.eq('activity_id', activityId).eq('updated_at', expectedUpdatedAt);
+  const r = assertOk(await query.select('id'));
+  return (r.data || []).length === 1 ? { ok: true } : { error: 'task changed or unavailable' };
+}
+
+async function transitionConsole(event) {
+  const id = parseInt(event.id, 10), activityId = parseInt(event.activity_id, 10);
+  const expectedUpdatedAt = String(event.expectedUpdatedAt || ''), status = event.status;
+  if (!Number.isSafeInteger(id) || id < 1 || !Number.isSafeInteger(activityId) || activityId < 1 ||
+      !expectedUpdatedAt || !Number.isFinite(Date.parse(expectedUpdatedAt)) ||
+      !['completed', 'skipped'].includes(status)) return { error: 'task transition scope required' };
+  const activity = await assertActivity(activityId);
+  if (activity.error) return activity;
+  const now = nowIso();
+  const r = assertOk(await rdb.from('activity_tasks').update({ status, completed_at: now, updated_at: now })
+    .eq('id', id).eq('activity_id', activityId).eq('updated_at', expectedUpdatedAt).select('id'));
+  return (r.data || []).length === 1 ? { ok: true } : { error: 'task changed or unavailable' };
 }
 
 // complete / skip 共用
@@ -204,9 +233,19 @@ async function complete(event, newStatus) {
   return { ok: (r.data || []).length === 1 };
 }
 
-async function remove(event) {
+async function remove(event, consoleScoped) {
   const id = parseInt(event.id, 10);
   if (!id) return { error: 'id required' };
-  const r = assertOk(await rdb.from('activity_tasks').delete().eq('id', id).select('id'));
-  return { ok: (r.data || []).length === 1 };
+  let query = rdb.from('activity_tasks').delete().eq('id', id);
+  if (consoleScoped) {
+    const activityId = parseInt(event.activity_id, 10);
+    const expectedUpdatedAt = String(event.expectedUpdatedAt || '');
+    if (!Number.isSafeInteger(activityId) || activityId < 1 || !expectedUpdatedAt ||
+        !Number.isFinite(Date.parse(expectedUpdatedAt))) return { error: 'task scope and version required' };
+    const activity = await assertActivity(activityId);
+    if (activity.error) return activity;
+    query = query.eq('activity_id', activityId).eq('updated_at', expectedUpdatedAt);
+  }
+  const r = assertOk(await query.select('id'));
+  return (r.data || []).length === 1 ? { ok: true } : { error: 'task changed or unavailable' };
 }

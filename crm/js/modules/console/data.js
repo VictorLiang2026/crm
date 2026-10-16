@@ -122,8 +122,26 @@ export const data = {
 
   // ---------- 活动 ----------
   activityDetail: (ctx, id) => call(ctx, 'activities', { action: 'get', id: Number(id) }),
+  createActivity: (ctx, payload) => call(ctx, 'activities', { action: 'create', data: payload }),
+  updateActivity: (ctx, id, expectedUpdatedAt, payload) => call(ctx, 'activities', {
+    action: 'updateConsole', id: Number(id), expectedUpdatedAt, data: payload,
+  }),
+  previewRemoveActivity: (ctx, id) => call(ctx, 'activities', { action: 'previewRemove', id: Number(id) }),
+  removeActivity: (ctx, id, expectedUpdatedAt, expectedParticipantCount) => call(ctx, 'activities', {
+    action: 'removeConsole', id: Number(id), expectedUpdatedAt, expectedParticipantCount,
+  }),
   activityTasks: (ctx, activityId) =>
     call(ctx, 'activity_tasks', { action: 'list', activity_id: Number(activityId) }),
+  createActivityTask: (ctx, payload) => call(ctx, 'activity_tasks', { action: 'create', data: payload }),
+  updateActivityTask: (ctx, id, activityId, expectedUpdatedAt, payload) => call(ctx, 'activity_tasks', {
+    action: 'updateConsole', id: Number(id), activity_id: Number(activityId), expectedUpdatedAt, data: payload,
+  }),
+  transitionActivityTask: (ctx, id, activityId, expectedUpdatedAt, status) => call(ctx, 'activity_tasks', {
+    action: 'transitionConsole', id: Number(id), activity_id: Number(activityId), expectedUpdatedAt, status,
+  }),
+  removeActivityTask: (ctx, id, activityId, expectedUpdatedAt) => call(ctx, 'activity_tasks', {
+    action: 'removeConsole', id: Number(id), activity_id: Number(activityId), expectedUpdatedAt,
+  }),
   activityPostReviewV2: (ctx, activityId) =>
     call(ctx, 'ai_activity', { action: 'postReviewV2', activity_id: Number(activityId) }),
   activityData: (ctx, activityId) =>

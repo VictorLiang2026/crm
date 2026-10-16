@@ -3,6 +3,10 @@
 import { h } from '../dom.js';
 import { ic } from '../icons.js';
 import { data } from '../data.js';
+import {
+  changeActivityTaskStatus, confirmActivityRemoval, confirmActivityTaskRemoval,
+  openActivityEditor, openActivityTaskEditor,
+} from '../activities-write.js';
 import { t, translateEnum } from '../i18n.js';
 import {
   wpTag, pageHead, emptyNote, loadInto, bdg, kvGrid, sectionTitle,
@@ -55,7 +59,7 @@ export function renderActivities(ctx) {
       if (!rows.length) {
         return h('div', { class: 'card-body' }, [emptyNote(
           selectedDate ? t('act_empty_today') : t('act_empty_recent'),
-          selectedDate ? t('act_empty_select_other') : t('act_empty_new_wp2'))]);
+          selectedDate ? t('act_empty_select_other') : t('act_empty_new'))]);
       }
       return h('div', { class: 'card-body' }, rows.map((a) => {
         const diff = dayDiffFromToday(a.activity_date);
@@ -78,11 +82,11 @@ export function renderActivities(ctx) {
 
   ctx.main.replaceChildren(
     pageHead({
-      kicker: 'ACTIVITIES', title: t('title_activities'), tag: wpTag(t('act_wp1_readonly')),
+      kicker: 'ACTIVITIES', title: t('title_activities'), tag: wpTag(t('act_manage_tag')),
       sub: t('sub_activities'),
       actions: [
-        h('button', { class: 'btn btn-ghost', type: 'button', title: t('act_daily_report'), onclick: () => ctx.toast(t('act_daily_report') + ' WP1') }, [ic('calendar'), t('act_daily_report')]),
-        h('button', { class: 'btn btn-primary', type: 'button', onclick: () => ctx.toast(t('act_new') + ' WP2') }, [ic('plus'), t('act_new')]),
+        h('button', { class: 'btn btn-ghost', type: 'button', title: t('act_daily_report'), onclick: () => { location.hash = '#/activity/customer'; } }, [ic('calendar'), t('act_daily_report')]),
+        h('button', { class: 'btn btn-primary', type: 'button', onclick: () => openActivityEditor(ctx, { onDone: runList }) }, [ic('plus'), t('act_new')]),
       ],
     }),
     h('div', { class: 'date-strip' }, strip),
@@ -104,8 +108,11 @@ function flowNode(ctx, id) {
         [t('act_name'), a.name], [t('act_date'), a.activity_date ? `${fmtDate(a.activity_date)} ${weekdayCN(a.activity_date)}` : ''],
         [t('act_type'), translateEnum('activity_type', a.activity_type)], [t('act_location'), a.location], [t('act_status'), actStatusLabel(a.status)], [t('act_desc'), a.description],
       ]),
-      sectionTitle(`${t('act_prep_tasks')}（${tasks.length}）`),
-      tasks.length ? h('div', {}, tasks.map((task) => h('div', { class: 'list-row' }, [
+      sectionTitle(`${t('act_prep_tasks')}（${tasks.length}）`, h('button', {
+        class: 'btn btn-primary btn-sm', type: 'button',
+        onclick: () => openActivityTaskEditor(ctx, { activityId: id, onDone: () => renderActivity(ctx, id) }),
+      }, [ic('plus'), t('act_task_add')])),
+      tasks.length ? h('div', {}, tasks.map((task) => h('div', { class: 'list-row act-task-row' }, [
         h('div', { style: 'flex:1;min-width:0' }, [
           h('div', { class: 'row-title' }, [
             task.task_type ? bdg(task.task_type, 'ink') : null,
@@ -115,6 +122,24 @@ function flowNode(ctx, id) {
           task.due_date ? h('div', { class: 'row-sub' }, `${t('act_due')} ${fmtDate(task.due_date)}`) : null,
         ]),
         bdg(t((TASK_STATUS[task.status] || [task.status, 'gray'])[0]), (TASK_STATUS[task.status] || ['', 'gray'])[1]),
+        h('div', { class: 'act-task-actions' }, [
+          h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => openActivityTaskEditor(ctx, {
+            activityId: id, task, onDone: () => renderActivity(ctx, id),
+          }) }, t('act_task_edit')),
+          ['completed', 'skipped'].includes(task.status) ? null : h('button', {
+            class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => changeActivityTaskStatus(ctx, {
+              activityId: id, task, status: 'completed', onDone: () => renderActivity(ctx, id),
+            }),
+          }, t('act_task_mark_done')),
+          ['completed', 'skipped'].includes(task.status) ? null : h('button', {
+            class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => changeActivityTaskStatus(ctx, {
+              activityId: id, task, status: 'skipped', onDone: () => renderActivity(ctx, id),
+            }),
+          }, t('act_task_skip')),
+          h('button', { class: 'btn btn-ghost btn-sm act-task-delete', type: 'button', onclick: () => confirmActivityTaskRemoval(ctx, {
+            activityId: id, task, onDone: () => renderActivity(ctx, id),
+          }) }, t('act_task_delete')),
+        ]),
       ]))) : emptyNote(t('act_no_prep_tasks'), ''),
     ]);
   });
@@ -303,8 +328,20 @@ export function renderActivity(ctx, id) {
 
   ctx.main.replaceChildren(
     pageHead({
-      kicker: 'ACTIVITY', title: `${t('title_activity')} #${id}`, tag: wpTag(t('act_wp1_readonly')),
+      kicker: 'ACTIVITY', title: `${t('title_activity')} #${id}`, tag: wpTag(t('act_manage_tag')),
       sub: t('sub_activity'),
+      actions: [
+        h('button', { class: 'btn btn-ghost', type: 'button', onclick: async () => {
+          try {
+            const result = await data.activityDetail(ctx, id);
+            if (!result.activity) throw new Error(t('act_activity_not_found'));
+            openActivityEditor(ctx, { activity: result.activity, onDone: () => renderActivity(ctx, id) });
+          } catch (error) { ctx.toast(error.message || t('act_load_failed'), 'err'); }
+        } }, [ic('edit'), t('act_edit')]),
+        h('button', { class: 'btn btn-ghost act-delete-button', type: 'button', onclick: () => confirmActivityRemoval(ctx, {
+          activity: { id }, onDone: () => { location.hash = '#/activities'; },
+        }) }, [ic('trash'), t('act_delete')]),
+      ],
     }),
     h('div', { class: 'tabs' }, btns),
     h('section', { class: 'card tabs-body' }, bodies),

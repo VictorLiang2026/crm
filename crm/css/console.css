@@ -820,3 +820,9 @@ body:has(.login), body.is-login { padding-top: env(safe-area-inset-top); }
   .insurance-category { padding: 14px 4px; }
   .policy-report-body { padding: 0 20px 20px; }
 }
+
+/* PC16: Activity task controls stay usable on iPad without creating a second Action. */
+.act-task-row { align-items: center; flex-wrap: wrap; gap: 8px; }
+.act-task-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; width: 100%; }
+.act-task-actions .btn { min-height: 40px; }
+.act-danger { background: var(--red) !important; border-color: var(--red) !important; color: #fff !important; }
