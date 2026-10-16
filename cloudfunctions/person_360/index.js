@@ -42,6 +42,7 @@ const OPPORTUNITY_READ_TABLES = new Set([
   'crm_test_batches','crm_test_records',
 ]);
 const AI_AUDIT_READ_TABLES = new Set(['ai_tasks', 'ai_results']);
+const ACTIVITY_REVIEW_READ_TABLES = new Set(['crm_activity_review_commands']);
 const OCR_REVIEW_READ_TABLES = new Set(['crm_ocr_parse_commands']);
 const TABLES = new Set([
   'persons', 'households', 'household_members', 'interactions', 'commitments',
@@ -51,6 +52,7 @@ const TABLES = new Set([
   ...RECRUIT_READ_TABLES,
   ...OPPORTUNITY_READ_TABLES,
   ...AI_AUDIT_READ_TABLES,
+  ...ACTIVITY_REVIEW_READ_TABLES,
   ...OCR_REVIEW_READ_TABLES,
   ...LEGACY_INTERACTION_TABLES,
 ]);
@@ -92,6 +94,7 @@ async function pgRequest(table, method, filters = {}, body) {
   if (RECRUIT_READ_TABLES.has(table) && method !== 'GET') throw new Error('Invalid source operation');
   if (OPPORTUNITY_READ_TABLES.has(table) && method !== 'GET') throw new Error('Invalid source operation');
   if (OCR_REVIEW_READ_TABLES.has(table) && method !== 'GET') throw new Error('Invalid source operation');
+  if (ACTIVITY_REVIEW_READ_TABLES.has(table) && method !== 'GET') throw new Error('Invalid source operation');
   if (table === 'commitments' && method !== 'GET') throw new Error('Invalid source operation');
   const env = process.env.TCB_ENV;
   const key = process.env.CRM_PERSON360_DB_API_KEY;
@@ -1000,6 +1003,8 @@ exports.main = async event => {
         .execute(event.previewId,uid);
       case 'listActivityOutcomes': return await new ActivityReviewWorkflowService({request:pgRequest,rpc:pgRpc})
         .outcomes(event.activityId);
+      case 'listActivityReviewHistory': return await new ActivityReviewWorkflowService({request:pgRequest,rpc:pgRpc})
+        .history(event.activityId);
       case 'resolveQuickCaptureName': return await service.resolveQuickCaptureName(event.name);
       case 'addCanonicalParticipant': return await new ParticipantService({ request: pgRequest })
         .add(event.data, uid);

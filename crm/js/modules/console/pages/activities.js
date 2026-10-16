@@ -7,6 +7,7 @@ import {
   openActivityEditor, openActivityTaskEditor,
 } from '../activities-write.js';
 import { renderActivityParticipants, renderActivityResources } from '../activity-people.js';
+import { renderActivityReview } from '../activity-review.js';
 import { t, translateEnum } from '../i18n.js';
 import {
   wpTag, pageHead, emptyNote, loadInto, bdg, kvGrid, sectionTitle,
@@ -212,63 +213,7 @@ function claimList(items) {
 }
 
 function reviewNode(ctx, id) {
-  return (async () => {
-    const blocks = [h('p', { class: 'muted' }, t('act_review_note'))];
-    let res;
-    try { res = await data.activityPostReviewV2(ctx, id); }
-    catch (e) {
-      return h('div', { class: 'tab-stack' }, [emptyNote(t('act_review_failed'), e.message || 'ACTIVITY_REVIEW_FAILED')]);
-    }
-    if (res.error) {
-      const map = { ACTIVITY_NOT_ENDED: t('act_not_ended'), NO_CANONICAL_PERSON: res.message || t('act_no_canonical') };
-      return h('div', { class: 'tab-stack' }, [emptyNote(map[res.error] || res.error, '')]);
-    }
-    const r = res.review || {};
-    blocks.push(sectionTitle(t('act_review_summary')));
-    blocks.push(h('p', { class: 'summary-text' }, r.summary || ''));
-    const sections = [
-      [t('act_who_mattered'), r.whoMattered],
-      [t('act_what_changed'), r.whatChanged],
-      [t('act_relationships_improved'), r.relationshipsImproved],
-      [t('act_signals_appeared'), r.signalsAppeared],
-      [t('act_opps_appeared'), r.opportunitiesAppeared],
-      [t('act_followup_people'), r.followUpPeople],
-    ];
-    sections.forEach(([title, items]) => {
-      blocks.push(sectionTitle(title));
-      blocks.push(claimList(items));
-    });
-    if (Array.isArray(r.actionCandidates) && r.actionCandidates.length) {
-      blocks.push(sectionTitle(t('act_action_candidates')));
-      blocks.push(h('div', {}, r.actionCandidates.map((a) => h('div', { class: 'list-row' }, [
-        h('div', { style: 'flex:1;min-width:0' }, [
-          h('div', { class: 'row-title' }, [
-            a.personName ? h('a', { href: `#/person/${a.personId}` }, a.personName) : `Person #${a.personId}`,
-          ]),
-          h('div', { class: 'row-sub' }, a.title),
-          a.reason ? h('div', { class: 'row-sub' }, a.reason) : null,
-        ]),
-      ]))));
-    }
-    if (Array.isArray(r.opportunityCandidates) && r.opportunityCandidates.length) {
-      blocks.push(sectionTitle(t('act_opp_candidates')));
-      blocks.push(h('div', {}, r.opportunityCandidates.map((o) => h('div', { class: 'list-row' }, [
-        h('div', { style: 'flex:1;min-width:0' }, [
-          h('div', { class: 'row-title' }, [
-            o.personName ? h('a', { href: `#/person/${o.personId}` }, o.personName) : `Person #${o.personId}`,
-            bdg(o.opportunityType, 'gold'),
-          ]),
-          o.reason ? h('div', { class: 'row-sub' }, o.reason) : null,
-          o.nextAction ? h('div', { class: 'row-sub' }, `${t('act_next_step')}: ${o.nextAction}`) : null,
-        ]),
-      ]))));
-    }
-    if (res.discarded_unsupported_items) {
-      blocks.push(h('p', { class: 'foot-note' }, `${t('act_filtered_unsupported')} ${res.discarded_unsupported_items} ${t('act_items_unsupported')}`));
-    }
-    blocks.push(h('p', { class: 'foot-note' }, `${t('act_task_id')}${res.task_id}${t('act_task_id_sep')}${t('act_review_only')}`));
-    return h('div', { class: 'tab-stack' }, blocks);
-  })();
+  return renderActivityReview(ctx, id);
 }
 
 export function renderActivity(ctx, id) {

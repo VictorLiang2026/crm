@@ -1,7 +1,7 @@
 /** Human-reviewed activity candidates and Outcome; all writes use service-only public RPCs. */
 'use strict';
 
-const { disclose, refsForRows } = require('./test-data');
+const { disclose, refsForRows, collectRefs } = require('./test-data');
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ID = /^[1-9][0-9]*$/;
 const OPS = new Set(['action','opportunity','reject_action','reject_opportunity','outcome']);
@@ -102,6 +102,70 @@ class ActivityReviewWorkflowService {
     });
     return {rows,testData:await this.disclosure([
       ...refsForRows('activities',activity),...refsForRows('outcomes',rows)])};
+  }
+  async history(activityId) {
+    const idValue=id(activityId);
+    const activity=await this.request('activities','GET',{
+      select:'id,name,status',id:`eq.${idValue}`,deleted_at:'is.null',limit:1,
+    });
+    if (!activity.length) throw new Error('Activity unavailable');
+    const tasks=await this.request('ai_tasks','GET',{
+      select:'id,task_type,subject_type,subject_id,status,created_at,completed_at',
+      task_type:'eq.activity_review',subject_type:'eq.activity',subject_id:`eq.${idValue}`,
+      status:'eq.completed',order:'created_at.desc,id.desc',limit:20,
+    });
+    const taskIds=(tasks||[]).map(row=>String(row.id)).filter(value=>ID.test(value));
+    const results=taskIds.length?await this.request('ai_results','GET',{
+      select:'id,task_id,result_json,rank,created_at',task_id:`in.(${taskIds.join(',')})`,
+      order:'created_at.desc,id.desc',limit:100,
+    }):[];
+    const resultIds=(results||[]).map(row=>String(row.id)).filter(value=>ID.test(value));
+    const commands=resultIds.length?await this.request('crm_activity_review_commands','GET',{
+      select:'id,activity_id,ai_result_id,candidate_index,operation,executed_at,result_json',
+      activity_id:`eq.${idValue}`,ai_result_id:`in.(${resultIds.join(',')})`,
+      executed_at:'not.is.null',order:'created_at.asc',limit:300,
+    }):[];
+    const outcomes=await this.request('outcomes','GET',{
+      select:'id,activity_id,outcome_type,result,occurred_at',activity_id:`eq.${idValue}`,
+      order:'occurred_at.desc,id.desc',limit:20,
+    });
+    const taskById=new Map((tasks||[]).map(row=>[String(row.id),row]));
+    const commandsByResult=new Map();
+    for(const row of commands||[]){
+      const key=String(row.ai_result_id);
+      if(!commandsByResult.has(key))commandsByResult.set(key,[]);
+      commandsByResult.get(key).push(row);
+    }
+    const versions=(results||[]).map(row=>{
+      const task=taskById.get(String(row.task_id));
+      if(!task)return null;
+      const review=row.result_json&&typeof row.result_json==='object'?row.result_json:{};
+      const decisions=(commandsByResult.get(String(row.id))||[]).map(command=>({
+        candidateIndex:Number(command.candidate_index),
+        kind:command.operation.includes('action')?'action':'opportunity',
+        status:command.operation.startsWith('reject_')?'rejected':'accepted',
+        result:command.result_json||{},executedAt:command.executed_at,
+      }));
+      return {id:row.id,taskId:row.task_id,createdAt:row.created_at,
+        summary:review.summary||'',review,
+        actionCandidates:Array.isArray(review.actionCandidates)?review.actionCandidates:[],
+        opportunityCandidates:Array.isArray(review.opportunityCandidates)?review.opportunityCandidates:[],
+        decisions};
+    }).filter(Boolean);
+    const refs=[...refsForRows('activities',activity),...refsForRows('ai_tasks',tasks||[]),
+      ...refsForRows('ai_results',results||[]),...refsForRows('outcomes',outcomes||[])];
+    const sourceRows=[];
+    for(const row of results||[]){
+      const result=row.result_json||{};
+      const candidates=[...(Array.isArray(result.actionCandidates)?result.actionCandidates:[]),
+        ...(Array.isArray(result.opportunityCandidates)?result.opportunityCandidates:[])];
+      for(const candidate of candidates){
+        if(ID.test(String(candidate.personId||'')))sourceRows.push({table:'persons',id:String(candidate.personId)});
+        sourceRows.push(...collectRefs(candidate.sourceRefs||[]));
+      }
+    }
+    return {activity:activity[0],versions,outcomes:outcomes||[],
+      testData:await this.disclosure([...refs,...sourceRows])};
   }
 }
 module.exports={ActivityReviewWorkflowService,payload};

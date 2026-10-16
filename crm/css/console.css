@@ -500,6 +500,23 @@ body:has(.login), body.is-login { padding-top: env(safe-area-inset-top); }
 .day:active { transform: scale(.95); }
 .day.sel { outline: 2.5px solid var(--ink); outline-offset: 1px; }
 
+/* PC18 activity review: review history stays readable beside the selected version on iPad landscape. */
+.pc18-review { gap: 10px; }
+.pc18-review-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; align-items: start; }
+.pc18-version-list { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.pc18-version-button { justify-content: flex-start; text-align: left; white-space: normal; }
+.pc18-version-button.active { border-color: var(--red); color: var(--red); background: var(--red-50); }
+.pc18-version-view { min-width: 0; }
+.pc18-version-meta { display: flex; flex-wrap: wrap; align-items: baseline; gap: 7px 14px; padding: 10px 12px; border-left: 3px solid var(--gold); background: #f7f8fa; }
+.pc18-version-meta b { color: var(--ink); }
+.pc18-candidate { align-items: flex-start; }
+.pc18-candidate .summary-text { margin: 6px 0; white-space: pre-wrap; }
+.pc18-outcome-editor { margin-top: 10px; }
+@media (min-width: 1000px) {
+  .pc18-review-layout { grid-template-columns: minmax(220px, 280px) minmax(0, 1fr); }
+  .pc18-version-list { position: sticky; top: 12px; max-height: 55vh; overflow-y: auto; }
+}
+
 .sub-followups { padding: 0 0 8px 14px; display: flex; flex-direction: column; gap: 3px; }
 .recruit-block { border-bottom: 1px dashed var(--line); }
 .recruit-block:last-child { border-bottom: none; }
