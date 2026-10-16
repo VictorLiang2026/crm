@@ -267,15 +267,15 @@ function workItemValues(kind, draft, row) {
 
 /** Native Person/Today work item editor. All writes remain preview → confirm → execute. */
 export function openWorkItemEditor(ctx, { kind = 'action', row = null, personId = null,
-  personName = '', onDone } = {}) {
+  personName = '', initialTitle = '', initialDescription = '', onDone } = {}) {
   const isAction = kind === 'action';
   const initialPerson = row?.person_id || personId || '';
   const chosen = { id: initialPerson ? String(initialPerson) : '', name: row?.person_name || personName || '' };
   const title = row ? t(isAction ? 'edit_action' : 'edit_commitment')
     : t(isAction ? 'create_action' : 'create_commitment');
-  const text = isAction ? h('input', { class: 'sheet-input', maxlength: 200, value: row?.title || '' })
+  const text = isAction ? h('input', { class: 'sheet-input', maxlength: 200, value: row?.title || initialTitle })
     : h('textarea', { class: 'sheet-textarea', maxlength: 4000, rows: 3 }, row?.content || '');
-  const description = isAction ? h('textarea', { class: 'sheet-textarea', maxlength: 4000, rows: 2 }, row?.description || '') : null;
+  const description = isAction ? h('textarea', { class: 'sheet-textarea', maxlength: 4000, rows: 2 }, row?.description || initialDescription) : null;
   const priority = isAction ? sel([
     ['low', t('priority_low')], ['medium', t('priority_medium')],
     ['high', t('priority_high')], ['urgent', t('priority_urgent')],

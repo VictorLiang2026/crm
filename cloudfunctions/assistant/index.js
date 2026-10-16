@@ -43,6 +43,15 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
         return { ok:false,error:{code,message:'机会候选操作未完成'} };
       }
     }
+    if (event?.action === 'recruitCoach') {
+      try { return await require('./recruit-coach-service').runRecruitCoach(event); }
+      catch (error) {
+        const code = ['INVALID_INPUT','INVALID_CONFIG','INVALID_RESULT','RATE_LIMIT','TIMEOUT',
+          'UPSTREAM_UNAVAILABLE','PERSISTENCE_ERROR','AI_REQUEST_FAILED','INVALID_CANDIDATE']
+          .includes(error?.code) ? error.code : 'RECRUIT_COACH_FAILED';
+        return {ok:false,error:{code,message:'Recruit Coach request could not be completed'}};
+      }
+    }
     const isActionPlan = event?.action === 'command' && event.stage === 'plan' &&
       event.command?.operation === 'create' && event.command?.resource === 'actions' &&
       event.command?.personId != null;

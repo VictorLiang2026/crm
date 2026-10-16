@@ -4,6 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { createSkillRegistry, defaultRegistry, SkillValidationError, TIMEOUT_CLASS_MS } =
   require('../../cloudfunctions/_shared/skill-registry');
+const { defaultRegistry: assistantRegistry } = require('../../cloudfunctions/assistant/skill-registry');
 
 const names = ['quick_capture', 'person_summary', 'meeting_prep', 'today_coach',
   'opportunity_analysis', 'opportunity_candidate', 'activity_prepare', 'activity_review', 'recruit_coach',
@@ -21,6 +22,15 @@ test('all versioned contracts are model-independent and immutable', () => {
     assert.equal(JSON.stringify(skill).includes('model'), false);
     assert.equal(JSON.stringify(skill).includes('provider'), false);
   }
+});
+
+test('deployed assistant registry carries the same Recruit Coach v2 contract', () => {
+  const shared=defaultRegistry.get('recruit_coach');
+  const assistant=assistantRegistry.get('recruit_coach');
+  assert.equal(shared.version,'2.0.0');
+  assert.equal(assistant.version,shared.version);
+  assert.deepEqual(assistant.outputSchema,shared.outputSchema);
+  assert.deepEqual(assistant.contextRecipe,shared.contextRecipe);
 });
 
 test('every initial skill accepts a representative input, context and output', () => {
@@ -50,8 +60,13 @@ test('every initial skill accepts a representative input, context and output', (
       open_opportunities: [], relationships: [] },
       { summary: 'Review activity', whoMattered: [], whatChanged: [], relationshipsImproved: [],
         signalsAppeared: [], opportunitiesAppeared: [], followUpPeople: [], actionCandidates: [] }],
-    recruit_coach: [{ candidateId: '1' }, { candidate: {} },
-      { assessment: 'Review candidate', conversationTips: [], nextActions: [], evidence: [] }],
+    recruit_coach: [{ candidateId: '1', personId: '2', language: 'zh-CN' }, { candidate: {} },
+      { assessment: 'Review candidate', dimensions: [
+        'industry_resources','learning_ability','resilience','communication',
+        'entrepreneurial_motivation','cultural_fit',
+      ].map(key => ({key,score:null,rationale:'Insufficient data',evidenceRefs:[]})),
+      contactSuggestion:{assumptionReasons:[],clarifyingQuestions:[],prohibitedPhrasing:[],nextStep:'Review the missing evidence.'},
+      uncertainty:'Some evidence is missing.',confidence:'low' }],
     conversation_playbook: [{ person_id: 1, objection: '担心保障范围' },
       { guidance: {}, person: {}, recent_interactions: [], facts: [], signals: [],
         open_opportunities: [], relevant_playbooks: [], reliable_evidence: [] },

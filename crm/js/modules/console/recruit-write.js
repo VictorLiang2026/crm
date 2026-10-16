@@ -1,8 +1,8 @@
 import { h } from './dom.js';
 import { ic } from './icons.js';
-import { openSheet } from './write.js';
+import { openSheet, openWorkItemEditor } from './write.js';
 import { data } from './data.js';
-import { t, translateEnum } from './i18n.js';
+import { t, getLang, translateEnum } from './i18n.js';
 import { emptyNote, fmtDate, sectionTitle } from './ui.js';
 
 const STAGES = ['新增人才', '互动暖客', '初次面谈', '增员活动', '精准面谈', '入职申请', '签约入司', '流失'];
@@ -29,6 +29,161 @@ const actions = (cancel, save) => h('div', { class: 'sheet-actions' }, [
   save,
 ]);
 const saveButton = (handler) => h('button', { class: 'btn btn-primary', type: 'button', onclick: handler }, t('btn_save'));
+
+const COACH_DIMENSIONS = [
+  'industry_resources','learning_ability','resilience','communication','entrepreneurial_motivation','cultural_fit',
+];
+
+function openRecruitCoachOutcome(ctx, { personId, candidateId, personName, resultId, actionId, onDone }) {
+  const actual = area('pc20_outcome_text', '', 3);
+  const now=new Date();
+  const occurredAt = field('pc20_outcome_date', `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}T${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`, 'datetime-local');
+  const linkedAction = field('pc20_action_id', actionId || '', 'number', { min: 1, step: 1,
+    placeholder: t('pc20_action_id_optional') });
+  const form = h('div', {}, [
+    h('p', { class:'sheet-note' }, t('pc20_outcome_note')),
+    fieldRow('pc20_outcome_text', actual), fieldRow('pc20_outcome_date', occurredAt),
+    fieldRow('pc20_action_id', linkedAction),
+    h('div', { class:'sheet-actions' }, [
+      h('button',{class:'btn btn-ghost',type:'button',onclick:()=>sheet.overlay.remove()},t('btn_cancel')),
+      h('button',{class:'btn btn-primary',type:'button',onclick:preview},t('pc20_preview_outcome')),
+    ]),
+  ]);
+  const sheet=openSheet({title:t('pc20_outcome_title'),sub:t('pc20_outcome_note'),body:form});
+  document.body.appendChild(sheet.overlay);
+  async function preview(button) {
+    if (!actual.value.trim()) { sheet.showErr(t('pc20_outcome_required')); return; }
+    button.disabled=true;
+    try {
+      const date=new Date(occurredAt.value);
+      if(!Number.isFinite(date.getTime()))throw new Error(t('pc20_outcome_required'));
+      const payload={candidateId:String(candidateId),aiResultId:String(resultId),
+        actionId:linkedAction.value.trim()||null,
+        draft:{outcome_type:'recruit_followup',result:actual.value.trim(),occurred_at:date.toISOString()}};
+      const pv=await data.previewRecruitCoachOutcome(ctx,payload);
+      sheet.swap(h('div',{},[
+        h('p',{class:'sheet-note'},t('pc20_outcome_confirm_note')),
+        h('div',{class:'sheet-preview'},[
+          h('div',{class:'kv-line'},[h('span',{class:'kv-k'},t('person')),`${personName} · #${personId}`]),
+          h('div',{class:'kv-line'},[h('span',{class:'kv-k'},t('pc20_result_id')),`#${resultId}`]),
+          payload.actionId?h('div',{class:'kv-line'},[h('span',{class:'kv-k'},t('pc20_action_id')),`#${payload.actionId}`]):null,
+          h('div',{class:'kv-line'},[h('span',{class:'kv-k'},t('pc20_outcome_text')),actual.value.trim()]),
+          h('div',{class:'kv-line'},[h('span',{class:'kv-k'},t('pc20_outcome_date')),fmtDate(date.toISOString())]),
+        ]),
+        h('div',{class:'sheet-actions'},[
+          h('button',{class:'btn btn-ghost',type:'button',onclick:()=>sheet.swap(form)},t('back_to_edit')),
+          h('button',{class:'btn btn-primary',type:'button',onclick:async event=>{
+            const button=event.currentTarget;
+            button.disabled=true;
+            try {
+              await data.confirmRecruitCoachOutcome(ctx,{previewId:pv.previewId,previewHash:pv.previewHash});
+              const saved=await data.executeRecruitCoachOutcome(ctx,{previewId:pv.previewId});
+              if(saved?.ok!==true||!saved.outcomeId)throw new Error(t('pc20_outcome_failed'));
+              sheet.overlay.remove();ctx.toast(t('pc20_outcome_saved'),'ok');onDone?.(saved);
+            } catch(error){sheet.showErr(t('pc20_outcome_failed'));}
+          }},t('pc20_confirm_outcome')),
+        ]),
+      ]));
+    } catch(error){button.disabled=false;sheet.showErr(t('pc20_outcome_failed'));}
+  }
+}
+
+function renderCoachHistory(ctx, host, personId, candidate, personName, onDone) {
+  host.replaceChildren(h('div',{class:'sheet-note'},t('pc20_loading')));
+  data.recruitCoach(ctx,'history',{personId:String(personId),candidateId:String(candidate.id)}).then(result=>{
+    const rows=Array.isArray(result.history)?result.history:[];
+    if(!rows.length){host.replaceChildren(h('div',{class:'sheet-note'},t('pc20_history_empty')));return;}
+    host.replaceChildren(...rows.map(item=>{
+      const resultData=item.result||{};
+      const dimensions=new Map((resultData.dimensions||[]).map(d=>[d.key,d]));
+      const refs=new Set((resultData.sourceRefs||[]).map(String));
+      const decisionLabel=item.decision?t(`pc20_decision_${item.decision}`):t('pc20_decision_pending');
+      const card=h('div',{class:'list-row',style:'display:block;align-items:flex-start'},[
+        h('div',{class:'stack-head'},[
+          h('b',{},`${t('pc20_result_version')} · ${fmtDate(item.createdAt)}`),
+          h('span',{class:'row-sub'},`${t('pc20_result_id')} #${item.resultId} · ${decisionLabel}`),
+        ]),
+        resultData.totalScore!=null?h('div',{class:'row-title'},`${t('pc20_total_score')}: ${resultData.totalScore}/100`):
+          h('div',{class:'sheet-note'},t('pc20_score_unavailable')),
+        resultData.totalScoreNoteCode?h('div',{class:'sheet-note'},t(resultData.totalScoreNoteCode)):null,
+        resultData.uncertaintyCode?h('div',{class:'sheet-note'},t(resultData.uncertaintyCode)):null,
+        h('div',{class:'pc20-dimensions',style:'display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:8px'},
+          COACH_DIMENSIONS.map(key=>{const d=dimensions.get(key);return h('div',{class:'list-row',style:'display:block'},[
+            h('b',{},t(`pc20_dim_${key}`)),h('div',{class:'row-sub'},d?.score==null?t('pc20_no_score'):`${d.score}/100 · ${d.rationale||''}`),
+          ]);})),
+        resultData.assessment?h('p',{class:'sheet-note'},resultData.assessment):null,
+        ...(resultData.evidenceSources||[]).filter(src=>refs.has(src.ref)).map(src=>h('div',{class:'row-sub'},[
+          `${t(src.sourceType==='candidate'?'pc20_source_candidate':'pc20_source_followup')}${src.date?` · ${src.date}`:''} · ${src.ref}`,
+          ...(src.fields||[]).map(item=>h('div',{},`${t(`pc20_field_${item.key}`)}: ${item.value}`)),
+        ])),
+        h('div',{class:'pc20-contact',style:'margin-top:8px'},[
+          h('b',{},t('pc20_contact_title')),
+          ...(resultData.contactSuggestion?.assumptionReasons||[]).map(x=>h('div',{class:'row-sub'},`• ${x}`)),
+          ...(resultData.contactSuggestion?.clarifyingQuestions||[]).map(x=>h('div',{class:'row-sub'},`${t('pc20_questions')}: ${x}`)),
+          ...(resultData.contactSuggestion?.prohibitedPhrasing||[]).map(x=>h('div',{class:'row-sub'},`${t('pc20_prohibited')}: ${x}`)),
+          resultData.contactSuggestion?.nextStep?h('div',{class:'row-sub'},`${t('pc20_next_step')}: ${resultData.contactSuggestion.nextStep}`):null,
+        ]),
+      ]);
+      if(!item.decision){
+        const next=field('pc20_next_step',resultData.contactSuggestion?.nextStep||'');
+        const editPanel=h('div',{class:'tab-stack'},[
+          fieldRow('pc20_next_step',next),
+          h('div',{class:'sheet-actions'},[
+            h('button',{class:'btn btn-ghost btn-sm',type:'button',onclick:()=>decide('deferred')},t('pc20_defer')),
+            h('button',{class:'btn btn-ghost btn-sm',type:'button',onclick:()=>decide('rejected')},t('pc20_reject')),
+            h('button',{class:'btn btn-ghost btn-sm',type:'button',onclick:()=>decide('modified')},t('pc20_accept_modified')),
+            h('button',{class:'btn btn-primary btn-sm',type:'button',onclick:()=>decide('accepted')},t('pc20_accept')),
+          ]),
+        ]);
+        card.append(editPanel);
+        async function decide(value){
+          const btns=[...card.querySelectorAll('button')];btns.forEach(b=>b.disabled=true);
+          try {
+            await data.recruitCoach(ctx,'decision',{personId:String(personId),candidateId:String(candidate.id),resultId:item.resultId,
+              decision:value,...(value==='modified'?{contactSuggestion:{...resultData.contactSuggestion,nextStep:next.value.trim()}}:{})});
+            renderCoachHistory(ctx,host,personId,candidate,personName,onDone);
+          } catch(error){btns.forEach(b=>b.disabled=false);ctx.toast(t('pc20_decision_failed'),'err');}
+        }
+      } else if(['accepted','modified'].includes(item.decision)) {
+        let recentActionId=null;
+        card.append(h('div',{class:'sheet-actions',style:'justify-content:flex-start'},[
+          h('button',{class:'btn btn-ghost btn-sm',type:'button',onclick:()=>openWorkItemEditor(ctx,{kind:'action',personId:String(personId),personName,
+            initialTitle:resultData.contactSuggestion?.nextStep||'',
+            initialDescription:`${t('pc20_action_source')} #${item.resultId}`,
+            onDone:saved=>{recentActionId=saved?.itemId||saved?.actionId||null;ctx.toast(t('pc20_action_created'),'ok');}})},t('pc20_create_action')),
+          h('button',{class:'btn btn-ghost btn-sm',type:'button',onclick:()=>openRecruitCoachOutcome(ctx,{personId,candidateId:candidate.id,personName,
+            resultId:item.resultId,actionId:recentActionId,onDone:()=>renderCoachHistory(ctx,host,personId,candidate,personName,onDone)})},t('pc20_record_outcome')),
+        ]));
+      }
+      return card;
+    }));
+  }).catch(()=>host.replaceChildren(h('div',{class:'sheet-note'},t('pc20_history_failed'))));
+}
+
+function recruitCoachSection(ctx,personId,candidate,personName,onDone){
+  const host=h('div',{class:'tab-stack'});
+  const generateButton=h('button',{class:'btn btn-primary btn-sm',type:'button',onclick:async event=>{
+    const button=event.currentTarget;
+    button.disabled=true;button.textContent=t('pc20_generating');
+    try{
+      const generated=await data.recruitCoach(ctx,'generate',{personId:String(personId),candidateId:String(candidate.id),language:getLang()==='en'?'en':'zh-CN'});
+      if(generated?.status!=='generated'||!generated.result)throw new Error(t('pc20_generate_failed'));
+      renderCoachHistory(ctx,host,personId,candidate,personName,onDone);
+      ctx.toast(t('pc20_generated'),'ok');
+    }catch(error){ctx.toast(t('pc20_generate_failed'),'err');}
+    finally{button.disabled=false;button.textContent=t('pc20_generate');}
+  }},t('pc20_generate'));
+  const section=h('section',{class:'card',style:'overflow:hidden'},[
+    h('div',{class:'card-head'},[ic('sparkle'),h('b',{},t('pc20_title')),generateButton]),
+    h('div',{class:'card-body tab-stack'},[
+      h('div',{class:'sheet-note'},t('pc20_disclaimer')),
+      candidate.potential_score!=null?h('div',{class:'row-sub'},`${t('pc20_legacy_score')}: ${candidate.potential_score}/100 · ${t('pc20_legacy_note')}${candidate.potential_reason?` · ${candidate.potential_reason}`:''}`):null,
+      host,
+    ]),
+  ]);
+  renderCoachHistory(ctx,host,personId,candidate,personName,onDone);
+  return section;
+}
 
 export function openRecruitCandidateCreate(ctx, { initialName = '', onDone } = {}) {
   const name = field('recruit_identity_name', initialName, 'search', { maxlength: 160, autocomplete: 'off' });
@@ -327,7 +482,7 @@ export async function renderRecruitSection(ctx, personId, onDone) {
             item.from_stage ? `${translateEnum('recruit_stage', item.from_stage)} → ` : '',
             translateEnum('recruit_stage', item.to_stage), item.note ? ` · ${item.note}` : '',
           ]))) : emptyNote(t('recruit_milestones_empty'), '')]),
-        h('div', {}, [sectionTitle(`${t('recruit_followups')} (${followups.length})`), followups.length
+      h('div', {}, [sectionTitle(`${t('recruit_followups')} (${followups.length})`), followups.length
           ? h('div', {}, followups.map(item => h('div', { class: 'list-row', style: 'align-items:flex-start' }, [
             h('div', { style: 'flex:1;min-width:0' }, [
               h('b', {}, `${fmtDate(item.followup_date)} · ${item.contact_method || t('recruit_contact_unspecified')}`),
@@ -336,6 +491,7 @@ export async function renderRecruitSection(ctx, personId, onDone) {
             ]),
             h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => openFollowupEditor(ctx, candidate, item, reload) }, t('btn_edit')),
           ]))) : emptyNote(t('recruit_followups_empty'), '')]),
+        recruitCoachSection(ctx,personId,candidate,personName,reload),
       ]),
     ]));
   }

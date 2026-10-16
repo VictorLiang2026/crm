@@ -142,7 +142,7 @@ async function pgRpc(name, body) {
     'crm_household_preview_v1','crm_household_execute_v1',
     'crm_relationship_preview_v1','crm_relationship_execute_v1',
     'crm_ocr_parse_preview_v1','crm_ocr_parse_undo_preview_v1','crm_ocr_parse_execute_v1',
-    'crm_recruit_candidate_create_v1','crm_recruit_candidate_transition_v1',
+    'crm_recruit_candidate_create_v1','crm_recruit_candidate_transition_v1','crm_recruit_coach_outcome_v1',
     'crm_knowledge_review_v1']).has(name)) throw new Error('Invalid RPC');
   const env = process.env.TCB_ENV;
   const key = process.env.CRM_PERSON360_DB_API_KEY;
@@ -708,6 +708,39 @@ function createService({ request = pgRequest, rpc = pgRpc, disclosure = disclose
     })) };
   }
 
+  async function getRecruitCoachContext(personIdValue, candidateIdValue) {
+    const personId = idOf(personIdValue), candidateId = idOf(candidateIdValue);
+    const person = await findPerson(personId);
+    if (!person) throw new Error('Person not found');
+    const candidates = await request('recruit_candidates', 'GET', {
+      select: 'id,person_id,stage,motivation,concerns,work_experience,family_situation,personality_tags,career_plan,next_action,next_action_date,updated_at',
+      id: `eq.${candidateId}`, person_id: `eq.${personId}`, deleted_at: 'is.null', limit: 1,
+    });
+    const candidate = candidates[0];
+    if (!candidate) throw new Error('Recruit candidate not found for Person');
+    const followups = await request('recruit_followups', 'GET', {
+      select: 'id,candidate_id,followup_date,contact_method,interaction_summary,followup_notes,interest_level,concern_feedback,next_action,next_followup_date,next_followup_goal',
+      candidate_id: `eq.${candidateId}`, deleted_at: 'is.null',
+      order: 'followup_date.desc,id.desc', limit: 20,
+    });
+    const source = (table, id) => ({ schema: 'public', table, id: String(id) });
+    const fields = ['stage','motivation','concerns','work_experience','family_situation',
+      'personality_tags','career_plan','next_action','next_action_date'];
+    const candidateData = Object.fromEntries(fields.map(key => [key,
+      typeof candidate[key] === 'string' ? candidate[key].slice(0, 600) : candidate[key] ?? null]));
+    return {
+      candidate: { data: candidateData, source: source('recruit_candidates', candidate.id),
+        updatedAt: candidate.updated_at || null },
+      recruit_followups: followups.map(row => ({
+        data: Object.fromEntries(['followup_date','contact_method','interaction_summary','followup_notes',
+          'interest_level','concern_feedback','next_action','next_followup_date','next_followup_goal']
+          .map(key => [key, typeof row[key] === 'string' ? row[key].slice(0, 600) : row[key] ?? null])),
+        source: source('recruit_followups', row.id),
+      })),
+      sourceRefs: [source('recruit_candidates', candidate.id), ...followups.map(row => source('recruit_followups', row.id))],
+    };
+  }
+
   async function getInsuranceContext(personId) {
     const person = await findPerson(personId);
     if (!person) throw new Error('Person not found');
@@ -878,7 +911,7 @@ function createService({ request = pgRequest, rpc = pgRpc, disclosure = disclose
     createRecruitCandidate: (data, uid) => recruitCandidateService.create(data, uid),
     getRecruitCandidate: (candidateId, personId) => recruitCandidateService.details(candidateId, personId),
     transitionRecruitStage: (data, uid) => recruitCandidateService.transition(data, uid),
-    listOpportunities, listRecruitContext, createOpportunity, updateOpportunity, closeOpportunity, removeOpportunity,
+    listOpportunities, listRecruitContext, getRecruitCoachContext, createOpportunity, updateOpportunity, closeOpportunity, removeOpportunity,
     getInsuranceContext,
     resolveQuickCaptureName, commitQuickCaptureV2 };
 }
@@ -960,6 +993,21 @@ exports.main = async event => {
       case 'executeOpportunity': return await new OpportunityWorkflowService({request:pgRequest,rpc:pgRpc})
         .execute(event.previewId,uid);
       case 'listRecruitContext': return await service.listRecruitContext(event.personId);
+      case 'getRecruitCoachContext': return await service.getRecruitCoachContext(event.personId, event.candidateId);
+      case 'previewRecruitCoachOutcome':
+      case 'confirmRecruitCoachOutcome':
+      case 'executeRecruitCoachOutcome': {
+        const stage = {previewRecruitCoachOutcome:'preview',confirmRecruitCoachOutcome:'confirm',
+          executeRecruitCoachOutcome:'execute'}[event.action];
+        return await pgRpc('crm_recruit_coach_outcome_v1', {
+          p_stage: stage, p_actor_uid: uid,
+          p_command_id: event.previewId || null,
+          p_candidate_id: event.candidateId == null ? null : Number(idOf(event.candidateId)),
+          p_ai_result_id: event.aiResultId == null ? null : Number(idOf(event.aiResultId)),
+          p_action_id: event.actionId == null || event.actionId === '' ? null : Number(idOf(event.actionId)),
+          p_draft: event.draft || null, p_preview_hash: event.previewHash || null,
+        });
+      }
       case 'getInsuranceContext': return await service.getInsuranceContext(event.personId);
       case 'listOcrParseCommands':
         return await new OcrReviewService({request:pgRequest,rpc:pgRpc,

@@ -11,9 +11,11 @@
 | `opportunity_analysis` | analysis | opportunity | confirm_before_write | standard |
 | `activity_prepare` | planning | activity | confirm_before_write | long |
 | `activity_review` | analysis | activity | confirm_before_write | long |
-| `recruit_coach` | coaching | candidate | confirm_before_write | standard |
+| `recruit_coach` 2.0 | coaching | candidate + bounded recruit follow-ups | confirm_before_write | standard |
 | `conversation_playbook` | coaching | person | confirm_before_write | standard |
 | `ai_search` | retrieval | search_results | review | standard |
+
+`recruit_coach` 2.0 由 PC20 接入；输入绑定候选人和 Person，输出六维评分及接触建议，来源只取候选人档案和最近 20 条招募跟进。输出不直接写入业务资料；采纳后由人通过现有 Action 预览确认流程另行创建行动，实际跟进结果通过独立预览确认写入 `public.outcomes` 并关联 `ai_result_id` 与可选 Action。
 
 `meeting_prep` 2.0 使用唯一输入 `person_id`。其上下文为 Person、Household、双向 Relationship、最近 Interactions、已确认 Facts、Signals、进行中 Opportunities、未完成 Actions、未完成 Commitments、Insurance Context 与 Relevant Playbook。输出契约要求七项：30 秒人物摘要、最近变化、本次建议目标、建议切入点、可能异议、需要确认的信息、不建议做什么。它是只读建议，`confirmationLevel=review`；原 1.0 契约未接入生产调用。本轮未接入模型或页面，Playbook 因尚无内容源而明确标为不可用。
 

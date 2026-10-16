@@ -135,13 +135,26 @@ const SKILLS = [
     confirmationLevel: 'confirm_before_write', timeoutClass: 'long',
   },
   {
-    name: 'recruit_coach', version: '1.0.0', capability: 'coaching',
-    contextRecipe: recipe(['candidate'], ['person', 'recruit_followups', 'recruit_goals'],
-      { recruit_followups: 20, recruit_goals: 10 }),
-    inputSchema: object({ candidateId: text(80), question: text(500) }, ['candidateId']),
-    outputSchema: object({ assessment: text(3000), conversationTips: strings(15, 500),
-      nextActions: strings(12, 500), evidence: strings(20, 500) },
-    ['assessment', 'conversationTips', 'nextActions', 'evidence']),
+    name: 'recruit_coach', version: '2.0.0', capability: 'coaching',
+    contextRecipe: recipe(['candidate'], ['person', 'recruit_followups', 'recruit_goals', 'guidance'],
+      { recruit_followups: 20 }),
+    inputSchema: object({ candidateId: text(80), personId: text(80), question: text(500),
+      language: { type: 'string', enum: ['zh-CN','en'] } }, ['candidateId', 'personId']),
+    outputSchema: (() => {
+      const sourceRefs = { type: 'array', maxItems: 5, uniqueItems: true,
+        items: { type: 'string', pattern: '^public\\.[a-z_]+#[1-9][0-9]*$' } };
+      const score = { anyOf: [{ type: 'integer', minimum: 0, maximum: 100 }, { type: 'null' }] };
+      const dimension = object({ key: { type: 'string', enum: [
+        'industry_resources','learning_ability','resilience','communication','entrepreneurial_motivation','cultural_fit',
+      ] }, score, rationale: text(500), evidenceRefs: sourceRefs },
+      ['key','score','rationale','evidenceRefs']);
+      return object({ assessment: text(2000), dimensions: { type: 'array', minItems: 6, maxItems: 6, items: dimension },
+        contactSuggestion: object({ assumptionReasons: strings(8, 400), clarifyingQuestions: strings(8, 400),
+          prohibitedPhrasing: strings(8, 300), nextStep: text(500) },
+        ['assumptionReasons','clarifyingQuestions','prohibitedPhrasing','nextStep']),
+        uncertainty: text(500), confidence: { type: 'string', enum: ['high','medium','low'] } },
+      ['assessment','dimensions','contactSuggestion','uncertainty','confidence']);
+    })(),
     confirmationLevel: 'confirm_before_write', timeoutClass: 'standard',
   },
   {

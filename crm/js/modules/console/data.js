@@ -191,6 +191,14 @@ export const data = {
   resolveRecruitCandidateName: (ctx, name) => p360(ctx, 'resolveRecruitCandidateName', { name }),
   createRecruitCandidate: (ctx, payload) => p360(ctx, 'createRecruitCandidate', { data: payload }),
   recruitCandidateDetails: (ctx, candidateId, personId) => p360(ctx, 'getRecruitCandidate', { candidateId, personId }),
+  recruitCoach: async (ctx, operation, payload) => {
+    const result = await call(ctx, 'assistant', { action: 'recruitCoach', operation, ...(payload || {}) });
+    if (result.ok === false) throw new Error(result.error?.message || 'Recruit Coach request failed');
+    return result;
+  },
+  previewRecruitCoachOutcome: (ctx, payload) => p360(ctx, 'previewRecruitCoachOutcome', payload),
+  confirmRecruitCoachOutcome: (ctx, payload) => p360(ctx, 'confirmRecruitCoachOutcome', payload),
+  executeRecruitCoachOutcome: (ctx, payload) => p360(ctx, 'executeRecruitCoachOutcome', payload),
   transitionRecruitStage: (ctx, payload) => p360(ctx, 'transitionRecruitStage', { data: payload }),
   updateRecruitCandidate: (ctx, id, expectedUpdatedAt, payload) => call(ctx, 'recruit_candidates', {
     action: 'update', id: String(id), expectedUpdatedAt, data: payload,

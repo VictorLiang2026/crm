@@ -742,6 +742,37 @@
     },
     {
       "kind": "relation",
+      "name": "crm_recruit_coach_outcome_commands",
+      "detail": {
+        "rls": true,
+        "type": "r",
+        "policies": [
+          {
+            "name": "recruit_coach_outcome_commands_service_only",
+            "roles": [
+              "service_role"
+            ],
+            "command": "*",
+            "check_hash": "b326b5062b2f0e69046810717534cb09",
+            "permissive": true,
+            "using_hash": "b326b5062b2f0e69046810717534cb09"
+          }
+        ],
+        "force_rls": true,
+        "privileges": {
+          "anon": [],
+          "service_role": [
+            "INSERT",
+            "SELECT",
+            "UPDATE"
+          ],
+          "authenticated": []
+        },
+        "security_invoker": false
+      }
+    },
+    {
+      "kind": "relation",
       "name": "crm_relationship_commands",
       "detail": {
         "rls": true,
@@ -2406,16 +2437,6 @@
     },
     {
       "kind": "routine",
-      "name": "crm_knowledge_review_v1(p_table text, p_id bigint, p_action text, p_actor_uid text, p_expected_updated_at timestamp with time zone)",
-      "detail": {
-        "anon_execute": false,
-        "service_execute": true,
-        "security_definer": true,
-        "authenticated_execute": false
-      }
-    },
-    {
-      "kind": "routine",
       "name": "crm_activity_review_execute_v1(p_actor_uid text, p_preview_id uuid)",
       "detail": {
         "anon_execute": false,
@@ -2491,6 +2512,16 @@
         "anon_execute": false,
         "service_execute": true,
         "security_definer": false,
+        "authenticated_execute": false
+      }
+    },
+    {
+      "kind": "routine",
+      "name": "crm_knowledge_review_v1(p_table text, p_id bigint, p_action text, p_actor_uid text, p_expected_updated_at timestamp with time zone)",
+      "detail": {
+        "anon_execute": false,
+        "service_execute": true,
+        "security_definer": true,
         "authenticated_execute": false
       }
     },
@@ -2631,6 +2662,16 @@
         "anon_execute": false,
         "service_execute": true,
         "security_definer": true,
+        "authenticated_execute": false
+      }
+    },
+    {
+      "kind": "routine",
+      "name": "crm_recruit_coach_outcome_v1(p_stage text, p_actor_uid text, p_command_id uuid, p_candidate_id bigint, p_ai_result_id bigint, p_action_id bigint, p_draft jsonb, p_preview_hash text)",
+      "detail": {
+        "anon_execute": false,
+        "service_execute": true,
+        "security_definer": false,
         "authenticated_execute": false
       }
     },
