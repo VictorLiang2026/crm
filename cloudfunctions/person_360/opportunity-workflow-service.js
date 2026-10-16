@@ -5,6 +5,8 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ID = /^[1-9][0-9]*$/;
 const TYPES = new Set(['insurance','recruit','referral','activity','speaker',
   'partnership','service','relationship']);
+const LEGACY_TYPES = new Set(['医疗保障','重疾保障','养老规划','教育规划','财富规划','家庭保障','转介绍']);
+const STATUSES = new Set(['active','terminal','发现','沟通','方案','成交','关闭','潜在线索','已介绍','已联系','已建立关系']);
 const OPERATIONS = new Set(['create','edit','stage','close','link_action']);
 function id(value) {
   if (!ID.test(String(value)) || !Number.isSafeInteger(Number(value))) throw new Error('Invalid Opportunity ID');
@@ -97,6 +99,62 @@ class OpportunityWorkflowService {
       .map(x=>({...x,personName:names.get(String(x.person_id))})),
     hasMore:rows.length>20,testData:await this.disclosure([
       ...refsForRows('opportunity_candidates',page),...refsForRows('persons',people)])};
+  }
+  async directory(input,actorUid) {
+    if(typeof actorUid!=='string'||!actorUid.trim()||!plain(input)||
+       Object.keys(input).some(key=>!['page','pageSize','kind','status','type','personId','query'].includes(key)))
+      throw new Error('Invalid Opportunity directory query');
+    const page=Number(input.page??1),pageSize=Number(input.pageSize??20);
+    const kind=input.kind??'all',status=input.status||null,type=input.type||null;
+    const personId=input.personId==null||input.personId===''?null:id(input.personId);
+    const query=input.query==null||input.query===''?null:String(input.query).trim();
+    if(!Number.isInteger(page)||page<1||page>1000||!Number.isInteger(pageSize)||pageSize<1||pageSize>50||
+       !['all','person','customer'].includes(kind)||(status&&!STATUSES.has(status))||
+       (type&&!TYPES.has(type)&&!LEGACY_TYPES.has(type))||
+       (query!=null&&(!query||query.length>120))) throw new Error('Invalid Opportunity directory query');
+    return this.rpc('crm_opportunity_directory_v1',{
+      p_actor_uid:actorUid,p_page:page,p_page_size:pageSize,p_kind:kind,
+      p_status:status,p_type:type,p_person_id:personId,p_query:query,
+    });
+  }
+  async details(opportunityId,actorUid) {
+    const oppId=id(opportunityId);
+    if(typeof actorUid!=='string'||!actorUid.trim()) throw new Error('Login required');
+    const rows=await this.request('opportunities','GET',{
+      select:'id,person_id,customer_id,opportunity_type,status,discovered_at,last_progress,next_action,next_action_date,ai_summary,referred_name,referred_relation,created_at,updated_at',
+      id:`eq.${oppId}`,deleted_at:'is.null',limit:1,
+    });
+    if(!rows.length) throw new Error('Opportunity unavailable');
+    const opportunity=rows[0];
+    let personId=opportunity.person_id? id(opportunity.person_id):null;
+    let customerRows=[];
+    if(!personId&&opportunity.customer_id){
+      customerRows=await this.request('customers','GET',{
+        select:'Id,person_id',Id:`eq.${id(opportunity.customer_id)}`,deleted_at:'is.null',limit:1,
+      });
+      personId=customerRows[0]?.person_id?id(customerRows[0].person_id):null;
+    }
+    const [people,direct,links,outcomes]=await Promise.all([
+      personId?this.request('persons','GET',{select:'id,display_name',id:`eq.${personId}`,deleted_at:'is.null',limit:1}):[],
+      this.request('actions','GET',{select:'id,person_id,opportunity_id,title,description,status,due_at,source,updated_at',opportunity_id:`eq.${oppId}`,order:'updated_at.desc,id.desc',limit:50}),
+      opportunity.customer_id?Promise.resolve([]):this.request('crm_opportunity_action_links','GET',{
+        select:'action_id',person_id:`eq.${personId}`,opportunity_id:`eq.${oppId}`,limit:50,
+      }),
+      this.request('outcomes','GET',{select:'id,opportunity_id,action_id,outcome_type,result,occurred_at',
+        opportunity_id:`eq.${oppId}`,order:'occurred_at.desc,id.desc',limit:20}),
+    ]);
+    const linkedIds=links.map(row=>id(row.action_id));
+    const linkedActions=linkedIds.length?await this.request('actions','GET',{
+      select:'id,person_id,opportunity_id,title,description,status,due_at,source,updated_at',
+      person_id:personId?`eq.${personId}`:'is.null',id:`in.(${linkedIds.join(',')})`,limit:50,
+    }):[];
+    const actions=[...new Map([...direct,...linkedActions].map(row=>[String(row.id),row])).values()];
+    const person=people[0]||null;
+    return {opportunity:{...opportunity,person},actions,outcomes,
+      testData:await this.disclosure([
+        ...refsForRows('opportunities',rows),...refsForRows('persons',people),
+        ...refsForRows('customers',customerRows),...refsForRows('actions',actions),
+        ...refsForRows('outcomes',outcomes)])};
   }
   async linked(personId,opportunityId,actorUid) {
     const person=id(personId),opp=id(opportunityId);

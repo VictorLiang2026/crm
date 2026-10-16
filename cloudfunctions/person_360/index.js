@@ -127,7 +127,7 @@ async function pgRpc(name, body) {
     'person_trash_page_v1',
     'person_identity_preview_v1', 'person_identity_execute_v1',
     'crm_person_only_recruit_delete_v1', 'crm_work_item_preview_v1',
-    'crm_work_item_execute_v1', 'crm_opportunity_preview_v1',
+    'crm_work_item_execute_v1', 'crm_opportunity_directory_v1', 'crm_opportunity_preview_v1',
     'crm_opportunity_execute_v1','crm_activity_review_preview_v1',
     'crm_activity_review_execute_v1','crm_person_delete_preview_v1',
     'crm_person_delete_execute_v1','crm_person_restore_v1',
@@ -926,7 +926,9 @@ exports.main = async event => {
       case 'executePersonDelete': return await service.executePersonDelete(event.data, uid);
       case 'restorePerson': return await service.restorePerson(event.data, uid);
       case 'listPersonTrash': return await service.listPersonTrash(event);
-      case 'listOpportunityDirectory': return await service.listOpportunityDirectory(event);
+      case 'listOpportunityDirectory': return await new OpportunityWorkflowService({request:pgRequest,rpc:pgRpc}).directory(event,uid);
+      case 'getOpportunityDirectoryDetails': return await new OpportunityWorkflowService({request:pgRequest,rpc:pgRpc})
+        .details(event.id,uid);
       case 'listPendingOpportunityCandidates': return await new OpportunityWorkflowService({request:pgRequest,rpc:pgRpc}).listPending(uid);
       case 'listOpportunities': return await service.listOpportunities(event.personId);
       case 'getOpportunityLinks': return await new OpportunityWorkflowService({request:pgRequest,rpc:pgRpc})

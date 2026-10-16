@@ -39,7 +39,6 @@ function uuid() {
   });
 }
 const OPP_TYPES = ['insurance', 'recruit', 'referral', 'activity', 'speaker', 'partnership', 'service', 'relationship'];
-const STAGE_OPTIONS = ['发现', '沟通', '方案', '潜在线索', '已介绍', '已联系', '已建立关系'];
 // 枚举翻译统一走 i18n.js 集中注册表
 const oppTypeLabel = (type) => translateEnum('opportunity_type', type);
 const stageLabel = (s) => translateEnum('opportunity_stage', s);
@@ -435,8 +434,12 @@ export function openWorkItemTransition(ctx, { row, operation, onDone } = {}) {
 export function openOpportunityAdvance(ctx, { opportunity, personName, onDone }) {
   const status = opportunity.status || '发现';
   const modeSel = sel([['stage', t('advance_stage')], ['close', t('close_won')]], 'stage');
-  const stageSel = sel(STAGE_OPTIONS.filter((s) => s !== status).map((s) => [s, stageLabel(s)]), '沟通');
+  const referral = ['referral','转介绍'].includes(opportunity.opportunity_type);
+  const allowedStages = (referral ? ['潜在线索','已介绍','已联系','已建立关系'] : ['发现','沟通','方案']).filter((s) => s !== status);
+  const stageSel = sel(allowedStages.map((s) => [s, stageLabel(s)]), allowedStages.includes('沟通') ? '沟通' : allowedStages[0]);
   const closeSel = sel([['成交', t('won')], ['关闭', t('closed')]], '成交');
+  const actionSel = sel([['', t('opp_no_action_link')]], '');
+  const actionNote = h('div', { class: 'sheet-note' }, t('opp_action_loading'));
   const resultTa = h('textarea', { class: 'sheet-textarea', placeholder: t('outcome_required') });
   const form = h('div', {}, [
     fieldRow(t('operation'), modeSel),
@@ -445,6 +448,7 @@ export function openOpportunityAdvance(ctx, { opportunity, personName, onDone })
     h('div', { id: 'opp-close-wrap', style: 'display:none' }, [
       fieldRow(t('result'), closeSel),
       fieldRow(t('result_note'), resultTa, t('close_check_note')),
+      fieldRow(t('opp_action_link'), h('div', {}, [actionSel, actionNote]), t('opp_action_link_note')),
     ]),
   ]);
   const sheet = openSheet({
@@ -460,6 +464,13 @@ export function openOpportunityAdvance(ctx, { opportunity, personName, onDone })
     ]),
   });
   document.body.appendChild(sheet.overlay);
+  data.opportunityDetails(ctx, opportunity.id).then((res) => {
+    const actions = Array.isArray(res.actions) ? res.actions.filter((action) =>
+      String(action.opportunity_id || '') === String(opportunity.id)) : [];
+    actions.forEach((action) => actionSel.appendChild(h('option', { value: String(action.id) },
+      `${action.title || t('opp_action_untitled')} · ${translateEnum('work_status', action.status) || action.status || ''}`)));
+    actionNote.textContent = actions.length ? t('opp_action_link_ready') : t('opp_action_none');
+  }).catch(() => { actionNote.textContent = t('opp_action_unavailable'); });
   modeSel.onchange = () => {
     form.querySelector('#opp-stage-wrap').style.display = modeSel.value === 'stage' ? '' : 'none';
     form.querySelector('#opp-close-wrap').style.display = modeSel.value === 'close' ? '' : 'none';
@@ -468,7 +479,7 @@ export function openOpportunityAdvance(ctx, { opportunity, personName, onDone })
     sheet.showErr('');
     busy(btn, true, t('previewing'));
     const draft = modeSel.value === 'stage' ? { status: stageSel.value }
-      : { actionId: null, status: closeSel.value, result: resultTa.value.trim() };
+      : { actionId: actionSel.value ? Number(actionSel.value) : null, status: closeSel.value, result: resultTa.value.trim() };
     try {
       if (modeSel.value === 'close' && !draft.result) throw new Error(t('fill_outcome'));
       const res = await p360(ctx, 'previewOpportunity', { data: {
@@ -509,6 +520,67 @@ export function openOpportunityAdvance(ctx, { opportunity, personName, onDone })
         }, t('confirm_execute')),
       ]),
     ]));
+  }
+}
+
+// ---------- 机会：编辑 Person-only opportunity ----------
+export function openOpportunityEdit(ctx, { opportunity, personName, onDone }) {
+  const typeSel = sel(OPP_TYPES.map((key) => [key, oppTypeLabel(key)]), opportunity.opportunity_type);
+  const progressTa = h('textarea', { class: 'sheet-textarea' }, opportunity.last_progress || '');
+  const nextInput = h('input', { class: 'sheet-input', value: opportunity.next_action || '' });
+  const dateInput = h('input', { class: 'sheet-input', type: 'date', value: opportunity.next_action_date || '' });
+  const sheet = openSheet({
+    title: t('opp_edit_title'),
+    sub: `${oppTypeLabel(opportunity.opportunity_type) || opportunity.opportunity_type || t('opportunity')} · ${personName || ''}`,
+    body: h('div', {}, [
+      h('p', { class: 'sheet-note', style: 'margin:0 0 10px' }, t('preview_before_write')),
+      fieldRow(t('opp_type'), typeSel),
+      fieldRow(t('current_progress'), progressTa),
+      fieldRow(t('next_step'), nextInput),
+      fieldRow(t('next_date'), dateInput, t('date_optional')),
+      h('div', { class: 'sheet-actions' }, [
+        h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => sheet.overlay.remove() }, t('cancel')),
+        h('button', { class: 'btn btn-primary', type: 'button', onclick: (e) => doPreview(e.currentTarget) }, t('generate_preview')),
+      ]),
+    ]),
+  });
+  document.body.appendChild(sheet.overlay);
+  async function doPreview(btn) {
+    sheet.showErr('');
+    if (!progressTa.value.trim()) { sheet.showErr(t('fill_progress')); return; }
+    if (!nextInput.value.trim()) { sheet.showErr(t('fill_next_step')); return; }
+    busy(btn, true, t('previewing'));
+    const draft = { type:typeSel.value,progress:progressTa.value.trim(),nextAction:nextInput.value.trim(),
+      nextActionDate:dateInput.value || null };
+    try {
+      const res = await p360(ctx, 'previewOpportunity', { data: {
+        idempotencyKey: uuid(), operation: 'edit', personId: String(opportunity.person_id || opportunity.person?.id || ''),
+        opportunityId: String(opportunity.id), draft,
+      } });
+      const preview = res.preview || {};
+      sheet.swap(h('div', {}, [
+        previewBlock([
+          kvRow(t('target'), (preview.personName || personName || '')),
+          kvRow(t('opp_type'), `${oppTypeLabel(opportunity.opportunity_type) || opportunity.opportunity_type} → ${oppTypeLabel(draft.type)}`),
+          kvRow(t('current_progress'), draft.progress.slice(0, 180)),
+          kvRow(t('next_step'), `${draft.nextAction}${draft.nextActionDate ? ' · ' + draft.nextActionDate : ''}`),
+          h('div', { class: 'sheet-note', style: 'margin-top:8px' }, t('preview_no_write')),
+        ]),
+        h('div', { class: 'sheet-actions' }, [
+          h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => sheet.overlay.remove() }, t('cancel')),
+          h('button', { class: 'btn btn-primary', type: 'button', onclick: async (e) => {
+            const confirmBtn = e.currentTarget;
+            busy(confirmBtn, true, t('writing'));
+            try {
+              await p360(ctx, 'executeOpportunity', { previewId: res.previewId });
+              sheet.overlay.remove();
+              ctx.toast(t('opp_updated'), 'ok');
+              if (onDone) onDone();
+            } catch (err) { busy(confirmBtn, false, t('confirm_execute')); sheet.showErr(err.message); }
+          } }, t('confirm_execute')),
+        ]),
+      ]));
+    } catch (err) { busy(btn, false, t('generate_preview')); sheet.showErr(err.message); }
   }
 }
 

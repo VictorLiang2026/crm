@@ -30,6 +30,7 @@
     "test:pc12": "node --test tests/pc12/*.test.cjs tests/pc12/*.browser.cjs",
     "test:pc13": "node --test tests/pc13/*.test.cjs tests/pc13/*.browser.cjs",
     "test:pc14": "node --test tests/pc14/*.test.cjs tests/pc14/*.browser.cjs",
+    "test:pc15": "node --test tests/pc15/*.test.cjs tests/pc15/*.browser.cjs",
     "test:interactions": "node --test tests/interactions/interaction-service.cjs tests/interactions/legacy-adapter.cjs tests/interactions/person360-dispatch.cjs tests/interactions/activity-interaction-service.cjs",
     "test:actions": "node --test tests/actions/action-service.cjs",
     "test:recruit-goals": "node --test tests/recruit-goals/transactional-save.cjs",

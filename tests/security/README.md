@@ -4,6 +4,8 @@
 
 2026-10-16 PC14 更新：仅在完整核对 `public.crm_ocr_parse_commands` 的 FORCE RLS/service_role-only 策略，以及三条 OCR 审阅 RPC 仅授予 `service_role` 后，将这 4 个新对象加入预期快照；不刷新或接受其他对象漂移。
 
+2026-10-16 PC15 更新：已核对 `public.crm_opportunity_directory_v1` 的签名和有效执行权限，确认仅 `service_role` 可执行，`anon` 与 `authenticated` 不可执行；仅将该函数加入预期快照。
+
 ## 运行
 
 1. 确认 CloudBase 环境为 `crm-d1gkae8ddc930d151`，使用 `queryPgDatabase(action="sql", limit=1)` 执行 `verify-public.sql` 全文。结果必须 `success=true`、`returnedRows=1`、`truncated=false`。
