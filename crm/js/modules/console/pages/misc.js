@@ -159,7 +159,8 @@ const LEGACY_BUSINESS_GROUPS = [
 
 function moreEntry(entry, status) {
   const [icon, key, hash] = entry;
-  return h('a', { class: 'tile', href: hash.startsWith('#/people-trash') ? hash : LEGACY_ADMIN + hash }, [
+  const href = key === 'knowledge_governance' || hash.startsWith('#/people-trash') ? hash : LEGACY_ADMIN + hash;
+  return h('a', { class: 'tile', href }, [
     ic(icon), h('b', {}, t(key)), bdg(t(status), status === 'status_live' ? 'jade' : 'ink'),
     h('span', {}, t(key + '_desc')),
   ]);
@@ -187,6 +188,7 @@ export function renderMore(ctx) {
   ];
   const systemEntries = [ENTRY_KEYS.legacy_account, ENTRY_KEYS.legacy_test_scenario];
   const knowledgeEntries = [
+    ['file', 'knowledge_governance', '#/knowledge-governance'],
     ENTRY_KEYS.legacy_funnels, ENTRY_KEYS.legacy_ai_suggestions, ENTRY_KEYS.legacy_policy_review,
     ENTRY_KEYS.legacy_products, ENTRY_KEYS.legacy_gifts, ENTRY_KEYS.legacy_photos,
   ];
@@ -205,7 +207,12 @@ export function renderMore(ctx) {
       h('div', { class: 'more-actions' }, h('button', {
         class: 'btn btn-ghost', type: 'button', onclick: () => ctx.signOut(),
       }, [ic('logout'), t('setting_signout')]))),
-    moreGroup('more_knowledge_title', 'more_knowledge_desc', knowledgeEntries),
+    h('section', { class: 'more-section' }, [
+      sectionTitle(t('more_knowledge_title')),
+      h('p', { class: 'foot-note', style: 'margin:0 0 12px' }, t('more_knowledge_desc')),
+      h('div', { class: 'tile-grid' }, knowledgeEntries.map(entry => moreEntry(entry,
+        entry[1] === 'knowledge_governance' ? 'status_live' : 'status_legacy'))),
+    ]),
     h('section', { class: 'more-section' }, [
       sectionTitle(t('more_recycle_title')),
       h('p', { class: 'foot-note', style: 'margin:0 0 12px' }, t('more_recycle_desc')),

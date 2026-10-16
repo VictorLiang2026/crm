@@ -866,3 +866,9 @@ body:has(.login), body.is-login { padding-top: env(safe-area-inset-top); }
   .act-resource-row { align-items: flex-start; flex-direction: column; }
   .act-resource-actions { justify-content: flex-start; }
 }
+/* PC22 knowledge governance: iPad-first split workspace. */
+.kg-layout{display:grid;grid-template-columns:minmax(280px,.8fr) minmax(420px,1.2fr);gap:16px;align-items:start}
+.kg-form{display:grid;gap:12px}.kg-form h2,.kg-toolbar h2{margin:0;font-size:17px}.kg-field{display:grid;gap:6px;color:var(--ink-600,#565e6b);font-size:13px}
+.kg-field input,.kg-field select,.kg-field textarea{width:100%;box-sizing:border-box;border:1px solid var(--line,#e3e5e9);border-radius:10px;padding:10px 12px;background:#fff;color:var(--ink,#2e333b);font:inherit}
+.kg-list{display:grid;gap:10px}.kg-toolbar{display:flex;align-items:center;justify-content:space-between}.kg-row{background:#fff;border:1px solid var(--line,#e3e5e9);border-radius:14px;padding:14px;display:grid;gap:8px}.kg-row-head,.kg-actions{display:flex;align-items:center;gap:8px;justify-content:space-between}.kg-status{font-size:12px;border-radius:999px;padding:4px 8px;background:#f0f1f3}.kg-verified{color:#176e4d;background:#e6f5ed}.kg-invalidated,.kg-superseded{color:#8b2e41;background:#fae9ed}.kg-copy{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--ink,#2e333b)}
+@media(max-width:1100px){.kg-layout{grid-template-columns:1fr}}

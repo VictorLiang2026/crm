@@ -3,6 +3,7 @@ import {
   renderToday, renderPeople, renderPeopleTrash, renderPerson, renderOpportunities,
   renderActivities, renderActivity, renderRecruit, renderAI, renderMore,
   renderSettings, renderRecruitGoals, renderActivityReport,
+  renderKnowledgeGovernance,
 } from './views.js';
 
 const EXACT = new Map([
@@ -16,6 +17,7 @@ const EXACT = new Map([
   ['#/ai', renderAI],
   ['#/more', renderMore],
   ['#/settings', renderSettings],
+  ['#/knowledge-governance', renderKnowledgeGovernance],
 ]);
 
 const PATTERNS = [
@@ -39,6 +41,7 @@ const NAV_OF = {
   '#/ai': '#/ai',
   '#/more': '#/more',
   '#/settings': '#/more',
+  '#/knowledge-governance': '#/more',
   '#/activity-report/customer': '#/today',
   '#/activity-report/recruit': '#/today',
 };

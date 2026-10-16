@@ -30,6 +30,10 @@ export const data = {
   meetingPrep: (ctx, personId) => call(ctx, 'assistant', { action: 'meetingPrep', personId }),
   conversationPlaybook: (ctx, personId, objection) => call(ctx, 'assistant', { action: 'conversationPlaybook', personId, objection }),
   conversationPlaybookHistory: (ctx, personId) => call(ctx, 'assistant', { action: 'conversationPlaybookHistory', personId }),
+  knowledgeGovernance: (ctx) => p360(ctx, 'listKnowledgeGovernance'),
+  saveKnowledgeGovernance: (ctx, payload) => p360(ctx, 'saveKnowledgeGovernance', { data: payload }),
+  reviewKnowledgeGovernance: (ctx, payload) => p360(ctx, 'reviewKnowledgeGovernance', { data: payload }),
+  createKnowledgeFixtures: (ctx) => p360(ctx, 'createKnowledgeGovernanceFixtures'),
   activities: (ctx) => call(ctx, 'activities', { action: 'list' }),
 
   // ---------- 人物目录 ----------

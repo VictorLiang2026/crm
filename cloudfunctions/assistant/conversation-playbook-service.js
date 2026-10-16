@@ -12,6 +12,7 @@ function positiveId(value) {
 async function runConversationPlaybook(event) {
   const personId = String(event?.personId || '').trim();
   const objection = String(event?.objection || '').trim();
+  const scenario = String(event?.scenario || '').trim();
   if (!positiveId(personId)) {
     const e = new Error('personId must be a positive integer');
     e.code = 'INVALID_INPUT';
@@ -22,10 +23,11 @@ async function runConversationPlaybook(event) {
     e.code = 'INVALID_INPUT';
     throw e;
   }
+  if (scenario.length > 256) { const e = new Error('scenario is too long'); e.code = 'INVALID_INPUT'; throw e; }
 
   const p360 = await app.callFunction({
     name: 'person_360',
-    data: { action: 'getMeetingPrepContext', personId },
+    data: { action: 'getMeetingPrepContext', personId, objection, scenario },
   });
   const prep = p360 && p360.result;
   if (!prep || typeof prep !== 'object' || prep.error || !prep.person) {
@@ -34,23 +36,17 @@ async function runConversationPlaybook(event) {
     throw e;
   }
 
-  // Build reliable_evidence from recent interactions and facts (person_360 returns arrays).
-  const evidence = [];
-  (Array.isArray(prep.recent_interactions) ? prep.recent_interactions : []).slice(0, 6).forEach((it) => {
-    evidence.push(`互动: ${it.summary || it.type || ''}`.slice(0, 200));
-  });
-  (Array.isArray(prep.facts) ? prep.facts : []).slice(0, 6).forEach((f) => {
-    evidence.push(`事实: ${f.content || ''}`.slice(0, 200));
-  });
+  const governance = prep.relevant_playbook?.content || {};
+  const evidence = Array.isArray(governance.reliable_evidence) ? governance.reliable_evidence.slice(0, 12) : [];
 
   const context = {
-    guidance: '保险销售对话原则：先理解客户真实顾虑，用事实和数据回应，不夸大承诺，不施压；尊重客户节奏，提供选择而非结论。',
+    guidance: { principle: '先理解客户真实顾虑，不夸大承诺、不施压；潜在原因作为待确认假设。只引用 reliable_evidence 中的证据 ID；互动、Person 事实、案例和故事均不得作为已核验证据。尊重客户节奏，提供选择而非结论。' },
     person: prep.person,
     recent_interactions: prep.recent_interactions,
     facts: prep.facts,
     signals: prep.signals,
     open_opportunities: prep.open_opportunities,
-    relevant_playbooks: [],
+    relevant_playbooks: Array.isArray(governance.relevant_playbooks) ? governance.relevant_playbooks.slice(0, 3) : [],
     reliable_evidence: evidence,
   };
 
@@ -63,7 +59,7 @@ async function runConversationPlaybook(event) {
     capability: 'coaching',
     subjectType: 'person',
     subjectId: personId,
-    input: { person_id: personId, objection },
+    input: { person_id: personId, objection, ...(scenario ? { scenario } : {}) },
     context,
     contextSnapshot: {
       ...context,
@@ -78,7 +74,8 @@ async function runConversationPlaybook(event) {
     possibleUnderlyingReasons: task.result.possibleUnderlyingReasons,
     clarifyingQuestions: task.result.clarifyingQuestions,
     responseLogic: task.result.responseLogic,
-    evidenceRefs: task.result.evidenceRefs,
+    evidenceRefs: [...new Set((Array.isArray(task.result.evidenceRefs) ? task.result.evidenceRefs : []).map(String))]
+      .filter(id => evidence.some(row => String(row.id ?? row.reference?.id) === id)).map(Number),
     nextObjective: task.result.nextObjective,
     doNotSay: task.result.doNotSay,
     taskId: task.taskId,

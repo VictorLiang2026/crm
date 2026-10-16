@@ -1,0 +1,25 @@
+# PC22 实施任务
+
+- [x] 1. 建立 `public` 迁移与成对 rollback
+  - 增加两表治理/版本字段、约束、索引和 service-only 原子审核 RPC。
+  - 迁移后重新查询两表结构及权限；不得改 authenticated/anon 权限。
+  - _Requirement: 2, 3, 7_
+- [x] 2. 实现受控服务端治理 action
+  - 新增 allowlist 数据适配器和 `assistant` authenticated action。
+  - 实现分页 list、草稿 create/edit、追加修订、引用预览、review、invalidate；固定字段并校验 actor、类型、引用与乐观锁。
+  - _Requirement: 1, 2, 3, 7_
+- [x] 3. 将经过审核的内容加入既有 AI 上下文
+  - 在 Person 360 会前准备上下文确定性筛选有效 Playbook 及其引用。
+  - 更新会前准备与对话策略服务，只把合格 Evidence 放入 reliable evidence，并保持旧结果契约、人工审核和只读业务语义。
+  - _Requirement: 4, 5, 6_
+- [x] 4. 构建 Console 治理页面
+  - 新增 iPad 工作台、筛选/列表/编辑/确认审核/失效/版本和引用预览。
+  - More 增加入口；旧入口保留；所有新文案经双语字典。
+  - _Requirement: 1, 9_
+- [ ] 5. 回归与测试数据（自动回归已完成；3 条线上派生样例待真实用户登录后经治理页面确认）
+  - 覆盖 draft/verify/invalid/revision、日期/置信度/类型过滤、恶意引用/并发、权限拒绝、AI 历史快照与旧 UI。
+  - 经正常确认创建 3 条现有虚构 Person 的衍生样本，核对台账/标记/引用，不增加初始 seed。
+  - _Requirement: 3, 4, 5, 6, 7, 8_
+- [x] 6. 发布与同步核验（云端部署和源码同步已完成；GitHub 提交/标签随本轮收尾）
+  - 完成发布门禁、限定部署受影响函数和静态文件、回归、GitHub 提交推送/标签及 CloudBase 三端核对。
+  - _Requirement: 1-9_

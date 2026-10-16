@@ -9,6 +9,17 @@ const { HouseholdContextService } = require('./household-context');
 const OPEN_OPPORTUNITY_STATUSES = new Set(['成交', '关闭']);
 const SOURCE = table => ({ schema: 'public', table });
 const clip = (value, max = 400) => typeof value === 'string' ? value.trim().slice(0, max) : '';
+const normalized = value => clip(value, 1000).toLocaleLowerCase().replace(/[\s\p{P}\p{S}]+/gu, '');
+function playbookScore(row, objection, scenario) {
+  const asked = normalized(objection); const known = normalized(row.objection);
+  const requestedScenario = normalized(scenario); const category = normalized(row.scenario);
+  let score = 0;
+  if (known && asked === known) score += 6;
+  else if (known && asked.length >= 3 && known.length >= 3 && (asked.includes(known) || known.includes(asked))) score += 3;
+  else if (known) return 0;
+  if (requestedScenario && category && requestedScenario === category) score += 2;
+  return score;
+}
 
 function idOf(value) {
   const id = String(value ?? '');
@@ -25,7 +36,7 @@ class MeetingPrepContextBuilder {
     this.now = now;
   }
 
-  async build(personId) {
+  async build(personId, { objection = '', scenario = '' } = {}) {
     const id = idOf(personId);
     const read = (table, filters) => this.request(table, 'GET', filters);
     const person = (await read('persons', { select: 'id,display_name,occupation,organization',
@@ -81,6 +92,36 @@ class MeetingPrepContextBuilder {
     const openOpportunities = [...opportunityById.values()]
       .sort((a, b) => String(b.updated_at || '').localeCompare(String(a.updated_at || ''))).slice(0, 10);
     const recent = Array.isArray(interactions?.rows) ? interactions.rows : [];
+    const today = this.now().toISOString().slice(0, 10);
+    const current = row => (!row.valid_from || row.valid_from <= today) && (!row.valid_to || row.valid_to >= today) &&
+      (!row.source_date || row.source_date <= today);
+    const [knowledgeRows, playbookRows] = await Promise.all([
+      read('knowledge_items', { select: 'id,item_type,source,source_date,valid_from,valid_to,verified,confidence,content,lifecycle_status',
+        lifecycle_status: 'eq.verified', verified: 'eq.true', order: 'updated_at.desc,id.desc', limit: 30 }),
+      read('playbooks', { select: 'id,scenario,objection,possible_underlying_reasons,clarifying_questions,response_logic,evidence_refs,case_refs,story_refs,do_not_say,next_objective,source,confidence,valid_from,valid_to,lifecycle_status',
+        lifecycle_status: 'eq.verified', order: 'updated_at.desc,id.desc', limit: 30 }),
+    ]);
+    const evidenceById = new Map(knowledgeRows.filter(row => row.item_type === 'evidence' && row.verified === true &&
+      row.confidence != null && Number(row.confidence) >= 0.7 && clip(row.source, 500) && clip(row.content, 5000) && current(row))
+      .map(row => [String(row.id), row]));
+    const curatedEvidence = [...evidenceById.values()].slice(0, 12).map(row => ({
+      content: clip(row.content, 1000), source: clip(row.source, 300), confidence: Number(row.confidence),
+      source_date: row.source_date, reference: { ...SOURCE('knowledge_items'), id: row.id, item_type: 'evidence' },
+    }));
+    const curatedPlaybooks = playbookRows.map(row => ({ row, score: playbookScore(row, objection, scenario) }))
+      .filter(({ row, score }) => score > 0 && current(row) && clip(row.source, 500) &&
+      Number(row.confidence) >= 0.7 && Array.isArray(row.evidence_refs) &&
+      row.evidence_refs.length > 0 && row.evidence_refs.every(ref => evidenceById.has(String(ref))) &&
+      !(row.case_refs || []).some(ref => evidenceById.has(String(ref))) &&
+      !(row.story_refs || []).some(ref => evidenceById.has(String(ref))))
+      .sort((a,b) => b.score - a.score).slice(0, 3).map(({row}) => ({ scenario: clip(row.scenario, 160), objection: clip(row.objection, 500),
+        response_logic: clip(row.response_logic, 2000), possible_underlying_reasons: row.possible_underlying_reasons,
+        clarifying_questions: row.clarifying_questions, do_not_say: row.do_not_say,
+        next_objective: clip(row.next_objective, 300), source: clip(row.source, 300),
+        evidence: row.evidence_refs.map(ref => evidenceById.get(String(ref))).map(item => ({
+          content: clip(item.content, 700), source: clip(item.source, 250), confidence: Number(item.confidence),
+          reference: { ...SOURCE('knowledge_items'), id: item.id, item_type: 'evidence' },
+        })) }));
 
     return {
       person: { data: { id: person.id, display_name: clip(person.display_name, 120),
@@ -118,8 +159,10 @@ class MeetingPrepContextBuilder {
         content: clip(row.content, 300), due_at: row.due_at,
         source: { ...SOURCE('commitments'), id: row.id } })),
       insurance_context: { ...insurance, source: { schema: 'public', service: 'InsuranceContextService' } },
-      relevant_playbook: { status: 'unavailable', content: null,
-        reason: 'No maintained playbook content source exists in this CRM.' },
+      relevant_playbook: curatedPlaybooks.length || curatedEvidence.length ? {
+        status: 'available', content: { relevant_playbooks: curatedPlaybooks, reliable_evidence: curatedEvidence },
+      } : { status: 'unavailable', content: null,
+        reason: 'No reviewed, current, referenced playbook or qualifying evidence matches the governance rules.' },
     };
   }
 }

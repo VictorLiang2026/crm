@@ -45,6 +45,7 @@ const OPPORTUNITY_READ_TABLES = new Set([
 const AI_AUDIT_READ_TABLES = new Set(['ai_tasks', 'ai_results']);
 const ACTIVITY_REVIEW_READ_TABLES = new Set(['crm_activity_review_commands']);
 const OCR_REVIEW_READ_TABLES = new Set(['crm_ocr_parse_commands']);
+const KNOWLEDGE_GOVERNANCE_TABLES = new Set(['knowledge_items', 'playbooks']);
 const TABLES = new Set([
   'persons', 'households', 'household_members', 'interactions', 'commitments',
   'opportunities',
@@ -55,6 +56,7 @@ const TABLES = new Set([
   ...AI_AUDIT_READ_TABLES,
   ...ACTIVITY_REVIEW_READ_TABLES,
   ...OCR_REVIEW_READ_TABLES,
+  ...KNOWLEDGE_GOVERNANCE_TABLES,
   ...LEGACY_INTERACTION_TABLES,
 ]);
 const ROLES = new Set(['spouse', 'child', 'parent', 'sibling', 'other']);
@@ -96,6 +98,7 @@ async function pgRequest(table, method, filters = {}, body) {
   if (OPPORTUNITY_READ_TABLES.has(table) && method !== 'GET') throw new Error('Invalid source operation');
   if (OCR_REVIEW_READ_TABLES.has(table) && method !== 'GET') throw new Error('Invalid source operation');
   if (ACTIVITY_REVIEW_READ_TABLES.has(table) && method !== 'GET') throw new Error('Invalid source operation');
+  if (KNOWLEDGE_GOVERNANCE_TABLES.has(table) && !['GET', 'POST', 'PATCH'].includes(method)) throw new Error('Invalid source operation');
   if (table === 'commitments' && method !== 'GET') throw new Error('Invalid source operation');
   const env = process.env.TCB_ENV;
   const key = process.env.CRM_PERSON360_DB_API_KEY;
@@ -139,7 +142,8 @@ async function pgRpc(name, body) {
     'crm_household_preview_v1','crm_household_execute_v1',
     'crm_relationship_preview_v1','crm_relationship_execute_v1',
     'crm_ocr_parse_preview_v1','crm_ocr_parse_undo_preview_v1','crm_ocr_parse_execute_v1',
-    'crm_recruit_candidate_create_v1','crm_recruit_candidate_transition_v1']).has(name)) throw new Error('Invalid RPC');
+    'crm_recruit_candidate_create_v1','crm_recruit_candidate_transition_v1',
+    'crm_knowledge_review_v1']).has(name)) throw new Error('Invalid RPC');
   const env = process.env.TCB_ENV;
   const key = process.env.CRM_PERSON360_DB_API_KEY;
   if (!/^crm-[a-z0-9]+$/.test(env || '') || !key) throw new Error('Person 360 is not configured');
@@ -961,6 +965,17 @@ exports.main = async event => {
         return await new OcrReviewService({request:pgRequest,rpc:pgRpc,
           resolveName:name=>new PersonService({request:pgRequest}).resolveName(name)})
           .list(event.personId,uid);
+      case 'listKnowledgeGovernance':
+        return await new (require('./knowledge-governance-service').KnowledgeGovernanceService)({request:pgRequest,rpc:pgRpc}).list();
+      case 'saveKnowledgeGovernance':
+        return await new (require('./knowledge-governance-service').KnowledgeGovernanceService)({request:pgRequest,rpc:pgRpc})
+          .save(event.data,uid);
+      case 'reviewKnowledgeGovernance':
+        return await new (require('./knowledge-governance-service').KnowledgeGovernanceService)({request:pgRequest,rpc:pgRpc})
+          .review(event.data,uid);
+      case 'createKnowledgeGovernanceFixtures':
+        return await new (require('./knowledge-governance-service').KnowledgeGovernanceService)({request:pgRequest,rpc:pgRpc})
+          .createFixtures(uid);
       case 'previewOcrParse':
         return await new OcrReviewService({request:pgRequest,rpc:pgRpc,
           resolveName:name=>new PersonService({request:pgRequest}).resolveName(name)})
@@ -996,7 +1011,7 @@ exports.main = async event => {
         .execute(event.previewId, uid);
       case 'listActivityData': return await listActivityData(event);
       case 'getMeetingPrepContext': return await new MeetingPrepContextBuilder({ request: pgRequest })
-        .build(event.personId);
+        .build(event.personId, { objection: event.objection || '', scenario: event.scenario || '' });
       case 'listDueCommitments': return await new CommitmentService({ request: pgRequest }).listDue();
       case 'listPersonWorkItems': return await new WorkItemService({request:pgRequest,rpc:pgRpc})
         .listForPerson(event.personId);

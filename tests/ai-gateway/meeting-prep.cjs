@@ -14,6 +14,7 @@ function fixture() {
         return filters.id === 'eq.1' ? [{ id: 1, display_name: '[CRM_TEST_ONLY]甲',
           occupation: '顾问', organization: '测试机构', legacy_customer_id: null }] :
           [{ id: 2, display_name: '[CRM_TEST_ONLY]乙' }];
+      case 'customers': return [];
       case 'households': return [{ id: 3, anchor_person_id: 1, important_facts: '有一名配偶' }];
       case 'household_members': return filters.household_id ?
         [{ id: 4, person_id: 2, relationship_to_anchor: 'spouse', confirmed_at: '2026-09-28' }] : [];
@@ -28,6 +29,8 @@ function fixture() {
         next_action: '核对保单' }, { id: 10, opportunity_type: 'recruit', status: '关闭' }];
       case 'actions': return [{ id: 11, title: '准备资料', priority: 'high' }];
       case 'commitments': return [{ id: 12, commitment_type: 'I_PROMISED', content: '发送方案' }];
+      case 'knowledge_items': return [];
+      case 'playbooks': return [];
       default: throw new Error(`Unexpected source: ${table}`);
     }
   }
@@ -75,7 +78,7 @@ test('builder reads bounded sourced Person context and does not promote AI fact 
   assert.ok(!JSON.stringify(context).includes('MUST_NOT_RETURN'));
   assert.ok(calls.every(call => call.method === 'GET'));
   assert.ok(calls.every(call => !/raw_note|phone|photo_url/.test(call.filters.select || '')));
-  assert.ok(calls.every(call => call.filters.limit <= 30));
+  assert.ok(calls.every(call => call.filters.limit <= 50), JSON.stringify(calls.filter(call => call.filters.limit > 50 || call.filters.limit == null)));
 });
 
 test('missing Person fails before reading any dependent table', async () => {
