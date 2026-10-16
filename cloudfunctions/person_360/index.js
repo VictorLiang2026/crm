@@ -21,6 +21,7 @@ const { ContextItemLifecycleService } = require('./context-item-lifecycle-servic
 const { HouseholdService } = require('./household-service');
 const { RelationshipService } = require('./relationship-service');
 const { RelationshipNetworkService } = require('./relationship-network-service');
+const { OcrReviewService } = require('./ocr-review-service');
 const aiStandards = require('./ai');
 
 const app = cloudbase.init({ env: process.env.TCB_ENV });
@@ -41,6 +42,7 @@ const OPPORTUNITY_READ_TABLES = new Set([
   'crm_test_batches','crm_test_records',
 ]);
 const AI_AUDIT_READ_TABLES = new Set(['ai_tasks', 'ai_results']);
+const OCR_REVIEW_READ_TABLES = new Set(['crm_ocr_parse_commands']);
 const TABLES = new Set([
   'persons', 'households', 'household_members', 'interactions', 'commitments',
   'opportunities',
@@ -49,6 +51,7 @@ const TABLES = new Set([
   ...RECRUIT_READ_TABLES,
   ...OPPORTUNITY_READ_TABLES,
   ...AI_AUDIT_READ_TABLES,
+  ...OCR_REVIEW_READ_TABLES,
   ...LEGACY_INTERACTION_TABLES,
 ]);
 const ROLES = new Set(['spouse', 'child', 'parent', 'sibling', 'other']);
@@ -88,6 +91,7 @@ async function pgRequest(table, method, filters = {}, body) {
   if (RELATIONSHIP_READ_TABLES.has(table) && method !== 'GET') throw new Error('Invalid source operation');
   if (RECRUIT_READ_TABLES.has(table) && method !== 'GET') throw new Error('Invalid source operation');
   if (OPPORTUNITY_READ_TABLES.has(table) && method !== 'GET') throw new Error('Invalid source operation');
+  if (OCR_REVIEW_READ_TABLES.has(table) && method !== 'GET') throw new Error('Invalid source operation');
   if (table === 'commitments' && method !== 'GET') throw new Error('Invalid source operation');
   const env = process.env.TCB_ENV;
   const key = process.env.CRM_PERSON360_DB_API_KEY;
@@ -129,7 +133,8 @@ async function pgRpc(name, body) {
     'crm_person_delete_execute_v1','crm_person_restore_v1',
     'crm_context_item_preview_v1','crm_context_item_execute_v1',
     'crm_household_preview_v1','crm_household_execute_v1',
-    'crm_relationship_preview_v1','crm_relationship_execute_v1']).has(name)) throw new Error('Invalid RPC');
+    'crm_relationship_preview_v1','crm_relationship_execute_v1',
+    'crm_ocr_parse_preview_v1','crm_ocr_parse_undo_preview_v1','crm_ocr_parse_execute_v1']).has(name)) throw new Error('Invalid RPC');
   const env = process.env.TCB_ENV;
   const key = process.env.CRM_PERSON360_DB_API_KEY;
   if (!/^crm-[a-z0-9]+$/.test(env || '') || !key) throw new Error('Person 360 is not configured');
@@ -934,6 +939,22 @@ exports.main = async event => {
         .execute(event.previewId,uid);
       case 'listRecruitContext': return await service.listRecruitContext(event.personId);
       case 'getInsuranceContext': return await service.getInsuranceContext(event.personId);
+      case 'listOcrParseCommands':
+        return await new OcrReviewService({request:pgRequest,rpc:pgRpc,
+          resolveName:name=>new PersonService({request:pgRequest}).resolveName(name)})
+          .list(event.personId,uid);
+      case 'previewOcrParse':
+        return await new OcrReviewService({request:pgRequest,rpc:pgRpc,
+          resolveName:name=>new PersonService({request:pgRequest}).resolveName(name)})
+          .previewApply(event.data,uid);
+      case 'executeOcrParse':
+        return await new OcrReviewService({request:pgRequest,rpc:pgRpc,
+          resolveName:name=>new PersonService({request:pgRequest}).resolveName(name)})
+          .execute(event.previewId,uid);
+      case 'previewOcrUndo':
+        return await new OcrReviewService({request:pgRequest,rpc:pgRpc,
+          resolveName:name=>new PersonService({request:pgRequest}).resolveName(name)})
+          .previewUndo(event.data,uid);
       case 'getRelationshipDecay': return await new RelationshipDecayService({ request: pgRequest })
         .evaluateForPerson(event.personId);
       case 'createOpportunity':

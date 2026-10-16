@@ -2,6 +2,8 @@
 
 本测试只读取 `public` 对象的目录元数据，不读取客户资料或测试记录，不改数据库。它把 2026-10-02 已核验的对象、策略表达式摘要和三种角色的**有效授权**固定在 `expected-public-baseline.json`；新增、消失或权限变化均使测试失败，必须人工复核后才可更新基线。基线不是对旧授权安全性的全面认可。
 
+2026-10-16 PC14 更新：仅在完整核对 `public.crm_ocr_parse_commands` 的 FORCE RLS/service_role-only 策略，以及三条 OCR 审阅 RPC 仅授予 `service_role` 后，将这 4 个新对象加入预期快照；不刷新或接受其他对象漂移。
+
 ## 运行
 
 1. 确认 CloudBase 环境为 `crm-d1gkae8ddc930d151`，使用 `queryPgDatabase(action="sql", limit=1)` 执行 `verify-public.sql` 全文。结果必须 `success=true`、`returnedRows=1`、`truncated=false`。

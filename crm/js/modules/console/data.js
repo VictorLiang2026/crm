@@ -1,5 +1,5 @@
-// Console 只读数据层（WP1）：所有调用经 ctx.api（core/createApi：校验函数名、拒绝 pr_*）。
-// 只封装已上线的 CRM action，不新增任何云函数与数据库对象。
+// Console 数据层（WP1）：调用经 ctx.api（core/createApi：校验函数名、拒绝 pr_*）。
+// 仅封装当前页面所需的 CRM 云函数 action；业务写入仍由服务端作用域与预览执行边界控制。
 async function call(ctx, name, params) {
   const res = await ctx.api.call(name, params || {});
   if (res == null || typeof res !== 'object') throw new Error('服务无响应');
@@ -50,6 +50,15 @@ export const data = {
   previewRelationship: (ctx, personId, operation, payload) => p360(ctx, 'previewRelationship', { personId, operation, data: payload }),
   executeRelationship: (ctx, previewId) => p360(ctx, 'executeRelationship', { previewId }),
   customerProfile: (ctx, personId) => p360(ctx, 'getCustomerProfile', { personId }),
+  resolvePersonName: (ctx, name) => p360(ctx, 'resolveIdentity', { name }),
+  ocrRecords: (ctx, customerId) => call(ctx, 'ocr_records', {
+    action: 'list', customer_id: Number(customerId),
+  }),
+  parseOcr: (ctx, input) => call(ctx, 'ai_parse', { action: 'parse', ...(input || {}) }),
+  ocrParseCommands: (ctx, personId) => p360(ctx, 'listOcrParseCommands', { personId }),
+  previewOcrParse: (ctx, data) => p360(ctx, 'previewOcrParse', { data }),
+  executeOcrParse: (ctx, previewId) => p360(ctx, 'executeOcrParse', { previewId }),
+  previewOcrUndo: (ctx, data) => p360(ctx, 'previewOcrUndo', { data }),
   // ---------- 客户关怀与资料（仅 Person 关联的 customer_id） ----------
   gifts: (ctx, customerId, paging = {}) => call(ctx, 'gifts', {
     action: 'list', customer_id: Number(customerId), ...(paging || {}),

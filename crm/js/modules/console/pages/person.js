@@ -1,4 +1,4 @@
-// Person 360（WP2）：九页签；关系边通过服务端预览与人工确认维护，
+// Person 360（WP2）：多页签；关系边通过服务端预览与人工确认维护，
 // 「机会与行动」页签接入写入闭环（完成行动/承诺、推进/关闭机会）。
 // 「活动」页签按 G5 证据口径：activities.listByPerson 仅支持 legacy 数字 ID，
 // 故 canonical 人物的活动参与记录取 getTimelinePage 已合并的 activity_participants 数据。
@@ -10,6 +10,7 @@ import { renderFamily } from '../family-actions.js';
 import { relationshipNode } from '../relationship-actions.js';
 import { relationshipNetworkNode } from '../relationship-network.js';
 import { careMaterialsNode } from '../care-materials.js';
+import { renderOcrReview } from '../ocr-review.js';
 import { renderInsuranceEditor } from '../insurance-editor.js';
 import { renderInsuranceReports } from '../insurance-reports.js';
 import { openWorkItemEditor, openWorkItemTransition, openOpportunityAdvance, openQuickCapture, openPersonEdit, openPersonDelete,
@@ -20,7 +21,7 @@ import {
 } from '../ui.js';
 import { t, translateEnum } from '../i18n.js';
 
-const TABS = () => [t('tab_overview'), t('tab_timeline'), t('tab_facts'), t('tab_family'), t('tab_relationships'), t('tab_insurance'), t('tab_opportunities'), t('tab_recruit'), t('tab_activities'), t('tab_care_materials')];
+const TABS = () => [t('tab_overview'), t('tab_timeline'), t('tab_facts'), t('tab_family'), t('tab_relationships'), t('tab_insurance'), t('tab_opportunities'), t('tab_recruit'), t('tab_activities'), t('tab_care_materials'), t('tab_ocr_review')];
 const TYPE_LABEL = () => ({
   followup: t('type_followup'), recruit_followup: t('type_recruit_followup'), activity_participant: t('type_activity_participant'),
   meeting: t('type_meeting'), call: t('type_call'), message: t('type_message'), note: t('type_note'),
@@ -392,7 +393,7 @@ function relationshipsNode(ctx, id) {
 }
 
 const BUILDERS = [overviewNode, timelineNode, factsNode, familyNode, relationshipsNode, insuranceNode, opportunitiesNode, recruitNode, activitiesNode,
-  (ctx, id) => careMaterialsNode(ctx, id, { onDone: ctx.onWriteDone })];
+  (ctx, id) => careMaterialsNode(ctx, id, { onDone: ctx.onWriteDone }), renderOcrReview];
 
 // ---------- 页面 ----------
 export function renderPerson(ctx, id) {
@@ -422,7 +423,7 @@ export function renderPerson(ctx, id) {
   // Refresh the active tab now and invalidate the other affected tabs for next visit.
   const wctx = Object.assign({}, ctx, {
     onWriteDone: () => {
-      [0, 1, 8, 9, cur].forEach((index) => loaded.delete(index));
+      [0, 1, 8, 9, 10, cur].forEach((index) => loaded.delete(index));
       select(cur);
     },
   });
