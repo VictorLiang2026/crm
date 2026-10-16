@@ -64,6 +64,15 @@ function resolveRange(event) {
 
 const active = (r) => !r.deleted_at;
 const inRange = (day, start, end) => day && day >= start && day <= end;
+const SOURCE_SECTIONS = {
+  customers: 'timeline', followups: 'timeline', ai_recommendations: 'timeline',
+  gifts: 'care', photos: 'care', ocr_records: 'ocr', policy_review_reports: 'insurance', products: 'insurance',
+  recruit_candidates: 'recruit', recruit_followups: 'recruit', recruit_milestones: 'recruit',
+};
+const sourceRef = (table, id, personId) => id == null ? null : ({
+  table, id: String(id), ...(personId == null ? {} : { personId: String(personId) }),
+  ...(SOURCE_SECTIONS[table] ? { section: SOURCE_SECTIONS[table] } : {}),
+});
 
 // ---------- 客户经营活动量 ----------
 async function customerReport(event) {
@@ -95,6 +104,7 @@ async function customerReport(event) {
   const products = (assertOk(productsR).data || []).filter(active);
 
   const custName = {};
+  const custPerson = {};
   // PMC-10：展示姓名用 Person（person_id 存在且 Person 未软删时覆盖；客户总数/分桶统计仍基于 customers）
   const personNameMap = {};
   const personMap = {};
@@ -106,6 +116,7 @@ async function customerReport(event) {
     // PMC-20：客户当前名只取 Person（customers.customer_name 已退出，CL-02）
     const personName = c.person_id ? personNameMap[c.person_id] : null;
     custName[c.Id] = personName || '';
+    custPerson[String(c.Id)] = c.person_id == null ? null : String(c.person_id);
     c.customer_name = personName || ''; // 新增客户 feed 用
     c.first_contact_date = c.person_id != null ? personMap[String(c.person_id)]?.first_contact_date || null : null;
   });
@@ -115,9 +126,9 @@ async function customerReport(event) {
   const feed = [];
   const planPairs = new Set(), donePairs = new Set();
 
-  function pushFeed(t, day, type, name, detail) {
+  function pushFeed(t, day, type, name, detail, sourceRef) {
     if (!inRange(day, start, end)) return;
-    feed.push({ t: t || (day + 'T00:00:00+08:00'), day, type, name: name || '', detail: detail || '' });
+    feed.push({ t: t || (day + 'T00:00:00+08:00'), day, type, name: name || '', detail: detail || '', ...(sourceRef ? { sourceRef } : {}) });
   }
 
   const touchedTotal = new Set();
@@ -129,7 +140,7 @@ async function customerReport(event) {
       totals.newCustomers++;
       if (!dailyMap[dNew]) dailyMap[dNew] = blankCustomerDaily();
       dailyMap[dNew].newCustomers++;
-      pushFeed(c.created_at, dNew, '新增客户', c.customer_name, '客户建档');
+      pushFeed(c.created_at, dNew, '新增客户', c.customer_name, '客户建档', sourceRef('customers', c.Id, c.person_id));
     }
     const dFirst = toDayKey(c.first_contact_date);
     if (inRange(dFirst, start, end)) {
@@ -151,7 +162,7 @@ async function customerReport(event) {
       dailyMap[day]._touched.add(f.customer_id);
       dailyMap[day].customersTouched = dailyMap[day]._touched.size;
       donePairs.add(f.customer_id + '|' + day);
-      pushFeed(f.created_at, day, '跟进', custName[f.customer_id] || f.customer_name, trunc(f.followup_notes, 60));
+      pushFeed(f.created_at, day, '跟进', custName[f.customer_id] || f.customer_name, trunc(f.followup_notes, 60), sourceRef('followups', f.Id, custPerson[String(f.customer_id)]));
     }
     const nd = toDayKey(f.next_followup_date);
     if (nd) planPairs.add(f.customer_id + '|' + nd);
@@ -187,7 +198,7 @@ async function customerReport(event) {
       if (!dailyMap[day]) dailyMap[day] = blankCustomerDaily();
       dailyMap[day].gifts++;
       pushFeed(g.created_at || g.given_date, day, '伴手礼', custName[g.customer_id] || g.customer_name,
-        (g.gift_name || '礼品') + ' ×' + (g.quantity || 1));
+        (g.gift_name || '礼品') + ' ×' + (g.quantity || 1), sourceRef('gifts', g.Id, custPerson[String(g.customer_id)]));
     }
   });
 
@@ -198,7 +209,7 @@ async function customerReport(event) {
       totals.photos++;
       if (!dailyMap[day]) dailyMap[day] = blankCustomerDaily();
       dailyMap[day].photos++;
-      pushFeed(p.created_at, day, '资料上传', custName[p.customer_id] || p.customer_name, p.file_name || '');
+      pushFeed(p.created_at, day, '资料上传', custName[p.customer_id] || p.customer_name, p.file_name || '', sourceRef('photos', p.id, custPerson[String(p.customer_id)]));
     }
   });
 
@@ -209,7 +220,7 @@ async function customerReport(event) {
       totals.ocrParses++;
       if (!dailyMap[day]) dailyMap[day] = blankCustomerDaily();
       dailyMap[day].ocrParses++;
-      pushFeed(o.created_at, day, 'AI解析', custName[o.customer_id], trunc(o.summary, 60));
+      pushFeed(o.created_at, day, 'AI解析', custName[o.customer_id], trunc(o.summary, 60), sourceRef('ocr_records', o.id, custPerson[String(o.customer_id)]));
     }
   });
 
@@ -220,7 +231,7 @@ async function customerReport(event) {
       totals.aiSuggestions++;
       if (!dailyMap[day]) dailyMap[day] = blankCustomerDaily();
       dailyMap[day].aiSuggestions++;
-      pushFeed(a.created_at || a.recommendation_date, day, 'AI建议', custName[a.customer_id] || a.customer_name, trunc(a.suggested_followup_goal, 60));
+      pushFeed(a.created_at || a.recommendation_date, day, 'AI建议', custName[a.customer_id] || a.customer_name, trunc(a.suggested_followup_goal, 60), sourceRef('ai_recommendations', a.id, custPerson[String(a.customer_id)]));
     }
   });
 
@@ -231,7 +242,7 @@ async function customerReport(event) {
       totals.policyReviews++;
       if (!dailyMap[day]) dailyMap[day] = blankCustomerDaily();
       dailyMap[day].policyReviews++;
-      pushFeed(r.created_at || r.report_date, day, '保单检视', custName[r.customer_id] || r.customer_name, r.report_type || '检视报告');
+      pushFeed(r.created_at || r.report_date, day, '保单检视', custName[r.customer_id] || r.customer_name, r.report_type || '检视报告', sourceRef('policy_review_reports', r.id, custPerson[String(r.customer_id)]));
     }
   });
 
@@ -243,7 +254,7 @@ async function customerReport(event) {
       totals.productUpdates++;
       if (!dailyMap[day]) dailyMap[day] = blankCustomerDaily();
       dailyMap[day].productUpdates++;
-      pushFeed(p.updated_at, day, '额度更新', custName[p.customer_id] || p.customer_name, '产品额度维护');
+      pushFeed(p.updated_at, day, '额度更新', custName[p.customer_id] || p.customer_name, '产品额度维护', sourceRef('products', p.id ?? p.Id, custPerson[String(p.customer_id)] || p.person_id));
     }
   });
 
@@ -310,7 +321,7 @@ async function recruitReport(event) {
   const { start, end, days } = range;
 
   const [candsR, fuR, msR, custR, personsR] = await Promise.all([
-    rdb.from('recruit_candidates').select('id, customer_id, stage, created_at, deleted_at'),
+    rdb.from('recruit_candidates').select('id, customer_id, person_id, stage, created_at, deleted_at'),
     rdb.from('recruit_followups').select('id, candidate_id, contact_method, interest_level, followup_notes, followup_date, next_followup_date, created_at, deleted_at'),
     rdb.from('recruit_milestones').select('id, candidate_id, from_stage, to_stage, happened_at, note'),
     rdb.from('customers').select('Id, person_id, deleted_at'),
@@ -321,6 +332,7 @@ async function recruitReport(event) {
   const candsAll = assertOk(candsR).data || [];
   const activeCands = candsAll.filter(active);
   const activeCandIds = new Set(activeCands.map(c => c.id));
+  const candPerson = new Map(candsAll.map(c => [String(c.id), c.person_id == null ? null : String(c.person_id)]));
   const fus = (assertOk(fuR).data || []).filter(r => active(r) && activeCandIds.has(r.candidate_id));
   const milestones = assertOk(msR).data || [];
   const customers = (assertOk(custR).data || []).filter(active);
@@ -330,7 +342,7 @@ async function recruitReport(event) {
   const custName = {};
   customers.forEach(c => { custName[c.Id] = (c.person_id ? personNameMap[c.person_id] : null) || ''; });
   const candName = {};
-  candsAll.forEach(c => { candName[c.id] = custName[c.customer_id] || ('候选人#' + c.id); });
+  candsAll.forEach(c => { candName[c.id] = personNameMap[c.person_id] || custName[c.customer_id] || ('候选人#' + c.id); });
 
   const totals = blankRecruitTotals();
   const dailyMap = {};
@@ -345,9 +357,9 @@ async function recruitReport(event) {
     dailyMap[day][key]++;
     return true;
   }
-  function pushFeed(t, day, type, name, detail) {
+  function pushFeed(t, day, type, name, detail, source) {
     if (!inRange(day, start, end)) return;
-    feed.push({ t: t || (day + 'T00:00:00+08:00'), day, type, name: name || '', detail: detail || '' });
+    feed.push({ t: t || (day + 'T00:00:00+08:00'), day, type, name: name || '', detail: detail || '', ...(source ? { sourceRef: source } : {}) });
   }
 
   // 新增候选人
@@ -357,7 +369,7 @@ async function recruitReport(event) {
       totals.newCandidates++;
       if (!dailyMap[day]) dailyMap[day] = blankRecruitDaily();
       dailyMap[day].newCandidates++;
-      pushFeed(c.created_at, day, '新增候选人', candName[c.id], '进入「新增人才」阶段');
+      pushFeed(c.created_at, day, '新增候选人', candName[c.id], '进入「新增人才」阶段', sourceRef('recruit_candidates', c.id, c.person_id));
     }
   });
 
@@ -375,7 +387,8 @@ async function recruitReport(event) {
       donePairs.add(f.candidate_id + '|' + day);
       const detail = [f.contact_method, f.interest_level ? ('意向:' + f.interest_level) : '', trunc(f.followup_notes, 40)]
         .filter(Boolean).join(' / ');
-      pushFeed(f.created_at, day, '增员跟进', candName[f.candidate_id], detail);
+      pushFeed(f.created_at, day, '增员跟进', candName[f.candidate_id], detail,
+        sourceRef('recruit_followups', f.id, candPerson.get(String(f.candidate_id))));
     }
     const nd = toDayKey(f.next_followup_date);
     if (nd) planPairs.add(f.candidate_id + '|' + nd);
@@ -400,7 +413,8 @@ async function recruitReport(event) {
       dailyMap[day][key]++;
       // 「新增人才」里程碑与候选人创建事件重复，不重复进入流水
       pushFeed(m.happened_at, day, '阶段推进', candName[m.candidate_id],
-        (m.from_stage ? m.from_stage + ' → ' : '') + m.to_stage);
+        (m.from_stage ? m.from_stage + ' → ' : '') + m.to_stage,
+        sourceRef('recruit_milestones', m.id, candPerson.get(String(m.candidate_id))));
     }
   });
 

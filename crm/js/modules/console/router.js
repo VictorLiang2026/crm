@@ -2,7 +2,7 @@
 import {
   renderToday, renderPeople, renderPeopleTrash, renderPerson, renderOpportunities,
   renderActivities, renderActivity, renderRecruit, renderAI, renderMore,
-  renderSettings,
+  renderSettings, renderRecruitGoals, renderActivityReport,
 } from './views.js';
 
 const EXACT = new Map([
@@ -12,14 +12,19 @@ const EXACT = new Map([
   ['#/opportunities', renderOpportunities],
   ['#/activities', renderActivities],
   ['#/recruit', renderRecruit],
+  ['#/recruit/goals', renderRecruitGoals],
   ['#/ai', renderAI],
   ['#/more', renderMore],
   ['#/settings', renderSettings],
 ]);
 
 const PATTERNS = [
-  { re: /^#\/person\/(\d+)$/, nav: '#/people', render: renderPerson },
+  { re: /^#\/person\/(\d+)(?:\/(timeline|insurance|recruit|care|ocr))?$/, nav: '#/people', render: (ctx, id, section) => renderPerson(ctx, id, section) },
   { re: /^#\/activity\/(\d+)$/, nav: '#/activities', render: renderActivity },
+  { re: /^#\/activity-report\/(customer|recruit)(?:\?(.*))?$/, nav: '#/today', render: (ctx, type, query) => {
+    const params = new URLSearchParams(query || '');
+    return renderActivityReport(ctx, type, { startDate: params.get('startDate'), endDate: params.get('endDate') });
+  } },
 ];
 
 const NAV_OF = {
@@ -30,9 +35,12 @@ const NAV_OF = {
   '#/opportunities': '#/opportunities',
   '#/activities': '#/activities',
   '#/recruit': '#/recruit',
+  '#/recruit/goals': '#/recruit',
   '#/ai': '#/ai',
   '#/more': '#/more',
   '#/settings': '#/more',
+  '#/activity-report/customer': '#/today',
+  '#/activity-report/recruit': '#/today',
 };
 
 export function navHashFor(raw) {

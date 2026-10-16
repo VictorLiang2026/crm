@@ -43,7 +43,7 @@ test('PC16 activity create/edit/delete and task CRUD retain review, legacy repor
     await browser.wait("window.pc16.created.some(x=>x.name.includes('活动乙'))");
     const created=await browser.evaluate("window.pc16.created[0]");
     assert.equal(created.activity_date,'2026-10-20');assert.equal(created.status,'idea');
-    assert.ok((await browser.evaluate(`(()=>{const b=[...document.querySelectorAll('#pc16-host button')].find(x=>x.innerText.includes('活动量日报'));return b?.onclick?.toString()||''})()`)).includes('/activity/customer'),'daily report keeps the legacy route');
+    assert.ok((await browser.evaluate(`(()=>{const b=[...document.querySelectorAll('#pc16-host button')].find(x=>x.innerText.includes('活动量日报'));return b?.onclick?.toString()||''})()`)).includes('/activity-report/customer'),'daily report opens the Console report');
     await browser.evaluate("window.pc16render.renderActivity(window.pc16ctx,42)");
     await browser.wait("document.querySelector('#pc16-host .act-task-actions')");
     assert.ok((await browser.evaluate("document.querySelector('#pc16-host').innerText")).includes('虚构活动甲'));

@@ -81,7 +81,10 @@ export function renderActivities(ctx) {
       kicker: 'ACTIVITIES', title: t('title_activities'), tag: wpTag(t('act_manage_tag')),
       sub: t('sub_activities'),
       actions: [
-        h('button', { class: 'btn btn-ghost', type: 'button', title: t('act_daily_report'), onclick: () => { location.hash = '#/activity/customer'; } }, [ic('calendar'), t('act_daily_report')]),
+        h('button', { class: 'btn btn-ghost', type: 'button', title: t('act_daily_report'), onclick: () => {
+          const range = selectedDate ? `?startDate=${selectedDate}&endDate=${selectedDate}` : '';
+          location.hash = `#/activity-report/customer${range}`;
+        } }, [ic('calendar'), t('act_daily_report')]),
         h('button', { class: 'btn btn-primary', type: 'button', onclick: () => openActivityEditor(ctx, { onDone: runList }) }, [ic('plus'), t('act_new')]),
       ],
     }),

@@ -16,7 +16,7 @@ test('PC16 keeps the legacy activity/task actions while adding parent and versio
   assert.match(activity,/activity changed; reload the impact preview/);
   assert.match(activity,/participants changed; reload the impact preview/);
   assert.match(tasks,/\.eq\('activity_id', activityId\)\.eq\('updated_at', expectedUpdatedAt\)/);
-  assert.match(page,/location\.hash = '#\/activity\/customer'/,'daily report links to the existing report page');
+  assert.match(page,/location\.hash = `#\/activity-report\/customer\$\{range\}`/,'daily report links to the Console report with the selected date filter');
   assert.match(writes,/related_type: 'none'/);
   assert.match(writes,/source: 'manual'/);
   assert.match(writes,/participantsSoftDeleted/);

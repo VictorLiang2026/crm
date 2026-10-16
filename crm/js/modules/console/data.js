@@ -196,4 +196,10 @@ export const data = {
   recruitFunnel: (ctx) => call(ctx, 'recruit_candidates', { action: 'funnel' }),
   recruitProgress: (ctx, startMonth, endMonth) =>
     call(ctx, 'recruit_goals', { action: 'getProgress', startMonth, endMonth }),
+  recruitGoals: (ctx, startMonth, endMonth) =>
+    call(ctx, 'recruit_goals', { action: 'listGoals', startMonth, endMonth }),
+  saveRecruitGoals: (ctx, goalMonth, goals) => call(ctx, 'recruit_goals', {
+    action: 'saveGoals', goalMonth, goals, operator: ctx.operator?.name || '',
+  }),
+  activityReport: (ctx, action, params = {}) => call(ctx, 'activity_reports', { action, ...params }),
 };

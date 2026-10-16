@@ -156,6 +156,23 @@ test('activity report includes marked rows in ordinary date buckets but excludes
  const outside=await load('activity_reports',data,[{table:'customers',id:'910002',batchKey:batch}]).main(event);
  assert.equal(outside.testData.containsTestData,false);
 });
+test('PC21 activity feed adds source links while retaining legacy customer and recruit totals',async()=>{
+ const customerData={customers:[{Id:910010,person_id:710010,created_at:'2026-10-02T10:00:00+08:00'}],
+  persons:[{id:710010,display_name:marker+'虚构顾问'}],
+  followups:[{Id:910011,customer_id:910010,followup_date:'2026-10-02',created_at:'2026-10-02T11:00:00+08:00',followup_notes:'虚构跟进'}]};
+ const customer=plain(await load('activity_reports',customerData).main({action:'customer',mode:'range',startDate:'2026-10-02',endDate:'2026-10-02'}));
+ assert.equal(customer.totals.newCustomers,1);assert.equal(customer.totals.followups,1);
+ assert.deepEqual(customer.feed.find(x=>x.type==='新增客户').sourceRef,{table:'customers',id:'910010',personId:'710010',section:'timeline'});
+ assert.deepEqual(customer.feed.find(x=>x.type==='跟进').sourceRef,{table:'followups',id:'910011',personId:'710010',section:'timeline'});
+ const recruitData={recruit_candidates:[{id:910020,person_id:710020,customer_id:null,created_at:'2026-10-02T10:00:00+08:00'}],
+  persons:[{id:710020,display_name:marker+'虚构候选人'}],
+  recruit_followups:[{id:910021,candidate_id:910020,followup_date:'2026-10-02',created_at:'2026-10-02T11:00:00+08:00',followup_notes:'虚构招募跟进'}]};
+ const recruit=plain(await load('activity_reports',recruitData).main({action:'recruit',mode:'range',startDate:'2026-10-02',endDate:'2026-10-02'}));
+ assert.equal(recruit.totals.newCandidates,1);assert.equal(recruit.totals.rcFollowups,1);
+ assert.deepEqual(recruit.feed.find(x=>x.type==='新增候选人').sourceRef,{table:'recruit_candidates',id:'910020',personId:'710020',section:'recruit'});
+ assert.deepEqual(recruit.feed.find(x=>x.type==='增员跟进').sourceRef,{table:'recruit_followups',id:'910021',personId:'710020',section:'recruit'});
+ assert.equal(recruit.feed[0].name,marker+'虚构候选人');
+});
 test('recruit goals ordinary milestone calculations include marked samples',async()=>{
  const data={recruit_milestones:[{id:910001,to_stage:'新增人才',happened_at:'2026-10-02'},{id:910002,to_stage:'新增人才',happened_at:'2026-10-03'}]};
  const event={action:'getProgress',startMonth:'2026-10',endMonth:'2026-10'};

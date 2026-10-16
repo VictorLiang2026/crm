@@ -380,7 +380,7 @@ const BUILDERS = [overviewNode, timelineNode, factsNode, familyNode, relationshi
   (ctx, id) => careMaterialsNode(ctx, id, { onDone: ctx.onWriteDone }), renderOcrReview];
 
 // ---------- 页面 ----------
-export function renderPerson(ctx, id) {
+export function renderPerson(ctx, id, initialSection) {
   const titleNode = h('span', {}, `Person #${id}`);
   const tabs = TABS();
   const bodies = tabs.map(() => h('div', {}));
@@ -631,5 +631,6 @@ export function renderPerson(ctx, id) {
     h('div', { class: 'tabs' }, btns),
     h('section', { class: 'card tabs-body' }, bodies),
   );
-  select(0);
+  const initialIndex = { timeline: 1, insurance: 5, recruit: 7, care: 9, ocr: 10 }[initialSection] ?? 0;
+  select(initialIndex);
 }
