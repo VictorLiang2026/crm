@@ -1,0 +1,64 @@
+{
+  "environment": "crm-d1gkae8ddc930d151",
+  "observedAt": "2026-10-17T17:03:31.442Z",
+  "baselineCommit": "25f23435048618a2a3d3b8bdebf95f449686a253",
+  "migration": {
+    "version": "20261018010000",
+    "name": "learning_idempotency",
+    "taskId": "task-1fa777e670304ae6",
+    "status": "Succeed",
+    "officialFetchUsed": true,
+    "remoteSqlMatchesLocalIgnoringTerminalNewline": true,
+    "functionBodyExact": true,
+    "localSqlSha256": "fc105f2bf71eb4509c5c05d22136bfabea38bb0bf22124b37498e2bf596f4936"
+  },
+  "baselineReproduction": "PC32 replay accepted a different actor; whole fixture transaction rolled back",
+  "transaction": {
+    "status": "PASS",
+    "assertions": 29,
+    "fixtureRowsRolledBack": true
+  },
+  "concurrency": {
+    "environment": "crm-d1gkae8ddc930d151",
+    "observedAt": "2026-10-17T17:00:28.502Z",
+    "observedOverlappingLock": true,
+    "lockTimeoutRejectedWithoutWrite": true,
+    "retryAndFullTransactionPassed": true,
+    "holderExecutionMs": 12008,
+    "contenderExecutionMs": 513,
+    "retryExecutionMs": 59,
+    "persistentBusinessWrites": false
+  },
+  "after": {
+    "grants": "{service_role=X/cloudbase_postgres_pgdb_pn3idppt,cloudbase_postgres_pgdb_pn3idppt=X/cloudbase_postgres_pgdb_pn3idppt}",
+    "bodyMd5": "980622b8b8cf607b2c49831e3fc187de",
+    "initial": 10,
+    "learningCount": 0,
+    "fixtureFeedback": 0,
+    "fixtureOutcomes": 0
+  },
+  "localTests": {
+    "pc32Contracts": 3,
+    "pc29ServiceAndBrowser": 7
+  },
+  "additionalChainFixtures": {
+    "pass": 35,
+    "fail": 0,
+    "initialFailure": "Two stale identity fixtures omitted the existing customers.person_id read; publication stopped before commit, mock corrected without business changes, all 35 rerun passed"
+  },
+  "gate": {
+    "status": "PASS_WITH_LIMITATIONS",
+    "finishedAt": "2026-10-17T17:08:44.413Z",
+    "fingerprint": "0e0e86e0700054c933e711d97949891439b72b952d7fbaaabce74d04cb0998f1",
+    "catalogChecks": 995,
+    "regression": {
+      "pass": 108,
+      "fail": 0,
+      "skip": 5
+    },
+    "anonymous": {
+      "pass": 69,
+      "fail": 0
+    }
+  }
+}

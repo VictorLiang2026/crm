@@ -1,0 +1,20 @@
+-- 20260908110000: 活动生命周期 Activity Lifecycle（v1.7.0）
+ALTER TABLE public.activities ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'idea';
+ALTER TABLE public.activities ADD COLUMN IF NOT EXISTS goal_types jsonb NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE public.activities ADD COLUMN IF NOT EXISTS target_participants integer;
+ALTER TABLE public.activities ADD COLUMN IF NOT EXISTS actual_participants integer;
+ALTER TABLE public.activities ADD COLUMN IF NOT EXISTS topic_ids jsonb NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE public.activities ADD COLUMN IF NOT EXISTS review_summary text;
+ALTER TABLE public.activities ADD COLUMN IF NOT EXISTS review_notes text;
+ALTER TABLE public.activities ADD COLUMN IF NOT EXISTS review_score smallint;
+ALTER TABLE public.activities ADD COLUMN IF NOT EXISTS reviewed_at timestamptz;
+ALTER TABLE public.activities ADD CONSTRAINT activities_status_check CHECK (status IN ('idea','preparing','confirmed','in_progress','ended','reviewed'));
+ALTER TABLE public.activities ADD CONSTRAINT activities_goal_types_check CHECK (jsonb_typeof(goal_types) = 'array');
+ALTER TABLE public.activities ADD CONSTRAINT activities_target_participants_check CHECK (target_participants IS NULL OR target_participants >= 0);
+ALTER TABLE public.activities ADD CONSTRAINT activities_actual_participants_check CHECK (actual_participants IS NULL OR actual_participants >= 0);
+ALTER TABLE public.activities ADD CONSTRAINT activities_review_score_check CHECK (review_score IS NULL OR (review_score >= 1 AND review_score <= 5));
+ALTER TABLE public.activity_participants ADD COLUMN IF NOT EXISTS participant_role text NOT NULL DEFAULT 'attendee';
+ALTER TABLE public.activity_participants ADD COLUMN IF NOT EXISTS followup_status text NOT NULL DEFAULT 'none';
+ALTER TABLE public.activity_participants ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
+ALTER TABLE public.activity_participants ADD CONSTRAINT activity_participants_participant_role_check CHECK (participant_role IN ('attendee','speaker','organizer','partner','guest'));
+ALTER TABLE public.activity_participants ADD CONSTRAINT activity_participants_followup_status_check CHECK (followup_status IN ('none','pending','done','not_needed'));

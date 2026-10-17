@@ -17,6 +17,13 @@ function fixture(people = []) {
   const calls = [];
   const request = async (table, method, filters) => {
     calls.push({ table, method, filters });
+    if (table === 'customers' && method === 'GET') {
+      // Current resolution joins customers.person_id after reading candidates.
+      // These fixtures represent Person-only identities, so the link set is empty.
+      assert.deepEqual(filters, { select: 'Id,person_id',
+        person_id: `in.(${people.map(p => p.id).join(',')})`, deleted_at: 'is.null' });
+      return [];
+    }
     if (table !== 'persons' || method !== 'GET') throw Error('Unexpected read');
     if (filters.deleted_at === 'not.is.null') return [];
     if (filters.name_key) return people;
@@ -50,6 +57,7 @@ test('one matching Person is never automatically selected or duplicated', async 
   const resolved = await f.service.resolveIdentity(name);
   assert.equal(resolved.status, 'confirm_existing');
   assert.equal(resolved.selectedPersonId, null);
+  assert.equal(f.calls.filter(c => c.table === 'customers').length, 1);
   await assert.rejects(f.service.previewIdentity({ kind: 'person', idempotencyKey: key,
     displayName: name }, 'test-uid'), /manual review/);
   assert.equal(f.calls.filter(c => c.operation).length, 0);
