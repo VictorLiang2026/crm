@@ -15,7 +15,7 @@ PC31 已完成：提交 `25f23435048618a2a3d3b8bdebf95f449686a253`，标签 `rel
 | 链 | 线上已存在的事务/防重 | 当前结论及下一步 |
 | --- | --- | --- |
 | Quick Capture V2 | 测试账号专用的 assistant plan/command 有命令锁、actor、预览和回执；Console 当前走 person_360 的 `quick_capture_v2_commit` | 新建 Person 时两次 RPC 可能半写入；已有 Person 同一 RPC 原子写入互动/事实，但同请求重复提交已实测生成双份。PC32-C/D 各自具体范围待批准；Legacy 保留 |
-| 身份新建 | 命令行锁、姓名 advisory lock；Person、角色、业务档案和命令结果同 RPC | 保留已有治理；补逐步骤失败、重试验收 |
+| 身份新建 | 命令行锁、姓名 advisory lock；Person、角色、业务档案和命令结果同 RPC | 已用虚构新 Person 完成 8 项预览、故障回滚、重试原 ID 与跨操作者拒绝；角色转换分支沿用既有 WP07.1 回归 |
 | Opportunity 候选晋升 | 候选行锁；Opportunity、候选状态、AI 结果同事务 | PC32-B 将已执行 replay 放在请求形状和原确认操作者核验之后；虚构事务与并发验证通过 |
 | 活动复盘 | 命令 actor/版本校验，业务成果、来源占用和执行结果同 RPC | Outcome、Action、机会候选三个写入分支均已用虚构来源验证故障回滚、重试及防重复；Outcome 命令另有独立进程锁验证 |
 | 招募创建/阶段 | 创建候选+里程碑原子；阶段行锁、updated_at 冲突拒绝 | 阶段已完成 6 项虚构事务及独立进程并发验证；候选创建已完成 4 项事务检查，故障无半成品，重复创建被唯一索引拒绝，但不返回原 ID，首次并发创建仍未实测 |
@@ -140,3 +140,11 @@ PC32 父包仍有 Quick Capture V2、身份新建、活动复盘、招募阶段�
 `tests/pc32/quick-capture-existing-diagnosis.sql` 对已登记虚构 Person 783 连续两次调用完全相同的 `public.quick_capture_v2_commit` 请求，真实复现两个不同互动 ID 和四条事实/信号；外层事务回滚后均为 0。旧服务离线契约 5/5 通过，但它没有覆盖同请求重放。Console 现有 Person 分支缺服务端幂等回执，重复确认可能多造业务记录。拟作为 PC32-D 单独治理；已向用户发出具体范围确认，答复前不修改 Console 或 RPC。PC32-C 新建分支确认亦仍待答复。
 
 本轮只提交诊断和事务脚本及逐链矩阵，不改线上业务产物；目标标签 `release-20261018-031500`。发布前后按 WP01 门禁、本地/云端/GitHub 一致性核对执行。
+
+上述活动来源/重复诊断审计于 2026-10-18 发布完成：提交 `a37e32c732368100e384abeea6691c504b5d0110`，标签 `release-20261018-031500`，发布脚本退出 0。发布后 29 函数/198 源码、73 静态资源及 GitHub 一致；证据 `D:\Temp\crm-cloud-audit-6eabf55291494a038e6913313796d91e`。无云端业务产物更改。
+
+## 身份新建虚构事务复核
+
+`tests/pc32/identity-create-transaction.sql` 使用已登记测试操作者和随机带“勿联系”标记的虚构姓名，在外层回滚事务中实际调用 `public.person_identity_preview_v1` 与 `public.person_identity_execute_v1`。8 项检查通过：预览不建档；同键同输入重用预览、改输入拒绝；换操作者不能执行；Person、命令回执和衍生台账写入后注入故障，三者一同回滚；重试只建一个 Person；同命令再执行返回原 Person ID；第二命令不能悄然新建同名 Person。事务结束后该姓名 Person、命令均为 0，初始台账仍为 10 条。WP07.1 相邻身份服务回归 6/6 通过。
+
+此项只证明现有 `kind=person` 身份新建链，不代表 Quick Capture 新建分支的两次 RPC 已合并；后者仍在 PC32-C 待确认范围。测试和文档不改云端业务产物；目标标签 `release-20261018-033000`，需通过发布门禁及发布后三端核对。
