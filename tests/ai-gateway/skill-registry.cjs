@@ -9,7 +9,7 @@ const { defaultRegistry: assistantRegistry } = require('../../cloudfunctions/ass
 const names = ['quick_capture', 'person_summary', 'meeting_prep', 'today_coach',
   'opportunity_analysis', 'opportunity_candidate', 'activity_prepare', 'activity_review', 'recruit_coach',
   'conversation_playbook', 'ai_search', 'crm_search_parse'];
-names.push('assistant_read_intent_v1', 'assistant_action_update_v1', 'crm_search_query_v2');
+names.push('assistant_read_intent_v1', 'assistant_action_update_v1', 'assistant_opportunity_update_v1', 'crm_search_query_v2');
 
 test('all versioned contracts are model-independent and immutable', () => {
   assert.deepEqual(defaultRegistry.list().map(item => item.name), names);
@@ -47,6 +47,14 @@ test('deployed assistant registry carries the same PC26 Action command contract'
   const shared=defaultRegistry.get('assistant_action_update_v1');
   const assistant=assistantRegistry.get('assistant_action_update_v1');
   assert.equal(shared.version,'1.0.0');
+  assert.equal(assistant.version,shared.version);
+  assert.deepEqual(assistant.outputSchema,shared.outputSchema);
+  assert.deepEqual(assistant.contextRecipe,shared.contextRecipe);
+});
+
+test('deployed assistant registry carries the same PC27 Opportunity command contract', () => {
+  const shared=defaultRegistry.get('assistant_opportunity_update_v1');
+  const assistant=assistantRegistry.get('assistant_opportunity_update_v1');
   assert.equal(assistant.version,shared.version);
   assert.deepEqual(assistant.outputSchema,shared.outputSchema);
   assert.deepEqual(assistant.contextRecipe,shared.contextRecipe);
@@ -107,6 +115,10 @@ test('every initial skill accepts a representative input, context and output', (
       {status:'supported',operation:'update',interpretation:'更新指定行动的截止时间。',
         personMention:'张明',actionMention:'跟进回访',changes:{action_type:null,title:null,description:null,
           due_at:'2026-10-23T17:00:00+08:00',priority:null}}],
+    assistant_opportunity_update_v1: [{text:'把张明的保障方案下一步改成下周核对资料',language:'zh-CN'}, {guidance:{}},
+      {status:'supported',operation:'edit',interpretation:'更新机会的下一步计划。',
+        personMention:'张明',opportunityMention:'保障方案',changes:{type:null,progress:null,
+          nextAction:'下周核对资料',nextActionDate:null,status:null}}],
   };
   for (const name of names) {
     const [input, context, output] = examples[name];

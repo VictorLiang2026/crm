@@ -9,7 +9,10 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
   candidateRunner = (event, uid) => require('./opportunity-candidate-service').runOpportunityCandidate(event, uid),
   readTaskRunner = event => require('./read-intent-service').runReadIntent(event),
   actionIntentRunner = event => require('./action-command-intent-service').interpretActionCommand(event),
-  actionTargetsRunner = event => require('./action-command-intent-service').listActionTargets(event)) {
+  actionTargetsRunner = event => require('./action-command-intent-service').listActionTargets(event),
+  opportunityIntentRunner = event => require('./opportunity-command-intent-service').interpretOpportunityCommand(event),
+  opportunityTargetsRunner = (event, uid) => require('./opportunity-command-intent-service').listOpportunityTargets(event,uid),
+  opportunityCommandRunner = (event, uid) => require('./opportunity-command-service').runOpportunityCommand(event,uid)) {
   return async event => {
     let identity;
     try { identity = await getIdentity(); }
@@ -76,6 +79,37 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
       } catch (error) {
         const code=['INVALID_INPUT','INVALID_CONFIG','UPSTREAM_UNAVAILABLE'].includes(error?.code)?error.code:'ACTION_COMMAND_FAILED';
         return {ok:false,error:{code,message:'Action target selection could not be verified'}};
+      }
+    }
+    if (event?.action === 'opportunityCommandInterpret') {
+      try {
+        if (Object.keys(event).some(key=>!['action','query','language'].includes(key))) {
+          return {ok:false,error:{code:'INVALID_INPUT',message:'Opportunity request could not be interpreted'}};
+        }
+        return await opportunityIntentRunner({query:event.query,language:event.language});
+      } catch (error) {
+        const code=['INVALID_INPUT','INVALID_RESULT','INVALID_CONFIG','TIMEOUT','UPSTREAM_UNAVAILABLE',
+          'PERSISTENCE_ERROR','AI_REQUEST_FAILED'].includes(error?.code)?error.code:'OPPORTUNITY_COMMAND_FAILED';
+        return {ok:false,error:{code,message:'Opportunity request could not be interpreted'}};
+      }
+    }
+    if (event?.action === 'opportunityCommandTargets') {
+      try {
+        if (Object.keys(event).some(key=>!['action','personMention','selectedPersonId'].includes(key))) {
+          return {ok:false,error:{code:'INVALID_INPUT',message:'Opportunity target selection could not be verified'}};
+        }
+        return await opportunityTargetsRunner({personMention:event.personMention,selectedPersonId:event.selectedPersonId},identity.uid);
+      } catch (error) {
+        const code=['INVALID_INPUT','INVALID_CONFIG','UPSTREAM_UNAVAILABLE'].includes(error?.code)?error.code:'OPPORTUNITY_COMMAND_FAILED';
+        return {ok:false,error:{code,message:'Opportunity target selection could not be verified'}};
+      }
+    }
+    if (event?.action === 'opportunityCommand') {
+      try { return await opportunityCommandRunner(event,identity.uid); }
+      catch (error) {
+        const code=['INVALID_COMMAND','PREVIEW_STALE','CONFIRMATION_REQUIRED','OPPORTUNITY_COMMAND_FAILED'].includes(error?.code)?
+          error.code:'OPPORTUNITY_COMMAND_FAILED';
+        return {ok:false,error:{code,message:'Opportunity command could not be completed'}};
       }
     }
     const isActionPlan = event?.action === 'command' && event.stage === 'plan' &&

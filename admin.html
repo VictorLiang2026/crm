@@ -1057,6 +1057,11 @@ function route(){
   }).catch(function(e){ return import('/crm/js/modules/console/i18n.js').then(function(i18n){
     $('view').textContent = i18n.t('action_change_load_error') + ': ' + e.message;
   }); });
+  if(hash === '#/assistant/opportunities/change') return import('/crm/js/modules/assistant-opportunity-change.js').then(function(module){
+    return module.renderAssistantOpportunityChange({root:$('view'), callFn:callFn});
+  }).catch(function(e){ return import('/crm/js/modules/console/i18n.js').then(function(i18n){
+    $('view').textContent = i18n.t('opp_change_load_error') + ': ' + e.message;
+  }); });
   if(hash === '#/ai/search') return import('/crm/js/modules/ai-crm-search.js').then(function(module){
     return module.renderAiCrmSearch({root:$('view'), callFn:callFn});
   }).catch(function(e){ $('view').textContent = 'AI CRM 搜索加载失败：' + e.message; });

@@ -6,6 +6,8 @@
 
 2026-10-16 PC15 更新：已核对 `public.crm_opportunity_directory_v1` 的签名和有效执行权限，确认仅 `service_role` 可执行，`anon` 与 `authenticated` 不可执行；仅将该函数加入预期快照。
 
+2026-10-17 PC27 更新：核对 `public.assistant_opportunity_commands` 的 FORCE RLS、service_role-only 策略/表权限，以及 `public.assistant_opportunity_command_v1` 仅授予 `service_role` 执行；仅加入这两个新对象，未接受其他目录漂移。
+
 ## 运行
 
 1. 确认 CloudBase 环境为 `crm-d1gkae8ddc930d151`，使用 `queryPgDatabase(action="sql", limit=1)` 执行 `verify-public.sql` 全文。结果必须 `success=true`、`returnedRows=1`、`truncated=false`。

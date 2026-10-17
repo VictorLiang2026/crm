@@ -58,6 +58,8 @@ class Browser {
       else if (pathname === '/crm/css/assistant-action-create.css') { res.setHeader('Content-Type', 'text/css; charset=utf-8'); res.end(fs.readFileSync(path.join(this.root, 'crm/css/assistant-action-create.css'))); }
       else if (pathname === '/crm/js/modules/assistant-action-change.js') { res.setHeader('Content-Type', 'text/javascript; charset=utf-8'); res.end(fs.readFileSync(path.join(this.root, 'crm/js/modules/assistant-action-change.js'))); }
       else if (pathname === '/crm/css/assistant-action-change.css') { res.setHeader('Content-Type', 'text/css; charset=utf-8'); res.end(fs.readFileSync(path.join(this.root, 'crm/css/assistant-action-change.css'))); }
+      else if (pathname === '/crm/js/modules/assistant-opportunity-change.js') { res.setHeader('Content-Type', 'text/javascript; charset=utf-8'); res.end(fs.readFileSync(path.join(this.root, 'crm/js/modules/assistant-opportunity-change.js'))); }
+      else if (pathname === '/crm/css/assistant-opportunity-change.css') { res.setHeader('Content-Type', 'text/css; charset=utf-8'); res.end(fs.readFileSync(path.join(this.root, 'crm/css/assistant-opportunity-change.css'))); }
       else if (pathname === '/crm/css/ai-crm-search.css') { res.setHeader('Content-Type', 'text/css; charset=utf-8'); res.end(fs.readFileSync(path.join(this.root, 'crm/css/ai-crm-search.css'))); }
       else if (pathname === '/crm/css/activity-review-v2.css') { res.setHeader('Content-Type', 'text/css; charset=utf-8'); res.end(fs.readFileSync(path.join(this.root, 'crm/css/activity-review-v2.css'))); }
       else if (pathname === '/crm/js/core/api.js' || pathname === '/crm/js/core/feature-flags.js' ||

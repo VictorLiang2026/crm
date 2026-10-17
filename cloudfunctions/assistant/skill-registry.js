@@ -230,6 +230,23 @@ const SKILLS = [
     confirmationLevel:'confirm_before_write',timeoutClass:'short',
   },
   {
+    name:'assistant_opportunity_update_v1',version:'1.0.0',capability:'structured_extraction',
+    contextRecipe:recipe(['guidance']),
+    inputSchema:object({text:text(1200),language:{type:'string',enum:['zh-CN','en']}},['text','language']),
+    outputSchema:object({
+      status:{type:'string',enum:['supported','needs_clarification','unsupported']},
+      operation:{type:'string',enum:['edit','stage','close','unsupported']},
+      interpretation:text(300),personMention:{type:['string','null'],maxLength:120},
+      opportunityMention:{type:['string','null'],maxLength:200},
+      changes:object({type:{type:['string','null'],enum:[...['insurance','recruit','referral','activity','speaker','partnership','service','relationship'],null]},
+        progress:{type:['string','null'],maxLength:4000},nextAction:{type:['string','null'],maxLength:1000},
+        nextActionDate:{type:['string','null'],format:'date'},
+        status:{type:['string','null'],enum:[...['发现','沟通','方案','潜在线索','已介绍','已联系','已建立关系','成交','关闭'],null]}},
+      ['type','progress','nextAction','nextActionDate','status'])
+    },['status','operation','interpretation','personMention','opportunityMention','changes']),
+    confirmationLevel:'confirm_before_write',timeoutClass:'short',
+  },
+  {
     name: 'crm_search_query_v2', version: '2.0.0', capability: 'structured_extraction',
     contextRecipe: recipe(['guidance']),
     inputSchema: object({ query: text(1000), language: { type: 'string', enum: ['zh-CN','en'] } }, ['query','language']),
