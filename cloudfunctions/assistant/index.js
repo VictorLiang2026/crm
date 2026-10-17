@@ -203,6 +203,14 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
         return { ok: false, error: { code, message: 'Could not load AI history' } };
       }
     }
+    if (event?.action === 'aiExperience') {
+      try { return await require('./ai-experience-service').runAiExperience(event, identity.uid); }
+      catch (error) {
+        const code = ['INVALID_INPUT','PERSISTENCE_ERROR','STALE','TIMEOUT'].includes(error?.code)
+          ? error.code : 'AI_EXPERIENCE_FAILED';
+        return { ok:false,error:{code,message:'AI Experience request could not be completed'} };
+      }
+    }
     // CloudBase may add transport metadata to the event. Only route the declared request fields.
     try { return routeIntent({ intent: event?.intent, subject: event?.subject, input: event?.input }); }
     catch (error) {

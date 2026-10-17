@@ -231,6 +231,12 @@ export function renderAI(ctx) {
       ],
     }),
     h('div', { style: 'height:16px' }),
+    card({
+      title:t('ai_experience_title'),icon:'sparkle',tag:wpTag(t('ai_status_live')),
+      body:[h('p',{class:'foot-note'},t('ai_experience_hub')),
+        h('a',{class:'btn btn-soft',href:'#/ai/experience'},t('ai_experience_title'))],
+    }),
+    h('div', { style: 'height:16px' }),
     h('div', { class: 'ai-grid' }, items.map(([icon, name, desc, status, hot]) =>
       h('div', { class: 'card ai-card' }, [
         h('div', { class: 'ai-ic' }, ic(icon)),

@@ -2,7 +2,7 @@
 import {
   renderToday, renderPeople, renderPeopleTrash, renderPerson, renderOpportunities,
   renderActivities, renderActivity, renderRecruit, renderAI, renderMore,
-  renderSettings, renderRecruitGoals, renderActivityReport,
+  renderSettings, renderRecruitGoals, renderActivityReport, renderAiExperience,
   renderKnowledgeGovernance,
 } from './views.js';
 
@@ -15,6 +15,7 @@ const EXACT = new Map([
   ['#/recruit', renderRecruit],
   ['#/recruit/goals', renderRecruitGoals],
   ['#/ai', renderAI],
+  ['#/ai/experience', ctx => renderAiExperience({ root:ctx.main, callFn:ctx.callFn })],
   ['#/more', renderMore],
   ['#/settings', renderSettings],
   ['#/knowledge-governance', renderKnowledgeGovernance],
@@ -43,6 +44,7 @@ const NAV_OF = {
   '#/recruit': '#/recruit',
   '#/recruit/goals': '#/recruit',
   '#/ai': '#/ai',
+  '#/ai/experience': '#/ai',
   '#/more': '#/more',
   '#/settings': '#/more',
   '#/knowledge-governance': '#/more',
