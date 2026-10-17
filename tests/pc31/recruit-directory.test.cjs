@@ -96,6 +96,6 @@ test('PC31 Console pages incrementally and discloses the Person activity window 
   assert.doesNotMatch(recruitPage, /pageSize:\s*1000/);
   assert.match(i18n, /已达 1000 条显示上限/);
   assert.match(i18n, /1,000 candidate cap/);
-  assert.match(i18n, /最近 50 条沟通与跟进时间线记录/);
-  assert.match(i18n, /50 most recent timeline items/);
+  assert.match(i18n, /每次读取 20 条/);
+  assert.match(i18n, /20 at a time/);
 });

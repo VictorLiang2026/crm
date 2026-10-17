@@ -506,6 +506,9 @@ module.exports = async function smoke(root, test) {
       await b.evaluate("(() => { const modal=document.querySelector('.modal-overlay'); modal.querySelector('textarea').value='当面讨论保障需求并约定后续核对保单'; modal.querySelector('input[type=checkbox]').checked=true; })()");
       await b.click('.modal-overlay button', '确认并保存互动');
       await b.wait(called('person_360', 'recordActivityInteraction'));
+      // The fixture records a call before its promise settles. Wait for the
+      // successful save to close this modal before the next modal interaction.
+      await b.wait("document.querySelector('.modal-overlay') === null");
       const payload = await b.evaluate("window.__crmTest.calls.find(c=>c.action==='recordActivityInteraction').payload");
       assert.equal(payload.activityId, 940001);
       assert.equal(payload.participantId, 970001);

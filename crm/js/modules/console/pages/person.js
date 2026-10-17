@@ -423,20 +423,42 @@ function recruitNode(ctx, id) {
 }
 
 function activitiesNode(ctx, id) {
-  return data.timeline(ctx, id, 1, 50).then((res) => {
-    const rows = (res.rows || []).filter((r) => r.activityId != null);
-    return h('div', { class: 'tab-stack' }, [
-      h('p', { class: 'foot-note', style: 'margin:0 0 6px' },
-        t('activities_note')),
-      rowsBlock(rows, (r) => h('a', { class: 'list-row data-row', href: `#/activity/${r.activityId}` }, [
+  let page = 0;
+  const seen = new Set();
+  const rows = [];
+  const list = h('div', { class: 'person-activity-list' });
+  const note = h('p', { class: 'foot-note', role: 'status' }, t('activities_note'));
+  const error = h('p', { class: 'foot-note', role: 'alert' });
+  const more = h('button', { class: 'btn btn-soft btn-sm person-activities-more', type: 'button' }, t('btn_load_more'));
+  async function loadPage() {
+    const res = await data.timeline(ctx, id, page + 1, 20);
+    page += 1;
+    for (const row of res.rows || []) {
+      if (row.activityId != null && !seen.has(row.source || row.id)) {
+        seen.add(row.source || row.id);
+        rows.push(row);
+      }
+    }
+    list.replaceChildren(rowsBlock(rows, (r) => h('a', { class: 'list-row data-row', href: `#/activity/${r.activityId}` }, [
         h('div', { style: 'flex:1;min-width:0' }, [
           h('div', { class: 'row-title' }, textOf(r.summary) || t('activity_participation_default')),
           h('div', { class: 'row-sub' }, `${fmtDate(r.at)} ${weekdayCN(r.at)}${r.channel ? ' · ' + translateEnum('channel', r.channel) : ''}`),
         ]),
         ic('chevron', 'mut'),
-      ]), t('empty_no_activities_person')),
-    ]);
-  });
+      ]), t('activities_empty_loaded')));
+    more.hidden = !res.hasMore || page >= 20;
+    note.textContent = t(res.hasMore && page >= 20 ? 'activities_limit' : 'activities_note');
+    error.textContent = '';
+  }
+  more.onclick = async () => {
+    if (more.disabled) return;
+    more.disabled = true;
+    more.textContent = t('loading');
+    try { await loadPage(); }
+    catch { error.textContent = t('data_load_failed'); }
+    finally { more.disabled = false; more.textContent = t('btn_load_more'); }
+  };
+  return loadPage().then(() => h('div', { class: 'tab-stack' }, [note, list, error, more]));
 }
 
 function relationshipsNode(ctx, id) {

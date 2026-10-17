@@ -986,7 +986,16 @@ exports.main = async event => {
       case 'executePersonDelete': return await service.executePersonDelete(event.data, uid);
       case 'restorePerson': return await service.restorePerson(event.data, uid);
       case 'listPersonTrash': return await service.listPersonTrash(event);
-      case 'listOpportunityDirectory': return await new OpportunityWorkflowService({request:pgRequest,rpc:pgRpc}).directory(event,uid);
+      case 'listOpportunityDirectory': {
+        // The CloudBase invocation envelope is not a business query. Forward
+        // only supported filters; the service still validates every value and
+        // binds the actor from the authenticated runtime, never event metadata.
+        const query = {};
+        for (const key of ['page','pageSize','kind','status','type','personId','query']) {
+          if (Object.hasOwn(event, key)) query[key] = event[key];
+        }
+        return await new OpportunityWorkflowService({request:pgRequest,rpc:pgRpc}).directory(query,uid);
+      }
       case 'getOpportunityDirectoryDetails': return await new OpportunityWorkflowService({request:pgRequest,rpc:pgRpc})
         .details(event.id,uid);
       case 'listPendingOpportunityCandidates': return await new OpportunityWorkflowService({request:pgRequest,rpc:pgRpc}).listPending(uid);
