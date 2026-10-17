@@ -22,6 +22,7 @@ const { HouseholdService } = require('./household-service');
 const { RelationshipService } = require('./relationship-service');
 const { RelationshipNetworkService } = require('./relationship-network-service');
 const { OcrReviewService } = require('./ocr-review-service');
+const { RecruitDirectoryService } = require('./recruit-directory-service');
 const { RecruitCandidateService } = require('./recruit-candidate-service');
 const aiStandards = require('./ai');
 
@@ -35,7 +36,7 @@ const INSURANCE_READ_TABLES = new Set([
 ]);
 const RELATIONSHIP_READ_TABLES = new Set(['context_items', 'crm_context_item_commands', 'person_roles', 'relationships']);
 const RECRUIT_READ_TABLES = new Set([
-  'v_recruit_candidates_person_only', 'v_recruit_candidates_person_only_trash',
+  'v_recruit_candidates', 'v_recruit_candidates_person_only', 'v_recruit_candidates_person_only_trash',
   'recruit_milestones',
 ]);
 const OPPORTUNITY_READ_TABLES = new Set([
@@ -908,7 +909,9 @@ function createService({ request = pgRequest, rpc = pgRpc, disclosure = disclose
   return { get, lookupCustomer, search, saveFacts, addMember, removeMember,
     listPeople, listOpportunityDirectory, resolveIdentity, previewIdentity, executeIdentity,
     updatePerson, previewPersonDelete, executePersonDelete, restorePerson, listPersonTrash,
-    listPersonOnlyRecruits, getPersonOnlyRecruit, listPersonOnlyRecruitTrash,
+    listPersonOnlyRecruits,
+    listRecruitDirectory: event => new RecruitDirectoryService({ request }).list(event),
+    getPersonOnlyRecruit, listPersonOnlyRecruitTrash,
     changePersonOnlyRecruit,
     resolveRecruitCandidateName: name => recruitCandidateService.resolveRecruitName(name),
     createRecruitCandidate: (data, uid) => recruitCandidateService.create(data, uid),
@@ -966,6 +969,7 @@ exports.main = async event => {
       case 'lookupCustomer': return await service.lookupCustomer(event.customerId);
       case 'listPeople': return await service.listPeople(event);
       case 'listPersonOnlyRecruits': return await service.listPersonOnlyRecruits();
+      case 'listRecruitDirectory': return await service.listRecruitDirectory(event);
       case 'getPersonOnlyRecruit': return await service.getPersonOnlyRecruit(event.id);
       case 'listPersonOnlyRecruitTrash': return await service.listPersonOnlyRecruitTrash();
       case 'removePersonOnlyRecruit': return await service.changePersonOnlyRecruit('remove', [event.id], uid);

@@ -194,6 +194,7 @@ export const data = {
   // ---------- 招募 ----------
   recruitList: (ctx, params) => call(ctx, 'recruit_candidates', { action: 'list', ...(params || {}) }),
   recruitPersonOnly: (ctx) => p360(ctx, 'listPersonOnlyRecruits'),
+  recruitDirectory: (ctx, params) => p360(ctx, 'listRecruitDirectory', params || {}),
   resolveRecruitCandidateName: (ctx, name) => p360(ctx, 'resolveRecruitCandidateName', { name }),
   createRecruitCandidate: (ctx, payload) => p360(ctx, 'createRecruitCandidate', { data: payload }),
   recruitCandidateDetails: (ctx, candidateId, personId) => p360(ctx, 'getRecruitCandidate', { candidateId, personId }),

@@ -21,38 +21,24 @@ function stageTone(stage) {
 }
 
 function listNode(ctx) {
-  return Promise.all([
-    data.recruitList(ctx, { page: 1, pageSize: 1000 }).catch((e) => ({ _error: e })),
-    data.recruitPersonOnly(ctx).catch((e) => ({ _error: e })),
-  ]).then(([legacy, personOnly]) => {
-    if (legacy._error && personOnly._error) throw legacy._error;
-    const norm = (r, source) => ({
-      id: r.candidate_id ?? r.id,
-      name: r.customer_name,
-      stage: r.stage,
-      occupation: r.occupation,
-      score: r.potential_score,
-      nextAction: r.next_action,
-      nextDate: r.next_action_date,
-      idleDays: r.idle_days,
-      personId: r.person_id,
-      customerId: r.customer_id,
-      source,
-    });
-    const rows = [
-      ...(legacy.rows || []).map((r) => norm(r, 'legacy')),
-      ...(personOnly.rows || []).map((r) => norm(r, 'person')),
-    ].sort((a, b) => String(b.nextDate || '').localeCompare(String(a.nextDate || '')));
-    if (!rows.length) return emptyNote(t('empty_no_recruit_candidates'), t('empty_no_recruit_candidates_note'));
+  const pageSize = 50;
+  let page = 1;
+  let cursor = null;
+  const body = h('div', { class: 'card-body' });
+  const rowsNode = h('div', {});
+  const moreButton = h('button', { class: 'btn btn-ghost btn-sm', type: 'button' }, t('recruit_directory_load_more'));
+  const status = h('p', { class: 'foot-note' });
+  body.append(rowsNode, status, moreButton);
 
-    function openPerson(row, ev) {
-      ev.preventDefault();
-      if (row.personId) { location.hash = `#/person/${row.personId}`; return; }
-      data.lookupCustomer(ctx, row.customerId).then((res) => {
-        location.hash = `#/person/${res.personId}`;
-      }).catch(() => ctx.toast(t('toast_no_person_identity')));
-    }
-    return h('div', { class: 'card-body' }, rows.map((row) => {
+  function openPerson(row, ev) {
+    ev.preventDefault();
+    if (row.personId) { location.hash = `#/person/${row.personId}`; return; }
+    data.lookupCustomer(ctx, row.customerId).then((res) => {
+      location.hash = `#/person/${res.personId}`;
+    }).catch(() => ctx.toast(t('toast_no_person_identity')));
+  }
+
+  function renderRow(row) {
       const diff = dayDiffFromToday(row.nextDate);
       const subParts = [
         row.occupation,
@@ -73,7 +59,60 @@ function listNode(ctx) {
         ]),
         ic('chevron', 'mut'),
       ]);
+  }
+
+  function appendRows(result) {
+    const rows = (result.rows || []).map((r) => ({
+      id: r.candidate_id,
+      name: r.customer_name,
+      stage: r.stage,
+      occupation: r.occupation,
+      score: r.potential_score,
+      nextAction: r.next_action,
+      nextDate: r.next_action_date,
+      idleDays: r.idle_days,
+      personId: r.person_id,
+      customerId: r.customer_id,
+      source: r.source,
     }));
+    rowsNode.append(...rows.map(renderRow));
+    if (page === 1 && rows.length === 0) {
+      body.replaceChildren(emptyNote(t('empty_no_recruit_candidates'), t('empty_no_recruit_candidates_note')));
+      return;
+    }
+    if (result.truncated) {
+      status.textContent = t('recruit_directory_limit');
+      moreButton.remove();
+    } else if (!result.hasMore) {
+      moreButton.remove();
+      status.textContent = '';
+    }
+  }
+
+  moreButton.addEventListener('click', async () => {
+    moreButton.disabled = true;
+    moreButton.textContent = t('recruit_directory_loading');
+    try {
+      page += 1;
+      const result = await data.recruitDirectory(ctx, { page, pageSize, cursor });
+      cursor = result.cursor;
+      appendRows(result);
+      if (moreButton.isConnected) {
+        moreButton.disabled = false;
+        moreButton.textContent = t('recruit_directory_load_more');
+      }
+    } catch (error) {
+      page -= 1;
+      moreButton.disabled = false;
+      moreButton.textContent = t('recruit_directory_load_more');
+      ctx.toast(error?.message || String(error));
+    }
+  });
+
+  return data.recruitDirectory(ctx, { page, pageSize }).then((result) => {
+    cursor = result.cursor;
+    appendRows(result);
+    return body;
   });
 }
 

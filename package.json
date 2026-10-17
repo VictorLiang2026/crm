@@ -45,6 +45,7 @@
     "test:pc27": "node --test tests/pc27/*.test.cjs tests/pc27/*.browser.cjs tests/ai-gateway/skill-registry.cjs",
     "test:pc29": "node --test tests/pc29/*.test.cjs tests/pc29/*.browser.cjs",
     "test:pc30": "node --test tests/pc30/*.test.cjs tests/pc30/*.browser.cjs",
+    "test:pc31": "node --test tests/pc31/*.test.cjs",
     "test:interactions": "node --test tests/interactions/interaction-service.cjs tests/interactions/legacy-adapter.cjs tests/interactions/person360-dispatch.cjs tests/interactions/activity-interaction-service.cjs",
     "test:actions": "node --test tests/actions/action-service.cjs",
     "test:recruit-goals": "node --test tests/recruit-goals/transactional-save.cjs",
