@@ -1,6 +1,6 @@
 # PC32 多步骤事务与幂等审计
 
-日期：2026-10-18。PC32-A/B 已发布；父包未完成，后续链逐项验收。
+日期：2026-10-18。PC32-A/B 与部分链路审计已发布；父包未完成，后续链逐项验收。
 
 ## 前置与范围
 
@@ -17,12 +17,12 @@ PC31 已完成：提交 `25f23435048618a2a3d3b8bdebf95f449686a253`，标签 `rel
 | Quick Capture V2 | 测试账号专用的 assistant plan/command 有命令锁、actor、预览和回执；Console 当前走 person_360 的 `quick_capture_v2_commit` | 新建 Person 时先 `executeIdentity` 再 `commitQuickCaptureV2`，两次 RPC 可能半写入；已有 Person 的互动/事实同一 RPC，但无请求幂等键。PC32-C 拟优先修新建分支，具体范围待批准；Legacy 保留 |
 | 身份新建 | 命令行锁、姓名 advisory lock；Person、角色、业务档案和命令结果同 RPC | 保留已有治理；补逐步骤失败、重试验收 |
 | Opportunity 候选晋升 | 候选行锁；Opportunity、候选状态、AI 结果同事务 | PC32-B 将已执行 replay 放在请求形状和原确认操作者核验之后；虚构事务与并发验证通过 |
-| 活动复盘 | 命令 actor/版本校验，业务成果、来源占用和执行结果同 RPC | 保留已有实现；补故障注入验收 |
+| 活动复盘 | 命令 actor/版本校验，业务成果、来源占用和执行结果同 RPC | 已用虚构 Outcome 验证预览、版本冲突、故障回滚、重试及命令行锁；Action/机会候选分支仍未逐项注入故障 |
 | 招募创建/阶段 | 创建候选+里程碑原子；阶段行锁、updated_at 冲突拒绝 | 阶段已完成 6 项虚构事务及独立进程并发验证；旧版本明确拒绝、同阶段不重复记里程碑。候选创建仍需单独故障证据 |
 | 招募目标 | 已有原子 saveGoals RPC | 保留，不重写；现有门禁夹具覆盖 |
 | OCR apply/undo | 命令 actor、Person/客户/OCR 行锁与版本；字段、反向命令和结果同事务 | 保留已有实现；补撤销失败与重试验收 |
 | AI 决策/Outcome | 各自 RPC 比对 actor 与完整输入，唯一键防重复 | 已用登记虚构 AI/Action 来源完成 10 项事务及故障回滚检查；首次并发写入的唯一冲突仍待独立验证 |
-| Learning 候选 | 原函数同键仅比对主来源/learning/scope | PC32-A 修复目标；其他输入与 actor 未绑定，已通过虚构样本复现 |
+| Learning 候选 | 原函数同键仅比对主来源/learning/scope | PC32-A 已修复 actor 与完整规范化输入绑定；虚构事务和独立进程并发验证通过 |
 
 只读线上定义保存于本地忽略的 `tests/security/.results/pc32-function-audit.json` 和 `pc32-additional-functions.json`。矩阵描述已确认代码事实，不将代码审阅等同故障注入已通过。
 
@@ -108,3 +108,13 @@ PC32 父包仍有 Quick Capture V2、身份新建、活动复盘、招募阶段�
 `tests/pc32/recruit-concurrency.cjs` 由两个独立 CLI 进程验证同一虚构候选的行锁：持锁 12013ms、500ms 锁超时下的真实阶段 RPC 在 511ms 内拒绝；锁释放后同阶段重试 15ms 返回 `changed=false`，未写业务。测试后候选仍为“新增人才”，`updated_at` 原值、里程碑 1 条、初始台账种子 10 条。并发证据在 `tests/security/.results/pc32-recruit-concurrency.json`。
 
 此项只证明阶段链的冲突拒绝、同阶段重试及事务回滚；尚未验证候选创建分支的逐步骤故障，不能把阶段验收扩展成整个招募创建链验收。本轮只新增测试和文档，无云端产物修改；拟用 `release-20261018-022500` 发布，门禁及三端核对通过后才记完成。
+
+招募阶段审计于 2026-10-18 发布完成：提交 `8386df883afb7ad6ff69470eb86b0c74d12cd2e4`，标签 `release-20261018-022500`，发布脚本退出 0。发布后 29 函数/198 源码与 73 静态资源、本地及 GitHub 一致；证据 `D:\Temp\crm-cloud-audit-0c8c2b5833e646a39059ce78392d9f1b`。无云端业务产物更改。
+
+## 活动复盘虚构事务与并发复核
+
+`tests/pc32/activity-review-transaction.sql` 只使用台账已登记的虚构活动 11 与其已执行的 Outcome 命令。服务角色实际调用预览和执行 RPC，9 项断言通过：过期历史命令同 actor 重试返回原 Outcome 2、换 actor 拒绝；新预览不写业务；活动版本变化拒绝；Outcome 与命令写入后注入故障，两者一起回滚；重试只写一次；同命令重复执行不再写；换 actor 和改预览输入拒绝。外层事务回滚后，活动仍只有原 Outcome 1 条、命令 1 条，初始台账 10 条。
+
+`tests/pc32/activity-review-concurrency.cjs` 使用两个独立 CLI 进程锁定该已执行命令。实际持锁 12009ms；500ms 锁超时的执行调用在 507ms 内被拒绝；锁释放后同 actor 重试返回原 Outcome 2，业务数据未变。证据 `tests/security/.results/pc32-activity-review-concurrency.json`。相邻 PC12/PC18 离线工作流和浏览器回归 7/7 通过。
+
+此项证明活动 Outcome 分支的事务边界与命令回放；Action/机会候选、来源占用分支尚未逐步故障注入，不能据此认定整条活动复盘链完结。本轮仅新增测试和文档，不修改云端业务产物；拟用 `release-20261018-024000` 发布。发布前必须通过 WP01 门禁，发布后核对本地、云端、GitHub。
