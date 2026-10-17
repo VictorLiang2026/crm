@@ -21,7 +21,7 @@ PC31 已完成：提交 `25f23435048618a2a3d3b8bdebf95f449686a253`，标签 `rel
 | 招募创建/阶段 | 创建候选+里程碑原子；阶段行锁、updated_at 冲突拒绝 | 阶段已完成 6 项虚构事务及独立进程并发验证；候选创建已完成 4 项事务检查，故障无半成品，重复创建被唯一索引拒绝，但不返回原 ID，首次并发创建仍未实测 |
 | 招募目标 | 已有原子 saveGoals RPC | 保留，不重写；现有门禁夹具覆盖 |
 | OCR apply/undo | 命令 actor、Person/客户/OCR 行锁与版本；字段、反向命令和结果同事务 | 已用虚构 OCR 来源完成 13 项应用/撤销、人工改动冲突、故障回滚与重试验收；独立进程并发仍未实测 |
-| AI 决策/Outcome | 各自 RPC 比对 actor 与完整输入，唯一键防重复 | 已用登记虚构 AI/Action 来源完成 10 项事务及故障回滚检查；首次并发写入的唯一冲突仍待独立验证 |
+| AI 决策/Outcome | 各自 RPC 比对 actor 与完整输入，唯一键防重复 | 已完成 10 项虚构顺序/故障回滚检查；同键首次写入的反馈和 Outcome 均已独立进程验证锁竞争、明确超时拒绝和回滚后重试 |
 | Learning 候选 | 原函数同键仅比对主来源/learning/scope | PC32-A 已修复 actor 与完整规范化输入绑定；虚构事务和独立进程并发验证通过 |
 
 只读线上定义保存于本地忽略的 `tests/security/.results/pc32-function-audit.json` 和 `pc32-additional-functions.json`。矩阵描述已确认代码事实，不将代码审阅等同故障注入已通过。
@@ -148,3 +148,11 @@ PC32 父包仍有 Quick Capture V2、身份新建、活动复盘、招募阶段�
 `tests/pc32/identity-create-transaction.sql` 使用已登记测试操作者和随机带“勿联系”标记的虚构姓名，在外层回滚事务中实际调用 `public.person_identity_preview_v1` 与 `public.person_identity_execute_v1`。8 项检查通过：预览不建档；同键同输入重用预览、改输入拒绝；换操作者不能执行；Person、命令回执和衍生台账写入后注入故障，三者一同回滚；重试只建一个 Person；同命令再执行返回原 Person ID；第二命令不能悄然新建同名 Person。事务结束后该姓名 Person、命令均为 0，初始台账仍为 10 条。WP07.1 相邻身份服务回归 6/6 通过。
 
 此项只证明现有 `kind=person` 身份新建链，不代表 Quick Capture 新建分支的两次 RPC 已合并；后者仍在 PC32-C 待确认范围。测试和文档不改云端业务产物；目标标签 `release-20261018-033000`，需通过发布门禁及发布后三端核对。
+
+身份新建审计于 2026-10-18 发布完成：提交 `658f89ecaffdceaaa01ca026a209e0ff4d4fc650`，标签 `release-20261018-033000`，发布脚本退出 0。发布后 29 函数/198 源码、73 静态资源及 GitHub 一致；证据 `D:\Temp\crm-cloud-audit-b0c3c4a1f8954ba8976a2323d01f8072`。无云端业务产物更改。
+
+## AI 反馈与实际 Outcome 首次同键并发复核
+
+`tests/pc32/feedback-first-write-concurrency.cjs` 使用两个独立 CLI 服务角色进程，对台账已登记的虚构 AI 结果 7、活动 11 分别执行反馈和实际 Outcome 的同键首次请求。持有方在事务内成功写入后睡眠约 12 秒并回滚，竞争方确实在唯一键上等待；反馈调用 512ms、Outcome 调用 520ms 后按 500ms 锁超时明确拒绝。持有方回滚后，同键重试分别在 8ms、16ms 完成一次写入，随后测试事务也回滚。最终两张表的测试键记录均为 0，初始台账为 10 条；证据 `tests/security/.results/pc32-feedback-first-write-concurrency.json`。
+
+此项证明并发首次请求不会产生部分业务成果，并发受阻方获得清晰拒绝后可以重试；不声称两次同时成功或高负载压力表现。现有 RPC 不把唯一冲突自动转换为原 ID，调用方需按明确错误重试。未修改任何业务代码或云端产物；目标标签 `release-20261018-034500`，发布前后继续执行 WP01 门禁与三端核对。
