@@ -54,6 +54,9 @@
     "anonymousFail": 0
   },
   "unverified": ["real customer writes", "model calls", "production rollback", "load capacity", "WP01 interactive login"],
-  "targetTag": "release-20261018-014000",
+  "releaseCommit": "e1027b7fe8a440714e0785ddeb46ffd989c03bce",
+  "releaseTag": "release-20261018-014000",
+  "postReleaseAudit": "D:/Temp/crm-cloud-audit-4246e90dac384d60882647a1474c7de3",
+  "releaseExitCode": 0,
   "parentPc32Complete": false
 }
