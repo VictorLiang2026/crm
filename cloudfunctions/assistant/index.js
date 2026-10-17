@@ -6,7 +6,8 @@ const { handleCommand, OPERATIONS } = require('./command-safety');
 
 function createMain(getIdentity, searchRunner = event => require('./search-service').runSearch(event),
   actionRunner = (event, uid) => require('./action-command-service').runActionCommand(event, uid),
-  candidateRunner = (event, uid) => require('./opportunity-candidate-service').runOpportunityCandidate(event, uid)) {
+  candidateRunner = (event, uid) => require('./opportunity-candidate-service').runOpportunityCandidate(event, uid),
+  readTaskRunner = event => require('./read-intent-service').runReadIntent(event)) {
   return async event => {
     let identity;
     try { identity = await getIdentity(); }
@@ -87,6 +88,15 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
         const code = ['INVALID_INPUT','INVALID_RESULT','INVALID_CONFIG','RATE_LIMIT','TIMEOUT',
           'UPSTREAM_UNAVAILABLE','PERSISTENCE_ERROR','AI_REQUEST_FAILED'].includes(error?.code) ? error.code : 'SEARCH_FAILED';
         return {ok:false,error:{code,message:'CRM combination search could not be completed'}};
+      }
+    }
+    if (event?.action === 'assistantReadTask') {
+      try { return await readTaskRunner({query:event.query,language:event.language,
+        selectedIntent:event.selectedIntent,selectedPersonId:event.selectedPersonId}); }
+      catch (error) {
+        const code = ['INVALID_INPUT','INVALID_RESULT','INVALID_CONFIG','RATE_LIMIT','TIMEOUT',
+          'UPSTREAM_UNAVAILABLE','PERSISTENCE_ERROR','AI_REQUEST_FAILED','NOT_FOUND'].includes(error?.code) ? error.code : 'READ_TASK_FAILED';
+        return {ok:false,error:{code,message:'Assistant read task could not be completed'}};
       }
     }
     if (event?.action === 'summarize') {

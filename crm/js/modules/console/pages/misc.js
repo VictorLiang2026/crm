@@ -113,6 +113,98 @@ function searchPanel(ctx) {
   return h('div', { class: 'search-panel' }, [form, examples, out]);
 }
 
+const INTENT_KEYS = ['search','summarize','prepare','analyze','plan'];
+function assistantTaskPanel(ctx) {
+  const out = h('div', {});
+  const query = h('textarea', {class:'sheet-input',rows:'3',maxlength:'1000',placeholder:t('assistant_task_placeholder')});
+  async function run(selectedIntent = null, selectedPersonId = null) {
+    if (!query.value.trim()) { ctx.toast(t('toast_enter_search')); return; }
+    loadInto(out, async () => renderAssistantTask(ctx, await data.assistantReadTask(ctx, {
+      query:query.value.trim(), language:document.documentElement.lang === 'en' ? 'en' : 'zh-CN',
+      ...(selectedIntent ? {selectedIntent} : {}), ...(selectedPersonId ? {selectedPersonId} : {}),
+    }), run), h('div',{class:'muted'},t('assistant_task_loading')));
+  }
+  const form = h('form',{class:'search-form',onsubmit:e=>{e.preventDefault();run();}},[
+    query,h('button',{class:'btn btn-soft',type:'submit'},[ic('sparkle'),t('assistant_task_run')]),
+  ]);
+  return h('div',{class:'search-panel'},[h('p',{class:'foot-note'},t('assistant_task_scope')),form,out]);
+}
+
+function renderAssistantTask(ctx, response, run) {
+  if (!response || response.ok !== true) return h('p',{class:'foot-note'},t('assistant_task_error'));
+  if (response.status === 'needs_intent_choice') {
+    const options = (response.options||[]).filter(v=>INTENT_KEYS.includes(v));
+    return h('div',{},[h('p',{class:'foot-note'},t('assistant_task_choose_intent')),
+      ...options.map(intent=>h('button',{class:'btn btn-ghost btn-sm',type:'button',onclick:()=>run(intent)},t('assistant_intent_'+intent)))]);
+  }
+  if (response.status === 'needs_person_name') return h('p',{class:'foot-note'},t('assistant_task_name_needed'));
+  if (response.status === 'person_not_found') return h('p',{class:'foot-note'},t('search_v2_person_missing'));
+  if (response.status === 'needs_person_selection' || response.result?.status === 'needs_person_selection') {
+    const candidates = response.candidates || response.result?.candidates || [];
+    if (!candidates.length) return h('p',{class:'foot-note'},t('assistant_task_error'));
+    const select = h('select',{class:'sheet-input','aria-label':t('search_v2_choose_person')},[
+      h('option',{value:''},t('search_v2_choose_person')),
+      ...candidates.map(p=>h('option',{value:p.id},[p.displayName,p.organization?` · ${p.organization}`:'',p.occupation?` · ${p.occupation}`:''])),
+    ]);
+    return h('div',{},[h('p',{class:'foot-note'},t('assistant_task_person_choice')),select,
+      h('button',{class:'btn btn-soft',type:'button',onclick:()=>/^[1-9][0-9]*$/.test(String(select.value))?run(response.plan?.intent||'search',String(select.value)):ctx.toast(t('search_v2_person_required'))},t('btn_confirm'))]);
+  }
+  if (response.status === 'unsupported') return h('div',{},[
+    h('p',{class:'foot-note'},response.plan?.intent==='analyze'?t('assistant_task_analyze_unsupported'):t('assistant_task_unsupported')),
+    response.plan?.interpretation?h('p',{class:'muted'},response.plan.interpretation):null,
+  ].filter(Boolean));
+  if (response.status !== 'complete' || !response.result) return h('p',{class:'foot-note'},t('assistant_task_error'));
+  const {intent,result,plan,execution}=response;
+  const body=[h('div',{class:'search-summary'},[bdg(t('assistant_task_plan'),'ink'),h('span',{class:'muted'},plan?.interpretation||'')]),
+    h('p',{class:'foot-note'},`${t('assistant_task_scope_label')}: ${plan?.dataScope||''} · ${t(execution?.businessDataWritten?'assistant_task_written':'assistant_task_readonly')}`)];
+  if(intent==='search') {
+    const search=result;
+    if(search.status==='unsupported') body.push(h('p',{class:'foot-note'},t('search_v2_unsupported')));
+    else {
+      if(search.testData?.status==='unverified') body.push(h('p',{class:'foot-note'},t('search_v2_unverified')));
+      else if(search.testData?.containsTestData) body.push(h('p',{class:'foot-note'},t('search_v2_test_data')));
+      if(!search.rows?.length) body.push(h('p',{class:'muted'},t('search_no_matches')));
+      for(const row of (search.rows||[])) body.push(h('a',{class:'list-row data-row',href:`#/person/${row.person_id}`},[
+        h('div',{style:'flex:1;min-width:0'},[
+          h('div',{class:'row-title'},row.display_name||`Person #${row.person_id}`),
+          h('div',{class:'row-sub'},[
+            ...(row.matchReasons||[]).flatMap(reason=>[
+              h('div',{class:'foot-note'},`${t('search_v2_condition_'+reason.condition)} · ${(reason.records||[]).map(ref=>`public.${ref.table} #${ref.id}`).join(', ')}`),
+              ...(reason.verifiedAbsence?[h('div',{class:'foot-note'},t('search_v2_no_recent_followup'))]:[]),
+            ]),
+          ]),
+        ]),ic('chevron'),
+      ]));
+      body.push(h('p',{class:'foot-note'},`${search.total||0} ${t('search_v2_total')} · ${t('search_v2_time_note')}`));
+    }
+  } else if(intent==='summarize') {
+    body.push(h('a',{class:'list-row data-row',href:`#/person/${result.personId}`},[h('b',{},result.personName||`Person #${result.personId}`),ic('chevron')]));
+    body.push(h('p',{class:'brief-guidance'},result.summary||''));
+    for(const source of (result.sources||[])) body.push(h('p',{class:'foot-note'},`${source.schema}.${source.table} #${source.id}${source.at?` · ${source.at}`:''}`));
+    for(const [key,label] of [['signals','assistant_task_signals'],['gaps','assistant_task_gaps'],['nextActions','assistant_task_next_actions']]) if(result[key]?.length) {
+      body.push(h('b',{},t(label)),...result[key].map(v=>h('p',{class:'foot-note'},v)));
+    }
+  } else if(intent==='prepare') {
+    body.push(h('a',{class:'list-row data-row',href:`#/person/${result.personId}`},[h('b',{},`Person #${result.personId}`),ic('chevron')]));
+    for(const [key,label] of [['brief30Seconds','assistant_task_brief'],['suggestedObjective','assistant_task_objective'],['openingAngles','assistant_task_openings'],['possibleObjections','assistant_task_objections'],['questionsToConfirm','assistant_task_questions'],['avoid','assistant_task_avoid']]) {
+      const value=result[key]; if(Array.isArray(value)&&value.length){body.push(h('b',{},t(label)),...value.map(v=>h('p',{class:'foot-note'},v)));}
+      else if(typeof value==='string'&&value){body.push(h('b',{},t(label)),h('p',{class:'foot-note'},value));}
+    }
+    for(const source of (result.sources||[])) body.push(h('p',{class:'foot-note'},`${source.schema||'public'}.${source.table} #${source.id}${source.at?` · ${source.at}`:''}`));
+  } else if(intent==='plan') {
+    const sections=result.sections||{}, brief=sections.morningBrief||{};
+    if(brief.headline) body.push(h('b',{},brief.headline));
+    if(brief.guidance) body.push(h('p',{class:'brief-guidance'},brief.guidance));
+    for(const action of (sections.topActions||[])) body.push(h('a',{class:'list-row data-row',href:action.target||'#/today'},[
+      h('div',{style:'flex:1;min-width:0'},[h('div',{class:'row-title'},action.title||t('unnamed_action')),
+        h('div',{class:'row-sub'},[action.personName?`${action.personName} · `:'',action.whyNow||'',action.source?` · ${action.source}`:''])]),ic('chevron'),
+    ]));
+    if(result.testData?.status==='unverified') body.push(h('p',{class:'foot-note'},t('search_v2_unverified')));
+    else if(result.testData?.containsTestData) body.push(h('p',{class:'foot-note'},t('search_v2_test_data')));
+  }
+  return h('div',{},body);
+}
+
 export function renderAI(ctx) {
   const items = [
     ['sparkle', t('ai_item_nl_command'), t('ai_item_nl_command_desc'), 'WP3', 'hot'],
@@ -126,6 +218,11 @@ export function renderAI(ctx) {
       kicker: t('kicker_ai'), title: t('title_ai'), tag: wpTag(t('wp3_tag')),
       sub: t('sub_ai'),
     }),
+    card({
+      title:t('assistant_task_title'),icon:'sparkle',tag:wpTag(t('ai_status_live')),
+      body:[assistantTaskPanel(ctx)],
+    }),
+    h('div',{style:'height:16px'}),
     card({
       title: t('ai_search_title'), icon: 'search', tag: wpTag(t('ai_status_live')),
       body: [

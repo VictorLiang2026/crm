@@ -9,7 +9,7 @@ const { defaultRegistry: assistantRegistry } = require('../../cloudfunctions/ass
 const names = ['quick_capture', 'person_summary', 'meeting_prep', 'today_coach',
   'opportunity_analysis', 'opportunity_candidate', 'activity_prepare', 'activity_review', 'recruit_coach',
   'conversation_playbook', 'ai_search', 'crm_search_parse'];
-names.push('crm_search_query_v2');
+names.push('assistant_read_intent_v1', 'crm_search_query_v2');
 
 test('all versioned contracts are model-independent and immutable', () => {
   assert.deepEqual(defaultRegistry.list().map(item => item.name), names);
@@ -92,6 +92,8 @@ test('every initial skill accepts a representative input, context and output', (
       {status:'supported',interpretation:'筛选近期活动参与并有跟进的客户。',personMention:null,
         filters:{roles:['customer'],relationshipTypes:null,fact:null,attendanceMonths:3,
           followupState:'recent',followupMonths:3,opportunityStatuses:null,opportunityTypes:null,recruitStages:null}}],
+    assistant_read_intent_v1: [{query:'帮我准备明天和李明的会面',language:'zh-CN'}, {guidance:{}},
+      {status:'supported',intent:'prepare',interpretation:'准备指定人物的会面。',personMention:'李明',options:[]}],
   };
   for (const name of names) {
     const [input, context, output] = examples[name];
