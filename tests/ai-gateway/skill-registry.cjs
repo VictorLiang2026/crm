@@ -9,7 +9,7 @@ const { defaultRegistry: assistantRegistry } = require('../../cloudfunctions/ass
 const names = ['quick_capture', 'person_summary', 'meeting_prep', 'today_coach',
   'opportunity_analysis', 'opportunity_candidate', 'activity_prepare', 'activity_review', 'recruit_coach',
   'conversation_playbook', 'ai_search', 'crm_search_parse'];
-names.push('assistant_read_intent_v1', 'crm_search_query_v2');
+names.push('assistant_read_intent_v1', 'assistant_action_update_v1', 'crm_search_query_v2');
 
 test('all versioned contracts are model-independent and immutable', () => {
   assert.deepEqual(defaultRegistry.list().map(item => item.name), names);
@@ -38,6 +38,15 @@ test('deployed assistant registry carries the same PC24 search v2 contract', () 
   const shared=defaultRegistry.get('crm_search_query_v2');
   const assistant=assistantRegistry.get('crm_search_query_v2');
   assert.equal(shared.version,'2.0.0');
+  assert.equal(assistant.version,shared.version);
+  assert.deepEqual(assistant.outputSchema,shared.outputSchema);
+  assert.deepEqual(assistant.contextRecipe,shared.contextRecipe);
+});
+
+test('deployed assistant registry carries the same PC26 Action command contract', () => {
+  const shared=defaultRegistry.get('assistant_action_update_v1');
+  const assistant=assistantRegistry.get('assistant_action_update_v1');
+  assert.equal(shared.version,'1.0.0');
   assert.equal(assistant.version,shared.version);
   assert.deepEqual(assistant.outputSchema,shared.outputSchema);
   assert.deepEqual(assistant.contextRecipe,shared.contextRecipe);
@@ -94,6 +103,10 @@ test('every initial skill accepts a representative input, context and output', (
           followupState:'recent',followupMonths:3,opportunityStatuses:null,opportunityTypes:null,recruitStages:null}}],
     assistant_read_intent_v1: [{query:'帮我准备明天和李明的会面',language:'zh-CN'}, {guidance:{}},
       {status:'supported',intent:'prepare',interpretation:'准备指定人物的会面。',personMention:'李明',options:[]}],
+    assistant_action_update_v1: [{text:'把张明的跟进回访改到周五',language:'zh-CN'}, {guidance:{}},
+      {status:'supported',operation:'update',interpretation:'更新指定行动的截止时间。',
+        personMention:'张明',actionMention:'跟进回访',changes:{action_type:null,title:null,description:null,
+          due_at:'2026-10-23T17:00:00+08:00',priority:null}}],
   };
   for (const name of names) {
     const [input, context, output] = examples[name];

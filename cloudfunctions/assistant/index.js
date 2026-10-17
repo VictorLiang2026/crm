@@ -7,7 +7,9 @@ const { handleCommand, OPERATIONS } = require('./command-safety');
 function createMain(getIdentity, searchRunner = event => require('./search-service').runSearch(event),
   actionRunner = (event, uid) => require('./action-command-service').runActionCommand(event, uid),
   candidateRunner = (event, uid) => require('./opportunity-candidate-service').runOpportunityCandidate(event, uid),
-  readTaskRunner = event => require('./read-intent-service').runReadIntent(event)) {
+  readTaskRunner = event => require('./read-intent-service').runReadIntent(event),
+  actionIntentRunner = event => require('./action-command-intent-service').interpretActionCommand(event),
+  actionTargetsRunner = event => require('./action-command-intent-service').listActionTargets(event)) {
   return async event => {
     let identity;
     try { identity = await getIdentity(); }
@@ -53,8 +55,31 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
         return {ok:false,error:{code,message:'Recruit Coach request could not be completed'}};
       }
     }
+    if (event?.action === 'actionCommandInterpret') {
+      try {
+        if (Object.keys(event).some(key=>!['action','query','language'].includes(key))) {
+          return {ok:false,error:{code:'INVALID_INPUT',message:'Action request could not be interpreted'}};
+        }
+        return await actionIntentRunner({query:event.query,language:event.language});
+      } catch (error) {
+        const code=['INVALID_INPUT','INVALID_RESULT','INVALID_CONFIG','TIMEOUT','UPSTREAM_UNAVAILABLE',
+          'PERSISTENCE_ERROR','AI_REQUEST_FAILED'].includes(error?.code)?error.code:'ACTION_COMMAND_FAILED';
+        return {ok:false,error:{code,message:'Action request could not be interpreted'}};
+      }
+    }
+    if (event?.action === 'actionCommandTargets') {
+      try {
+        if (Object.keys(event).some(key=>!['action','personMention','selectedPersonId'].includes(key))) {
+          return {ok:false,error:{code:'INVALID_INPUT',message:'Action target selection could not be verified'}};
+        }
+        return await actionTargetsRunner({personMention:event.personMention,selectedPersonId:event.selectedPersonId});
+      } catch (error) {
+        const code=['INVALID_INPUT','INVALID_CONFIG','UPSTREAM_UNAVAILABLE'].includes(error?.code)?error.code:'ACTION_COMMAND_FAILED';
+        return {ok:false,error:{code,message:'Action target selection could not be verified'}};
+      }
+    }
     const isActionPlan = event?.action === 'command' && event.stage === 'plan' &&
-      event.command?.operation === 'create' && event.command?.resource === 'actions' &&
+      ['create','update','close'].includes(event.command?.operation) && event.command?.resource === 'actions' &&
       event.command?.personId != null;
     const isActionNext = event?.action === 'command' && event.resource === 'actions' &&
       ['preview', 'confirm', 'execute'].includes(event.stage);

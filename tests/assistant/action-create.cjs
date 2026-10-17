@@ -17,16 +17,19 @@ test('real login is required before reaching the Action executor', async () => {
   assert.equal(calls, 0);
 });
 
-test('only structured Person-scoped create is sent to the Action service', async () => {
+test('legacy create is dispatched while incomplete update and close drafts are rejected', async () => {
   const calls = [];
+  const data = { run: async (...args) => { calls.push(args); return { ok: true, status: 'planned' }; } };
   const main = createMain(() => ({ uid: 'real-uid', isAnonymous: false }), null,
-    (event, uid) => { calls.push({ event, uid }); return { ok: true, status: 'planned' }; });
+    (event, uid) => runActionCommand(event, uid, { data }));
   assert.equal((await main({ action: 'command', stage: 'plan', command: draft })).status, 'planned');
-  assert.equal(calls[0].uid, 'real-uid');
-  for (const operation of ['update', 'close', 'delete']) {
+  assert.equal(calls[0][1], 'real-uid');
+  for (const operation of ['update', 'close']) {
     const result = await main({ action: 'command', stage: 'plan', command: { ...draft, operation } });
-    assert.equal(result.execution.businessDataWritten, false);
+    assert.equal(result.error.code,'INVALID_COMMAND');
   }
+  const unsupported=await main({ action:'command',stage:'plan',command:{...draft,operation:'delete'} });
+  assert.equal(unsupported.error.code,'INVALID_COMMAND');
   assert.equal(calls.length, 1);
 });
 

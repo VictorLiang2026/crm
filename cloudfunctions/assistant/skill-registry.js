@@ -16,22 +16,6 @@ const recipe = (required, optional = [], limits = {}) => ({ required, optional, 
 
 const SKILLS = [
   {
-    name: 'quick_capture_v2', version: '2.0.0', capability: 'structured_extraction',
-    contextRecipe: recipe(['guidance','today'],['actor_uid']),
-    inputSchema: object({ text: text(10000) }, ['text']),
-    outputSchema: object({
-      person_name: {type:'string',maxLength:160},
-      interaction: object({type:text(64),date:{type:'string',maxLength:10},
-        channel:{type:'string',maxLength:100},summary:text(2000)},
-        ['type','date','channel','summary']),
-      facts: strings(20,500),signals:strings(12,500),
-      opportunity_candidates:strings(10,500),action_candidates:strings(10,500),
-      commitment_candidates:strings(10,500),evidence:strings(12,500),
-    }, ['person_name','interaction','facts','signals','opportunity_candidates',
-      'action_candidates','commitment_candidates','evidence']),
-    confirmationLevel:'confirm_before_write',timeoutClass:'standard',
-  },
-  {
     name: 'quick_capture', version: '1.0.0', capability: 'structured_extraction',
     contextRecipe: recipe([], ['operator_profile']),
     inputSchema: object({ text: text(12000) }, ['text']),
@@ -228,6 +212,22 @@ const SKILLS = [
       options:{type:'array',uniqueItems:true,maxItems:4,items:{type:'string',enum:['search','summarize','prepare','analyze','plan']}}},
     ['status','intent','interpretation','personMention','options']),
     confirmationLevel:'review',timeoutClass:'short',
+  },
+  {
+    name: 'assistant_action_update_v1', version: '1.0.0', capability: 'structured_extraction',
+    contextRecipe: recipe(['guidance']),
+    inputSchema: object({text:text(1200),language:{type:'string',enum:['zh-CN','en']}},['text','language']),
+    outputSchema: object({
+      status:{type:'string',enum:['supported','needs_clarification','unsupported']},
+      operation:{type:'string',enum:['update','close','unsupported']},
+      interpretation:text(300),personMention:{type:['string','null'],maxLength:120},
+      actionMention:{type:['string','null'],maxLength:200},
+      changes:object({action_type:{type:['string','null'],maxLength:64},title:{type:['string','null'],maxLength:200},
+        description:{type:['string','null'],maxLength:4000},due_at:{type:['string','null'],maxLength:64},
+        priority:{type:['string','null'],enum:['low','medium','high','urgent',null]}},
+      ['action_type','title','description','due_at','priority'])
+    },['status','operation','interpretation','personMention','actionMention','changes']),
+    confirmationLevel:'confirm_before_write',timeoutClass:'short',
   },
   {
     name: 'crm_search_query_v2', version: '2.0.0', capability: 'structured_extraction',

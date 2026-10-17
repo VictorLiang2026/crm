@@ -1052,6 +1052,11 @@ function route(){
   if(hash === '#/assistant/actions/new' || hash === '#/test-scenario/action') return import('/crm/js/modules/assistant-action-create.js').then(function(module){
     return module.renderAssistantActionCreate({root:$('view'), callFn:callFn, scenario:hash === '#/test-scenario/action'});
   }).catch(function(e){ $('view').textContent = '新建行动加载失败：' + e.message; });
+  if(hash === '#/assistant/actions/change') return import('/crm/js/modules/assistant-action-change.js').then(function(module){
+    return module.renderAssistantActionChange({root:$('view'), callFn:callFn});
+  }).catch(function(e){ return import('/crm/js/modules/console/i18n.js').then(function(i18n){
+    $('view').textContent = i18n.t('action_change_load_error') + ': ' + e.message;
+  }); });
   if(hash === '#/ai/search') return import('/crm/js/modules/ai-crm-search.js').then(function(module){
     return module.renderAiCrmSearch({root:$('view'), callFn:callFn});
   }).catch(function(e){ $('view').textContent = 'AI CRM 搜索加载失败：' + e.message; });

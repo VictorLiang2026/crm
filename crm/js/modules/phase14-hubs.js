@@ -2,6 +2,7 @@
 import { mountOpportunityWorkflow } from './opportunity-workflow.js';
 import { renderOpportunityCandidates } from './opportunity-candidates.js';
 import { renderTestDataNotice } from './test-data-notice.js';
+import { t } from './console/i18n.js';
 const PERSON_HASH = '#/people';
 const OPPORTUNITY_HASH = '#/opportunities';
 const LEGACY_TABS = {
@@ -320,6 +321,7 @@ export function renderAssistantHub({ root }) {
   for (const [title, description, hash] of [
     ['AI CRM 搜索', '描述要查找的人，由数据库筛选结果。', '#/ai/search'],
     ['创建行动', '选择人物、预览、确认后创建。', '#/assistant/actions/new'],
+    [t('action_change_title'), t('action_change_help'), '#/assistant/actions/change'],
     ['晨间简报', '在今日经营页按需生成。', '#/today'],
   ]) {
     const card = link(title, hash, 'phase14-tile');
