@@ -17,6 +17,10 @@ const p360 = (ctx, action, extra) => call(ctx, 'person_360', { action, ...(extra
 export const data = {
   // ---------- 今日 ----------
   todayWorkItems: (ctx) => p360(ctx, 'listTodayWorkItems'),
+  proactiveCoachCandidates: (ctx) => p360(ctx, 'listProactiveCoachCandidates'),
+  decideProactiveCoachCandidate: (ctx, payload) => p360(ctx, 'recordProactiveCoachDecision', { data: payload }),
+  previewWorkItem: (ctx, payload) => p360(ctx, 'previewWorkItem', { data: payload }),
+  executeWorkItem: (ctx, previewId) => p360(ctx, 'executeWorkItem', { previewId }),
   dueCommitments: (ctx) => p360(ctx, 'listDueCommitments'),
   pendingOpportunities: (ctx) => p360(ctx, 'listPendingOpportunityCandidates'),
   opportunityDirectory: (ctx, params) => p360(ctx, 'listOpportunityDirectory', params || {}),

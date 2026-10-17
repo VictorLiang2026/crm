@@ -46,6 +46,7 @@ const AI_AUDIT_READ_TABLES = new Set(['ai_tasks', 'ai_results']);
 const ACTIVITY_REVIEW_READ_TABLES = new Set(['crm_activity_review_commands']);
 const OCR_REVIEW_READ_TABLES = new Set(['crm_ocr_parse_commands']);
 const KNOWLEDGE_GOVERNANCE_TABLES = new Set(['knowledge_items', 'playbooks']);
+const PROACTIVE_COACH_TABLES = new Set(['crm_proactive_coach_decisions']);
 const TABLES = new Set([
   'persons', 'households', 'household_members', 'interactions', 'commitments',
   'opportunities',
@@ -57,6 +58,7 @@ const TABLES = new Set([
   ...ACTIVITY_REVIEW_READ_TABLES,
   ...OCR_REVIEW_READ_TABLES,
   ...KNOWLEDGE_GOVERNANCE_TABLES,
+  ...PROACTIVE_COACH_TABLES,
   ...LEGACY_INTERACTION_TABLES,
 ]);
 const ROLES = new Set(['spouse', 'child', 'parent', 'sibling', 'other']);
@@ -99,6 +101,7 @@ async function pgRequest(table, method, filters = {}, body) {
   if (OCR_REVIEW_READ_TABLES.has(table) && method !== 'GET') throw new Error('Invalid source operation');
   if (ACTIVITY_REVIEW_READ_TABLES.has(table) && method !== 'GET') throw new Error('Invalid source operation');
   if (KNOWLEDGE_GOVERNANCE_TABLES.has(table) && !['GET', 'POST', 'PATCH'].includes(method)) throw new Error('Invalid source operation');
+  if (PROACTIVE_COACH_TABLES.has(table) && method !== 'GET') throw new Error('Invalid source operation');
   if (table === 'commitments' && method !== 'GET') throw new Error('Invalid source operation');
   const env = process.env.TCB_ENV;
   const key = process.env.CRM_PERSON360_DB_API_KEY;
@@ -143,7 +146,7 @@ async function pgRpc(name, body) {
     'crm_relationship_preview_v1','crm_relationship_execute_v1',
     'crm_ocr_parse_preview_v1','crm_ocr_parse_undo_preview_v1','crm_ocr_parse_execute_v1',
     'crm_recruit_candidate_create_v1','crm_recruit_candidate_transition_v1','crm_recruit_coach_outcome_v1',
-    'crm_knowledge_review_v1']).has(name)) throw new Error('Invalid RPC');
+    'crm_knowledge_review_v1','crm_proactive_coach_decision_v1']).has(name)) throw new Error('Invalid RPC');
   const env = process.env.TCB_ENV;
   const key = process.env.CRM_PERSON360_DB_API_KEY;
   if (!/^crm-[a-z0-9]+$/.test(env || '') || !key) throw new Error('Person 360 is not configured');
@@ -1038,6 +1041,10 @@ exports.main = async event => {
           .previewUndo(event.data,uid);
       case 'getRelationshipDecay': return await new RelationshipDecayService({ request: pgRequest })
         .evaluateForPerson(event.personId);
+      case 'listProactiveCoachCandidates': return await new (require('./proactive-coach-service').ProactiveCoachService)(
+        {request:pgRequest,rpc:pgRpc}).list(uid);
+      case 'recordProactiveCoachDecision': return await new (require('./proactive-coach-service').ProactiveCoachService)(
+        {request:pgRequest,rpc:pgRpc}).decide(event.data,uid);
       case 'createOpportunity':
       case 'updateOpportunity':
       case 'closeOpportunity':

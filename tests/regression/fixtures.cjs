@@ -205,6 +205,8 @@ function installFixtures() {
       asOf:'2026-10-04T01:00:00Z',testData:{status:'verified',containsTestData:mode!=='empty',
         recordCount:workItems.length,sources:workItems.length?[{batchKey:'crm_test_fixture',table:'actions',count:1},
           {batchKey:'crm_test_fixture',table:'commitments',count:1}]:[]}}),
+    'person_360:listProactiveCoachCandidates': () => ({candidates:[],asOf:'2026-10-04T01:00:00Z',limit:12,hasMore:false,
+      disclosure:{status:'verified',containsTestData:false,recordCount:0,sources:[]}}),
     'person_360:previewWorkItem': event => {
       const draft = event.data;
       const row = workItems.find(item => String(item.id) === String(draft.itemId));

@@ -6,6 +6,7 @@ import { ic } from '../icons.js';
 import { data } from '../data.js';
 import { t, getLang, translateEnum } from '../i18n.js';
 import { openWorkItemEditor, openWorkItemTransition, openCandidate } from '../write.js';
+import { renderProactiveCoach } from '../proactive-coach.js';
 import {
   wpTag, sk, pageHead, card, emptyNote, loadInto, bdg, avatar,
   dueLabel, dayDiffFromToday, textOf,
@@ -177,6 +178,7 @@ export function renderToday(ctx) {
   const today5El = h('div', {});
   const candidateEl = h('div', {});
   const rhythmEl = h('div', {});
+  const coachEl = h('div', {});
   const commitEl = h('div', {});
   const oppEl = h('div', {});
   const briefEl = h('div', {});
@@ -287,6 +289,8 @@ export function renderToday(ctx) {
     });
   });
 
+  loadInto(coachEl, async () => renderProactiveCoach(ctx,{onDone:reload}));
+
   loadInto(commitEl, async () => {
     const work = await pools.work;
     if (!work.ok) throw work.e;
@@ -354,7 +358,7 @@ export function renderToday(ctx) {
         h('div', { style: 'height:16px' }),
         candidateEl,
       ]),
-      h('div', { class: 'today-aside' }, [rhythmEl, commitEl, riskCard, oppEl]),
+      h('div', { class: 'today-aside' }, [rhythmEl, coachEl, commitEl, riskCard, oppEl]),
     ]),
   );
 }
