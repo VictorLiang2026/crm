@@ -1,0 +1,59 @@
+{
+  "environment": "crm-d1gkae8ddc930d151",
+  "baselineCommit": "c55d2531fdba878b7a9633a02457449aaa26ef05",
+  "baselineTag": "release-20261018-011000",
+  "approvedScope": "Only public.opportunity_candidate_v1 created-state execute replay validation",
+  "beforeFunctionDefinitionMd5": "a5ea39367c4c41281c221e7c0a40cb04",
+  "beforeFunctionBodyMd5": "6f39f30fcec4a2a0921a368354f86dfa",
+  "migration": {
+    "version": "20261018013000",
+    "name": "opportunity_replay_actor",
+    "taskId": "task-9a8668ec116c41d5",
+    "status": "Succeed",
+    "latestRemoteVersionConfirmed": true,
+    "officialFetchAligned": true,
+    "localSqlSha256": "4d4b778b660c2332295fc8a1b290b0938fa610f75732ad1a92f3fa2dbe13e0b1"
+  },
+  "afterFunctionBodyMd5": "8eea87664012f050cd6abbae02d9866e",
+  "securityInvoker": true,
+  "searchPath": "pg_catalog, public",
+  "grantsUnchanged": true,
+  "baselineReproduction": "PC32-B replay accepted different actor; transaction rolled back",
+  "fictionalTransaction": {
+    "assertions": 14,
+    "passed": true,
+    "allFixtureRowsRolledBack": true,
+    "registeredPersonId": 783,
+    "registeredInteractionId": 10
+  },
+  "concurrency": {
+    "observedAt": "2026-10-17T17:32:40.075Z",
+    "observedOverlappingLock": true,
+    "lockTimeoutRejectedWithoutWrite": true,
+    "retryReturnedOriginalId": true,
+    "existingFictionalCandidateId": 3,
+    "originalOpportunityId": 10,
+    "holderExecutionMs": 12010,
+    "contenderExecutionMs": 506,
+    "retryExecutionMs": 14,
+    "persistentBusinessWrites": false
+  },
+  "adjacentRegression": {
+    "pass": 36,
+    "fail": 0
+  },
+  "gate": {
+    "status": "PASS_WITH_LIMITATIONS",
+    "finishedAt": "2026-10-17T17:37:13.567Z",
+    "fingerprint": "500a726af3bbe3f7de4b8035acb835c13aa1de563705eb3e261f5cd517aad841",
+    "catalogChecks": 995,
+    "regressionPass": 108,
+    "regressionFail": 0,
+    "regressionSkip": 5,
+    "anonymousPass": 69,
+    "anonymousFail": 0
+  },
+  "unverified": ["real customer writes", "model calls", "production rollback", "load capacity", "WP01 interactive login"],
+  "targetTag": "release-20261018-014000",
+  "parentPc32Complete": false
+}
