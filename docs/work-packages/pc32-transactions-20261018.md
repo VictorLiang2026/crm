@@ -14,10 +14,10 @@ PC31 已完成：提交 `25f23435048618a2a3d3b8bdebf95f449686a253`，标签 `rel
 
 | 链 | 线上已存在的事务/防重 | 当前结论及下一步 |
 | --- | --- | --- |
-| Quick Capture V2 | 测试账号专用的 assistant plan/command 有命令锁、actor、预览和回执；Console 当前走 person_360 的 `quick_capture_v2_commit` | 新建 Person 时先 `executeIdentity` 再 `commitQuickCaptureV2`，两次 RPC 可能半写入；已有 Person 的互动/事实同一 RPC，但无请求幂等键。PC32-C 拟优先修新建分支，具体范围待批准；Legacy 保留 |
+| Quick Capture V2 | 测试账号专用的 assistant plan/command 有命令锁、actor、预览和回执；Console 当前走 person_360 的 `quick_capture_v2_commit` | 新建 Person 时两次 RPC 可能半写入；已有 Person 同一 RPC 原子写入互动/事实，但同请求重复提交已实测生成双份。PC32-C/D 各自具体范围待批准；Legacy 保留 |
 | 身份新建 | 命令行锁、姓名 advisory lock；Person、角色、业务档案和命令结果同 RPC | 保留已有治理；补逐步骤失败、重试验收 |
 | Opportunity 候选晋升 | 候选行锁；Opportunity、候选状态、AI 结果同事务 | PC32-B 将已执行 replay 放在请求形状和原确认操作者核验之后；虚构事务与并发验证通过 |
-| 活动复盘 | 命令 actor/版本校验，业务成果、来源占用和执行结果同 RPC | 已用虚构 Outcome 验证预览、版本冲突、故障回滚、重试及命令行锁；Action/机会候选分支仍未逐项注入故障 |
+| 活动复盘 | 命令 actor/版本校验，业务成果、来源占用和执行结果同 RPC | Outcome、Action、机会候选三个写入分支均已用虚构来源验证故障回滚、重试及防重复；Outcome 命令另有独立进程锁验证 |
 | 招募创建/阶段 | 创建候选+里程碑原子；阶段行锁、updated_at 冲突拒绝 | 阶段已完成 6 项虚构事务及独立进程并发验证；候选创建已完成 4 项事务检查，故障无半成品，重复创建被唯一索引拒绝，但不返回原 ID，首次并发创建仍未实测 |
 | 招募目标 | 已有原子 saveGoals RPC | 保留，不重写；现有门禁夹具覆盖 |
 | OCR apply/undo | 命令 actor、Person/客户/OCR 行锁与版本；字段、反向命令和结果同事务 | 已用虚构 OCR 来源完成 13 项应用/撤销、人工改动冲突、故障回滚与重试验收；独立进程并发仍未实测 |
@@ -128,3 +128,15 @@ PC32 父包仍有 Quick Capture V2、身份新建、活动复盘、招募阶段�
 `tests/pc32/recruit-create-transaction.sql` 复用已登记虚构 Person 785 与客户 792，服务角色实际调用创建 RPC，4 项检查通过：错误所选姓名拒绝；候选与首个里程碑写入后注入故障，两者及衍生台账一同回滚；重试正常创建且自动登记；重复调用明确报“已有活跃候选”且无第二条。外层事务回滚后 Person 785 仍无活跃候选，初始台账 10 条。PC19 相邻服务/UI 回归 10/10 通过。当前创建接口没有请求幂等键，重复调用不返回原候选 ID；首次并发创建时序未实测。这两项仍留在 PC32 父包的待治理范围。
 
 本轮只增加虚构事务脚本和审计文档，无云端业务产物更改。拟用 `release-20261018-030000` 发布，发布前执行 WP01 门禁，发布后核对本地、云端、GitHub。PC32-C 的既有 Quick Capture 行为修复仍待用户对具体范围的答复；未获答复前不改写该流程。
+
+上述 OCR/招募创建审计于 2026-10-18 发布完成：提交 `230db05a12644d2e5d67d0866caba695cadbc4dc`，标签 `release-20261018-030000`，发布脚本退出 0。发布后 29 函数/198 源码、73 静态资源及 GitHub 一致；证据 `D:\Temp\crm-cloud-audit-44b7310b7f06416097707d5f6a20cc9e`。无云端业务产物更改。
+
+## 活动 Action/机会候选事务与 Quick Capture 重复诊断
+
+`tests/pc32/activity-action-transaction.sql` 在外层回滚事务内将已登记虚构 AI 结果 19 的 Action 候选暂指向已登记到场来源 `public.activity_participants#18`。服务角色实际调用预览与执行 RPC，6 项检查通过：预览不写入；Action 和来源占用写入后注入故障，两者连同命令执行回执一起回滚；重试只生成一条 Action/来源占用；同命令回放返回原 ID；换人拒绝；第二个命令不能重复占用相同来源。事务结束后原 AI 结果、Action、来源占用及命令均恢复原样。
+
+`tests/pc32/activity-opportunity-transaction.sql` 复用虚构 AI 结果 19 与已登记、关联活动 11 且重要度为 3 的互动 11，在外层回滚事务内暂添机会候选。对应 6 项检查通过：预览无业务写入、候选与来源占用故障后共同回滚、重试一次创建、同命令回放原 ID、换人拒绝、第二个命令不能重复占用来源。结束后 AI 结果仍无该机会候选，活动命令仅剩原 1 条，来源占用与本次机会候选均为 0，初始台账仍为 10 条。这补齐活动复盘三个实际写入分支的虚构故障验收；未声称真实模型调用或容量压力验收。
+
+`tests/pc32/quick-capture-existing-diagnosis.sql` 对已登记虚构 Person 783 连续两次调用完全相同的 `public.quick_capture_v2_commit` 请求，真实复现两个不同互动 ID 和四条事实/信号；外层事务回滚后均为 0。旧服务离线契约 5/5 通过，但它没有覆盖同请求重放。Console 现有 Person 分支缺服务端幂等回执，重复确认可能多造业务记录。拟作为 PC32-D 单独治理；已向用户发出具体范围确认，答复前不修改 Console 或 RPC。PC32-C 新建分支确认亦仍待答复。
+
+本轮只提交诊断和事务脚本及逐链矩阵，不改线上业务产物；目标标签 `release-20261018-031500`。发布前后按 WP01 门禁、本地/云端/GitHub 一致性核对执行。
