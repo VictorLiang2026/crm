@@ -3,9 +3,14 @@ param([Parameter(Mandatory=$true)][string]$Message, [string]$Tag = ('release-' +
 $ErrorActionPreference = 'Stop'
 Set-Location (Split-Path -Parent $PSScriptRoot)
 function GitChecked([string[]]$Arguments) {
-  $result = & git @Arguments
-  if ($LASTEXITCODE -ne 0) { throw "git $($Arguments -join ' ') failed." }
-  return $result
+  $networkCommand = $Arguments[0] -in @('ls-remote','fetch','push')
+  $maxAttempts = if ($networkCommand) { 5 } else { 1 }
+  for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+    $result = & git @Arguments
+    if ($LASTEXITCODE -eq 0) { return $result }
+    if ($attempt -lt $maxAttempts) { Start-Sleep -Seconds 2 }
+  }
+  throw "git $($Arguments -join ' ') failed."
 }
 try {
   if ($Tag -notmatch '^(v\d+(\.\d+){2,3}|release-\d{8}-\d{4,6})$') { throw 'Invalid release tag.' }

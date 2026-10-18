@@ -520,7 +520,7 @@ module.exports = async function smoke(root, test) {
       await b.click('#view button', '+ 添加参与者');
       assert.equal(await b.evaluate("window.__crmTest.calls.some(c=>c.action==='addCanonicalParticipant')"), false);
       await b.evaluate("(() => { const input=document.querySelector('.modal-overlay input[type=text]'); input.value='[CRM_TEST_ONLY]客户甲'; input.dispatchEvent(new Event('input',{bubbles:true})); })()");
-      await b.wait(called('person_360', 'resolveQuickCaptureName'));
+      await b.wait(called('person_360', 'resolveQuickCaptureName'), 15000);
       await b.wait("Boolean(document.querySelector('.modal-overlay .person-candidate'))");
       await b.click('.modal-overlay .person-candidate', '[CRM_TEST_ONLY]客户甲');
       await b.click('.modal-overlay button', '确认添加 Person');

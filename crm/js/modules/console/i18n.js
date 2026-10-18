@@ -2,6 +2,13 @@
 const DEFAULT = 'zh-CN';
 
 const DICT = {
+  // PC34-A: existing Console labels previously rendered as raw dictionary keys.
+  'person': { 'zh-CN': '人物', 'en': 'Person' },
+  'opportunities': { 'zh-CN': '机会', 'en': 'Opportunities' },
+  'work_item': { 'zh-CN': '工作项', 'en': 'Work item' },
+  'act_legacy_status': { 'zh-CN': '原状态', 'en': 'Legacy status' },
+  'btn_refresh': { 'zh-CN': '刷新', 'en': 'Refresh' },
+  'confidence_low': { 'zh-CN': '低置信度', 'en': 'Low confidence' },
   // PC33 AI request resilience
   'pc33_ai_in_progress': { 'zh-CN': '这项 AI 请求仍在处理中，请稍后查看历史。', 'en': 'This AI request is still running. Check history shortly.' },
   'pc33_ai_retry_later': { 'zh-CN': '刚才的请求已记录，请稍后重试或查看历史。', 'en': 'The recent request was recorded. Retry later or check history.' },

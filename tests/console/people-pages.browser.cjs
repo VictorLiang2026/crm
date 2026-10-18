@@ -12,7 +12,7 @@ test('Console People directory sorts person-owned priority and follow-up columns
     await b.evaluate(`(async()=>{
       const {renderPeople}=await import('/crm/js/modules/console/pages/people.js');
       window.peopleRequests=[];
-      const ctx={main:document.getElementById('view'),toast(){},api:{call:async(name,args)=>{
+      const ctx={main:(()=>{const e=document.createElement('main');document.body.append(e);return e})(),toast(){},api:{call:async(name,args)=>{
         window.peopleRequests.push({name,args});
         return {rows:[{id:9,display_name:'【系统测试·勿联系】虚构人物',roles:['customer'],
           sales_priority:'A',recruitment_priority:'B',referral_priority:'C',latest_followup_date:'2026-10-01',
@@ -56,7 +56,7 @@ test('People directory reveals role priorities and applies multi-select only on 
     await b.evaluate(`(async()=>{
       const {renderPeople}=await import('/crm/js/modules/console/pages/people.js');
       window.peopleRequests=[];
-      const ctx={main:document.getElementById('view'),toast(){},api:{call:async(name,args)=>{
+      const ctx={main:(()=>{const e=document.createElement('main');document.body.append(e);return e})(),toast(){},api:{call:async(name,args)=>{
         window.peopleRequests.push({name,args});
         return {rows:[],page:1,pageSize:20,total:0,totalPages:1,hasMore:false};
       }}};
@@ -101,7 +101,7 @@ test('People directory shows one 招募 badge for converted recruits without cha
     await b.open('#/more');
     await b.evaluate(`(async()=>{
       const {renderPeople}=await import('/crm/js/modules/console/pages/people.js');
-      const ctx={main:document.getElementById('view'),toast(){},api:{call:async()=>({rows:[
+      const ctx={main:(()=>{const e=document.createElement('main');document.body.append(e);return e})(),toast(){},api:{call:async()=>({rows:[
         {id:7,display_name:'已转招募',roles:['recruit'],recruit_id:73},
         {id:8,display_name:'招募关联人物',roles:[],recruit_id:74},
       ],page:1,pageSize:20,total:2,totalPages:1,hasMore:false})}};
@@ -126,7 +126,7 @@ test('Recycle bin remains simple and has no directory filters', async () => {
     await b.evaluate(`(async()=>{
       const {renderPeopleTrash}=await import('/crm/js/modules/console/pages/people-trash.js');
       window.trashRequests=[];
-      const ctx={main:document.getElementById('view'),toast(){},api:{call:async(name,args)=>{
+      const ctx={main:(()=>{const e=document.createElement('main');document.body.append(e);return e})(),toast(){},api:{call:async(name,args)=>{
         window.trashRequests.push({name,args});
         return {rows:[],page:1,pageSize:20,total:0,totalPages:1,hasMore:false};
       }}};

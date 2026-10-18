@@ -14,6 +14,15 @@ function classify(status, range, expectsSelect) {
 }
 
 const funnelMetrics = ['current_count', 'entered_30d', 'moved_30d', 'overdue_count', 'dwell_median_days', 'stuck_count'];
+async function fetchGateway(url, options) {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try { return await fetch(url, { ...options, signal: AbortSignal.timeout(20000) }); }
+    catch (error) {
+      if (attempt === 2) throw error;
+      await new Promise(resolve => setTimeout(resolve, 500 * (attempt + 1)));
+    }
+  }
+}
 function emptyFunnelMetrics(rows) {
   return Array.isArray(rows) && rows.length > 0 && rows.length <= 100 && rows.every(row =>
     row && typeof row === 'object' && Object.keys(row).length === funnelMetrics.length &&
@@ -42,12 +51,11 @@ async function probe() {
     url.search = new URLSearchParams(funnel ? {
       select: funnelMetrics.join(',')
     } : { select: '*', limit: '0' }).toString();
-    const response = await fetch(url, { method: 'HEAD', headers: {
+    const response = await fetchGateway(url, { method: 'HEAD', headers: {
       Authorization: `Bearer ${key}`, 'Accept-Profile': 'public', Prefer: 'count=exact'
-    }, signal: AbortSignal.timeout(20000) });
+    } });
     if (funnel) {
-      const full = await fetch(url, { headers: { Authorization: `Bearer ${key}`, 'Accept-Profile': 'public' },
-        signal: AbortSignal.timeout(20000) });
+      const full = await fetchGateway(url, { headers: { Authorization: `Bearer ${key}`, 'Accept-Profile': 'public' } });
       const values = await full.json();
       const zeroMetrics = full.status === 200 && emptyFunnelMetrics(values);
       results.push({ object: item.name, status: full.status, empty: false,

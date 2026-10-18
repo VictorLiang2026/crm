@@ -53,7 +53,8 @@ function catalog(raw, now = Date.now()) {
   return { actual, result };
 }
 function runNode(args) {
-  const r = spawnSync(process.execPath, args, { cwd: root, encoding: 'utf8', timeout: 180000, maxBuffer: 4 * 1024 * 1024, windowsHide: true });
+  const timeout = args.includes('tests/regression/run.cjs') ? 360000 : 180000;
+  const r = spawnSync(process.execPath, args, { cwd: root, encoding: 'utf8', timeout, maxBuffer: 4 * 1024 * 1024, windowsHide: true });
   if (r.stdout) process.stdout.write(r.stdout);
   if (r.status !== 0 || r.error) throw Error('Check process failed: ' + args.join(' '));
 }

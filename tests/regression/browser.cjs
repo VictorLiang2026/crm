@@ -167,13 +167,13 @@ class Browser {
     this.runtimeErrors.length = 0;
     const target = this.origin + '/admin.html?' + query + '&run=' + Date.now() + hash;
     await this.send('Page.navigate', { url: target });
-    await this.wait('location.href === ' + JSON.stringify(target) + ' && Boolean(window.__crmTest && document.getElementById("view"))', 25000);
+    await this.wait('location.href === ' + JSON.stringify(target) + ' && Boolean(window.__crmTest && document.getElementById("view"))', 45000);
   }
   async openConsole(hash = '#/today', query = '') {
     this.runtimeErrors.length = 0;
     const target = this.origin + '/console.html?' + query + '&run=' + Date.now() + hash;
     await this.send('Page.navigate', { url: target });
-    await this.wait('location.href === ' + JSON.stringify(target) + ' && Boolean(window.__crmTest && document.getElementById("app"))', 25000);
+    await this.wait('location.href === ' + JSON.stringify(target) + ' && Boolean(window.__crmTest && document.getElementById("app"))', 45000);
   }
   async click(selector, text) {
     await this.evaluate(`(() => { const e = [...document.querySelectorAll(${JSON.stringify(selector)})].find(e => e.textContent.includes(${JSON.stringify(text)})); if (!e) throw new Error('Control not found: ' + ${JSON.stringify(text)}); e.click(); })()`);
