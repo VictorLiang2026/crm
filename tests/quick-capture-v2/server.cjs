@@ -86,3 +86,39 @@ test('confirmed V2 payload passes only Interaction, Fact and Signal to restricte
 test('anonymous call is denied before any V2 database access', async () => {
   assert.deepEqual(await main({ action: 'commitQuickCaptureV2', data: {} }), { error: 'UNAUTHORIZED' });
 });
+
+test('new Person capture preview binds the complete normalized interaction and candidates', async () => {
+  const calls = [];
+  const service = createService({
+    request: async (table, method) => {
+      assert.equal(method, 'GET');
+      if (table === 'persons' || table === 'customers') return [];
+      assert.fail(`Unexpected lookup table: ${table}`);
+    },
+    rpc: async (name, body) => {
+      calls.push({ name, body });
+      return { previewId: 'a45da2ae-b2ed-42c0-992e-e68e53085acc', preview: body.p_payload };
+    },
+  });
+  const payload = {
+    kind: 'capture_v2_new',
+    idempotencyKey: 'f7fd0cbd-9e8f-4b39-9c77-30dcaf6c62ee',
+    displayName: '【系统测试·勿联系】虚构记录丙',
+    interaction: { type: '微信', at: '2026-10-18T12:00:00+08:00', channel: '',
+      summary: '  【系统测试·勿联系】虚构摘要  ', rawNote: '【系统测试·勿联系】原话' },
+    facts: ['  【系统测试·勿联系】虚构事实  '], signals: ['【系统测试·勿联系】虚构信号'],
+  };
+  await service.previewIdentity(payload, 'test-uid');
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].name, 'person_identity_preview_v1');
+  assert.equal(calls[0].body.p_kind, 'capture_v2_new');
+  assert.equal(calls[0].body.p_actor_uid, 'test-uid');
+  assert.equal(calls[0].body.p_payload.interaction.summary, '【系统测试·勿联系】虚构摘要');
+  assert.deepEqual(calls[0].body.p_payload.facts, ['【系统测试·勿联系】虚构事实']);
+  assert.equal(calls[0].body.p_payload.source, '人工新增');
+  assert.equal('person_id' in calls[0].body.p_payload, false);
+  await assert.rejects(service.previewIdentity({ ...payload, personId: '11' }, 'test-uid'), /New Person capture/);
+  await assert.rejects(service.previewIdentity({ ...payload, extra: true }, 'test-uid'), /Invalid Quick Capture preview/);
+  await assert.rejects(service.previewIdentity({ ...payload, facts: ['x'.repeat(501)] }, 'test-uid'), /Invalid Context/);
+  assert.equal(calls.length, 1);
+});

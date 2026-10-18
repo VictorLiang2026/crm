@@ -156,3 +156,15 @@ PC32 父包仍有 Quick Capture V2、身份新建、活动复盘、招募阶段�
 `tests/pc32/feedback-first-write-concurrency.cjs` 使用两个独立 CLI 服务角色进程，对台账已登记的虚构 AI 结果 7、活动 11 分别执行反馈和实际 Outcome 的同键首次请求。持有方在事务内成功写入后睡眠约 12 秒并回滚，竞争方确实在唯一键上等待；反馈调用 512ms、Outcome 调用 520ms 后按 500ms 锁超时明确拒绝。持有方回滚后，同键重试分别在 8ms、16ms 完成一次写入，随后测试事务也回滚。最终两张表的测试键记录均为 0，初始台账为 10 条；证据 `tests/security/.results/pc32-feedback-first-write-concurrency.json`。
 
 此项证明并发首次请求不会产生部分业务成果，并发受阻方获得清晰拒绝后可以重试；不声称两次同时成功或高负载压力表现。现有 RPC 不把唯一冲突自动转换为原 ID，调用方需按明确错误重试。未修改任何业务代码或云端产物；目标标签 `release-20261018-034500`，发布前后继续执行 WP01 门禁与三端核对。
+
+## PC32-C Console 新建 Person 快速记录单事务
+
+用户已批准 PC32-C 的新建 Person 分支。修改 `crm/js/modules/console/write.js`、双语字典与 `person_360`；只扩展 `public.person_identity_preview_v1`、`public.person_identity_execute_v1` 和现有命令类型约束。新 `capture_v2_new` 请求由服务端重新 `resolveName`，把姓名、完整互动、事实、信号、操作者和幂等键绑定到 15 分钟预览；页面展示服务端返回的逐项内容，人工确认后调用原身份执行 RPC。执行函数在创建 Person 后同事务调用原 `public.quick_capture_v2_commit`，并保存结果回执；旧 `capture`、旧 `kind=person`、已有 Person 分支及 Legacy Quick Capture 保持原调用和返回结构。
+
+Migration `20261018014100_capture_new_atomic.sql` 与同名 `cloudbase/rollbacks/` 成对保存，并备份至 `C:\Users\victor\cloudbase\`。回滚先检查新命令是否已有记录，有记录时拒绝自动缩窄类型约束，需先评估业务数据。迁移计划仅 1 条 pending、无冲突；任务 `task-8409027373b04097` 状态 Succeed，远端历史确认版本 `20261018014100`。管理工具在任务完成瞬间曾返回 `MIGRATION_NOT_APPLIED`，随后独立查询远端历史确认已应用，未重复推送。上线函数正文 MD5 分别为 `bc1ffe4242495d839cd8e7c2883bbbd2`、`259b07e37cfc1f7998019b2db55bfa87`；仅 owner/service_role 可执行，仍为 SECURITY INVOKER 与 `pg_catalog, public` 搜索路径。
+
+`tests/pc32/quick-capture-new-transaction.sql` 使用已登记测试操作者和随机带“勿联系”标记的虚构姓名，在服务角色事务内通过 10 项检查：完整服务端预览不写业务、同键同内容重用回执、三类字段改动及换操作者拒绝、换操作者执行拒绝、Person/互动/两项未确认 Fact/Signal/台账与回执在注入故障后共同回滚、重试只写一次并回放原 ID。外层事务回滚后该类 Person、命令和台账均为 0。页面独立浏览器测试通过中文与英文预览、iPad 两种方向、无旧第二次提交；旧 Quick Capture 服务 6/6，PC14 7/7，PC19 10/10，身份服务 6/6 均通过。完整 WP01 于 2026-10-18 01:51:01 UTC `PASS_WITH_LIMITATIONS`，目录 995 项、旧回归 108 通过/0 失败/5 原有跳过、匿名权限 69/69。真实登录、真实业务写入、模型调用及生产回滚未在本包执行。
+
+迁移后还实际重跑旧 `kind=person` 身份创建 8 项事务脚本及旧已有 Person 重复诊断，两者均在虚构数据回滚事务内通过。旧接口重复请求仍会生成两份互动，这正是已获批 PC32-D 的待修链，不能把 C 的幂等性扩大宣称到已有 Person。
+
+本包仅部署 `person_360` 及 `/crm/js/modules/console/write.js`、`/crm/js/modules/console/i18n.js`，未传整站或其他函数。部署后实际调用 `person_360.resolveQuickCaptureName`，请求 `438b68d0-01e8-4b1e-ad7a-fe01dd07b117` 由线上函数返回预期 `UNAUTHORIZED`，证明未登录边界；本轮没有应用登录会话，故不把此调用算作带登录态的业务写入验收。发布收尾由 WP01 门禁、完整 cloud sync、Git master/标签三者共同判定；具体提交号与核对证据见本轮交付报告。PC32-D 已单独获批，须在 C 发布完成后实施。

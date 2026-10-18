@@ -1,11 +1,11 @@
-// Console 写入闭环（WP2）：全部写操作走「服务端预览 → 人工确认 → 执行」三段式。
-// 服务端均为既有实现，本模块零云函数/数据库变更，不直连数据库：
+// Console 写入闭环（WP2）：命令式写入走「服务端预览 → 人工确认 → 执行」。
+// 所有写入经云函数，不直连数据库：
 // - 行动/承诺完成: person_360 previewWorkItem{data:{idempotencyKey,kind,operation,personId,itemId,draft}}
 //     → {previewId,preview:{before,after}} → executeWorkItem{previewId}
 // - 机会推进/关闭/新建: person_360 previewOpportunity/executeOpportunity（stage/close/create）
 // - 机会候选三键: assistant opportunityCandidate edit/reject/preview→confirm(previewHash)→execute
 // - 快速记录: ai_parse quick_capture（只读解析）→ person_360 resolveQuickCaptureName（服务端身份解析）
-//     → 人工点选候选 → commitQuickCaptureV2{confirmed:true}（服务端再次校验所选候选未变）
+//     → 人工点选候选。新建 Person 走完整服务端预览和单事务执行；已有 Person 暂走旧 commitQuickCaptureV2。
 import { h } from './dom.js';
 import { ic } from './icons.js';
 import { bdg, fmtDate, dueLabel, textOf } from './ui.js';
@@ -868,6 +868,8 @@ export function openQuickCapture(ctx, { personId, onDone } = {}) {
     const sigsWrap = listEditor(sigList, t('signals_label'), t('max_12_signals'));
     const summaryTa = h('textarea', { class: 'sheet-textarea' },
       (p.facts || []).join('；') || '');
+    let newCaptureKey = '';
+    let newCaptureShape = '';
     const sheetBody = h('div', {}, [
       fieldRow(t('link_person'), candBox, hint),
       h('div', { style: 'display:flex;gap:10px' }, [
@@ -916,17 +918,35 @@ export function openQuickCapture(ctx, { personId, onDone } = {}) {
                     sheet.showErr(t('same_name_exists')); return;
                   }
                 }
+                const captureData = {
+                  kind: 'capture_v2_new', displayName: res.displayName, nameKey: res.nameKey,
+                  interaction: {
+                    type: typeSel.value, at: dateToIso(dateInput.value || todayStr()), channel: '',
+                    summary, rawNote: text,
+                  },
+                  facts, signals,
+                };
+                const shape = JSON.stringify(captureData);
+                if (shape !== newCaptureShape) { newCaptureShape = shape; newCaptureKey = uuid(); }
                 const pv = await p360(ctx, 'previewIdentity', { data: {
-                  kind: 'person', idempotencyKey: uuid(),
-                  displayName: res.displayName, nameKey: res.nameKey,
+                  ...captureData, idempotencyKey: newCaptureKey,
                 } });
+                const verified = pv && pv.preview;
+                if (!verified || verified.kind !== 'capture_v2_new' || !verified.newPerson ||
+                    !verified.interaction || !Array.isArray(verified.facts) || !Array.isArray(verified.signals)) {
+                  throw new Error(t('capture_preview_invalid'));
+                }
                 busy(b, false, t('confirm_save'));
                 sheet.swap(h('div', {}, [
                   previewBlock([
-                    kvRow(t('step1_new_person'), res.displayName),
-                    kvRow(t('step2_interaction'), `${t('interaction_type_' + (typeSel.value === '见面' ? 'meet' : typeSel.value === '吃饭' ? 'meal' : typeSel.value === '电话' ? 'call' : typeSel.value === '微信' ? 'wechat' : typeSel.value === '活动' ? 'activity' : 'other'))} · ${dateInput.value || todayStr()}`),
-                    kvRow(t('facts_signals'), `${facts.length} / ${signals.length}`),
-                    h('div', { class: 'sheet-note', style: 'margin-top:8px' }, t('two_writes_note')),
+                    kvRow(t('step1_new_person'), verified.displayName),
+                    kvRow(t('step2_interaction'), `${t('interaction_type_' + (verified.interaction.type === '见面' ? 'meet' : verified.interaction.type === '吃饭' ? 'meal' : verified.interaction.type === '电话' ? 'call' : verified.interaction.type === '微信' ? 'wechat' : verified.interaction.type === '活动' ? 'activity' : 'other'))} · ${verified.interaction.at}`),
+                    kvRow(t('interaction_summary'), verified.interaction.summary),
+                    kvRow(t('capture_original_note'), verified.interaction.rawNote),
+                    kvRow(t('facts_label'), verified.facts.join('；')),
+                    kvRow(t('signals_label'), verified.signals.join('；')),
+                    kvRow(t('capture_preview_expires'), pv.expiresAt || ''),
+                    h('div', { class: 'sheet-note', style: 'margin-top:8px' }, t('capture_atomic_note')),
                   ]),
                   h('div', { class: 'sheet-actions' }, [
                     h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => sheet.overlay.remove() }, t('cancel')),
@@ -937,8 +957,7 @@ export function openQuickCapture(ctx, { personId, onDone } = {}) {
                         busy(bb, true, t('creating_saving'));
                         try {
                           const created = await p360(ctx, 'executeIdentity', { data: { previewId: pv.previewId } });
-                          if (!created || !created.personId) throw new Error(t('create_failed'));
-                          await commit(created.personId, res.displayName);
+                          if (!created || !created.personId || !created.interactionId) throw new Error(t('create_failed'));
                           sheet.overlay.remove();
                           ctx.toast(`${t('new_person_saved')}${created.personId}`, 'ok');
                           if (onDone) onDone();

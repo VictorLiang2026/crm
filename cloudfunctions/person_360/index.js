@@ -393,12 +393,13 @@ function createService({ request = pgRequest, rpc = pgRpc, disclosure = disclose
   async function previewIdentity(data, uid) {
     if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('Invalid identity command');
     const kind = String(data.kind || '');
-    if (!['person', 'customer', 'recruit', 'speaker', 'capture'].includes(kind)) throw new Error('Invalid identity command');
+    if (!['person', 'customer', 'recruit', 'speaker', 'capture', 'capture_v2_new'].includes(kind)) throw new Error('Invalid identity command');
     const key = String(data.idempotencyKey || '');
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(key)) {
       throw new Error('Invalid idempotency key');
     }
     const selected = data.personId == null ? null : idOf(data.personId);
+    if (kind === 'capture_v2_new' && selected) throw new Error('New Person capture cannot select an existing Person');
     let name = String(data.displayName || '');
     if (selected && !name) {
       const person = await findPerson(selected);
@@ -442,6 +443,32 @@ function createService({ request = pgRequest, rpc = pgRpc, disclosure = disclose
         if (!/^\d{4}-\d{2}-\d{2}$/.test(String(data.nextDate))) throw new Error('Invalid next contact date');
         payload.next_contact_date = String(data.nextDate);
       }
+    }
+    if (kind === 'capture_v2_new') {
+      const allowed = new Set(['kind', 'idempotencyKey', 'displayName', 'nameKey', 'interaction', 'facts', 'signals']);
+      if (Object.keys(data).some(key => !allowed.has(key))) throw new Error('Invalid Quick Capture preview');
+      const interaction = data.interaction;
+      if (!interaction || typeof interaction !== 'object' || Array.isArray(interaction) ||
+          Object.keys(interaction).some(key => !['type', 'at', 'channel', 'summary', 'rawNote'].includes(key)) ||
+          typeof interaction.type !== 'string' || !interaction.type.trim() || interaction.type.length > 64 ||
+          typeof interaction.at !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:Z|[+-]\d{2}:\d{2})$/.test(interaction.at) ||
+          Number.isNaN(Date.parse(interaction.at)) ||
+          typeof interaction.summary !== 'string' || !interaction.summary.trim() || interaction.summary.trim().length > 2000 ||
+          typeof interaction.rawNote !== 'string' || !interaction.rawNote.trim() || interaction.rawNote.length > 10000 ||
+          (interaction.channel != null && (typeof interaction.channel !== 'string' || interaction.channel.trim().length > 100))) {
+        throw new Error('Invalid Interaction candidate');
+      }
+      const lists = [data.facts, data.signals];
+      if (lists.some((items, index) => !Array.isArray(items) || items.length > (index ? 12 : 20) ||
+        items.some(item => typeof item !== 'string' || !item.trim() || item.trim().length > 500))) {
+        throw new Error('Invalid Context Item candidate');
+      }
+      payload.interaction = {
+        type: interaction.type.trim(), at: interaction.at, channel: (interaction.channel || '').trim(),
+        summary: interaction.summary.trim(), rawNote: interaction.rawNote,
+      };
+      payload.facts = data.facts.map(item => item.trim());
+      payload.signals = data.signals.map(item => item.trim());
     }
     return rpc('person_identity_preview_v1', {
       p_actor_uid: uid, p_idempotency_key: key, p_kind: kind, p_payload: payload,
