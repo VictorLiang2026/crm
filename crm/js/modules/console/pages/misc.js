@@ -283,7 +283,8 @@ const LEGACY_BUSINESS_GROUPS = [
 
 function moreEntry(entry, status) {
   const [icon, key, hash] = entry;
-  const href = key === 'knowledge_governance' || hash.startsWith('#/people-trash') ? hash : LEGACY_ADMIN + hash;
+  const href = key === 'knowledge_governance' || hash.startsWith('#/people-trash') || hash.startsWith('#/recycle/')
+    ? hash : LEGACY_ADMIN + hash;
   return h('a', { class: 'tile', href }, [
     ic(icon), h('b', {}, t(key)), bdg(t(status), status === 'status_live' ? 'jade' : 'ink'),
     h('span', {}, t(key + '_desc')),
@@ -318,7 +319,8 @@ export function renderMore(ctx) {
   ];
   const recycleEntries = [
     ['refresh', 'person_trash_entry', '#/people-trash'],
-    ENTRY_KEYS.legacy_customers_trash, ENTRY_KEYS.legacy_recruit_trash,
+    ['refresh', 'customer_trash_entry', '#/recycle/customers'],
+    ['refresh', 'recruit_trash_entry', '#/recycle/recruit'],
   ];
   ctx.main.replaceChildren(
     pageHead({ kicker: t('kicker_more'), title: t('title_more'), sub: t('sub_more') }),
@@ -342,7 +344,7 @@ export function renderMore(ctx) {
       h('p', { class: 'foot-note', style: 'margin:0 0 12px' }, t('more_recycle_desc')),
       h('div', { class: 'tile-grid' }, [
         moreEntry(recycleEntries[0], 'status_live'),
-        ...recycleEntries.slice(1).map(entry => moreEntry(entry, 'status_legacy')),
+        ...recycleEntries.slice(1).map(entry => moreEntry(entry, 'status_live')),
       ]),
     ]),
     h('section', { class: 'more-section' }, [
@@ -352,6 +354,11 @@ export function renderMore(ctx) {
         h('h3', { class: 'more-business-title' }, t(titleKey)),
         h('div', { class: 'tile-grid' }, keys.map(key => moreEntry(ENTRY_KEYS[key], 'status_legacy'))),
       ])),
+      h('div', { class: 'more-business-group' }, [
+        h('h3', { class: 'more-business-title' }, t('more_legacy_trash_title')),
+        h('div', { class: 'tile-grid' }, [ENTRY_KEYS.legacy_customers_trash, ENTRY_KEYS.legacy_recruit_trash]
+          .map(entry => moreEntry(entry, 'status_legacy'))),
+      ]),
     ]),
   );
 }

@@ -16,7 +16,7 @@ test('Console People directory sorts person-owned priority and follow-up columns
         window.peopleRequests.push({name,args});
         return {rows:[{id:9,display_name:'【系统测试·勿联系】虚构人物',roles:['customer'],
           sales_priority:'A',recruitment_priority:'B',referral_priority:'C',latest_followup_date:'2026-10-01',
-          next_followup_date:'2026-10-15',customer_id:13,recruit_id:null}],page:1,pageSize:20,total:1,totalPages:1,hasMore:false};
+          next_followup_date:'2026-10-15',customer_id:13,recruit_id:null}],page:1,pageSize:30,total:1,totalPages:1,hasMore:false};
       }}};
       renderPeople(ctx);
     })()`);
@@ -58,7 +58,7 @@ test('People directory reveals role priorities and applies multi-select only on 
       window.peopleRequests=[];
       const ctx={main:(()=>{const e=document.createElement('main');document.body.append(e);return e})(),toast(){},api:{call:async(name,args)=>{
         window.peopleRequests.push({name,args});
-        return {rows:[],page:1,pageSize:20,total:0,totalPages:1,hasMore:false};
+        return {rows:[],page:1,pageSize:30,total:0,totalPages:1,hasMore:false};
       }}};
       renderPeople(ctx);
     })()`);
@@ -104,7 +104,7 @@ test('People directory shows one 招募 badge for converted recruits without cha
       const ctx={main:(()=>{const e=document.createElement('main');document.body.append(e);return e})(),toast(){},api:{call:async()=>({rows:[
         {id:7,display_name:'已转招募',roles:['recruit'],recruit_id:73},
         {id:8,display_name:'招募关联人物',roles:[],recruit_id:74},
-      ],page:1,pageSize:20,total:2,totalPages:1,hasMore:false})}};
+      ],page:1,pageSize:30,total:2,totalPages:1,hasMore:false})}};
       renderPeople(ctx);
     })()`);
     await b.wait("document.querySelectorAll('.people-table .badge-stack').length===2");
@@ -136,5 +136,66 @@ test('Recycle bin remains simple and has no directory filters', async () => {
     assert.equal(await b.evaluate("document.querySelector('.people-filter-trigger')"), null);
     assert.equal(await b.evaluate("document.querySelector('.people-trash-layout')"), null);
     assert.deepEqual(await b.evaluate('window.trashRequests[0].args'), { action: 'listPersonTrash', page: 1, pageSize: 20 });
+  } finally { await b.close(); }
+});
+
+test('People directory uses 30-row pages on phone and iPad with an unlocked content-width name column', async () => {
+  const b = new Browser(path.resolve(__dirname, '../..'));
+  try {
+    await b.start();
+    await b.open('#/more');
+    await b.send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+    await b.send('Emulation.setTouchEmulationEnabled', { enabled: true });
+    await b.evaluate(`(async()=>{
+      const {renderPeople}=await import('/crm/js/modules/console/pages/people.js');
+      window.peopleRequests=[];
+      window.peopleTestCtx={main:(()=>{const e=document.createElement('main');document.body.append(e);return e})(),toast(){},api:{call:async(name,args)=>{
+        window.peopleRequests.push({name,args});
+        const all=Array.from({length:31},(_,i)=>({id:100+i,display_name:i===17?'这是本页最长姓名用于确认姓名列按照最长内容自然扩展':'人物'+String(i+1).padStart(2,'0'),
+          roles:[],sales_priority:'A',recruitment_priority:'B',referral_priority:'C',latest_followup_date:'2026-10-04',next_followup_date:'2026-10-18'}));
+        const start=(args.page-1)*args.pageSize;
+        const rows=all.slice(start,start+args.pageSize);
+        return {rows,page:args.page,pageSize:args.pageSize,total:all.length,totalPages:Math.ceil(all.length/args.pageSize),hasMore:start+rows.length<all.length};
+      }}};
+      window.renderPeopleForViewport=()=>{const main=document.createElement('main');document.body.append(main);window.peopleTestCtx.main=main;renderPeople(window.peopleTestCtx)};
+      window.renderPeopleForViewport();
+    })()`);
+    await b.wait("document.querySelectorAll('.people-directory-table tbody tr').length===30");
+    await b.evaluate("document.head.insertAdjacentHTML('beforeend','<link rel=stylesheet href=/crm/css/console.css>')");
+    await b.wait("!!document.querySelector('link[href=\"/crm/css/console.css\"]')?.sheet && getComputedStyle(document.querySelector('.people-directory-table')).minWidth==='0px'");
+    assert.equal(await b.evaluate('window.peopleRequests[0].args.pageSize'), 30);
+    const mobile = await b.evaluate(`(async()=>{
+      const scroller=document.querySelector('.people-directory-scroll');
+      const table=document.querySelector('.people-directory-table');
+      const nameHead=table.querySelector('th.people-col-name');
+      const nameCell=table.querySelector('tbody td.people-col-name');
+      const before=nameCell.getBoundingClientRect().left;
+      scroller.scrollLeft=60;
+      await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+      const after=nameCell.getBoundingClientRect().left;
+      return {overflow:scroller.scrollWidth>scroller.clientWidth,scrollLeft:scroller.scrollLeft,scrollWidth:scroller.scrollWidth,clientWidth:scroller.clientWidth,overflowX:getComputedStyle(scroller).overflowX,position:getComputedStyle(nameHead).position,
+        nameWidth:nameHead.getBoundingClientRect().width,cellWidth:nameCell.getBoundingClientRect().width,
+        wholeTableMoves:after<before-50, minWidth:getComputedStyle(table).minWidth};
+    })()`);
+    assert.equal(mobile.overflow, true, 'phone table must be horizontally scrollable');
+    assert.equal(mobile.position, 'static', 'name column must not be sticky');
+    assert.equal(mobile.wholeTableMoves, true, `name column moves with the table (${JSON.stringify(mobile)})`);
+    assert.ok(mobile.nameWidth > 160, 'name column expands to fit the longest row');
+    assert.equal(mobile.cellWidth, mobile.nameWidth);
+    assert.equal(mobile.minWidth, '0px');
+    await b.evaluate("document.querySelector('.pager button:last-child').click()");
+    await b.wait("window.peopleRequests.at(-1)?.args.page===2 && document.querySelectorAll('.people-directory-table tbody tr').length===1");
+    assert.equal(await b.evaluate('window.peopleRequests.at(-1).args.pageSize'), 30);
+
+    await b.send('Emulation.setDeviceMetricsOverride', { width: 1024, height: 768, deviceScaleFactor: 1, mobile: true });
+    await b.evaluate('document.body.replaceChildren();window.renderPeopleForViewport()');
+    await b.wait("window.peopleRequests.at(-1)?.args.pageSize===30");
+    assert.equal(await b.evaluate("getComputedStyle(document.querySelector('.people-date-full')).display"), 'inline');
+    assert.equal(await b.evaluate("getComputedStyle(document.querySelector('.people-date-mobile')).display"), 'none');
+
+    await b.send('Emulation.setDeviceMetricsOverride', { width: 1366, height: 900, deviceScaleFactor: 1, mobile: false });
+    await b.send('Emulation.setTouchEmulationEnabled', { enabled: false });
+    await b.evaluate('document.body.replaceChildren();window.renderPeopleForViewport()');
+    await b.wait("window.peopleRequests.at(-1)?.args.pageSize===20");
   } finally { await b.close(); }
 });

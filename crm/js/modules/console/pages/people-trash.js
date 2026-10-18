@@ -13,6 +13,15 @@ function fmtTs(v) {
   return String(v).slice(0, 16).replace('T', ' ');
 }
 
+function roleLabel(role) {
+  const keys = {
+    customer: 'customer', recruit: 'recruit', referrer: 'role_referrer',
+    speaker: 'speaker', participant: 'participant', partner: 'role_partner',
+    alumni: 'role_alumni', other: 'role_other',
+  };
+  return keys[role] ? t(keys[role]) : role;
+}
+
 export function renderPeopleTrash(ctx) {
   const state = { page: 1 };
   const listEl = h('div', {});
@@ -67,6 +76,7 @@ export function renderPeopleTrash(ctx) {
         h('th', {}, t('trash_col_roles')),
         h('th', {}, t('trash_col_deleted_at')),
         h('th', {}, t('trash_col_customer')),
+        h('th', {}, t('trash_col_scope')),
         h('th', {}, t('trash_col_action')),
       ]));
       const tbody = h('tbody', {}, rows.map((r) => {
@@ -76,9 +86,10 @@ export function renderPeopleTrash(ctx) {
           : '-';
         return h('tr', {}, [
           h('td', {}, h('span', { title: t('deleted_person_open_hint') }, name)),
-          h('td', { 'data-label': t('trash_col_roles') }, (r.roles || []).map(role => roleLabels[role] || role).join(' · ') || '-'),
+          h('td', { 'data-label': t('trash_col_roles') }, (r.roles || []).map(roleLabel).join(' · ') || '-'),
           h('td', { 'data-label': t('trash_col_deleted_at') }, fmtTs(r.deleted_at)),
           h('td', { 'data-label': t('trash_col_customer') }, customerCell),
+          h('td', { 'data-label': t('trash_col_scope') }, t(r.batch_scoped ? 'trash_scope_batch' : 'trash_scope_legacy')),
           h('td', { 'data-label': t('trash_col_action') }, h('button', {
             class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => openRestore(r),
           }, [ic('refresh'), t('btn_restore')])),

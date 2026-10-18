@@ -6,7 +6,15 @@ import { openPersonNew, openPersonRoleConversion } from '../write.js';
 import { wpTag, pageHead, emptyNote, loadInto, bdg, textOf } from '../ui.js';
 import { t, translateEnum } from '../i18n.js';
 
-const PAGE_SIZE = 20;
+const DESKTOP_PAGE_SIZE = 20;
+const COMPACT_PAGE_SIZE = 30;
+
+function peoplePageSize() {
+  const compactViewport = typeof window.matchMedia === 'function'
+    ? window.matchMedia('(max-width: 1180px), (any-pointer: coarse)').matches
+    : window.innerWidth <= 1180;
+  return compactViewport ? COMPACT_PAGE_SIZE : DESKTOP_PAGE_SIZE;
+}
 const ROLE_BADGE = () => ({
   customer: [t('customer'), 'ink'],
   recruit: [t('recruit'), 'gold'],
@@ -78,7 +86,7 @@ export function renderPeople(ctx) {
     loadInto(listEl, async () => {
       const customerView = state.filters.roles.length === 1 && state.filters.roles[0] === 'customer';
       const res = await data.listPeople(ctx, {
-        page: state.page, pageSize: PAGE_SIZE, keyword: state.keyword,
+        page: state.page, pageSize: peoplePageSize(), keyword: state.keyword,
         sortField: state.sortField, sortDir: state.sortDir,
         ...state.filters, includeCustomerStage: customerView,
       });
@@ -154,7 +162,7 @@ export function renderPeople(ctx) {
         cells.forEach((td, i) => { if (i > 0) td.setAttribute('data-label', cols[i].label); });
         return h('tr', { onclick: () => { location.hash = `#/person/${p.id}`; } }, cells);
       }));
-      return h('div', { class: 'table-scroll' }, h('table', { class: 'people-table' }, [thead, tbody]));
+      return h('div', { class: 'table-scroll people-directory-scroll' }, h('table', { class: 'people-table people-directory-table' }, [thead, tbody]));
     });
   }
 

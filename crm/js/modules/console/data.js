@@ -47,6 +47,13 @@ export const data = {
   listPeople: (ctx, params) => p360(ctx, 'listPeople', params || {}),
   listPersonTrash: (ctx, params) => p360(ctx, 'listPersonTrash', params || {}),
   restorePerson: (ctx, personId) => p360(ctx, 'restorePerson', { data: { personId: String(personId) } }),
+  customerTrash: (ctx, params) => call(ctx, 'customers', { action: 'trashList', ...(params || {}) }),
+  restoreCustomer: (ctx, id) => call(ctx, 'customers', { action: 'restore', ids: [Number(id)] }),
+  recruitTrash: (ctx, params) => call(ctx, 'recruit_candidates', { action: 'trashList', ...(params || {}) }),
+  personOnlyRecruitTrash: (ctx) => p360(ctx, 'listPersonOnlyRecruitTrash'),
+  restoreRecruit: (ctx, id, personOnly) => personOnly
+    ? p360(ctx, 'restorePersonOnlyRecruit', { ids: [Number(id)] })
+    : call(ctx, 'recruit_candidates', { action: 'restore', ids: [Number(id)] }),
 
   // ---------- Person 360 ----------
   personHome: (ctx, personId) => p360(ctx, 'get', { personId }),

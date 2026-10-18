@@ -614,7 +614,7 @@ body:has(.login), body.is-login { padding-top: env(safe-area-inset-top); }
   .brief-headline, .brief-guidance {
     white-space: normal; overflow: visible; text-overflow: clip; word-break: break-word;
   }
-  /* 人物列表：保留紧凑表格，固定姓名列，其余字段横向滚动。 */
+  /* 人物目录：表格整体横向滚动，列宽按当前页内容收缩。 */
   .table-scroll { overflow-x: auto; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; }
   .people-table { width: max-content; min-width: 540px; table-layout: fixed; border-collapse: separate; border-spacing: 0; }
   .people-table { display: table; }
@@ -637,6 +637,18 @@ body:has(.login), body.is-login { padding-top: env(safe-area-inset-top); }
   .people-table .badge-stack { display: inline-flex; flex-wrap: nowrap; gap: 3px; }
   .people-col-customer_stage, .people-col-convert_customer, .people-col-convert_recruit { display: none !important; }
   .people-table .people-sort-arrow { font-size: 9px; }
+  .people-directory-table { width: max-content; min-width: 0; table-layout: auto; }
+  .people-directory-table th, .people-directory-table td { padding: 7px 2px; }
+  .people-directory-table .people-col-name { width: auto; min-width: 0; text-align: left !important; }
+  .people-directory-table .people-col-name:first-child { position: static; left: auto; z-index: auto; background: transparent; box-shadow: none; }
+  .people-directory-table th.people-col-name { background: #f8fafc; }
+  .people-directory-table td.people-col-name a { width: max-content; }
+  .people-directory-table .people-col-customer_priority,
+  .people-directory-table .people-col-recruit_priority,
+  .people-directory-table .people-col-referral_priority { width: 30px; min-width: 0; }
+  .people-directory-table .people-col-latest_followup,
+  .people-directory-table .people-col-next_followup { width: 40px; min-width: 0; }
+  .people-directory-table .people-col-id { width: 38px; min-width: 0; }
   .btn { padding: 6px 10px; font-size: 13px; }
   .btn-sm { padding: 4px 10px; font-size: 12px; }
   .bdg { height: 20px; padding: 0 7px; font-size: 11px; }

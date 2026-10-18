@@ -168,7 +168,13 @@ function installFixtures() {
     'person_360:listPersonTrash': data => ({ rows: [], page: Number(data.page) || 1,
       pageSize: Number(data.pageSize) || 20, hasMore: false }),
     'person_360:listPersonOnlyRecruits': () => ({rows:[],total:0,personOnly:true}),
-    'person_360:listPersonOnlyRecruitTrash': () => ({rows:[],total:0,personOnly:true}),
+    'person_360:listPersonOnlyRecruitTrash': () => mode === 'pc35' ? ({
+      rows:[{candidate_id:930100,person_id:980001,customer_id:null,
+        customer_name:marker+'独立增员',occupation:marker+'职业',
+        candidate_deleted_at:'2026-10-17T01:00:00Z',legacy_delete:false}],
+      total:1,counts:{930100:{followups:1}},personOnly:true,
+    }) : ({rows:[],total:0,personOnly:true}),
+    'person_360:restorePersonOnlyRecruit': () => ({restored:[930100],skipped:[]}),
     'person_360:previewIdentity': data => ({previewId:'a45da2ae-b2ed-42c0-992e-e68e53085acc',
       preview:{kind:data.data.kind,personId:data.data.personId,displayName:data.data.displayName,
         newPerson:false,willCreateSpeaker:true,willCreateCustomer:false},
@@ -349,13 +355,15 @@ function installFixtures() {
       opportunityCandidates: [marker + '机会推断'], actionCandidates: [marker + '下一步建议'],
       commitmentCandidates: [marker + '明确约定'], evidence: [marker + '原话依据'],
     } }) : fail('UNEXPECTED_LEGACY_AI_PARSE'),
-    'customers:trashList': () => ({ ...rows([{ ...customer, Id: 910099, customer_name: marker + '已删除客户', deleted_at: '2026-09-20T01:00:00Z' }]), counts: {} }),
+    'customers:trashList': () => ({ ...rows([{ ...customer, Id: 910099, customer_name: marker + '已删除客户', deleted_at: '2026-09-20T01:00:00Z', legacy_delete:true }]), counts: {}, recoverable_counts:{910099:{}} }),
+    'customers:restore': () => ({legacy_restored:[910099],restored:[910099],skipped:[]}),
     'ai_recommendations:listAll': () => rows([]),
     'recruit_candidates:rcMap': () => rows([{ id: candidate.candidate_id, customer_id: customer.Id, deleted_at: null }]),
     'recruit_candidates:list': () => rows([candidate]),
     'recruit_candidates:funnel': () => ({ funnel: { '新增人才': mode === 'empty' ? 0 : 1 }, total: mode === 'empty' ? 0 : 1 }),
     'recruit_candidates:get': () => ({ candidate, milestones: [] }),
-    'recruit_candidates:trashList': () => ({ ...rows([{ ...candidate, candidate_id: 930099, customer_name: marker + '已删除候选人', candidate_deleted_at: '2026-09-20T01:00:00Z', customer_deleted_at: null }]), counts: {} }),
+    'recruit_candidates:trashList': () => ({ ...rows([{ ...candidate, candidate_id: 930099, customer_name: marker + '已删除候选人', candidate_deleted_at: '2026-09-20T01:00:00Z', customer_deleted_at: null, legacy_delete:true }]), counts: {} }),
+    'recruit_candidates:restore': () => ({legacy_restored:[930099],restored:[930099],skipped:[]}),
     'recruit_followups:list': () => rows([{ id: 950001, candidate_id: candidate.candidate_id, followup_date: '2026-09-20', followup_notes: marker + '增员跟进' }]),
     'followups:list': () => rows(followups),
     'followups:create': data => {
@@ -464,7 +472,7 @@ function installFixtures() {
       }
       if (!Object.hasOwn(replies, key)) return fail('UNEXPECTED_OR_WRITE_ACTION: ' + key);
       calls.push({ name, action: data.action, view: data.view, guidance: data.guidance,
-        operation: data.operation || data.data?.operation, stage: data.stage, id: data.id,
+        operation: data.operation || data.data?.operation, stage: data.stage, id: data.id, ids:data.ids,
         customer_id: data.customer_id, candidate_id: data.candidate_id,
         page: data.page, pageSize: data.pageSize, keyword: data.keyword, exactName: data.exactName,
         sortField: data.sortField, sortDir: data.sortDir,
@@ -480,6 +488,7 @@ function installFixtures() {
           'followups:create','followups:update'].includes(key) ? (key==='assistant:quickCaptureV2'?data:data.data) : null });
       if (!loggedIn) return fail('CALL_BEFORE_LOGIN: ' + key);
       if (mode === 'error' && (!params.get('fail') || params.get('fail') === key)) return { result: { error: 'TEST_API_FAILURE' } };
+      if (params.get('failRestore') === key) return { result: { error: 'TEST_RESTORE_FAILURE' } };
       const result = structuredClone(replies[key](data));
       const testMode = params.get('wp02');
       if (testMode) {

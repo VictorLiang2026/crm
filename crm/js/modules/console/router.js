@@ -1,6 +1,6 @@
 // Console 路由：hash 精确表 + 详情正则；未知路由回落到今日。
 import {
-  renderToday, renderPeople, renderPeopleTrash, renderPerson, renderOpportunities,
+  renderToday, renderPeople, renderPeopleTrash, renderCustomerTrash, renderRecruitTrash, renderPerson, renderOpportunities,
   renderActivities, renderActivity, renderRecruit, renderAI, renderMore,
   renderSettings, renderRecruitGoals, renderActivityReport, renderAiExperience,
   renderKnowledgeGovernance,
@@ -10,6 +10,8 @@ const EXACT = new Map([
   ['#/today', renderToday],
   ['#/people', renderPeople],
   ['#/people-trash', renderPeopleTrash],
+  ['#/recycle/customers', renderCustomerTrash],
+  ['#/recycle/recruit', renderRecruitTrash],
   ['#/opportunities', renderOpportunities],
   ['#/activities', renderActivities],
   ['#/recruit', renderRecruit],
@@ -39,6 +41,8 @@ const NAV_OF = {
   '#/today': '#/today',
   '#/people': '#/people',
   '#/people-trash': '#/people',
+  '#/recycle/customers': '#/more',
+  '#/recycle/recruit': '#/more',
   '#/opportunities': '#/opportunities',
   '#/activities': '#/activities',
   '#/recruit': '#/recruit',
