@@ -71,7 +71,9 @@ PC34 门禁首次因本工作树缺少本轮 `public` 目录快照而停止。�
 
 原定观察期为 2026-10-10 至 **2027-01-08**；历史 [PMC-18 记录](../../specs/person-centered-migration/evidence/PMC-18.md) 中的 `2026-01-08` 是已知年份笔误，不改写历史原件。2026-10-18 生产只读查询显示 `public.pmc18_observations` **0 行**。`pmc18_observer` 的 `pmc18_daily_0200` 定时触发器仍在；最近日志连续返回 `Could not find the table 'public.pmc18_collect_metrics()' in the schema cache`，但函数日志的传输状态仍显示 200。根因在现有 `collect` 分支将 PostgreSQL 函数名传给 `rdb.from(...)` 当表读取。`SELECT public.pmc18_collect_metrics()` 已只读证明该聚合函数能返回结构化计数。故当前既不能声称定时指标正常，也不能把空表解释为零异常。
 
-该修复会让现有定时监测开始写入观测行，属于已有功能行为变化。用户已批准仅修 `pmc18_observer` 的 `collect` 分支并发布：改用 `rdb.rpc`、校验返回和等待写入结果，保留原触发器、`listRecent`、数据库结构、权限和其他业务函数。源码已完成，`node --check`、5 项隔离用例（成功、SDK 包装、RPC 失败、非法数据、异步写入失败、旧读取）和 58 份共享副本校验通过；当前尚未部署，实际采集、观测表读回和次日定时日志待核对。此包没有数据库结构或权限变化，因此不需 migration/rollback；回退为恢复原函数代码的后续发布，不能删已生成的观测记录。
+该修复会让现有定时监测开始写入观测行，属于已有功能行为变化。用户已批准仅修 `pmc18_observer` 的 `collect` 分支：改用 `rdb.rpc`、校验返回和等待写入结果，保留原触发器、`listRecent`、数据库结构、权限和其他业务函数。`node --check`、5 项隔离用例（成功、SDK 包装、RPC 失败、非法数据、异步写入失败、旧读取）和 58 份共享副本校验通过。2026-10-18 23:58 单函数代码部署后核对运行时 Nodejs20.19、定时触发器不变，手动执行批准的一次采集得到 RequestId `7033116c-ede7-4ac6-a693-5671e79035c2`，应用返回 **`permission denied for function pmc18_collect_metrics`**；随后 `public.pmc18_observations` 仍为 **0 行**。CLI 的进程退出码 0 仅代表调用传输成功，不代表采集成功。
+
+继续只读核对确认：当前 `rdb()` 云函数通道使用 `anon`，原聚合函数为 `SECURITY DEFINER` 但仅授予 `service_role` 执行；观测表对 `anon` 只有 SELECT，INSERT 仅给 `service_role`，且 RLS 仅有 service_role 写策略。故仅修 JS 调用方式不可能完成采集。已停止再次触发采集与发布收尾；待具体授权受限的 `public` 数据库执行路径，或恢复云函数旧版本并发布故障记录。任何新数据库对象须有 migration/rollback，不能直接扩大旧函数/表的 anon 写权限。
 
 ## 导航与交接门
 
