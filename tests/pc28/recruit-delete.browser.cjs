@@ -10,7 +10,9 @@ test('PC28 explains model cooldown in Chinese and English without implying delet
   const ui=fs.readFileSync(path.join(root,'crm/js/modules/console/recruit-delete.js'),'utf8');
   const i18n=fs.readFileSync(path.join(root,'crm/js/modules/console/i18n.js'),'utf8');
   assert.match(ui,/AI_RETRY_LATER.*AI_IN_PROGRESS.*pc28_retry_later/);
+  assert.match(ui,/INVALID_RESULT.*pc28_invalid_result/);
   assert.match(i18n,/'pc28_retry_later':\s*\{\s*'zh-CN':\s*'[^']*未执行删除[^']*',\s*'en':\s*'[^']*nothing was deleted/);
+  assert.match(i18n,/'pc28_invalid_result':\s*\{\s*'zh-CN':\s*'[^']*未执行删除[^']*',\s*'en':\s*'[^']*Nothing was deleted/);
 });
 
 test('Console requires explicit Person, candidate, preview, confirm and Execute clicks',async()=>{

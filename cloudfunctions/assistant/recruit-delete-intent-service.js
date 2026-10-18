@@ -6,7 +6,7 @@ const {createRecruitDeleteCommandData}=require('./recruit-delete-command-data');
 const {disclose,refsForRows}=require('./test-data');
 
 const GUIDANCE=Object.freeze({resource:'recruit_candidates',operation:'delete',
-  rules:'Only interpret an explicit request to delete exactly one existing recruit candidate that is not linked to a customer. Return a short Person name phrase and candidate phrase, never business IDs, SQL, a customer, or a whole Person. Reject requests for people, customers, customer-linked candidates, actions, opportunities, relationships, database objects, permanent deletion, purge, or more than one candidate. If the target or operation is unclear, request clarification. Do not claim anything was deleted. Human selection and a server-verified preview are mandatory.'});
+  rules:'Interpret an explicit request to delete exactly one recruit candidate as a candidate proposal, not a request to delete the Person. For a singular candidate request, return status supported and operation delete even if customer linkage is unknown: the server checks Person-only eligibility after the human selects the exact Person and candidate. Reject only an explicit request for a customer-linked candidate, whole Person, customer, action, opportunity, relationship, database object, permanent deletion, purge, or multiple candidates. A number in a displayed name such as Person 360 is literal name text, not a business ID unless the user explicitly supplies an ID. Return a short Person name phrase and candidate phrase, never choose business IDs or SQL. Keep interpretation below 120 characters. If the intended resource or number of targets is unclear, request clarification. Do not claim anything was deleted. Human selection and a server-verified preview are mandatory.'});
 const ID=/^[1-9][0-9]{0,18}$/;
 const plain=value=>value!==null&&typeof value==='object'&&!Array.isArray(value)&&
   (Object.getPrototypeOf(value)===Object.prototype||Object.getPrototypeOf(value)===null);
@@ -19,7 +19,7 @@ function validateProposal(value){
       !['status','operation','interpretation','personMention','candidateMention'].includes(key))||
      !['supported','needs_clarification','unsupported'].includes(value.status)||
      !['delete','unsupported'].includes(value.operation)||
-     typeof value.interpretation!=='string'||!value.interpretation.trim()||value.interpretation.length>300)
+     typeof value.interpretation!=='string'||!value.interpretation.trim()||value.interpretation.length>600)
     fail('INVALID_RESULT');
   const personMention=mention(value.personMention,120);
   const candidateMention=mention(value.candidateMention,200);

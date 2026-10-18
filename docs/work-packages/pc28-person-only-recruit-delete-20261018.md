@@ -47,3 +47,17 @@ PC28 专项测试在新基线再次 19/19 通过；人物目录相邻回归 5/5�
 修正后语法和 diff 检查通过，PC28 21/21、PC26 19/19、PC27 20/20、WP01 `PASS_WITH_LIMITATIONS`（目录 1031、旧流程 108 PASS/0 FAIL/5 SKIP、匿名 71/71）。仅重新部署 `assistant` 并上传 Console 的 `i18n.js`、`recruit-delete.js`；CloudBase 回执分别为 `Code updated` 和 2/2 上传成功。线上真实调用、云端全量比对、Git/标签仍待补录。
 
 部署后 CloudOnly 核对通过：75 个可访问页面/模块/样式、29 个 CRM 云函数、201 个源码/配置文件与本地一致。发布 Git 提交、标签与真实模型调用仍待记录；此次修复包的业务验收不能仅凭上述源码及隔离回归宣告完成。
+
+21:59 的已登录真实请求生成任务 #59，约 22.8 秒后返回 `INVALID_RESULT`。模型追踪显示其 JSON 五个字段齐全，但 `interpretation` 长 358、超过 PC28 契约的 300；内容把姓名中的 “Person 360” 误作潜在编号，并把尚未核实的客户关联当作解释阶段的前置条件，给出 `needs_clarification/unsupported`。这些判断均不应替代后续服务端 `resolveName`、Person-only 核验和人工选人。`public.ai_tasks` 的 #58、#59 均为失败审计；`public.assistant_recruit_delete_commands` 没有写入，三条测试对象保持活跃。因真实解释回归失败，已中止 Git 发布脚本；修复提交 `6abbc2a` 仅在本地 master，尚未推送或打标签。
+
+继续仅修 PC28 解释契约：指引明确“Person 360”等数字可以是显示姓名原文，客户关联未知时仍生成候选建议，后续由服务端验证；解释字段保持有界，放宽至 600 字符并将专属契约版本升为 `1.0.1`，不更改旧 AI 入口。新增双语 `INVALID_RESULT` 提示。此变更不会读取或选择业务 ID，不绕过 Command → Plan → Preview → Confirm → Execute，不自动重放模型。需重新通过专项/相邻回归、线上真实解释后再恢复发布。
+
+本轮修正后语法及 diff 检查、PC28 21/21、PC26 19/19、PC27 20/20、WP01 `PASS_WITH_LIMITATIONS`（旧流程 108 PASS/0 FAIL/5 SKIP、匿名探针 71/71）通过。只更新 `assistant`、Console `i18n.js` 和 `recruit-delete.js`，部署回执成功。线上真实模型解释与云端全量核对进行中；未执行生产删除。
+
+22:09 已登录用户仅点击“解释请求”的真实调用成功：日志 `ok:true/status:needs_person_selection`，候选人物 1 个，任务 #61 / 模型调用审计 `completed/success:true`；只读核对 #786、#20、#3 仍活跃。用户确认页面已显示 `#786` 人物选项。后续仍须人工选定 #786 / #20 并核对服务端预览，之后才可亲自确认及执行。
+
+22:11 用户亲自选定 Person #786、候选人 #20，生成计划并打开服务端预览。`public.assistant_recruit_delete_commands` 只读核对 `status=previewed`、人物 786、候选人 20、本次活跃跟进 1 条（ID 3）、原已删 0、预览到 22:26:24 有效。用户回传的页面预览逐项一致，保留人物、附件、原已删除跟进且无客户级联；已提示用户亲自确认和执行，尚待真实删除回执及数据库核验。
+
+22:13:52 只读核对该命令为 `executed` 且有服务端确认时间；候选人 #20 与跟进 #3 的 `deleted_at` 精确相同，且 `delete_batch_id` 为同一个本次批次，Person #786 的 `deleted_at` 仍为 NULL。未对其他候选人或客户执行写入。页面执行回执与同批恢复仍待用户确认。
+
+用户回传页面提示“候选人及本次跟进已移入回收站”。随后用户通过 Console 招募回收站执行恢复；只读核对候选人 #20、跟进 #3 的 `deleted_at` 与 `delete_batch_id` 均恢复为 NULL，Person #786 保持有效。该候选人仅有 1 个 PC28 删除命令且状态为 `executed`，审计回执保留。恢复页面提示待用户回传，但数据库同批结果已核实。本次发布前 CloudOnly 核对 75 个静态资源、29 个函数、201 个源码/配置文件均一致；GitHub 提交/标签与发布后全量核对尚待完成。

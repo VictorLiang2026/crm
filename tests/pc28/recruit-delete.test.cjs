@@ -30,6 +30,15 @@ test('only an explicit single recruit-candidate delete reaches the model',async(
 
 test('model proposal cannot select IDs or an unsupported resource',async()=>{
   assert.equal(validateProposal(proposal).personMention,'Fictional Lin');
+  assert.equal(validateProposal({...proposal,interpretation:'x'.repeat(358)}).interpretation.length,358);
+  assert.throws(()=>validateProposal({...proposal,interpretation:'x'.repeat(601)}),{code:'INVALID_RESULT'});
+  const intentSource=fs.readFileSync(path.resolve(__dirname,'../../cloudfunctions/assistant/recruit-delete-intent-service.js'),'utf8');
+  assert.match(intentSource,/server checks Person-only eligibility/);
+  assert.match(intentSource,/Person 360 is literal name text/);
+  const registry=require('../../cloudfunctions/assistant/skill-registry').defaultRegistry;
+  assert.equal(registry.get('assistant_recruit_delete_v1').version,'1.0.1');
+  assert.equal(registry.validateOutput('assistant_recruit_delete_v1',
+    {...proposal,interpretation:'x'.repeat(358)}),true);
   for(const bad of [{...proposal,candidateId:20},{...proposal,personMention:'#786'},
     {...proposal,operation:'remove'},{...proposal,candidateMention:'123'}])
     assert.throws(()=>validateProposal(bad),{code:'INVALID_RESULT'});
