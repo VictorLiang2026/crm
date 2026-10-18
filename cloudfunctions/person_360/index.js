@@ -393,13 +393,14 @@ function createService({ request = pgRequest, rpc = pgRpc, disclosure = disclose
   async function previewIdentity(data, uid) {
     if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('Invalid identity command');
     const kind = String(data.kind || '');
-    if (!['person', 'customer', 'recruit', 'speaker', 'capture', 'capture_v2_new'].includes(kind)) throw new Error('Invalid identity command');
+    if (!['person', 'customer', 'recruit', 'speaker', 'capture', 'capture_v2_new', 'capture_v2_existing'].includes(kind)) throw new Error('Invalid identity command');
     const key = String(data.idempotencyKey || '');
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(key)) {
       throw new Error('Invalid idempotency key');
     }
     const selected = data.personId == null ? null : idOf(data.personId);
     if (kind === 'capture_v2_new' && selected) throw new Error('New Person capture cannot select an existing Person');
+    if (kind === 'capture_v2_existing' && !selected) throw new Error('Selected Person is required');
     let name = String(data.displayName || '');
     if (selected && !name) {
       const person = await findPerson(selected);
@@ -412,7 +413,8 @@ function createService({ request = pgRequest, rpc = pgRpc, disclosure = disclose
       if (!person || person.display_name !== resolution.displayName) {
         throw new Error('Selected Person changed; resolve identity again');
       }
-      if (kind === 'person' && !resolution.candidates.some(c => c.id === selected)) {
+      if (['person', 'capture_v2_existing'].includes(kind) &&
+          !resolution.candidates.some(c => c.id === selected)) {
         throw new Error('Selected Person is outside the reviewed candidates');
       }
     } else {
@@ -444,8 +446,9 @@ function createService({ request = pgRequest, rpc = pgRpc, disclosure = disclose
         payload.next_contact_date = String(data.nextDate);
       }
     }
-    if (kind === 'capture_v2_new') {
-      const allowed = new Set(['kind', 'idempotencyKey', 'displayName', 'nameKey', 'interaction', 'facts', 'signals']);
+    if (kind === 'capture_v2_new' || kind === 'capture_v2_existing') {
+      const allowed = new Set(['kind', 'idempotencyKey', 'displayName', 'interaction', 'facts', 'signals',
+        ...(kind === 'capture_v2_new' ? ['nameKey'] : ['personId'])]);
       if (Object.keys(data).some(key => !allowed.has(key))) throw new Error('Invalid Quick Capture preview');
       const interaction = data.interaction;
       if (!interaction || typeof interaction !== 'object' || Array.isArray(interaction) ||

@@ -43,7 +43,10 @@ function fixture() {
     request: async (table, method, filters) => {
       calls.push({ table, method, filters });
       assert.equal(method, 'GET');
-      if (table === 'persons') return filters.name_key === 'eq.张玮' ? [person] : [];
+      if (table === 'persons') {
+        if (filters.id) return filters.id === 'eq.11' ? [person] : [];
+        return filters.name_key === 'eq.张玮' ? [person] : [];
+      }
       if (table === 'customers') return [{ Id: 101, person_id: 11 }];
       assert.fail(`Unexpected lookup table: ${table}`);
     },
@@ -121,4 +124,23 @@ test('new Person capture preview binds the complete normalized interaction and c
   await assert.rejects(service.previewIdentity({ ...payload, extra: true }, 'test-uid'), /Invalid Quick Capture preview/);
   await assert.rejects(service.previewIdentity({ ...payload, facts: ['x'.repeat(501)] }, 'test-uid'), /Invalid Context/);
   assert.equal(calls.length, 1);
+});
+
+test('existing Person capture preview re-resolves the selected identity and binds all content', async () => {
+  const { calls, service, payload } = fixture();
+  const request = { kind: 'capture_v2_existing', idempotencyKey: '985333f0-01ec-421c-bded-11e5fe94fa0e',
+    personId: payload.personId, displayName: payload.selectedDisplayName,
+    interaction: payload.interaction, facts: payload.facts, signals: payload.signals };
+  await service.previewIdentity(request, 'test-uid');
+  const call = calls.find(x => x.name === 'person_identity_preview_v1');
+  assert.equal(call.body.p_kind, 'capture_v2_existing');
+  assert.equal(call.body.p_actor_uid, 'test-uid');
+  assert.equal(call.body.p_payload.person_id, '11');
+  assert.equal(call.body.p_payload.display_name, payload.selectedDisplayName);
+  assert.deepEqual(call.body.p_payload.interaction, payload.interaction);
+  assert.deepEqual(call.body.p_payload.facts, payload.facts);
+  await assert.rejects(service.previewIdentity({ ...request, personId: null }, 'test-uid'), /Selected Person is required/);
+  await assert.rejects(service.previewIdentity({ ...request, personId: '12' }, 'test-uid'), /Selected Person changed/);
+  await assert.rejects(service.previewIdentity({ ...request, extra: true }, 'test-uid'), /Invalid Quick Capture preview/);
+  assert.equal(calls.filter(x => x.name === 'person_identity_preview_v1').length, 1);
 });

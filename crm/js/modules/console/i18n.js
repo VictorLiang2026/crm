@@ -513,6 +513,7 @@ const DICT = {
   'summary_note': { 'zh-CN': '保存到互动时间线；≤2000 字。原话已留存为 rawNote。', 'en': 'Saved to timeline; ≤2000 chars. Raw note preserved.' },
   'two_writes_note': { 'zh-CN': '一次确认产生两项写入：服务端先建档 Person，再落本次互动与事实/信号。', 'en': 'One confirmation triggers two writes: server creates Person first, then interaction with facts/signals.' },
   'capture_atomic_note': { 'zh-CN': '确认后，人物、互动和未确认事实／信号将在同一事务中保存；失败时全部撤销。', 'en': 'After confirmation, Person, interaction, and unconfirmed facts/signals save in one transaction. A failure rolls back all.' },
+  'capture_existing_atomic_note': { 'zh-CN': '确认后，本次互动与未确认事实／信号将在同一事务中保存；重复提交返回原记录。', 'en': 'After confirmation, this interaction and unconfirmed facts/signals save in one transaction. Repeating the request returns the original record.' },
   'capture_original_note': { 'zh-CN': '原始记录', 'en': 'Original note' },
   'capture_preview_expires': { 'zh-CN': '预览有效至', 'en': 'Preview expires' },
   'capture_preview_invalid': { 'zh-CN': '服务端预览不完整，请重新核对', 'en': 'Server preview is incomplete. Review again.' },

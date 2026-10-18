@@ -5,7 +5,7 @@
 // - 机会推进/关闭/新建: person_360 previewOpportunity/executeOpportunity（stage/close/create）
 // - 机会候选三键: assistant opportunityCandidate edit/reject/preview→confirm(previewHash)→execute
 // - 快速记录: ai_parse quick_capture（只读解析）→ person_360 resolveQuickCaptureName（服务端身份解析）
-//     → 人工点选候选。新建 Person 走完整服务端预览和单事务执行；已有 Person 暂走旧 commitQuickCaptureV2。
+//     → 人工点选候选 → 完整服务端预览 → 人工确认 → 单事务执行。
 import { h } from './dom.js';
 import { ic } from './icons.js';
 import { bdg, fmtDate, dueLabel, textOf } from './ui.js';
@@ -870,6 +870,8 @@ export function openQuickCapture(ctx, { personId, onDone } = {}) {
       (p.facts || []).join('；') || '');
     let newCaptureKey = '';
     let newCaptureShape = '';
+    let existingCaptureKey = '';
+    let existingCaptureShape = '';
     const sheetBody = h('div', {}, [
       fieldRow(t('link_person'), candBox, hint),
       h('div', { style: 'display:flex;gap:10px' }, [
@@ -893,16 +895,6 @@ export function openQuickCapture(ctx, { personId, onDone } = {}) {
             }
             const summary = (summaryTa.value || facts.join('；') || text).slice(0, 2000);
             if (!summary.trim()) { sheet.showErr(t('fill_summary_or_fact')); return; }
-            const commit = (personId, displayName) => p360(ctx, 'commitQuickCaptureV2', { data: {
-              confirmed: true,
-              personId: String(personId),
-              selectedDisplayName: displayName,
-              interaction: {
-                type: typeSel.value, at: dateToIso(dateInput.value || todayStr()), channel: '',
-                summary, rawNote: text,
-              },
-              facts, signals,
-            } });
             busy(b, true, t('saving'));
             try {
               if (picked.isNew) {
@@ -968,10 +960,56 @@ export function openQuickCapture(ctx, { personId, onDone } = {}) {
                 ]));
                 return;
               }
-              await commit(picked.id, picked.displayName || picked.display_name);
-              sheet.overlay.remove();
-              ctx.toast(t('interaction_saved'), 'ok');
-              if (onDone) onDone();
+              const captureData = {
+                kind: 'capture_v2_existing', personId: String(picked.id),
+                displayName: picked.displayName || picked.display_name,
+                interaction: {
+                  type: typeSel.value, at: dateToIso(dateInput.value || todayStr()), channel: '',
+                  summary, rawNote: text,
+                }, facts, signals,
+              };
+              const shape = JSON.stringify(captureData);
+              if (shape !== existingCaptureShape) { existingCaptureShape = shape; existingCaptureKey = uuid(); }
+              const pv = await p360(ctx, 'previewIdentity', { data: {
+                ...captureData, idempotencyKey: existingCaptureKey,
+              } });
+              const verified = pv && pv.preview;
+              if (!verified || verified.kind !== 'capture_v2_existing' || verified.newPerson ||
+                  String(verified.personId) !== String(picked.id) || !verified.interaction ||
+                  !Array.isArray(verified.facts) || !Array.isArray(verified.signals)) {
+                throw new Error(t('capture_preview_invalid'));
+              }
+              busy(b, false, t('confirm_save'));
+              sheet.swap(h('div', {}, [
+                previewBlock([
+                  kvRow(t('link_person'), `${verified.displayName} #${verified.personId}`),
+                  kvRow(t('step2_interaction'), `${t('interaction_type_' + (verified.interaction.type === '见面' ? 'meet' : verified.interaction.type === '吃饭' ? 'meal' : verified.interaction.type === '电话' ? 'call' : verified.interaction.type === '微信' ? 'wechat' : verified.interaction.type === '活动' ? 'activity' : 'other'))} · ${verified.interaction.at}`),
+                  kvRow(t('interaction_summary'), verified.interaction.summary),
+                  kvRow(t('capture_original_note'), verified.interaction.rawNote),
+                  kvRow(t('facts_label'), verified.facts.join('；')),
+                  kvRow(t('signals_label'), verified.signals.join('；')),
+                  kvRow(t('capture_preview_expires'), pv.expiresAt || ''),
+                  h('div', { class: 'sheet-note', style: 'margin-top:8px' }, t('capture_existing_atomic_note')),
+                ]),
+                h('div', { class: 'sheet-actions' }, [
+                  h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => sheet.overlay.remove() }, t('cancel')),
+                  h('button', { class: 'btn btn-primary', type: 'button',
+                    onclick: async (ev) => {
+                      const bb = ev.currentTarget;
+                      busy(bb, true, t('saving'));
+                      try {
+                        const saved = await p360(ctx, 'executeIdentity', { data: { previewId: pv.previewId } });
+                        if (!saved || !saved.interactionId || String(saved.personId) !== String(picked.id)) {
+                          throw new Error(t('save_failed'));
+                        }
+                        sheet.overlay.remove();
+                        ctx.toast(t('interaction_saved'), 'ok');
+                        if (onDone) onDone();
+                      } catch (err) { busy(bb, false, t('confirm_save')); sheet.showErr(err.message); }
+                    },
+                  }, t('confirm_save')),
+                ]),
+              ]));
             } catch (err) {
               busy(b, false, t('confirm_save'));
               sheet.showErr(String(err.message || '').includes('Selected Person')

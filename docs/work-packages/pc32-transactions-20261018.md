@@ -168,3 +168,15 @@ Migration `20261018014100_capture_new_atomic.sql` 与同名 `cloudbase/rollbacks
 迁移后还实际重跑旧 `kind=person` 身份创建 8 项事务脚本及旧已有 Person 重复诊断，两者均在虚构数据回滚事务内通过。旧接口重复请求仍会生成两份互动，这正是已获批 PC32-D 的待修链，不能把 C 的幂等性扩大宣称到已有 Person。
 
 本包仅部署 `person_360` 及 `/crm/js/modules/console/write.js`、`/crm/js/modules/console/i18n.js`，未传整站或其他函数。部署后实际调用 `person_360.resolveQuickCaptureName`，请求 `438b68d0-01e8-4b1e-ad7a-fe01dd07b117` 由线上函数返回预期 `UNAUTHORIZED`，证明未登录边界；本轮没有应用登录会话，故不把此调用算作带登录态的业务写入验收。发布收尾由 WP01 门禁、完整 cloud sync、Git master/标签三者共同判定；具体提交号与核对证据见本轮交付报告。PC32-D 已单独获批，须在 C 发布完成后实施。
+
+PC32-C 发布脚本退出 0：提交 `4705cb8fdda90c58c92e629f65e6261407af40ca`，标签 `release-20261018-095955`。最终 GitHub master/标签、29 函数 198 源码配置和 73 静态资源匹配，发布后审计目录 `D:\Temp\crm-cloud-audit-725325b54c0b483a9739f9b71700ea87`。
+
+## PC32-D Console 已有 Person 快速记录幂等执行
+
+用户已单独批准 PC32-D 的已有 Person 分支。Console 继续要求人工点选身份，改为调用 `previewIdentity(kind=capture_v2_existing)` 展示服务端核实的 Person、完整互动、事实/信号、有效期；人工确认后调用 `executeIdentity`。`person_360` 重新调用 `PersonService.resolveName()`，选中 ID 必须仍在候选中；SQL 预览绑定操作者、Person、全部规范化输入及幂等键，执行前核对候选版本和 15 分钟期限。执行在同一 public 事务调用原 `quick_capture_v2_commit` 并保存回执。同键同内容重放原互动 ID，改 Person/内容、换操作者、过期或版本变化拒绝。旧 `commitQuickCaptureV2`/`public.quick_capture_v2_commit` 接口及其原行为保持，Legacy Quick Capture 与 PC32-C 新建分支不变。
+
+Migration `20261018021400_capture_existing_atomic.sql` 与同名 rollback 成对备份到仓库和 `C:\Users\victor\cloudbase\`。回滚若已有 D 类型命令会停止并要求评估数据，避免静默丢失回执。计划仅 1 条 pending、无冲突；任务 `task-2a1a8c86ba8240bd` Succeed，远端历史确认版本 `20261018021400`。管理工具在任务刚完成时短暂报 `MIGRATION_NOT_APPLIED`，独立查询随后确认版本已入历史，没有再次推送。函数正文 MD5 `420d9f7585b1b3c1c0b8ee89bdd33f08` / `6bfc7224f04de2e4295ea095d5cc23e2`；权限仍仅 owner/service_role，SECURITY INVOKER 与 `pg_catalog, public` 搜索路径保持。
+
+`tests/pc32/quick-capture-existing-transaction.sql` 使用已登记虚构 Person 783，16 项事务检查通过：漏选、错选、多余字段、同键改变 Person/摘要/事实/信号、换操作者预览或执行、过期及 Person 版本变化全部拒绝；注入写入后故障时互动、两条未确认事实/信号和回执共同回滚；随后重试和回放只保留一条互动。所有新增记录由外层事务回滚，最终 D 命令/互动/事实/信号为 0。两个独立 CLI 进程确实观察到同一请求键的 advisory lock 重叠：持锁 12011ms，竞争请求 512ms 因 500ms 锁超时拒绝；释放后同键完整事务重试 59ms 通过，无持久写入。证据 `tests/security/.results/pc32-d-concurrency.json`。C 新建、旧 `kind=person` 身份事务和旧接口诊断迁移后均通过；Console 两分支浏览器测试 2/2（中英双语、iPad 两种方向）。Quick Capture 服务 7/7、PC14 7/7、PC19 10/10、身份服务 6/6 通过。旧直接提交 API 的重复请求仍可生成多条互动，属于明确保留的兼容行为，不作为新 Console 分支的幂等保证。
+
+本包只部署 `person_360` 与 Console `write.js`/`i18n.js`。完整 WP01 已通过 `PASS_WITH_LIMITATIONS`：目录 995 项、旧回归 108 通过/0 失败/5 跳过、匿名权限 69/69；真实登录、带认证的业务写入、生产回滚与手机验收仍未执行。本包已通过隔离事务验证写入与回滚，但不将无登录态的云函数调用等同于真实业务验收。CloudOnly 和最终 GitHub/云端核对在发布收尾中执行；发布证据以本轮交付报告为准。
