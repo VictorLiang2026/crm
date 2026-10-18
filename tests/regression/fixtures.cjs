@@ -161,6 +161,12 @@ function installFixtures() {
         customer_id: customer.Id, roles:['customer'], occupation: '顾问', organization: marker + '机构' },
     ], page: Number(data.page) || 1, pageSize: Number(data.pageSize) || 50,
       total:mode==='empty'?0:1,totalPages:1,hasMore:false }),
+    'person_360:listRecruitDirectory': data => ({ rows: mode === 'empty' ? [] : [
+      { ...candidate, person_id: 980001, source: 'legacy', next_action: marker + '确认意向' },
+    ], page: Number(data.page) || 1, pageSize: Number(data.pageSize) || 20,
+      hasMore: false, truncated: false, cursor: null }),
+    'person_360:listPersonTrash': data => ({ rows: [], page: Number(data.page) || 1,
+      pageSize: Number(data.pageSize) || 20, hasMore: false }),
     'person_360:listPersonOnlyRecruits': () => ({rows:[],total:0,personOnly:true}),
     'person_360:listPersonOnlyRecruitTrash': () => ({rows:[],total:0,personOnly:true}),
     'person_360:previewIdentity': data => ({previewId:'a45da2ae-b2ed-42c0-992e-e68e53085acc',

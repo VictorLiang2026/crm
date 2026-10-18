@@ -8,7 +8,7 @@ const baseline = require('../security/expected-public-baseline.json');
 const now = Date.now();
 const date = new Date(now).toISOString();
 const report = () => ({ version:1, environment:'crm-d1gkae8ddc930d151', fingerprint:'same',
-  finishedAt:date, catalogObservedAt:date, checks:['catalog','regression','guard-tests','anonymous','wp02-fixtures','wp03-fixtures','wp04-identity','wp05-profile','wp06-insights'].map(id => ({id,status:'PASS'})) });
+  finishedAt:date, catalogObservedAt:date, checks:['catalog','regression','guard-tests','anonymous','wp02-fixtures','wp03-fixtures','wp04-identity','wp05-profile','wp06-insights','pc34-business-security'].map(id => ({id,status:'PASS'})) });
 test('gate accepts explicit gaps but never failure, missing critical check or stale evidence', () => {
   const r = report();
   r.checks.push({id:'login',status:'MANUAL_LOGIN'},{id:'service-runtime',status:'UNVERIFIED'});
@@ -16,6 +16,9 @@ test('gate accepts explicit gaps but never failure, missing critical check or st
   for (const mutate of [
     r => { r.checks[0].status='FAIL'; },
     r => { r.checks[1].status='FAIL'; },
+    r => { r.checks.find(x=>x.id==='pc34-business-security').status='FAIL'; },
+    r => { r.checks.find(x=>x.id==='pc34-business-security').status='UNVERIFIED'; },
+    r => { r.checks.splice(r.checks.findIndex(x=>x.id==='pc34-business-security'),1); },
     r => { r.checks.pop(); },
     r => { r.checks.push({id:'login',status:'FAIL'}); },
     r => { r.fingerprint='older'; },

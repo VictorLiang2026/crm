@@ -12,7 +12,7 @@ const maxAgeMs = 60 * 60 * 1000;
 const reportFile = path.join(dir, 'wp01-report.json');
 const catalogFile = path.join(dir, 'wp01-catalog.json');
 const labels = { PASS: '自动通过', FAIL: '失败', MANUAL_LOGIN: '需人工登录', UNVERIFIED: '未验证' };
-const critical = ['catalog', 'regression', 'guard-tests', 'anonymous', 'wp02-fixtures', 'wp03-fixtures', 'wp04-identity', 'wp05-profile', 'wp06-insights'];
+const critical = ['catalog', 'regression', 'guard-tests', 'anonymous', 'wp02-fixtures', 'wp03-fixtures', 'wp04-identity', 'wp05-profile', 'wp06-insights', 'pc34-business-security'];
 const sha = input => crypto.createHash('sha256').update(input).digest('hex');
 function fresh(date, now = Date.now()) {
   const age = now - Date.parse(date);
@@ -53,10 +53,15 @@ function catalog(raw, now = Date.now()) {
   return { actual, result };
 }
 function runNode(args) {
-  const timeout = args.includes('tests/regression/run.cjs') ? 360000 : 180000;
+  const timeout = args.includes('tests/regression/run.cjs') || args.includes('tests/pc34/run.cjs') ? 360000 : 180000;
   const r = spawnSync(process.execPath, args, { cwd: root, encoding: 'utf8', timeout, maxBuffer: 4 * 1024 * 1024, windowsHide: true });
   if (r.stdout) process.stdout.write(r.stdout);
-  if (r.status !== 0 || r.error) throw Error('Check process failed: ' + args.join(' '));
+  if (r.status !== 0 || r.error) {
+    if (r.stderr) process.stdout.write(r.stderr.slice(-4000));
+    const error = Error('Check process failed: ' + args.join(' '));
+    error.exitCode = r.status;
+    throw error;
+  }
 }
 function loginRows(file, now = Date.now()) {
   if (!fs.existsSync(file)) return [{ id: 'login', status: 'MANUAL_LOGIN', detail: 'npm run test:wp01:login' }];
@@ -129,10 +134,13 @@ async function main(args = process.argv.slice(2)) {
       ['wp04-identity', ['tests/wp04/run.cjs']],
       ['wp05-profile', ['--test','tests/wp05/profile.test.cjs','tests/wp05/browser.test.cjs']],
       ['wp06-insights', ['--test','tests/wp06/insights.test.cjs','tests/wp06/browser.test.cjs']],
+      ['pc34-business-security', ['tests/pc34/run.cjs']],
       ['regression', ['tests/regression/run.cjs']]
     ]) {
-      try { runNode(args); add(id, 'PASS', id === 'wp04-identity' ? 'Fresh public read-only identity audit plus offline fixtures; explicit exceptions retained in wp04-report.json' : 'Offline fixtures; see per-case report'); }
-      catch(e) { add(id, 'FAIL', e.message); break; }
+      try { runNode(args); add(id, 'PASS', id === 'wp04-identity' ? 'Fresh public read-only identity audit plus offline fixtures; explicit exceptions retained in wp04-report.json' :
+        id === 'pc34-business-security' ? 'Critical role matrix, actual service_role read-only probe, Person-to-feedback chain, bilingual iPad touch and keyboard' : 'Offline fixtures; see per-case report'); }
+      catch(e) { const unavailable = id === 'pc34-business-security' && e.exitCode === 2;
+        add(id, unavailable ? 'UNVERIFIED' : 'FAIL', unavailable ? 'Service-role read-only probe could not authenticate; no PASS inferred' : e.message); break; }
     }
   }
   if (!checks.some(c => c.status === 'FAIL')) {

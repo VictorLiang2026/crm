@@ -4,6 +4,8 @@
 
 ## 当前 Person 中心计划
 
+- [PC34 权限、业务回归与双语 iPad 发布门禁（2026-10-18）](pc34-release-gate-20261018.md)：关键角色和命令检查、隔离业务链、双语 iPad 页面及发布阻断证据。
+- [PC34-A Console 六个缺失文案键（2026-10-18）](pc34a-console-i18n-missing-keys-20261018.md)：独立发布的最小字典修复。
 - [PC01 当前事实台账增量（2026-10-13）](pc01-baseline-20261013.md)：基于字段所有权/人物目录最新发布的 public 事实、权限、Console 与 Legacy 覆盖及 PC01–PC36 依赖状态；仅文档发布，不改业务产物、不覆盖历史验收。
 - [PC02 账号、会话与 Settings（2026-10-13）](pc02-account-settings-20261013.md)：修复 Console 改密及退出行为，保留 Legacy 账号路径、五分钟重新认证与语言偏好；改动和回归结果已记录。
 - [PC01 当前事实台账与执行基线（2026-10-11）](pc01-baseline-20261011.md)：Trae 更新后当前实现、public 数据与权限、Console/Legacy 覆盖、PC01–PC36 依赖和验收限制的增量盘点。仅作当前事实补充，不覆盖历史 WP/PMC 验收记录。
