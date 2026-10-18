@@ -103,6 +103,34 @@ test('assistant requires login before PC28 routes and leaves legacy command sepa
   assert.equal((await anonymous({action:'recruitDeleteCommand',stage:'execute',commandId:key})).error.code,'UNAUTHORIZED');
 });
 
+test('PC28 strips CloudBase runtime context while rejecting other extra fields',async()=>{
+  const seen=[];let dataCalls=0;
+  const main=createMain(async()=>({uid:actor,isAnonymous:false}),...Array(9).fill(undefined),
+    async event=>{seen.push(event);return {ok:true};},
+    async event=>{seen.push(event);return {ok:true};},
+    async (event,uid)=>{seen.push(event);return runRecruitDeleteCommand(event,uid,{
+      data:{run:async()=>{dataCalls++;return {ok:true,status:'previewed',replayed:false};}}});});
+  const context=['runtime-secret-fixture'];
+  for(const event of [
+    {action:'recruitDeleteInterpret',query:'删除增员候选人 Fictional Lin',language:'zh-CN'},
+    {action:'recruitDeleteTargets',personMention:'Fictional Lin',selectedPersonId:'786'},
+    {action:'recruitDeleteCommand',stage:'preview',commandId:key}]){
+    const result=await main({...event,TCB_CONTEXT_KEYS:context});
+    assert.equal(result.ok,true);
+    assert.equal(JSON.stringify(result).includes(context[0]),false);
+  }
+  assert.equal(seen.length,3);
+  for(const event of seen)assert.equal(Object.hasOwn(event,'TCB_CONTEXT_KEYS'),false);
+  assert.equal((await main({action:'recruitDeleteInterpret',query:'删除候选人',language:'zh-CN',actorUid:'forged',
+    TCB_CONTEXT_KEYS:context})).error.code,'INVALID_INPUT');
+  assert.equal((await main({action:'recruitDeleteTargets',personMention:'Fictional Lin',selectedPersonId:'786',
+    candidateId:20,TCB_CONTEXT_KEYS:context})).error.code,'INVALID_INPUT');
+  assert.equal((await main({action:'recruitDeleteCommand',stage:'preview',commandId:key,confirmed:true,
+    TCB_CONTEXT_KEYS:context})).error.code,'INVALID_COMMAND');
+  assert.equal(seen.length,4);
+  assert.equal(dataCalls,1);
+});
+
 test('migration binds complete input, 15-minute preview, locks impact and keeps rollback audit',()=>{
   const root=path.resolve(__dirname,'../..');
   const sql=fs.readFileSync(path.join(root,'cloudbase/migrations/20261018181500_assistant_recruit_delete.sql'),'utf8');
