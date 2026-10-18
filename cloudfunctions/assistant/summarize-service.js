@@ -77,6 +77,11 @@ async function runSummarize(event) {
       next_action: o.next_action, discovered_at: o.discovered_at,
     })),
   };
+  const sources = [
+    { schema: 'public', table: 'persons', id: String(person.id), label: person.display_name, at: null },
+    ...context.recent_interactions.map(row => ({ schema: 'public', table: 'interactions', id: String(row.id), label: row.type || 'interaction', at: row.at })),
+    ...context.open_opportunities.map(row => ({ schema: 'public', table: 'opportunities', id: String(row.id), label: row.type || 'opportunity', at: row.updated_at || row.discovered_at || null })),
+  ];
 
   const database = createSearchData({ env: process.env.TCB_ENV,
     key: process.env.CRM_ASSISTANT_DB_API_KEY });
@@ -91,13 +96,8 @@ async function runSummarize(event) {
     context,
     contextSnapshot: {
       ...context,
-      sources: [
-        { schema: 'public', table: 'persons', id: String(person.id), label: person.display_name, at: null },
-        ...context.recent_interactions.map(row => ({ schema: 'public', table: 'interactions', id: String(row.id), label: row.type || 'interaction', at: row.at })),
-        ...context.open_opportunities.map(row => ({ schema: 'public', table: 'opportunities', id: String(row.id), label: row.type || 'opportunity', at: row.updated_at || row.discovered_at || null })),
-      ],
       _context: { recipe: 'person_summary', version: '1.0.0',
-        source: 'public.persons + public.interactions + public.opportunities' },
+        source: 'public.persons + public.interactions + public.opportunities', sources },
     },
   });
 
@@ -109,11 +109,7 @@ async function runSummarize(event) {
     gaps: task.result.gaps,
     nextActions: task.result.nextActions,
     evidence: task.result.evidence,
-    sources: [
-      { schema: 'public', table: 'persons', id: String(person.id), label: person.display_name, at: null },
-      ...context.recent_interactions.map(row => ({ schema: 'public', table: 'interactions', id: String(row.id), label: row.type || 'interaction', at: row.at })),
-      ...context.open_opportunities.map(row => ({ schema: 'public', table: 'opportunities', id: String(row.id), label: row.type || 'opportunity', at: row.updated_at || row.discovered_at || null })),
-    ],
+    sources,
     taskId: task.taskId,
     resultId: task.resultId,
     skillVersion: task.skillVersion,

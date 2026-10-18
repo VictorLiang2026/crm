@@ -75,6 +75,22 @@ function createPublicRdb({ env, key, fetchImpl = fetch } = {}) {
       then(resolve, reject) { return request(table, state).then(resolve, reject); },
     };
     return chain;
+  }, async rpc(name, args) {
+    if (!['crm_ai_claim_v2', 'crm_ai_finish_v1'].includes(name)) throw new Error('Invalid AI audit RPC');
+    const url = new URL(`https://${env}.api.tcloudbasegateway.com/v1/rdb/rest/rpc/${name}`);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 10000);
+    try {
+      const response = await fetchImpl(url, { method: 'POST',
+        headers: { Authorization: `Bearer ${key}`, 'Accept-Profile': 'public',
+          'Content-Profile': 'public', Accept: 'application/json',
+          'Content-Type': 'application/json' },
+        body: JSON.stringify(args), signal: controller.signal });
+      if (!response.ok) throw new Error(`Activity review audit request failed (${response.status})`);
+      const value = await response.json();
+      if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid AI audit RPC response');
+      return { data: value };
+    } finally { clearTimeout(timer); }
   } };
 }
 

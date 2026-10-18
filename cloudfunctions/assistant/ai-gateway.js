@@ -3,6 +3,7 @@
 const testData = require('./test-data');
 
 const { isDeepStrictEqual } = require('node:util');
+const { createHash } = require('node:crypto');
 const { defaultRegistry, TIMEOUT_CLASS_MS, SkillValidationError } = require('./skill-registry');
 
 const DEFAULT_TIMEOUT_MS = 60000;
@@ -119,7 +120,7 @@ function createRdbAuditStore(rdb) {
       throw new AIGatewayError('PERSISTENCE_ERROR', `AI audit ${operation} failed`, false, error);
     }
   }
-  return {
+  const store = {
     async createTask(row) {
       return audit('task insert', () => rdb.from(TABLES.tasks).insert(row).select('id'));
     },
@@ -136,6 +137,47 @@ function createRdbAuditStore(rdb) {
       return audit('result insert', () => rdb.from(TABLES.results).insert(row).select('id'));
     },
   };
+  if (typeof rdb.rpc === 'function') {
+    const rpc = async (name, args) => {
+      try {
+        const response = await rdb.rpc(name, args);
+        const value = response?.data;
+        if (response?.error || !value || typeof value !== 'object' || Array.isArray(value) ||
+            !/^[1-9][0-9]*$/.test(String(value.taskId || ''))) {
+          throw new AIGatewayError('PERSISTENCE_ERROR', `AI audit ${name} failed`, false, response?.error);
+        }
+        return value;
+      } catch (error) {
+        if (error instanceof AIGatewayError) throw error;
+        throw new AIGatewayError('PERSISTENCE_ERROR', `AI audit ${name} failed`, false, error);
+      }
+    };
+    store.claimTask = row => rpc('crm_ai_claim_v2', {
+      p_actor_uid: row.actorUid, p_request_key: row.requestKey,
+      p_task_type: row.task.task_type, p_skill_name: row.task.skill_name,
+      p_subject_type: row.task.subject_type, p_subject_id: row.task.subject_id,
+      p_capability: row.task.capability, p_input_snapshot: row.task.input_snapshot,
+      p_context_snapshot: row.task.context_snapshot,
+    });
+    store.finishAttempt = row => rpc('crm_ai_finish_v1', {
+      p_task_id: row.taskId, p_run_id: row.runId, p_success: row.success,
+      p_error: row.error, p_usage: row.usage, p_result: row.result,
+      p_final: row.final,
+    });
+  }
+  return store;
+}
+
+function canonical(value) {
+  if (Array.isArray(value)) return value.map(canonical);
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.keys(value).sort().map(key => [key, canonical(value[key])]));
+  }
+  return value;
+}
+
+function requestKey(value) {
+  return createHash('sha256').update(JSON.stringify(canonical(value))).digest('hex');
 }
 
 function createAIGateway(options) {
@@ -226,8 +268,7 @@ function createAIGateway(options) {
       { role: 'system', content: 'Return only JSON matching the supplied output schema. Do not change business records.' },
       { role: 'user', content: JSON.stringify({ taskType, skill, capability, context, input, outputSchema: schema }) },
     ], disclosure);
-    let taskId;
-    try { taskId = await store.createTask({
+    const taskRow = {
       task_type: taskType,
       skill_name: skill,
       subject_type: subjectType,
@@ -237,12 +278,51 @@ function createAIGateway(options) {
       input_snapshot: input,
       context_snapshot: { ...contextSnapshot, _testData: disclosure, _skill: { name: skill, version: definition.version } },
       requires_confirmation: true,
-    }); } catch (error) { throw auditError(error); }
+    };
+    const atomicAudit = typeof store.claimTask === 'function' && typeof store.finishAttempt === 'function';
+    let taskId;
+    if (atomicAudit) {
+      let identity;
+      try { identity = await (options.actorResolver ? options.actorResolver() : app.auth().getUserInfo()); }
+      catch (_) { throw new AIGatewayError('UNAUTHORIZED', 'Authenticated AI request required'); }
+      if (typeof identity?.uid !== 'string' || !identity.uid.trim() || identity.isAnonymous !== false) {
+        throw new AIGatewayError('UNAUTHORIZED', 'Authenticated AI request required');
+      }
+      const claim = await store.claimTask({ actorUid: identity.uid.trim(),
+        requestKey: requestKey({ taskType, skill, capability, subjectType, subjectId,
+          model, group, input, contextSnapshot: taskRow.context_snapshot }), task: taskRow });
+      taskId = claim.taskId;
+      if (claim.status === 'reused') {
+        return { taskId, runId: claim.runId, resultId: claim.resultId,
+          result: claim.result, usage: claim.usage, testData: claim.testData,
+          skillVersion: claim.skillVersion || definition.version,
+          confirmationLevel: definition.confirmationLevel, requiresConfirmation: true,
+          reused: true };
+      }
+      if (claim.status !== 'claimed') {
+        const code = claim.status === 'in_progress' ? 'AI_IN_PROGRESS' :
+          claim.status === 'recent_failure' ? 'AI_RETRY_LATER' : 'AI_AUDIT_UNKNOWN';
+        const error = new AIGatewayError(code, code);
+        error.taskId = taskId;
+        error.retryAfter = claim.retryAfter || null;
+        throw error;
+      }
+    } else {
+      try { taskId = await store.createTask(taskRow); }
+      catch (error) { throw auditError(error); }
+    }
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       let runId;
       try { runId = await store.createRun({ task_id: taskId, success: null }); }
-      catch (error) { await markFailed(taskId); throw auditError(error); }
+      catch (error) {
+        if (atomicAudit) {
+          try { await store.finishAttempt({ taskId, runId: null, success: false,
+            error: 'PERSISTENCE_ERROR', usage: {}, result: null, final: true }); }
+          catch (auditFailure) { const failure = auditError(auditFailure); failure.taskId = taskId; throw failure; }
+        } else await markFailed(taskId);
+        const failure = auditError(error); failure.taskId = taskId; throw failure;
+      }
       const started = process.hrtime.bigint();
       let response;
       let result;
@@ -260,16 +340,27 @@ function createAIGateway(options) {
         }
       } catch (error) {
         const normalized = normalizeError(error);
-        try { await store.updateRun(runId, {
-          ...usageOf(response), latency_ms: elapsedMs(started),
-          success: false, error: normalized.code,
-        }); } catch (auditFailure) { await markFailed(taskId); throw auditError(auditFailure); }
-        if (normalized.retryable && attempt < maxAttempts) {
+        const canRetry = normalized.retryable && attempt < maxAttempts;
+        try {
+          if (atomicAudit) await store.finishAttempt({ taskId, runId, success: false,
+            error: normalized.code, usage: { ...usageOf(response), latency_ms: elapsedMs(started) },
+            result: null, final: !canRetry });
+          else await store.updateRun(runId, {
+            ...usageOf(response), latency_ms: elapsedMs(started),
+            success: false, error: normalized.code,
+          });
+        } catch (auditFailure) {
+          if (!atomicAudit) await markFailed(taskId);
+          const failure = auditError(auditFailure); failure.taskId = taskId; throw failure;
+        }
+        if (canRetry) {
           await sleep(Math.min(250 * (2 ** (attempt - 1)), 1000));
           continue;
         }
-        try { await store.updateTask(taskId, { status: 'failed', completed_at: new Date().toISOString() }); }
-        catch (auditFailure) { throw auditError(auditFailure); }
+        if (!atomicAudit) {
+          try { await store.updateTask(taskId, { status: 'failed', completed_at: new Date().toISOString() }); }
+          catch (auditFailure) { throw auditError(auditFailure); }
+        }
         normalized.taskId = taskId;
         throw normalized;
       }
@@ -277,13 +368,26 @@ function createAIGateway(options) {
       const usage = usageOf(response);
       let resultId;
       try {
-        await store.updateRun(runId, { ...usage, latency_ms: elapsedMs(started), success: true, error: null });
-        resultId = await store.createResult({
-        task_id: taskId, run_id: runId, result_json: result,
-        rank: 1, is_recommended: true, user_selected: false, user_edited: false,
-        });
-        await store.updateTask(taskId, { status: 'completed', completed_at: new Date().toISOString() });
-      } catch (error) { await markFailed(taskId); throw auditError(error); }
+        if (atomicAudit) {
+          const finished = await store.finishAttempt({ taskId, runId, success: true,
+            error: null, usage: { ...usage, latency_ms: elapsedMs(started) },
+            result, final: true });
+          if (finished.status !== 'completed' || !finished.resultId) {
+            throw new AIGatewayError('PERSISTENCE_ERROR', 'AI audit completion did not return a result');
+          }
+          resultId = finished.resultId;
+        } else {
+          await store.updateRun(runId, { ...usage, latency_ms: elapsedMs(started), success: true, error: null });
+          resultId = await store.createResult({
+            task_id: taskId, run_id: runId, result_json: result,
+            rank: 1, is_recommended: true, user_selected: false, user_edited: false,
+          });
+          await store.updateTask(taskId, { status: 'completed', completed_at: new Date().toISOString() });
+        }
+      } catch (error) {
+        if (!atomicAudit) await markFailed(taskId);
+        const failure = auditError(error); failure.taskId = taskId; throw failure;
+      }
       return { taskId, runId, resultId, result, usage, testData: disclosure, skillVersion: definition.version,
         confirmationLevel: definition.confirmationLevel, requiresConfirmation: true };
     }

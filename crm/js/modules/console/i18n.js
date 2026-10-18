@@ -2,6 +2,12 @@
 const DEFAULT = 'zh-CN';
 
 const DICT = {
+  // PC33 AI request resilience
+  'pc33_ai_in_progress': { 'zh-CN': '这项 AI 请求仍在处理中，请稍后查看历史。', 'en': 'This AI request is still running. Check history shortly.' },
+  'pc33_ai_retry_later': { 'zh-CN': '刚才的请求已记录，请稍后重试或查看历史。', 'en': 'The recent request was recorded. Retry later or check history.' },
+  'pc33_ai_audit_unknown': { 'zh-CN': 'AI 审计状态尚未核实，已停止自动重试；请查看历史或联系管理员。', 'en': 'AI audit status is uncertain. Automatic retry stopped; check history or contact an admin.' },
+  'pc33_ai_timeout': { 'zh-CN': 'AI 请求超时，远端是否完成尚不确定；请先查看历史。', 'en': 'AI request timed out; remote completion is uncertain. Check history first.' },
+  'pc33_ai_failed': { 'zh-CN': 'AI 请求未完成，请查看历史后重试。', 'en': 'AI request did not finish. Check history before retrying.' },
   // PC29 AI experience and human-reviewed learning
   'ai_experience_title': { 'zh-CN': 'AI 建议与实际结果', 'en': 'AI Results & Outcomes' },
   'ai_experience_intro': { 'zh-CN': '记录对 AI 建议的判断、真实工作结果和待审核经验；完成状态不会自动代表正向结果。', 'en': 'Record decisions, actual work outcomes, and learning candidates. Completion alone does not mean a positive outcome.' },

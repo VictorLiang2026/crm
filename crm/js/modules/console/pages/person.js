@@ -503,13 +503,36 @@ export function renderPerson(ctx, id, initialSection) {
   });
 
   // AI 人物摘要（WP3.2b）
+  const aiBusy = { summary: false, prep: false };
+  function aiFailureKey(error) {
+    const code = String(error?.code || error?.message || '').split(':')[0];
+    return ({ AI_IN_PROGRESS: 'pc33_ai_in_progress', AI_RETRY_LATER: 'pc33_ai_retry_later',
+      AI_AUDIT_UNKNOWN: 'pc33_ai_audit_unknown', TIMEOUT: 'pc33_ai_timeout',
+      PERSISTENCE_ERROR: 'pc33_ai_audit_unknown', RATE_LIMIT: 'pc33_ai_retry_later' })[code] || 'pc33_ai_failed';
+  }
+  async function showAI(panel, kind, build) {
+    if (aiBusy[kind]) return;
+    aiBusy[kind] = true;
+    panel.replaceChildren(h('div', { class: 'card-body muted' }, t('generating')));
+    try { panel.replaceChildren(await build()); }
+    catch (error) {
+      panel.replaceChildren(h('div', { class: 'card-body' }, [
+        h('p', { class: 'empty' }, t(aiFailureKey(error))),
+        h('div', { class: 'sheet-actions' }, [
+          h('button', { class: 'btn btn-soft btn-sm', type: 'button',
+            onclick: () => showAI(panel, kind, build) }, t('btn_retry_ai')),
+          h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: openAIHistory }, t('btn_ai_history')),
+        ]),
+      ]));
+    } finally { aiBusy[kind] = false; }
+  }
   const summaryPanel = h('div', { class: 'card summary-card', style: 'display:none;margin-bottom:12px' });
   function openSummary() {
     summaryPanel.style.display = '';
-    loadInto(summaryPanel, async () => {
+    showAI(summaryPanel, 'summary', async () => {
       let res;
       try { res = await data.summarizePerson(ctx, id); }
-      catch (e) { throw new Error(e.message || 'SUMMARY_FAILED'); }
+      catch (e) { throw e?.code ? e : new Error(e?.message || 'SUMMARY_FAILED'); }
       if (!res.ok) {
         const code = res.error?.code || 'SUMMARY_FAILED';
         const msg = res.error?.message || '';
@@ -539,17 +562,17 @@ export function renderPerson(ctx, id, initialSection) {
       blocks.push(aiSourcesNode(res.sources, id));
       blocks.push(h('p', { class: 'foot-note' }, t('summary_foot').replace('{taskId}', res.taskId)));
       return h('div', { class: 'card-body' }, blocks);
-    }, h('div', { class: 'card-body muted' }, t('generating')));
+    });
   }
 
   // AI 会前准备（WP3.3a）
   const prepPanel = h('div', { class: 'card summary-card', style: 'display:none;margin-bottom:12px' });
   function openPrep() {
     prepPanel.style.display = '';
-    loadInto(prepPanel, async () => {
+    showAI(prepPanel, 'prep', async () => {
       let res;
       try { res = await data.meetingPrep(ctx, id); }
-      catch (e) { throw new Error(e.message || 'MEETING_PREP_FAILED'); }
+      catch (e) { throw e?.code ? e : new Error(e?.message || 'MEETING_PREP_FAILED'); }
       if (!res.ok) {
         const code = res.error?.code || 'MEETING_PREP_FAILED';
         const msg = res.error?.message || '';
@@ -587,7 +610,7 @@ export function renderPerson(ctx, id, initialSection) {
       blocks.push(aiSourcesNode(res.sources, id));
       blocks.push(h('p', { class: 'foot-note' }, t('prep_foot').replace('{taskId}', res.taskId)));
       return h('div', { class: 'card-body' }, blocks);
-    }, h('div', { class: 'card-body muted' }, t('generating')));
+    });
   }
 
   // AI 对话策略（WP3.3b）
@@ -671,16 +694,15 @@ export function renderPerson(ctx, id, initialSection) {
       try { res = await data.conversationPlaybook(ctx, id, objection); }
       catch (e) {
         playbookPanel.replaceChildren(h('div', { class: 'card-body' }, [
-          h('div', { class: 'empty' }, `${t('playbook_failed_prefix')}${e.message || 'PLAYBOOK_FAILED'}`),
+          h('div', { class: 'empty' }, t(aiFailureKey(e))),
           h('button', { class: 'btn btn-soft btn-sm', type: 'button', onclick: () => runPlaybook(objection) }, t('btn_retry_ai')),
         ]));
         return;
       }
       if (!res.ok) {
         const code = res.error?.code || 'PLAYBOOK_FAILED';
-        const msg = res.error?.message || '';
         playbookPanel.replaceChildren(h('div', { class: 'card-body' }, [
-          h('div', { class: 'empty' }, `${code}${msg ? ': ' + msg : ''}`),
+          h('div', { class: 'empty' }, t(aiFailureKey({ code }))),
           h('button', { class: 'btn btn-soft btn-sm', type: 'button', onclick: () => runPlaybook(objection) }, t('btn_retry_ai')),
         ]));
         return;

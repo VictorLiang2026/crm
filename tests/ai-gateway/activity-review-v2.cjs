@@ -82,3 +82,20 @@ test('server-only adapter restricts schema, tables and business writes', async (
     /read-only/);
   await assert.rejects(async () => rdb.from('forbidden').select('id'), /Invalid review table/);
 });
+
+test('activity audit RPC uses only the approved public functions', async () => {
+  const requests = [];
+  const fetchImpl = async (url, options) => {
+    requests.push({ url: String(url), options });
+    return { ok: true, json: async () => ({ status: 'claimed', taskId: 123 }) };
+  };
+  const rdb = createPublicRdb({ env: 'crm-test123', key: 'test-secret', fetchImpl });
+  const result = await rdb.rpc('crm_ai_claim_v2', { p_actor_uid: 'fictional-actor' });
+  assert.equal(result.data.taskId, 123);
+  assert.match(requests[0].url, /\/v1\/rdb\/rest\/rpc\/crm_ai_claim_v2$/);
+  assert.equal(requests[0].options.headers['Content-Profile'], 'public');
+  assert.equal(requests[0].options.method, 'POST');
+  assert.equal(JSON.parse(requests[0].options.body).p_actor_uid, 'fictional-actor');
+  await assert.rejects(rdb.rpc('crm_ai_claim_v1', {}), /Invalid AI audit RPC/);
+  assert.equal(requests.length, 1);
+});

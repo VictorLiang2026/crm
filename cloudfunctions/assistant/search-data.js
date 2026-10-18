@@ -55,6 +55,11 @@ function createSearchData({ env, key, fetchImpl = fetch } = {}) {
           }).then(resolve, reject);
       },
     };
+  }, async rpc(name, args) {
+    if (!['crm_ai_claim_v2', 'crm_ai_finish_v1'].includes(name)) throw new Error('Invalid AI audit RPC');
+    const data = await request(`rpc/${name}`, 'POST', {}, args);
+    if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('Invalid AI audit RPC response');
+    return { data };
   } };
 
   async function search(template, months, limit) {

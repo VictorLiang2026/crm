@@ -75,7 +75,19 @@ try {
   $checked = 0
   foreach ($dir in $dirs) {
     $dest = Join-Path $audit $dir.Name
-    & (Join-Path $PSScriptRoot 'tcb.ps1') -CliArgs @('fn','code','download',$dir.Name,$dest,'-e',$config.envId,'--json') | Out-Null
+    $downloaded = $false
+    for ($attempt = 1; $attempt -le 3; $attempt++) {
+      try {
+        & (Join-Path $PSScriptRoot 'tcb.ps1') -CliArgs @('fn','code','download',$dir.Name,$dest,'-e',$config.envId,'--json') | Out-Null
+        $downloaded = $true
+        break
+      } catch {
+        if ($attempt -eq 3) { throw "Cloud code download failed after 3 attempts for $($dir.Name): $($_.Exception.Message)" }
+        Write-Host "[RETRY] $($dir.Name) cloud code download attempt $attempt failed; retrying."
+        Start-Sleep -Seconds (2 * $attempt)
+      }
+    }
+    if (!$downloaded) { throw "Cloud code download failed for $($dir.Name)." }
     $localFiles = @(Get-ChildItem $dir.FullName -Recurse -File | Where-Object FullName -notmatch '\\node_modules\\')
     $remoteFiles = @(Get-ChildItem $dest -Recurse -File | Where-Object { $_.FullName -notmatch '\\node_modules\\' -and $_.Name -ne 'package-lock.json' })
     foreach ($file in $localFiles) {

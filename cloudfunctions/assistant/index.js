@@ -3,6 +3,7 @@
 
 const { routeIntent, IntentError } = require('./intent-router');
 const { handleCommand, OPERATIONS } = require('./command-safety');
+const AI_AUDIT_CODES = new Set(['AI_IN_PROGRESS', 'AI_RETRY_LATER', 'AI_AUDIT_UNKNOWN']);
 
 function createMain(getIdentity, searchRunner = event => require('./search-service').runSearch(event),
   actionRunner = (event, uid) => require('./action-command-service').runActionCommand(event, uid),
@@ -45,7 +46,7 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
           'UPSTREAM_UNAVAILABLE','PERSISTENCE_ERROR','AI_REQUEST_FAILED','INVALID_CANDIDATE',
           'DUPLICATE_OPPORTUNITY','PREVIEW_STALE','CONFIRMATION_REQUIRED',
           'TEST_PERSON_REQUIRED',
-          'CANDIDATE_DATABASE_ERROR'].includes(error?.code) ? error.code : 'CANDIDATE_FAILED';
+          'CANDIDATE_DATABASE_ERROR'].includes(error?.code) || AI_AUDIT_CODES.has(error?.code) ? error.code : 'CANDIDATE_FAILED';
         return { ok:false,error:{code,message:'机会候选操作未完成'} };
       }
     }
@@ -54,7 +55,7 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
       catch (error) {
         const code = ['INVALID_INPUT','INVALID_CONFIG','INVALID_RESULT','RATE_LIMIT','TIMEOUT',
           'UPSTREAM_UNAVAILABLE','PERSISTENCE_ERROR','AI_REQUEST_FAILED','INVALID_CANDIDATE']
-          .includes(error?.code) ? error.code : 'RECRUIT_COACH_FAILED';
+          .includes(error?.code) || AI_AUDIT_CODES.has(error?.code) ? error.code : 'RECRUIT_COACH_FAILED';
         return {ok:false,error:{code,message:'Recruit Coach request could not be completed'}};
       }
     }
@@ -66,7 +67,7 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
         return await actionIntentRunner({query:event.query,language:event.language});
       } catch (error) {
         const code=['INVALID_INPUT','INVALID_RESULT','INVALID_CONFIG','TIMEOUT','UPSTREAM_UNAVAILABLE',
-          'PERSISTENCE_ERROR','AI_REQUEST_FAILED'].includes(error?.code)?error.code:'ACTION_COMMAND_FAILED';
+          'PERSISTENCE_ERROR','AI_REQUEST_FAILED'].includes(error?.code) || AI_AUDIT_CODES.has(error?.code)?error.code:'ACTION_COMMAND_FAILED';
         return {ok:false,error:{code,message:'Action request could not be interpreted'}};
       }
     }
@@ -89,7 +90,7 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
         return await opportunityIntentRunner({query:event.query,language:event.language});
       } catch (error) {
         const code=['INVALID_INPUT','INVALID_RESULT','INVALID_CONFIG','TIMEOUT','UPSTREAM_UNAVAILABLE',
-          'PERSISTENCE_ERROR','AI_REQUEST_FAILED'].includes(error?.code)?error.code:'OPPORTUNITY_COMMAND_FAILED';
+          'PERSISTENCE_ERROR','AI_REQUEST_FAILED'].includes(error?.code) || AI_AUDIT_CODES.has(error?.code)?error.code:'OPPORTUNITY_COMMAND_FAILED';
         return {ok:false,error:{code,message:'Opportunity request could not be interpreted'}};
       }
     }
@@ -136,7 +137,7 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
       catch (error) {
         const code = ['INVALID_INPUT', 'INVALID_CONFIG', 'RATE_LIMIT', 'TIMEOUT',
           'UPSTREAM_UNAVAILABLE', 'PERSISTENCE_ERROR', 'AI_REQUEST_FAILED',
-          'INVALID_RESULT'].includes(error?.code) ? error.code : 'SEARCH_FAILED';
+          'INVALID_RESULT'].includes(error?.code) || AI_AUDIT_CODES.has(error?.code) ? error.code : 'SEARCH_FAILED';
         return { ok: false, error: { code, message: 'CRM search could not be completed' } };
       }
     }
@@ -145,7 +146,7 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
         selectedPersonId:event.selectedPersonId,page:event.page}); }
       catch (error) {
         const code = ['INVALID_INPUT','INVALID_RESULT','INVALID_CONFIG','RATE_LIMIT','TIMEOUT',
-          'UPSTREAM_UNAVAILABLE','PERSISTENCE_ERROR','AI_REQUEST_FAILED'].includes(error?.code) ? error.code : 'SEARCH_FAILED';
+          'UPSTREAM_UNAVAILABLE','PERSISTENCE_ERROR','AI_REQUEST_FAILED'].includes(error?.code) || AI_AUDIT_CODES.has(error?.code) ? error.code : 'SEARCH_FAILED';
         return {ok:false,error:{code,message:'CRM combination search could not be completed'}};
       }
     }
@@ -154,7 +155,7 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
         selectedIntent:event.selectedIntent,selectedPersonId:event.selectedPersonId}); }
       catch (error) {
         const code = ['INVALID_INPUT','INVALID_RESULT','INVALID_CONFIG','RATE_LIMIT','TIMEOUT',
-          'UPSTREAM_UNAVAILABLE','PERSISTENCE_ERROR','AI_REQUEST_FAILED','NOT_FOUND'].includes(error?.code) ? error.code : 'READ_TASK_FAILED';
+          'UPSTREAM_UNAVAILABLE','PERSISTENCE_ERROR','AI_REQUEST_FAILED','NOT_FOUND'].includes(error?.code) || AI_AUDIT_CODES.has(error?.code) ? error.code : 'READ_TASK_FAILED';
         return {ok:false,error:{code,message:'Assistant read task could not be completed'}};
       }
     }
@@ -163,6 +164,7 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
       catch (error) {
         const code = ['INVALID_INPUT', 'NOT_FOUND', 'INVALID_CONFIG', 'INVALID_RESULT',
           'RATE_LIMIT', 'TIMEOUT', 'UPSTREAM_UNAVAILABLE', 'PERSISTENCE_ERROR',
+          'AI_IN_PROGRESS', 'AI_RETRY_LATER', 'AI_AUDIT_UNKNOWN',
           'AI_REQUEST_FAILED'].includes(error?.code) ? error.code : 'SUMMARY_FAILED';
         const detail = error?.message ? String(error.message) : '';
         return { ok: false, error: { code, message: detail || 'Person summary could not be generated' } };
@@ -173,6 +175,7 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
       catch (error) {
         const code = ['INVALID_INPUT', 'NOT_FOUND', 'INVALID_CONFIG', 'INVALID_RESULT',
           'RATE_LIMIT', 'TIMEOUT', 'UPSTREAM_UNAVAILABLE', 'PERSISTENCE_ERROR',
+          'AI_IN_PROGRESS', 'AI_RETRY_LATER', 'AI_AUDIT_UNKNOWN',
           'AI_REQUEST_FAILED'].includes(error?.code) ? error.code : 'MEETING_PREP_FAILED';
         const detail = error?.message ? String(error.message) : '';
         return { ok: false, error: { code, message: detail || 'Meeting prep could not be generated' } };
@@ -183,6 +186,7 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
       catch (error) {
         const code = ['INVALID_INPUT', 'NOT_FOUND', 'INVALID_CONFIG', 'INVALID_RESULT',
           'RATE_LIMIT', 'TIMEOUT', 'UPSTREAM_UNAVAILABLE', 'PERSISTENCE_ERROR',
+          'AI_IN_PROGRESS', 'AI_RETRY_LATER', 'AI_AUDIT_UNKNOWN',
           'AI_REQUEST_FAILED'].includes(error?.code) ? error.code : 'PLAYBOOK_FAILED';
         const detail = error?.message ? String(error.message) : '';
         return { ok: false, error: { code, message: detail || 'Conversation playbook could not be generated' } };

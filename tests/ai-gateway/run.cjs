@@ -199,3 +199,58 @@ test('RDB audit store touches only the three intended public table names', async
   await store.createResult({});
   assert.deepEqual(touched, ['ai_tasks', 'ai_tasks', 'ai_runs', 'ai_runs', 'ai_results']);
 });
+
+test('atomic claim reuses a completed request for one actor and isolates another actor', async () => {
+  const f = fixture([{ text: '{"recommendation":"first"}' },
+    { text: '{"recommendation":"second"}' }]);
+  let actor = 'fictional-actor-a';
+  const claims = new Map();
+  let nextTask = 1;
+  f.store.claimTask = async ({ actorUid, requestKey }) => {
+    const key = `${actorUid}:${requestKey}`;
+    let claim = claims.get(key);
+    if (!claim) {
+      claim = { taskId: nextTask++, status: 'claimed' };
+      claims.set(key, claim);
+      return { ...claim };
+    }
+    return { ...claim };
+  };
+  f.store.finishAttempt = async row => {
+    assert.equal(row.success, true);
+    const claim = [...claims.values()].find(item => item.taskId === row.taskId);
+    Object.assign(claim, { status: 'reused', runId: row.runId, resultId: row.taskId,
+      result: row.result, usage: row.usage, skillVersion: '1.0.0' });
+    return { status: 'completed', taskId: row.taskId, resultId: row.taskId };
+  };
+  const gateway = createAIGateway({ app: f.app, store: f.store, skillRegistry: testRegistry,
+    modelResolver: () => 'configured-model', actorResolver: () => ({ uid: actor, isAnonymous: false }) });
+  const first = await gateway.runAITask(request);
+  const replay = await gateway.runAITask(request);
+  assert.equal(replay.reused, true);
+  assert.equal(replay.taskId, first.taskId);
+  assert.equal(f.calls.length, 1);
+  actor = 'fictional-actor-b';
+  const other = await gateway.runAITask(request);
+  assert.notEqual(other.taskId, first.taskId);
+  assert.equal(f.calls.length, 2);
+});
+
+test('atomic claim rejects concurrent duplicate and never retries a model after audit failure', async () => {
+  let release;
+  const pending = new Promise(resolve => { release = resolve; });
+  const f = fixture([pending]);
+  let claimed = false;
+  f.store.claimTask = async () => claimed ? { status: 'in_progress', taskId: 1 } :
+    (claimed = true, { status: 'claimed', taskId: 1 });
+  f.store.finishAttempt = async () => { throw new Error('audit unavailable'); };
+  const gateway = createAIGateway({ app: f.app, store: f.store, skillRegistry: testRegistry,
+    modelResolver: () => 'configured-model', actorResolver: () => ({ uid: 'fictional-actor', isAnonymous: false }),
+    maxAttempts: 3 });
+  const first = gateway.runAITask(request);
+  while (!f.calls.length) await new Promise(resolve => setImmediate(resolve));
+  await assert.rejects(gateway.runAITask(request), error => error.code === 'AI_IN_PROGRESS' && error.taskId === 1);
+  release({ text: '{"recommendation":"draft"}' });
+  await assert.rejects(first, error => error.code === 'PERSISTENCE_ERROR' && error.taskId === 1);
+  assert.equal(f.calls.length, 1);
+});
