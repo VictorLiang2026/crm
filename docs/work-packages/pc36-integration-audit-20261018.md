@@ -4,6 +4,8 @@
 
 2026-10-18 晚间以 `master` 提交 `9cebc6e531104d91b7817d04c6b1c13c19cdd7ba`、标签 `release-20261018-2305` 为起点。完整 `sync-check.ps1` 已核对 GitHub `master` 与标签、75 个可达静态资源、29 个 CRM 云函数及 201 个源码/配置文件一致。PC28 在此基线的祖先提交 `ad468c1fcaa18debc7857f479fdee08197a0a650`、标签 `release-20261018-224914` 完成了虚构人物 #786、独立增员候选人 #20 和同批跟进 #3 的人工删除与恢复；另见 [PC28 记录](pc28-person-only-recruit-delete-20261018.md)。
 
+PMC18 受限采集与已部署的招募目录请求适配于 2026-10-19 合并发布：提交 `7caaa76f464258a7c7088ddcc699d71915efdecd`、标签 `release-20261019-011137`。发布后核对 GitHub `master`、标签、75 个静态资源及 29 个函数的 201 个源码/配置文件全部一致；本次实际部署范围是 `public` 迁移和 `pmc18_observer`，招募服务文件此前已单独部署且云端哈希相同。
+
 本台账只把生产真实操作及其数据读回记作端到端证据。源码、隔离浏览器、回滚事务与静态托管哈希分别记载，不能替代真实账号成功、拒绝、失败后数据未变、人工确认和 iPad 实机检查。下表的“保留”表示继续维持现有入口；不授权删除或重命名任何旧路由、函数或对象。PC03 原台账是 2026-10-15 的历史快照，之后 PC04–PC35 已陆续新增能力，需按本表重新验收。
 
 ## 生产登录只读集成核查
@@ -18,7 +20,7 @@
 
 PC34 门禁首次因本工作树缺少本轮 `public` 目录快照而停止。按 WP01 只读 `catalog.sql` 采集 173 个 `public` 对象并保存至忽略目录后重跑，权限矩阵与双语字典、实际 `service_role` 只读权限、Person→反馈隔离链、iPad 双语触控/键盘四组均通过。该结果证明隔离布局及权限检查，不替代用户设备上的页面视觉验收或不同真实角色的生产操作。
 
-23:41（北京时间）完整 WP01 门禁结果为 **PASS_WITH_LIMITATIONS**，14 项中 10 PASS、0 FAIL、1 项另需专用登录摘要、3 项未验证，匿名网关 71/71 通过，`public` 身份审计沿用已登记的 3 条活动参与者例外。PC36 的 21 项生产登录查询是独立证据；它不包含 WP01 专用的 47 项 authenticated HEAD 拒绝，所以后者仍列为待验收。WP01 原始报告在本地忽略目录 `tests/security/.results/wp01-report.json`；其一小时有效期只适用于本次发布门禁，不能延长成长期生产验收结论。
+23:41（北京时间）首次完整 WP01 门禁结果为 **PASS_WITH_LIMITATIONS**，当时登录专用探针未执行。2026-10-19 04:48，测试账号在独立窗口完成专用探针：有效登录 1/1、当前目录内 **71/71** 个 `public` relation 的 authenticated HEAD 均返回 403、旧 `customers.list` 用唯一虚构关键词查询得到空结果 1/1，合计 **73 PASS / 0 FAIL**；报告 `tests/security/.results/wp01-login.json` 仅存检查 ID、状态、时间和页面哈希，不存凭据或客户正文，测试会话已退出。PC36 的 21 项生产登录函数查询是另一组独立证据。WP01 目录与登录报告仅在门禁规定的一小时内有效；不把它们延长成长期生产验收。服务角色写入、真实业务写入和 E01–E16 全流程仍需逐项验证。
 
 ## 17 个旧版入口的当前覆盖判断
 
@@ -77,7 +79,9 @@ PC34 门禁首次因本工作树缺少本轮 `public` 目录快照而停止。�
 
 用户随后单独批准受限 `public` RPC 子包。迁移 [20261019003000](../../cloudbase/migrations/20261019003000_pmc_observer_daily_collect.sql) 新增无参数、`SECURITY DEFINER` 的 `public.pmc18_collect_once_v1()`，固定生成 20 项无个人资料指标，事务锁串行并按北京时间每天最多写一批；配套 [rollback](../../cloudbase/rollbacks/20261019003000_pmc_observer_daily_collect.rollback.sql) 只删除该新函数，须先恢复旧版云函数，**不自动删除已采集观测**。新函数仅授权 `anon` 执行；原聚合函数和观测表对 `anon` 的执行/写入权限不变。迁移工具最初在任务完成后的即时核验返回 `MIGRATION_NOT_APPLIED`，随后任务详情为 `Succeed`、远端迁移历史含版本 `20261019003000`，且只读目录确认新函数存在、无参数、限定搜索路径及实际权限；这是控制面可见性延迟，未重复应用迁移。
 
-`pmc18_observer` 仅改 `collect` 调用该 RPC 并校验回执；`listRecent`、Nodejs20.19、30 秒限制和 `pmc18_daily_0200` 定时触发器保留。2026-10-19 00:30（北京时间）经生产云函数真实调用，RequestId `e20b6fe1-568f-4ebb-a60b-02a29e44b0f5` 返回 `ok=true, reused=false, metrics=20`；`public.pmc18_observations` 读回同一时间戳的 **20 行/20 种指标**。同日再次调用 RequestId `81920955-78d2-48ba-8a3c-33a18b53300b` 返回 `reused=true`，两次并发重复调用亦均返回原采集时间，读回仍为 20 行。旧 `listRecent` 生产调用 RequestId `506012e8-b9e7-460c-900e-d9e408ed8825` 返回 1 行/total 1。权限读回：`anon` 仅能执行新 RPC，不能执行旧聚合 RPC；观测表写权限未扩张。预期 `public` 对象清单只新增该函数，并在目录门禁中对其设唯一的受限匿名执行例外，仍逐项比较精确权限；匿名网关门禁对原已授权读取的 `pmc18_observations` 接受非空观测，不改变表权限。该目录门禁专项用例 5/5 通过。采集器隔离用例 4/4 通过，覆盖成功、重放、RPC/回执故障拒绝和旧读取。生产批次有 **1 项 warning：persons_without_role=3**、0 项 critical，属于现有聚合返回的待核查信号，未在本包追查或改写人物数据。生产故障注入和次日 02:00 定时采集尚未观察，不能以手动成功替代定时连续性验收。
+`pmc18_observer` 仅改 `collect` 调用该 RPC 并校验回执；`listRecent`、Nodejs20.19、30 秒限制和 `pmc18_daily_0200` 定时触发器保留。2026-10-19 00:30（北京时间）经生产云函数真实调用，RequestId `e20b6fe1-568f-4ebb-a60b-02a29e44b0f5` 返回 `ok=true, reused=false, metrics=20`；`public.pmc18_observations` 读回同一时间戳的 **20 行/20 种指标**。同日再次调用 RequestId `81920955-78d2-48ba-8a3c-33a18b53300b` 返回 `reused=true`，两次并发重复调用亦均返回原采集时间，读回仍为 20 行。旧 `listRecent` 生产调用 RequestId `506012e8-b9e7-460c-900e-d9e408ed8825` 返回 1 行/total 1。权限读回：`anon` 仅能执行新 RPC，不能执行旧聚合 RPC；观测表写权限未扩张。预期 `public` 对象清单只新增该函数，并在目录门禁中对其设唯一的受限匿名执行例外，仍逐项比较精确权限；匿名网关门禁对原已授权读取的 `pmc18_observations` 接受非空观测，不改变表权限。该目录门禁专项用例 5/5 通过。采集器隔离用例 4/4 通过，覆盖成功、重放、RPC/回执故障拒绝和旧读取。生产批次有 **1 项 warning：persons_without_role=3**、0 项 critical，属于现有聚合返回的待核查信号，未在本包追查或改写人物数据。手动成功不替代定时和连续性验收；首次定时证据见下。
+
+2026-10-19 02:00:15（北京时间）CLS 日志证实 `request_source=TRIGGER_TIMER`，RequestId `048ab808-65c3-4d9c-9b52-6e93fae32bfb`，最终状态 200 / `ret_code=0`，返回 `ok=true, reused=true, metrics=20`，复用 00:30:56 的采集时间。04:49 再查 `public.pmc18_observations` 仍为当天 **20 行/20 种指标**，没有重复批次。首次修复后的定时触发已通过；连续多日执行、生产故障注入与原定至 2027-01-08 的观察期仍未完成。
 
 ## 导航与交接门
 
