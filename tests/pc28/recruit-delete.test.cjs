@@ -14,6 +14,8 @@ const proposal={status:'supported',operation:'delete',interpretation:'Delete one
   personMention:'Fictional Lin',candidateMention:'the recruit candidate'};
 
 test('only an explicit single recruit-candidate delete reaches the model',async()=>{
+  const intentSource=fs.readFileSync(path.resolve(__dirname,'../../cloudfunctions/assistant/recruit-delete-intent-service.js'),'utf8');
+  assert.match(intentSource,/timeoutMs:60000,maxAttempts:1/);
   for(const query of ['删除人物','delete all candidates','永久删除候选人','删除客户候选人',
     'delete the opportunity','drop database','删除 Action','删除所有增员候选人'])
     assert.equal(explicitSingleCandidate(query),false,query);
@@ -103,7 +105,7 @@ test('assistant requires login before PC28 routes and leaves legacy command sepa
   assert.equal((await anonymous({action:'recruitDeleteCommand',stage:'execute',commandId:key})).error.code,'UNAUTHORIZED');
 });
 
-test('PC28 strips CloudBase runtime context while rejecting other extra fields',async()=>{
+test('PC28 projects only business inputs from runtime envelope and rejects forged control fields',async()=>{
   const seen=[];let dataCalls=0;
   const main=createMain(async()=>({uid:actor,isAnonymous:false}),...Array(9).fill(undefined),
     async event=>{seen.push(event);return {ok:true};},
@@ -115,19 +117,28 @@ test('PC28 strips CloudBase runtime context while rejecting other extra fields',
     {action:'recruitDeleteInterpret',query:'删除增员候选人 Fictional Lin',language:'zh-CN'},
     {action:'recruitDeleteTargets',personMention:'Fictional Lin',selectedPersonId:'786'},
     {action:'recruitDeleteCommand',stage:'preview',commandId:key}]){
-    const result=await main({...event,TCB_CONTEXT_KEYS:context});
+    const result=await main({...event,TCB_CONTEXT_KEYS:context,
+      platformMetadata:{token:context[0]},userInfo:{runtime:context[0]}});
     assert.equal(result.ok,true);
     assert.equal(JSON.stringify(result).includes(context[0]),false);
   }
   assert.equal(seen.length,3);
-  for(const event of seen)assert.equal(Object.hasOwn(event,'TCB_CONTEXT_KEYS'),false);
+  for(const event of seen){
+    assert.equal(Object.hasOwn(event,'TCB_CONTEXT_KEYS'),false);
+    assert.equal(Object.hasOwn(event,'platformMetadata'),false);
+    assert.equal(Object.hasOwn(event,'userInfo'),false);
+  }
   assert.equal((await main({action:'recruitDeleteInterpret',query:'删除候选人',language:'zh-CN',actorUid:'forged',
     TCB_CONTEXT_KEYS:context})).error.code,'INVALID_INPUT');
   assert.equal((await main({action:'recruitDeleteTargets',personMention:'Fictional Lin',selectedPersonId:'786',
     candidateId:20,TCB_CONTEXT_KEYS:context})).error.code,'INVALID_INPUT');
   assert.equal((await main({action:'recruitDeleteCommand',stage:'preview',commandId:key,confirmed:true,
     TCB_CONTEXT_KEYS:context})).error.code,'INVALID_COMMAND');
-  assert.equal(seen.length,4);
+  assert.equal((await main({action:'recruitDeleteInterpret',query:'删除候选人',language:'zh-CN',
+    preview:{personId:786}})).error.code,'INVALID_INPUT');
+  assert.equal((await main({action:'recruitDeleteCommand',stage:'preview',commandId:key,
+    batchId:'forged'})).error.code,'INVALID_COMMAND');
+  assert.equal(seen.length,3);
   assert.equal(dataCalls,1);
 });
 

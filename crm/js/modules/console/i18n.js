@@ -2390,6 +2390,7 @@ const DICT = {
   'pc28_denied': { 'zh-CN': '确认、会话或权限无效，未执行删除。', 'en': 'Confirmation, session or permission was rejected. Nothing was deleted.' },
   'pc28_invalid': { 'zh-CN': '请求格式无效，未执行删除。', 'en': 'Invalid command. Nothing was deleted.' },
   'pc28_timeout': { 'zh-CN': '模型调用超时，未执行删除。', 'en': 'Model timed out. Nothing was deleted.' },
+  'pc28_retry_later': { 'zh-CN': '相同请求仍在处理或冷却中，请稍后再试；未执行删除。', 'en': 'This request is still running or cooling down. Try later; nothing was deleted.' },
   'pc28_failed': { 'zh-CN': '操作未完成，请核对当前状态后重试。', 'en': 'Operation did not finish. Check the current state before retrying.' },
 
   'close_aria': { 'zh-CN': '关闭', 'en': 'Close' },

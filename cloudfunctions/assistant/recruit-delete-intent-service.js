@@ -41,7 +41,8 @@ async function interpretRecruitDelete(event,deps={}){
     execution:{performed:false,modelCalled:false,businessDataRead:false,businessDataWritten:false}};
   const app=deps.app||require('./db').app;
   const database=deps.database||createSearchData({env:process.env.TCB_ENV,key:process.env.CRM_ASSISTANT_DB_API_KEY});
-  const gateway=deps.gateway||createAIGateway({app,rdb:database.auditRdb,timeoutMs:30000,maxAttempts:1});
+  // The assistant function has a 90-second limit; keep this one model call bounded at the standard 60 seconds.
+  const gateway=deps.gateway||createAIGateway({app,rdb:database.auditRdb,timeoutMs:60000,maxAttempts:1});
   const task=await gateway.runAITask({taskType:'assistant_recruit_delete_v1',skill:'assistant_recruit_delete_v1',
     capability:'structured_extraction',input:{text:query,language},context:{guidance:GUIDANCE},
     contextSnapshot:{guidance:GUIDANCE,_context:{recipe:'assistant_recruit_delete_v1',version:'1.0.0',

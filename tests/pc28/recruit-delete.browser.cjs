@@ -5,6 +5,14 @@ const path=require('node:path');
 const {Browser}=require('../regression/browser.cjs');
 const root=path.resolve(__dirname,'../..');
 
+test('PC28 explains model cooldown in Chinese and English without implying deletion',async()=>{
+  const fs=require('node:fs');
+  const ui=fs.readFileSync(path.join(root,'crm/js/modules/console/recruit-delete.js'),'utf8');
+  const i18n=fs.readFileSync(path.join(root,'crm/js/modules/console/i18n.js'),'utf8');
+  assert.match(ui,/AI_RETRY_LATER.*AI_IN_PROGRESS.*pc28_retry_later/);
+  assert.match(i18n,/'pc28_retry_later':\s*\{\s*'zh-CN':\s*'[^']*未执行删除[^']*',\s*'en':\s*'[^']*nothing was deleted/);
+});
+
 test('Console requires explicit Person, candidate, preview, confirm and Execute clicks',async()=>{
   const browser=new Browser(root);
   try{

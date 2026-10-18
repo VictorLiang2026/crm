@@ -4,9 +4,16 @@
 const { routeIntent, IntentError } = require('./intent-router');
 const { handleCommand, OPERATIONS } = require('./command-safety');
 const AI_AUDIT_CODES = new Set(['AI_IN_PROGRESS', 'AI_RETRY_LATER', 'AI_AUDIT_UNKNOWN']);
-// CloudBase adds this runtime context key to event objects; it is never a business input.
-const recruitDeleteInput = event => Object.fromEntries(
-  Object.entries(event).filter(([key]) => key !== 'TCB_CONTEXT_KEYS'));
+// Project only the PC28 contract from a runtime event envelope. Other metadata is never forwarded.
+const RECRUIT_DELETE_BUSINESS_KEYS = new Set(['action','query','language','personMention',
+  'selectedPersonId','stage','command','idempotencyKey','commandId','previewHash',
+  'confirmed','actorUid','personId','candidateId','customerId','resource','operation',
+  'preview','result','followupIds','batchId','requestText']);
+function recruitDeleteInput(event, allowed) {
+  if (!event || typeof event !== 'object' || Array.isArray(event) ||
+      Object.keys(event).some(key=>RECRUIT_DELETE_BUSINESS_KEYS.has(key)&&!allowed.includes(key))) return null;
+  return Object.fromEntries(allowed.filter(key=>Object.hasOwn(event,key)).map(key=>[key,event[key]]));
+}
 
 function createMain(getIdentity, searchRunner = event => require('./search-service').runSearch(event),
   actionRunner = (event, uid) => require('./action-command-service').runActionCommand(event, uid),
@@ -121,8 +128,8 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
     }
     if (event?.action === 'recruitDeleteInterpret') {
       try {
-        const input=recruitDeleteInput(event);
-        if (Object.keys(input).some(key=>!['action','query','language'].includes(key))) {
+        const input=recruitDeleteInput(event,['action','query','language']);
+        if (!input) {
           return {ok:false,error:{code:'INVALID_INPUT',message:'Recruit delete request is invalid'}};
         }
         return await recruitDeleteIntentRunner({query:input.query,language:input.language});
@@ -135,8 +142,8 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
     }
     if (event?.action === 'recruitDeleteTargets') {
       try {
-        const input=recruitDeleteInput(event);
-        if (Object.keys(input).some(key=>!['action','personMention','selectedPersonId'].includes(key))) {
+        const input=recruitDeleteInput(event,['action','personMention','selectedPersonId']);
+        if (!input) {
           return {ok:false,error:{code:'INVALID_INPUT',message:'Recruit delete target is invalid'}};
         }
         return await recruitDeleteTargetsRunner({personMention:input.personMention,
@@ -148,7 +155,14 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
       }
     }
     if (event?.action === 'recruitDeleteCommand') {
-      try { return await recruitDeleteCommandRunner(recruitDeleteInput(event),identity.uid); }
+      try {
+        const fields=event.stage==='plan'?['action','stage','command','idempotencyKey']:
+          event.stage==='confirm'?['action','stage','commandId','previewHash']:
+          ['action','stage','commandId'];
+        const input=recruitDeleteInput(event,fields);
+        if (!input) return {ok:false,error:{code:'INVALID_COMMAND',message:'Recruit delete command could not be completed'}};
+        return await recruitDeleteCommandRunner(input,identity.uid);
+      }
       catch (error) {
         const code=['INVALID_COMMAND','PREVIEW_STALE','COMMAND_DENIED','RECRUIT_DELETE_FAILED'].includes(error?.code)?
           error.code:'RECRUIT_DELETE_FAILED';

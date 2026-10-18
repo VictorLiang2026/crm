@@ -60,7 +60,8 @@ export function openRecruitDeleteCommand(ctx) {
     const key = code === 'PREVIEW_STALE' ? 'pc28_stale' :
       code === 'COMMAND_DENIED' ? 'pc28_denied' :
       code === 'INVALID_COMMAND' ? 'pc28_invalid' :
-      code === 'TIMEOUT' ? 'pc28_timeout' : 'pc28_failed';
+      code === 'TIMEOUT' ? 'pc28_timeout' :
+      (code === 'AI_RETRY_LATER' || code === 'AI_IN_PROGRESS') ? 'pc28_retry_later' : 'pc28_failed';
     sheet.showErr(t(key));
     status.textContent = t(key);
     if (code === 'PREVIEW_STALE') clearCommand();
