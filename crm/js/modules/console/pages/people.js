@@ -18,23 +18,41 @@ const ROLE_BADGE = () => ({
   other: [t('role_other'), 'gray'],
 });
 
+function compactColumnLabel(label, key) {
+  if (/[\u3400-\u9fff]/.test(label)) {
+    if (key.endsWith('_priority')) return label.replace(/优先级$/, '').slice(-1);
+    if (key.endsWith('_followup')) return label.replace(/跟进日期$/, '');
+    return label;
+  }
+  const word = label.match(/[A-Za-z]+/)?.[0];
+  if (!word) return label;
+  if (key.endsWith('_priority')) return `${word.slice(0, word.startsWith('Ref') ? 3 : 4)}.`;
+  return word;
+}
+
 const SORT_COLUMNS = (customerView = false) => ([
-  { field: 'display_name', label: t('col_name') },
-  ...(customerView ? [{ field: 'customer_stage', label: t('customer_view_stage'), sortable: false }] : []),
-  { field: 'sales_priority', label: t('col_customer_priority') },
-  { field: 'recruitment_priority', label: t('col_recruit_priority') },
-  { field: 'referral_priority', label: t('col_referral_priority') },
-  { field: 'latest_followup_date', label: t('col_latest_followup'), full: t('col_latest_followup_full') },
-  { field: 'next_followup_date', label: t('col_next_followup'), full: t('col_next_followup_full') },
-  { field: 'convert_customer', label: t('col_convert_customer'), sortable: false },
-  { field: 'convert_recruit', label: t('col_convert_recruit'), sortable: false },
-  { field: 'id', label: t('col_id') },
+  { key: 'name', field: 'display_name', label: t('col_name') },
+  ...(customerView ? [{ key: 'customer_stage', field: 'customer_stage', label: t('customer_view_stage'), sortable: false }] : []),
+  { key: 'customer_priority', field: 'sales_priority', label: t('col_customer_priority'), mobileLabel: compactColumnLabel(t('col_customer_priority'), 'customer_priority') },
+  { key: 'recruit_priority', field: 'recruitment_priority', label: t('col_recruit_priority'), mobileLabel: compactColumnLabel(t('col_recruit_priority'), 'recruit_priority') },
+  { key: 'referral_priority', field: 'referral_priority', label: t('col_referral_priority'), mobileLabel: compactColumnLabel(t('col_referral_priority'), 'referral_priority') },
+  { key: 'latest_followup', field: 'latest_followup_date', label: t('col_latest_followup'), mobileLabel: compactColumnLabel(t('col_latest_followup'), 'latest_followup'), full: t('col_latest_followup_full') },
+  { key: 'next_followup', field: 'next_followup_date', label: t('col_next_followup'), mobileLabel: compactColumnLabel(t('col_next_followup'), 'next_followup'), full: t('col_next_followup_full') },
+  { key: 'convert_customer', field: 'convert_customer', label: t('col_convert_customer'), sortable: false },
+  { key: 'convert_recruit', field: 'convert_recruit', label: t('col_convert_recruit'), sortable: false },
+  { key: 'id', field: 'id', label: t('col_id') },
 ]);
 
 function fmtDate(v) {
   if (!v) return '-';
   const s = String(v);
   return s.length >= 10 ? s.slice(0, 10) : s;
+}
+
+function fmtDateShort(v) {
+  if (!v) return '-';
+  const match = String(v).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return match ? `${match[3]}/${match[2]}` : fmtDate(v);
 }
 
 export function renderPeople(ctx) {
@@ -77,7 +95,7 @@ export function renderPeople(ctx) {
       const columns = SORT_COLUMNS(customerView);
       const thead = h('thead', {}, h('tr', {}, columns.map((col) => {
         const th = h('th', {
-          class: col.sortable === false ? '' : 'sortable-th',
+          class: `people-col-${col.key}${col.sortable === false ? '' : ' sortable-th'}`,
           title: col.full || undefined,
           onclick: col.sortable === false ? undefined : () => {
             if (state.sortField === col.field) {
@@ -89,7 +107,10 @@ export function renderPeople(ctx) {
             state.page = 1;
             runQuery();
           },
-        }, `${col.label}${arrow(col.field)}`);
+        }, [
+          h('span', { class: 'people-header-full', 'data-mobile-label': col.mobileLabel || undefined }, col.label),
+          h('span', { class: 'people-sort-arrow' }, arrow(col.field)),
+        ]);
         return th;
       })));
       const tbody = h('tbody', {}, rows.map((p) => {
@@ -103,7 +124,7 @@ export function renderPeople(ctx) {
         const cols = columns;
         const hasCustomer = (p.roles || []).includes('customer');
         const hasRecruit = (p.roles || []).includes('recruit') || !!p.recruit_id;
-        const convertCell = (kind, active) => h('td', {}, active
+        const convertCell = (kind, active) => active
           ? bdg(t('role_exists'), kind === 'customer' ? 'jade' : 'gold')
           : h('button', {
             class: 'btn btn-ghost btn-sm', type: 'button',
@@ -111,18 +132,23 @@ export function renderPeople(ctx) {
               ev.stopPropagation();
               openPersonRoleConversion(ctx, { person: p, kind, onDone: runQuery });
             },
-          }, t(kind === 'customer' ? 'btn_convert_customer' : 'btn_convert_recruit')));
+          }, t(kind === 'customer' ? 'btn_convert_customer' : 'btn_convert_recruit'));
+        const cell = (key, content) => h('td', { class: `people-col-${key}` }, content);
+        const dateCell = (key, value) => cell(key, [
+          h('span', { class: 'people-date-full' }, fmtDate(value)),
+          h('span', { class: 'people-date-mobile', title: fmtDate(value) }, fmtDateShort(value)),
+        ]);
         const cells = [
-          h('td', {}, h('a', {}, [p.display_name, h('span', { class: 'badge-stack' }, badges)])),
-          ...(customerView ? [h('td', {}, p.customer_stage ? translateEnum('customer_stage', p.customer_stage) : '-') ] : []),
-          h('td', {}, p.sales_priority ? translateEnum('sales_priority', p.sales_priority) : '-'),
-          h('td', {}, p.recruitment_priority ? translateEnum('sales_priority', p.recruitment_priority) : '-'),
-          h('td', {}, p.referral_priority ? translateEnum('sales_priority', p.referral_priority) : '-'),
-          h('td', {}, fmtDate(p.latest_followup_date)),
-          h('td', {}, fmtDate(p.next_followup_date)),
-          convertCell('customer', hasCustomer),
-          convertCell('recruit', hasRecruit),
-          h('td', {}, String(p.id)),
+          cell('name', h('a', {}, [p.display_name, h('span', { class: 'badge-stack' }, badges)])),
+          ...(customerView ? [cell('customer_stage', p.customer_stage ? translateEnum('customer_stage', p.customer_stage) : '-') ] : []),
+          cell('customer_priority', p.sales_priority ? translateEnum('sales_priority', p.sales_priority) : '-'),
+          cell('recruit_priority', p.recruitment_priority ? translateEnum('sales_priority', p.recruitment_priority) : '-'),
+          cell('referral_priority', p.referral_priority ? translateEnum('sales_priority', p.referral_priority) : '-'),
+          dateCell('latest_followup', p.latest_followup_date),
+          dateCell('next_followup', p.next_followup_date),
+          h('td', { class: 'people-col-convert_customer' }, convertCell('customer', hasCustomer)),
+          h('td', { class: 'people-col-convert_recruit' }, convertCell('recruit', hasRecruit)),
+          cell('id', String(p.id)),
         ];
         // Keep existing responsive labels aligned with the localized table headers.
         cells.forEach((td, i) => { if (i > 0) td.setAttribute('data-label', cols[i].label); });

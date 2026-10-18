@@ -147,6 +147,7 @@ h1, h2, h3, p, ul { margin: 0; }
 .people-filter-count { display: inline-grid; place-items: center; min-width: 18px; height: 18px; margin-left: 6px; padding: 0 4px; border-radius: 99px; background: var(--gold-50); color: var(--gold); font-size: 11px; font-weight: 700; }
 .people-table th, .people-table td { padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: middle; font-size: 13.5px; }
 .people-table th { background: #f8fafc; white-space: nowrap; color: var(--muted); font-weight: 600; }
+.people-date-mobile { display: none; }
 .people-table .sortable-th { cursor: pointer; user-select: none; }
 .people-table tbody tr { cursor: pointer; }
 .people-table tbody tr:last-child td { border-bottom: 0; }
@@ -613,20 +614,29 @@ body:has(.login), body.is-login { padding-top: env(safe-area-inset-top); }
   .brief-headline, .brief-guidance {
     white-space: normal; overflow: visible; text-overflow: clip; word-break: break-word;
   }
-  /* 人物列表：iPhone 转为卡片式堆叠，避免 640px 宽表横向滚动 */
-  .people-table { min-width: 0; }
-  .people-table thead { display: none; }
-  .people-table, .people-table tbody, .people-table tr, .people-table td { display: block; width: 100%; box-sizing: border-box; }
-  .people-table tr {
-    border: 1px solid var(--line); border-radius: 12px; background: var(--card);
-    padding: 10px 12px; margin: 0 0 10px; cursor: pointer;
-  }
-  .people-table tr:active { background: #f7f8fa; }
-  .people-table td { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 3px 0; border: none; font-size: 13.5px; text-align: right; }
-  .people-table td::before { content: attr(data-label); color: var(--muted); font-size: 12px; font-weight: 600; flex: none; }
-  .people-table td:first-child { padding: 2px 0 6px; }
-  .people-table td:first-child::before { content: none; }
-  .people-table td:first-child a { font-weight: 700; }
+  /* 人物列表：保留紧凑表格，固定姓名列，其余字段横向滚动。 */
+  .table-scroll { overflow-x: auto; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; }
+  .people-table { width: max-content; min-width: 540px; table-layout: fixed; border-collapse: separate; border-spacing: 0; }
+  .people-table { display: table; }
+  .people-table thead { display: table-header-group; }
+  .people-table tbody { display: table-row-group; }
+  .people-table tr { display: table-row; cursor: pointer; }
+  .people-table th, .people-table td { display: table-cell; box-sizing: border-box; padding: 8px 5px; font-size: 11.5px; text-align: center; white-space: nowrap; }
+  .people-table th { font-size: 11px; }
+  .people-header-full[data-mobile-label] { font-size: 0; }
+  .people-header-full[data-mobile-label]::after { content: attr(data-mobile-label); font-size: 11px; }
+  .people-date-full { display: none; }
+  .people-date-mobile { display: inline; }
+  .people-col-name { width: 160px; min-width: 160px; text-align: left !important; }
+  .people-col-customer_priority, .people-col-recruit_priority, .people-col-referral_priority { width: 54px; min-width: 54px; }
+  .people-col-latest_followup, .people-col-next_followup { width: 72px; min-width: 72px; }
+  .people-col-id { width: 62px; min-width: 62px; }
+  .people-col-name:first-child { position: sticky; left: 0; z-index: 3; background: var(--card); box-shadow: 5px 0 8px -7px rgba(30, 38, 52, .5); }
+  .people-table th.people-col-name { z-index: 4; background: #f8fafc; }
+  .people-table td.people-col-name a { display: flex; align-items: center; gap: 4px; font-weight: 700; white-space: nowrap; }
+  .people-table .badge-stack { display: inline-flex; flex-wrap: nowrap; gap: 3px; }
+  .people-col-customer_stage, .people-col-convert_customer, .people-col-convert_recruit { display: none !important; }
+  .people-table .people-sort-arrow { font-size: 9px; }
   .btn { padding: 6px 10px; font-size: 13px; }
   .btn-sm { padding: 4px 10px; font-size: 12px; }
   .bdg { height: 20px; padding: 0 7px; font-size: 11px; }
