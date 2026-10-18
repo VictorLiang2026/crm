@@ -24,8 +24,38 @@ exports.main = async (event, context) => {
 
 async function collect() {
   // 调用 DB 函数采集指标（只读，返回 JSON 快照）
-  const metricsRes = assertOk(await rdb.from('pmc18_collect_metrics()').select('*').single());
-  const m = metricsRes.pmc18_collect_metrics || metricsRes;
+  const metricsRes = assertOk(await rdb.rpc('pmc18_collect_metrics'));
+  if (!metricsRes || !Object.prototype.hasOwnProperty.call(metricsRes, 'data')) {
+    throw new Error('Metrics RPC returned no data');
+  }
+  let m = metricsRes.data;
+  if (Array.isArray(m)) {
+    if (m.length !== 1) throw new Error('Metrics RPC returned an unexpected row count');
+    m = m[0];
+  }
+  if (m && typeof m === 'object' && Object.prototype.hasOwnProperty.call(m, 'pmc18_collect_metrics')) {
+    m = m.pmc18_collect_metrics;
+  }
+  if (typeof m === 'string') {
+    try { m = JSON.parse(m); }
+    catch { throw new Error('Metrics RPC returned invalid JSON'); }
+  }
+  const isObject = value => value && typeof value === 'object' && !Array.isArray(value);
+  const isCount = value => Number.isSafeInteger(value) && value >= 0;
+  const groups = ['mappings', 'field_drift', 'duplicate_persons', 'orphans',
+    'softdelete_cross', 'roles', 'no_role', 'counts'];
+  if (!isObject(m) || m.version !== 'pmc18-metrics-v1' ||
+      m.environment !== process.env.TCB_ENV || groups.some(group => !isObject(m[group]))) {
+    throw new Error('Metrics RPC returned an invalid snapshot');
+  }
+  const counts = [m.mappings.customers_without_person, m.mappings.recruits_without_person,
+    m.field_drift.drift_rows, m.duplicate_persons.dup_groups,
+    m.softdelete_cross.person_alive_customer_deleted, m.softdelete_cross.person_deleted_customer_alive,
+    m.roles.duplicate_role_rows, m.no_role.no_role,
+    ...Object.values(m.orphans), ...Object.values(m.counts).map(value => value?.total)];
+  if (!Object.keys(m.orphans).length || !Object.keys(m.counts).length || counts.some(value => !isCount(value))) {
+    throw new Error('Metrics RPC returned invalid counts');
+  }
 
   const rows = [];
   const now = new Date().toISOString();
@@ -61,7 +91,8 @@ async function collect() {
   }
 
   // 写入观测表
-  await assertOk(rdb.from('pmc18_observations').insert(rows));
+  const inserted = assertOk(await rdb.from('pmc18_observations').insert(rows));
+  if (!inserted || typeof inserted !== 'object') throw new Error('Metrics insert returned no result');
 
   return {
     ok: true,

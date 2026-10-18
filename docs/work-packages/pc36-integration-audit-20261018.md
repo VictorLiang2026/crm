@@ -71,7 +71,7 @@ PC34 门禁首次因本工作树缺少本轮 `public` 目录快照而停止。�
 
 原定观察期为 2026-10-10 至 **2027-01-08**；历史 [PMC-18 记录](../../specs/person-centered-migration/evidence/PMC-18.md) 中的 `2026-01-08` 是已知年份笔误，不改写历史原件。2026-10-18 生产只读查询显示 `public.pmc18_observations` **0 行**。`pmc18_observer` 的 `pmc18_daily_0200` 定时触发器仍在；最近日志连续返回 `Could not find the table 'public.pmc18_collect_metrics()' in the schema cache`，但函数日志的传输状态仍显示 200。根因在现有 `collect` 分支将 PostgreSQL 函数名传给 `rdb.from(...)` 当表读取。`SELECT public.pmc18_collect_metrics()` 已只读证明该聚合函数能返回结构化计数。故当前既不能声称定时指标正常，也不能把空表解释为零异常。
 
-该修复会让现有定时监测开始写入观测行，属于已有功能行为变化。已按 AGENTS.md 取得具体范围确认请求；确认前不修改相关代码、不手动触发采集。拟仅在 `pmc18_observer` 中改用 `rdb.rpc`、校验返回和等待写入结果，保留原触发器、`listRecent`、数据库结构、权限和其他业务函数。修复后需核对一次无个人资料的实际采集、观测表读回、失败路径和次日定时日志。
+该修复会让现有定时监测开始写入观测行，属于已有功能行为变化。用户已批准仅修 `pmc18_observer` 的 `collect` 分支并发布：改用 `rdb.rpc`、校验返回和等待写入结果，保留原触发器、`listRecent`、数据库结构、权限和其他业务函数。源码已完成，`node --check`、5 项隔离用例（成功、SDK 包装、RPC 失败、非法数据、异步写入失败、旧读取）和 58 份共享副本校验通过；当前尚未部署，实际采集、观测表读回和次日定时日志待核对。此包没有数据库结构或权限变化，因此不需 migration/rollback；回退为恢复原函数代码的后续发布，不能删已生成的观测记录。
 
 ## 导航与交接门
 
