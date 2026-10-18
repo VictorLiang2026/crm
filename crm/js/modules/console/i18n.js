@@ -989,6 +989,8 @@ const DICT = {
   'col_customer_stage': { 'zh-CN': '客户经营阶段', 'en': 'Stage' },
   'col_latest_followup': { 'zh-CN': '本次跟进日期', 'en': 'Last FU' },
   'col_next_followup': { 'zh-CN': '下次跟进日期', 'en': 'Next FU' },
+  'col_recent_update': { 'zh-CN': '最近更新日期', 'en': 'Last Updated' },
+  'col_recent_update_mobile': { 'zh-CN': '最近', 'en': 'Updated' },
   'col_id': { 'zh-CN': '编号', 'en': 'ID' },
   'col_customer_stage_full': { 'zh-CN': '客户经营阶段', 'en': 'Customer Stage' },
   'col_latest_followup_full': { 'zh-CN': '本次跟进日期', 'en': 'Latest Follow-up Date' },

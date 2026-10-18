@@ -16,16 +16,21 @@ test('Console People directory sorts person-owned priority and follow-up columns
         window.peopleRequests.push({name,args});
         return {rows:[{id:9,display_name:'【系统测试·勿联系】虚构人物',roles:['customer'],
           sales_priority:'A',recruitment_priority:'B',referral_priority:'C',latest_followup_date:'2026-10-01',
-          next_followup_date:'2026-10-15',customer_id:13,recruit_id:null}],page:1,pageSize:30,total:1,totalPages:1,hasMore:false};
+          next_followup_date:'2026-10-15',updated_at:'2026-10-12T09:30:00Z',customer_id:13,recruit_id:null}],page:1,pageSize:30,total:1,totalPages:1,hasMore:false};
       }}};
       renderPeople(ctx);
     })()`);
     await b.wait("document.querySelector('.people-table tbody tr')");
     await b.evaluate("document.head.insertAdjacentHTML('beforeend','<link rel=stylesheet href=/crm/css/console.css>')");
     const headers = await b.evaluate("[...document.querySelectorAll('.people-table thead th')].map(x=>x.textContent.trim())");
-    for (const expected of ['客户优先级','招募优先级','转介优先级','本次跟进日期','下次跟进日期','转客户','转招募']) {
+    for (const expected of ['客户优先级','招募优先级','转介优先级','本次跟进日期','下次跟进日期','最近更新日期','转客户','转招募']) {
       assert.ok(headers.some(header => header.includes(expected)), `missing directory column: ${expected}`);
     }
+    const englishLabels = await b.evaluate(`(async()=>{
+      const {t,setLang}=await import('/crm/js/modules/console/i18n.js');
+      setLang('en');const labels=[t('col_recent_update'),t('col_recent_update_mobile')];setLang('zh-CN');return labels;
+    })()`);
+    assert.deepEqual(englishLabels, ['Last Updated','Updated']);
     assert.equal(headers.includes('优先级'), false);
     assert.equal(headers.includes('客户经营阶段'), false);
     assert.equal(await b.evaluate("getComputedStyle(document.querySelector('.people-table')).borderCollapse"), 'collapse');
@@ -35,7 +40,7 @@ test('Console People directory sorts person-owned priority and follow-up columns
     const sortable = [
       ['客户优先级','sales_priority'], ['招募优先级','recruitment_priority'],
       ['转介优先级','referral_priority'], ['本次跟进日期','latest_followup_date'],
-      ['下次跟进日期','next_followup_date'],
+      ['下次跟进日期','next_followup_date'], ['最近更新日期','updated_at'],
     ];
     for (const [label, field] of sortable) {
       const nextCount = await b.evaluate('window.peopleRequests.length+1');
@@ -152,7 +157,7 @@ test('People directory uses 30-row pages on phone and iPad with an unlocked cont
       window.peopleTestCtx={main:(()=>{const e=document.createElement('main');document.body.append(e);return e})(),toast(){},api:{call:async(name,args)=>{
         window.peopleRequests.push({name,args});
         const all=Array.from({length:31},(_,i)=>({id:100+i,display_name:i===17?'这是本页最长姓名用于确认姓名列按照最长内容自然扩展':'人物'+String(i+1).padStart(2,'0'),
-          roles:[],sales_priority:'A',recruitment_priority:'B',referral_priority:'C',latest_followup_date:'2026-10-04',next_followup_date:'2026-10-18'}));
+          roles:[],sales_priority:'A',recruitment_priority:'B',referral_priority:'C',latest_followup_date:'2026-10-04',next_followup_date:'2026-10-18',updated_at:'2026-10-12T09:30:00Z'}));
         const start=(args.page-1)*args.pageSize;
         const rows=all.slice(start,start+args.pageSize);
         return {rows,page:args.page,pageSize:args.pageSize,total:all.length,totalPages:Math.ceil(all.length/args.pageSize),hasMore:start+rows.length<all.length};
@@ -183,6 +188,8 @@ test('People directory uses 30-row pages on phone and iPad with an unlocked cont
     assert.ok(mobile.nameWidth > 160, 'name column expands to fit the longest row');
     assert.equal(mobile.cellWidth, mobile.nameWidth);
     assert.equal(mobile.minWidth, '0px');
+    assert.equal(await b.evaluate("getComputedStyle(document.querySelector('.people-directory-table th.people-col-updated_at .people-header-full'),'::after').content"), '"最近"');
+    assert.equal(await b.evaluate("document.querySelector('.people-directory-table td.people-col-updated_at .people-date-mobile').textContent"), '12/10');
     await b.evaluate("document.querySelector('.pager button:last-child').click()");
     await b.wait("window.peopleRequests.at(-1)?.args.page===2 && document.querySelectorAll('.people-directory-table tbody tr').length===1");
     assert.equal(await b.evaluate('window.peopleRequests.at(-1).args.pageSize'), 30);
@@ -192,6 +199,8 @@ test('People directory uses 30-row pages on phone and iPad with an unlocked cont
     await b.wait("window.peopleRequests.at(-1)?.args.pageSize===30");
     assert.equal(await b.evaluate("getComputedStyle(document.querySelector('.people-date-full')).display"), 'inline');
     assert.equal(await b.evaluate("getComputedStyle(document.querySelector('.people-date-mobile')).display"), 'none');
+    assert.equal(await b.evaluate("document.querySelector('.people-directory-table th.people-col-updated_at .people-header-full').textContent"), '最近更新日期');
+    assert.equal(await b.evaluate("document.querySelector('.people-directory-table td.people-col-updated_at .people-date-full').textContent"), '2026-10-12');
 
     await b.send('Emulation.setDeviceMetricsOverride', { width: 1366, height: 900, deviceScaleFactor: 1, mobile: false });
     await b.send('Emulation.setTouchEmulationEnabled', { enabled: false });
