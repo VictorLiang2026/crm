@@ -86,7 +86,12 @@ function evaluate(actual, approved = baseline) {
       }
     } else if (item.kind === 'routine') {
       counts.routines++;
-      check(item.detail?.service_execute === true, `Service routine execution missing: ${id}`);
+      if (item.name === 'pmc18_collect_once_v1()') {
+        check(item.detail?.anon_execute === true && item.detail?.service_execute === false,
+          `PMC18 bounded collector grant changed: ${id}`);
+      } else {
+        check(item.detail?.service_execute === true, `Service routine execution missing: ${id}`);
+      }
     } else check(false, `Unexpected object kind: ${id}`);
   }
   for (const id of approvedMap.keys()) check(actualMap.has(id), `Approved object missing: ${id}`);

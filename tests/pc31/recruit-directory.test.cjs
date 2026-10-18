@@ -136,6 +136,19 @@ test('recruit directory search, multi-select filters, sorting, and 30-row paging
     [...page1.rows, ...page2.rows].map(row => row.customer_name).sort((a, b) => a.localeCompare(b, 'zh-CN', { sensitivity: 'base' })));
 });
 
+test('recruit directory ignores transport context while validating supported criteria', async () => {
+  const f = fixture();
+  const result = await f.service.list({
+    action: 'listRecruitDirectory', page: 1, pageSize: 30, search: 'legacy',
+    stages: ['新增人才'], priorities: ['A'], sortField: 'name', sortDir: 'asc',
+    requestContext: { requestId: 'test-request', source: 'console' },
+  });
+  assert.ok(result.rows.length > 0);
+  assert.ok(result.rows.every(row => row.customer_name.startsWith('legacy-')));
+  assert.ok(result.rows.every(row => row.stage === '新增人才' && row.recruitment_priority === 'A'));
+  assert.ok(f.calls.every(call => !Object.hasOwn(call.filters, 'requestContext')));
+});
+
 test('recruit directory rejects unsupported filters and sorting fields', async () => {
   const f = fixture();
   await assert.rejects(() => f.service.list({ action: 'listRecruitDirectory', page: 1, pageSize: 30, sortField: 'person_id' }), /Invalid recruit directory criteria/);

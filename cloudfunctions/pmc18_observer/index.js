@@ -23,59 +23,17 @@ exports.main = async (event, context) => {
 };
 
 async function collect() {
-  // 调用 DB 函数采集指标（只读，返回 JSON 快照）
-  const metricsRes = assertOk(await rdb.from('pmc18_collect_metrics()').select('*').single());
-  const m = metricsRes.pmc18_collect_metrics || metricsRes;
-
-  const rows = [];
-  const now = new Date().toISOString();
-
-  // 身份映射
-  pushMetric(rows, now, 'customers_without_person', m.mappings?.customers_without_person, m.mappings?.customers_without_person > 0 ? 'critical' : 'info');
-  pushMetric(rows, now, 'recruits_without_person', m.mappings?.recruits_without_person, m.mappings?.recruits_without_person > 0 ? 'critical' : 'info');
-
-  // 字段漂移
-  pushMetric(rows, now, 'field_drift_rows', m.field_drift?.drift_rows, m.field_drift?.drift_rows > 0 ? 'warning' : 'info');
-
-  // 重复人物
-  pushMetric(rows, now, 'duplicate_person_groups', m.duplicate_persons?.dup_groups, m.duplicate_persons?.dup_groups > 0 ? 'warning' : 'info');
-
-  // 孤儿引用
-  for (const [k, v] of Object.entries(m.orphans || {})) {
-    pushMetric(rows, now, 'orphan_' + k, v, v > 0 ? 'critical' : 'info');
+  // The fixed public RPC owns the lock, the snapshot and the write transaction.
+  const response = assertOk(await rdb.rpc('pmc18_collect_once_v1'));
+  const result = response && response.data;
+  if (!result || typeof result !== 'object' || Array.isArray(result) ||
+      result.ok !== true || !Number.isInteger(result.metrics) || result.metrics !== 20 ||
+      typeof result.collectedAt !== 'string' || !Number.isFinite(Date.parse(result.collectedAt)) ||
+      (result.reused !== true && result.reused !== false) ||
+      (result.reused === false && (!result.summary || typeof result.summary !== 'object'))) {
+    throw new Error('Invalid PMC18 collection receipt');
   }
-
-  // 软删跨表不一致
-  pushMetric(rows, now, 'person_alive_customer_deleted', m.softdelete_cross?.person_alive_customer_deleted, m.softdelete_cross?.person_alive_customer_deleted > 0 ? 'warning' : 'info');
-  pushMetric(rows, now, 'person_deleted_customer_alive', m.softdelete_cross?.person_deleted_customer_alive, m.softdelete_cross?.person_deleted_customer_alive > 0 ? 'warning' : 'info');
-
-  // 角色重复
-  pushMetric(rows, now, 'duplicate_role_rows', m.roles?.duplicate_role_rows, m.roles?.duplicate_role_rows > 0 ? 'critical' : 'info');
-
-  // 无角色 Person（排除测试数据）
-  pushMetric(rows, now, 'persons_without_role', m.no_role?.no_role, m.no_role?.no_role > 0 ? 'warning' : 'info');
-
-  // 计数
-  for (const [t, c] of Object.entries(m.counts || {})) {
-    pushMetric(rows, now, 'count_' + t, c.total, 'info', c);
-  }
-
-  // 写入观测表
-  await assertOk(rdb.from('pmc18_observations').insert(rows));
-
-  return {
-    ok: true,
-    collectedAt: now,
-    metrics: rows.length,
-    summary: {
-      customers_without_person: m.mappings?.customers_without_person,
-      recruits_without_person: m.mappings?.recruits_without_person,
-      field_drift: m.field_drift?.drift_rows,
-      duplicate_persons: m.duplicate_persons?.dup_groups,
-      orphans: m.orphans,
-      persons_without_role: m.no_role?.no_role,
-    },
-  };
+  return result;
 }
 
 async function listRecent(event) {
@@ -85,14 +43,4 @@ async function listRecent(event) {
     .order('observed_at', { ascending: false })
     .limit(limit));
   return { rows: res.data || [], total: res.data?.length || 0 };
-}
-
-function pushMetric(rows, observedAt, metric, value, level, detail) {
-  rows.push({
-    observed_at: observedAt,
-    metric,
-    value: value != null ? String(value) : null,
-    level: level || 'info',
-    detail: detail != null ? JSON.stringify(detail) : null,
-  });
 }

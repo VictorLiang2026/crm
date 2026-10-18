@@ -57,9 +57,10 @@ function arrayField(value, allowed, name) {
 }
 
 function criteriaOf(event) {
-  const keys = new Set(['action', 'page', 'pageSize', 'search', 'stages', 'priorities', 'sortField', 'sortDir']);
-  if (Object.keys(event).some(key => !keys.has(key)) ||
-      (event.action != null && event.action !== 'listRecruitDirectory')) {
+  // CloudBase RPC event objects can carry transport context in addition to
+  // the caller's criteria. Only read the explicitly supported query fields;
+  // never forward arbitrary event properties into a database request.
+  if (event.action != null && event.action !== 'listRecruitDirectory') {
     throw new Error('Invalid recruit directory criteria');
   }
   const search = String(event.search ?? '').trim();

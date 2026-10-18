@@ -40,6 +40,16 @@ test('new or missing public objects cannot silently pass', () => {
   assert.match(evaluate(missing).failures.join('\n'), /Approved object missing/);
 });
 
+test('PMC18 bounded anon collector is the only approved service execution exception', () => {
+  assert.deepEqual(evaluate(copy()).failures, []);
+  const missing = copy();
+  object(missing, 'pmc18_collect_once_v1()').detail.anon_execute = false;
+  assert.match(evaluate(missing).failures.join('\n'), /PMC18 bounded collector grant changed/);
+  const expanded = copy();
+  object(expanded, 'pmc18_collect_once_v1()').detail.service_execute = true;
+  assert.match(evaluate(expanded).failures.join('\n'), /PMC18 bounded collector grant changed/);
+});
+
 test('anonymous gateway checks reject visible rows and nonzero aggregate facts', () => {
   assert.equal(classify(200, '*/0', true), true);
   assert.equal(classify(206, '0-0/1', true), false);

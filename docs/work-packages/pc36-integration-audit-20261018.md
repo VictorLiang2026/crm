@@ -73,7 +73,11 @@ PC34 门禁首次因本工作树缺少本轮 `public` 目录快照而停止。�
 
 该修复会让现有定时监测开始写入观测行，属于已有功能行为变化。用户已批准仅修 `pmc18_observer` 的 `collect` 分支：改用 `rdb.rpc`、校验返回和等待写入结果，保留原触发器、`listRecent`、数据库结构、权限和其他业务函数。`node --check`、5 项隔离用例（成功、SDK 包装、RPC 失败、非法数据、异步写入失败、旧读取）和 58 份共享副本校验通过。2026-10-18 23:58 单函数代码部署后核对运行时 Nodejs20.19、定时触发器不变，手动执行批准的一次采集得到 RequestId `7033116c-ede7-4ac6-a693-5671e79035c2`，应用返回 **`permission denied for function pmc18_collect_metrics`**；随后 `public.pmc18_observations` 仍为 **0 行**。CLI 的进程退出码 0 仅代表调用传输成功，不代表采集成功。
 
-继续只读核对确认：当前 `rdb()` 云函数通道使用 `anon`，原聚合函数为 `SECURITY DEFINER` 但仅授予 `service_role` 执行；观测表对 `anon` 只有 SELECT，INSERT 仅给 `service_role`，且 RLS 仅有 service_role 写策略。故仅修 JS 调用方式不可能完成采集。已停止再次触发采集，并将线上 `pmc18_observer` 恢复到本轮前源码；读回 `CodeInfo` 确认旧调用，`listRecent` 真实调用返回 `{rows: [], total: 0}`，观测表仍为 0 行。采集仍不可用，等待受限 `public` 执行路径的具体授权。任何新数据库对象须有 migration/rollback，不能直接扩大旧函数/表的 anon 写权限。
+继续只读核对确认：当前 `rdb()` 云函数通道使用 `anon`，原聚合函数为 `SECURITY DEFINER` 但仅授予 `service_role` 执行；观测表对 `anon` 只有 SELECT，INSERT 仅给 `service_role`，且 RLS 仅有 service_role 写策略。故仅修 JS 调用方式不可能完成采集。当时已停止再次触发采集，并将线上 `pmc18_observer` 恢复到本轮前源码；读回 `CodeInfo` 确认旧调用，`listRecent` 真实调用返回 `{rows: [], total: 0}`，观测表仍为 0 行。上述回退是诊断过程，以下为后续获授权的修复。
+
+用户随后单独批准受限 `public` RPC 子包。迁移 [20261019003000](../../cloudbase/migrations/20261019003000_pmc_observer_daily_collect.sql) 新增无参数、`SECURITY DEFINER` 的 `public.pmc18_collect_once_v1()`，固定生成 20 项无个人资料指标，事务锁串行并按北京时间每天最多写一批；配套 [rollback](../../cloudbase/rollbacks/20261019003000_pmc_observer_daily_collect.rollback.sql) 只删除该新函数，须先恢复旧版云函数，**不自动删除已采集观测**。新函数仅授权 `anon` 执行；原聚合函数和观测表对 `anon` 的执行/写入权限不变。迁移工具最初在任务完成后的即时核验返回 `MIGRATION_NOT_APPLIED`，随后任务详情为 `Succeed`、远端迁移历史含版本 `20261019003000`，且只读目录确认新函数存在、无参数、限定搜索路径及实际权限；这是控制面可见性延迟，未重复应用迁移。
+
+`pmc18_observer` 仅改 `collect` 调用该 RPC 并校验回执；`listRecent`、Nodejs20.19、30 秒限制和 `pmc18_daily_0200` 定时触发器保留。2026-10-19 00:30（北京时间）经生产云函数真实调用，RequestId `e20b6fe1-568f-4ebb-a60b-02a29e44b0f5` 返回 `ok=true, reused=false, metrics=20`；`public.pmc18_observations` 读回同一时间戳的 **20 行/20 种指标**。同日再次调用 RequestId `81920955-78d2-48ba-8a3c-33a18b53300b` 返回 `reused=true`，两次并发重复调用亦均返回原采集时间，读回仍为 20 行。旧 `listRecent` 生产调用 RequestId `506012e8-b9e7-460c-900e-d9e408ed8825` 返回 1 行/total 1。权限读回：`anon` 仅能执行新 RPC，不能执行旧聚合 RPC；观测表写权限未扩张。预期 `public` 对象清单只新增该函数，并在目录门禁中对其设唯一的受限匿名执行例外，仍逐项比较精确权限；匿名网关门禁对原已授权读取的 `pmc18_observations` 接受非空观测，不改变表权限。该目录门禁专项用例 5/5 通过。采集器隔离用例 4/4 通过，覆盖成功、重放、RPC/回执故障拒绝和旧读取。生产批次有 **1 项 warning：persons_without_role=3**、0 项 critical，属于现有聚合返回的待核查信号，未在本包追查或改写人物数据。生产故障注入和次日 02:00 定时采集尚未观察，不能以手动成功替代定时连续性验收。
 
 ## 导航与交接门
 

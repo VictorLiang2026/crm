@@ -46,3 +46,12 @@
 - Regression: `npm run test:pc31` passed 10/10, including a production-shaped RPC envelope and rejection of an unrelated action. WP01 passed with its existing declared limitations and 3 registered identity exceptions.
 - Function `person_360` was redeployed. CLI smoke invocation reached the deployed function but returned `UNAUTHORIZED` because the invocation had no authenticated CRM user; the service-level and browser-harness regressions cover the valid envelope, while authenticated production invocation remains unverified.
 - Follow-up fix release: `release-20261018-2305` (published from the latest GitHub master after cloud parity verification).
+
+## Follow-up fix: tolerate RPC transport context
+
+- The production log after `release-20261018-2305` still showed `Invalid recruit directory criteria` for authenticated list calls. The dispatched action was valid; the remaining rejection came from checking the entire CloudBase event for unknown keys.
+- Updated criteria validation to read only the supported action, pagination, search, stage, priority, and sorting fields. Extra transport context is ignored and never forwarded to PostgREST; supported filter values and sort fields remain validated against fixed allowlists.
+- Regression: `npm run test:pc31` passed 11/11, including a production-shaped request with extra transport context, and retained rejection tests for an unsupported sort field, invalid stage, and unrelated action.
+- `person_360` was deployed. CloudBase logs from 2026-10-18 23:35 through 2026-10-19 00:00 showed no further `Invalid recruit directory criteria` responses. An authenticated list request from the browser could not be independently exercised in this session.
+- The earlier production-only `pmc18_observer` code has been superseded by the separately approved PC36 bounded daily collection RPC and cloud-function update. That earlier source is excluded from this recruit fix. The recruit fix itself has no schema, data, permission, or static asset changes; the combined release includes the PC36 migration and its rollback.
+- The user approved publishing this already-deployed recruit service change, its regression, and this record with PC36 in one Git commit and tag. Final release gate and Git publication are pending.

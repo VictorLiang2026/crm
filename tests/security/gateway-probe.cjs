@@ -41,7 +41,8 @@ async function probe() {
   // 安全限制：anon 仅能读到未软删行（display_name 等基础字段），敏感写入仍需 service_role。
   // 待 PMC 后续包将 identity helper 改走 service_role/person_360 委托后可移除此例外。
   const anonSelectExceptions = {
-    persons: 'PMC-10 approved: anon reads non-deleted persons rows via rdb() gateway'
+    persons: 'PMC-10 approved: anon reads non-deleted persons rows via rdb() gateway',
+    pmc18_observations: 'PMC-18 approved: anon reads bounded monitoring observations'
   };
   const results = [];
   for (const item of objects) {
