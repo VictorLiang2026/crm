@@ -36,6 +36,13 @@
 
 ## Release
 
-- Pending final cloud parity check, GitHub push, and release tag.
-- Release includes the user-approved existing PC28 commit `6abbc2a`.
-- Cloud deployment scope: `crm/css/console.css`, `crm/js/modules/console/i18n.js`, `crm/js/modules/console/pages/recruit.js`, `crm/js/modules/console/recruit-delete.js`, and functions `assistant` (PC28) / `person_360` (directory filters and sorting). No database or permission changes.
+- Initial release: commit `e916e4d`, tag `release-20261018-2231`; includes the user-approved existing PC28 commit `6abbc2a`.
+- Initial cloud deployment scope: `crm/css/console.css`, `crm/js/modules/console/i18n.js`, `crm/js/modules/console/pages/recruit.js`, `crm/js/modules/console/recruit-delete.js`, and functions `assistant` (PC28) / `person_360` (directory filters and sorting). No database or permission changes.
+
+## Follow-up fix: route action validation
+
+- Diagnosis: the console API adapter includes `action: "listRecruitDirectory"` in the RPC event. `person_360` dispatches the event unchanged to this service, but the filtered-criteria allowlist rejected the normal `action` field, producing `Invalid recruit directory criteria` on production.
+- Fix: accept only `action: "listRecruitDirectory"` in the criteria envelope while continuing to reject unknown fields and other action values.
+- Regression: `npm run test:pc31` passed 10/10, including a production-shaped RPC envelope and rejection of an unrelated action. WP01 passed with its existing declared limitations and 3 registered identity exceptions.
+- Function `person_360` was redeployed. CLI smoke invocation reached the deployed function but returned `UNAUTHORIZED` because the invocation had no authenticated CRM user; the service-level and browser-harness regressions cover the valid envelope, while authenticated production invocation remains unverified.
+- Follow-up fix release: `release-20261018-2305` (published from the latest GitHub master after cloud parity verification).

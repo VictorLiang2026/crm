@@ -107,7 +107,7 @@ test('PC31 rejects pages beyond the explicit result cap', async () => {
 test('recruit directory search, multi-select filters, sorting, and 30-row paging span both sources', async () => {
   const f = fixture();
   const first = await f.service.list({
-    page: 1, pageSize: 30, search: 'legacy', stages: ['新增人才', '初次面谈'],
+    action: 'listRecruitDirectory', page: 1, pageSize: 30, search: 'legacy', stages: ['新增人才', '初次面谈'],
     priorities: ['A', 'C'], sortField: 'potential_score', sortDir: 'asc',
   });
   assert.ok(first.rows.length > 0);
@@ -126,8 +126,8 @@ test('recruit directory search, multi-select filters, sorting, and 30-row paging
   assert.ok(f.calls.every(call => call.filters.recruitment_priority === 'in.(A,C)'));
 
   const all = fixture();
-  const page1 = await all.service.list({ page: 1, pageSize: 30, sortField: 'name', sortDir: 'asc' });
-  const page2 = await all.service.list({ page: 2, pageSize: 30, sortField: 'name', sortDir: 'asc' });
+  const page1 = await all.service.list({ action: 'listRecruitDirectory', page: 1, pageSize: 30, sortField: 'name', sortDir: 'asc' });
+  const page2 = await all.service.list({ action: 'listRecruitDirectory', page: 2, pageSize: 30, sortField: 'name', sortDir: 'asc' });
   assert.equal(page1.rows.length, 30);
   assert.equal(page2.rows.length, 30);
   assert.equal(page2.page, 2);
@@ -138,8 +138,9 @@ test('recruit directory search, multi-select filters, sorting, and 30-row paging
 
 test('recruit directory rejects unsupported filters and sorting fields', async () => {
   const f = fixture();
-  await assert.rejects(() => f.service.list({ page: 1, pageSize: 30, sortField: 'person_id' }), /Invalid recruit directory criteria/);
+  await assert.rejects(() => f.service.list({ action: 'listRecruitDirectory', page: 1, pageSize: 30, sortField: 'person_id' }), /Invalid recruit directory criteria/);
   await assert.rejects(() => f.service.list({ page: 1, pageSize: 30, stages: ['unexpected'] }), /Invalid recruit directory stages/);
+  await assert.rejects(() => f.service.list({ action: 'otherAction', page: 1, pageSize: 30, sortField: 'name' }), /Invalid recruit directory criteria/);
   assert.equal(f.calls.length, 0);
 });
 
@@ -151,7 +152,7 @@ test('recruit directory supports sorting every visible table column', async () =
   };
   for (const [sortField, column] of Object.entries(fields)) {
     const f = fixture();
-    const result = await f.service.list({ page: 1, pageSize: 30, sortField, sortDir: 'desc' });
+    const result = await f.service.list({ action: 'listRecruitDirectory', page: 1, pageSize: 30, sortField, sortDir: 'desc' });
     assert.equal(result.rows.length, 30, `${sortField} page size`);
     assert.ok(f.calls.every(call => call.filters.order === `${column}.desc.nullslast,candidate_id.desc`), `${sortField} query order`);
   }

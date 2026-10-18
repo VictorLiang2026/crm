@@ -57,8 +57,11 @@ function arrayField(value, allowed, name) {
 }
 
 function criteriaOf(event) {
-  const keys = new Set(['page', 'pageSize', 'search', 'stages', 'priorities', 'sortField', 'sortDir']);
-  if (Object.keys(event).some(key => !keys.has(key))) throw new Error('Invalid recruit directory criteria');
+  const keys = new Set(['action', 'page', 'pageSize', 'search', 'stages', 'priorities', 'sortField', 'sortDir']);
+  if (Object.keys(event).some(key => !keys.has(key)) ||
+      (event.action != null && event.action !== 'listRecruitDirectory')) {
+    throw new Error('Invalid recruit directory criteria');
+  }
   const search = String(event.search ?? '').trim();
   const sortField = String(event.sortField ?? 'next_action_date');
   const sortDir = String(event.sortDir ?? 'desc');
