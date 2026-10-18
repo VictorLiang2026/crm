@@ -247,6 +247,18 @@ const SKILLS = [
     confirmationLevel:'confirm_before_write',timeoutClass:'short',
   },
   {
+    name:'assistant_recruit_delete_v1',version:'1.0.0',capability:'structured_extraction',
+    contextRecipe:recipe(['guidance']),
+    inputSchema:object({text:text(1200),language:{type:'string',enum:['zh-CN','en']}},['text','language']),
+    outputSchema:object({
+      status:{type:'string',enum:['supported','needs_clarification','unsupported']},
+      operation:{type:'string',enum:['delete','unsupported']},
+      interpretation:text(300),personMention:{type:['string','null'],maxLength:120},
+      candidateMention:{type:['string','null'],maxLength:200},
+    },['status','operation','interpretation','personMention','candidateMention']),
+    confirmationLevel:'confirm_before_write',timeoutClass:'short',
+  },
+  {
     name: 'crm_search_query_v2', version: '2.0.0', capability: 'structured_extraction',
     contextRecipe: recipe(['guidance']),
     inputSchema: object({ query: text(1000), language: { type: 'string', enum: ['zh-CN','en'] } }, ['query','language']),

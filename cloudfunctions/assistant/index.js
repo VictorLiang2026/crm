@@ -13,7 +13,10 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
   actionTargetsRunner = event => require('./action-command-intent-service').listActionTargets(event),
   opportunityIntentRunner = event => require('./opportunity-command-intent-service').interpretOpportunityCommand(event),
   opportunityTargetsRunner = (event, uid) => require('./opportunity-command-intent-service').listOpportunityTargets(event,uid),
-  opportunityCommandRunner = (event, uid) => require('./opportunity-command-service').runOpportunityCommand(event,uid)) {
+  opportunityCommandRunner = (event, uid) => require('./opportunity-command-service').runOpportunityCommand(event,uid),
+  recruitDeleteIntentRunner = event => require('./recruit-delete-intent-service').interpretRecruitDelete(event),
+  recruitDeleteTargetsRunner = (event,uid) => require('./recruit-delete-intent-service').listRecruitDeleteTargets(event,uid),
+  recruitDeleteCommandRunner = (event,uid) => require('./recruit-delete-command-service').runRecruitDeleteCommand(event,uid)) {
   return async event => {
     let identity;
     try { identity = await getIdentity(); }
@@ -111,6 +114,40 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
         const code=['INVALID_COMMAND','PREVIEW_STALE','CONFIRMATION_REQUIRED','OPPORTUNITY_COMMAND_FAILED'].includes(error?.code)?
           error.code:'OPPORTUNITY_COMMAND_FAILED';
         return {ok:false,error:{code,message:'Opportunity command could not be completed'}};
+      }
+    }
+    if (event?.action === 'recruitDeleteInterpret') {
+      try {
+        if (Object.keys(event).some(key=>!['action','query','language'].includes(key))) {
+          return {ok:false,error:{code:'INVALID_INPUT',message:'Recruit delete request is invalid'}};
+        }
+        return await recruitDeleteIntentRunner({query:event.query,language:event.language});
+      } catch (error) {
+        const code=['INVALID_INPUT','INVALID_RESULT','INVALID_CONFIG','TIMEOUT','UPSTREAM_UNAVAILABLE',
+          'PERSISTENCE_ERROR','AI_REQUEST_FAILED'].includes(error?.code)||AI_AUDIT_CODES.has(error?.code)?
+          error.code:'RECRUIT_DELETE_FAILED';
+        return {ok:false,error:{code,message:'Recruit delete request could not be interpreted'}};
+      }
+    }
+    if (event?.action === 'recruitDeleteTargets') {
+      try {
+        if (Object.keys(event).some(key=>!['action','personMention','selectedPersonId'].includes(key))) {
+          return {ok:false,error:{code:'INVALID_INPUT',message:'Recruit delete target is invalid'}};
+        }
+        return await recruitDeleteTargetsRunner({personMention:event.personMention,
+          selectedPersonId:event.selectedPersonId},identity.uid);
+      } catch (error) {
+        const code=['INVALID_INPUT','INVALID_CONFIG','UPSTREAM_UNAVAILABLE'].includes(error?.code)?
+          error.code:'RECRUIT_DELETE_FAILED';
+        return {ok:false,error:{code,message:'Recruit delete target could not be verified'}};
+      }
+    }
+    if (event?.action === 'recruitDeleteCommand') {
+      try { return await recruitDeleteCommandRunner(event,identity.uid); }
+      catch (error) {
+        const code=['INVALID_COMMAND','PREVIEW_STALE','COMMAND_DENIED','RECRUIT_DELETE_FAILED'].includes(error?.code)?
+          error.code:'RECRUIT_DELETE_FAILED';
+        return {ok:false,error:{code,message:'Recruit delete command could not be completed'}};
       }
     }
     const isActionPlan = event?.action === 'command' && event.stage === 'plan' &&

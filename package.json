@@ -43,6 +43,7 @@
     "test:pc25": "node --test tests/pc25/*.test.cjs tests/pc25/*.browser.cjs tests/ai-gateway/skill-registry.cjs",
     "test:pc26": "node --test tests/pc26/*.test.cjs tests/pc26/*.browser.cjs tests/ai-gateway/skill-registry.cjs",
     "test:pc27": "node --test tests/pc27/*.test.cjs tests/pc27/*.browser.cjs tests/ai-gateway/skill-registry.cjs",
+    "test:pc28": "node --test tests/pc28/*.test.cjs tests/pc28/*.browser.cjs tests/ai-gateway/skill-registry.cjs",
     "test:pc29": "node --test tests/pc29/*.test.cjs tests/pc29/*.browser.cjs",
     "test:pc30": "node --test tests/pc30/*.test.cjs tests/pc30/*.browser.cjs",
     "test:pc31": "node --test tests/pc31/*.test.cjs",

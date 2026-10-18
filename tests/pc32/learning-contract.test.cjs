@@ -17,7 +17,7 @@ test('PC32-A only replaces the approved public function and preserves permission
     assert.match(sql,/BEGIN;[\s\S]*COMMIT;/);
   }
   const body=migration.split('$function$')[1];
-  const hash=crypto.createHash('md5').update(body).digest('hex');
+  const hash=crypto.createHash('md5').update(body.replace(/\r\n/g,'\n')).digest('hex');
   assert.ok(rollback.includes(hash),'rollback refuses an unexpected newer function body');
   assert.match(migration,/35d51ed4e311dcee8764c470e53f93ec/);
 });
