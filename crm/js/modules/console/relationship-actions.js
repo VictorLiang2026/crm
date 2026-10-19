@@ -9,6 +9,36 @@ const typeLabel=value=>t(`relationship_type_${value}`);
 function field(label,control){return h('div',{class:'sheet-field'},[h('label',{},label),control]);}
 function select(options,value){const el=h('select',{class:'sheet-select'});options.forEach(([v,label])=>el.append(h('option',{value:v,selected:String(v)===String(value)},label)));return el;}
 
+function lifecyclePreviewMessage(operation, personId, payload, response){
+  const review=response?.preview||{}, before=review.before||{}, after=review.after||{};
+  const edgeId=String(before.relationshipId||''), fromId=String(review.fromPersonId||''), toId=String(review.toPersonId||'');
+  const unchanged=['fromPersonId','toPersonId','relationshipType','relationshipStage','strength','trustLevel','trend','importance','source','status'];
+  const valid=Boolean(response?.previewId&&review.humanConfirmationRequired===true&&
+    edgeId===String(payload.relationshipId)&&String(review.personId)===String(personId)&&
+    fromId===String(before.fromPersonId)&&toId===String(before.toPersonId)&&
+    fromId===String(after.fromPersonId)&&toId===String(after.toPersonId)&&
+    (fromId===String(personId)||toId===String(personId))&&
+    String(review.fromPersonName||'').trim()&&String(review.toPersonName||'').trim()&&
+    ['confirmed','pending'].includes(before.status)&&TYPES.includes(before.relationshipType)&&
+    unchanged.every(key=>JSON.stringify(before[key]??null)===JSON.stringify(after[key]??null))&&
+    (operation==='unlink' ? before.deletedAt==null&&after.deleted===true :
+      before.deletedAt!=null&&after.deleted===false));
+  if(!valid)throw new Error(t('relationship_preview_invalid'));
+  const state=deleted=>`${t(`relationship_${before.status}`)} · ${t(deleted?'relationship_unlinked':'relationship_active')}`;
+  return [
+    t('relationship_review_required'),
+    `${t(operation==='unlink'?'relationship_unlink':'relationship_restore')} · ${t('relationship_record')} #${edgeId}`,
+    `${t('relationship_from_person')}: ${review.fromPersonName} · Person #${fromId}`,
+    `${t('relationship_to_person')}: ${review.toPersonName} · Person #${toId}`,
+    `${t('relationship_type')}: ${typeLabel(before.relationshipType)}`,
+    `${t('relationship_stage')}: ${before.relationshipStage||t('relationship_no_stage')}`,
+    `${t('relationship_importance')}: ${before.importance??t('relationship_unrated')}`,
+    `${t('relationship_before')}: ${state(before.deletedAt!=null)}`,
+    `${t('relationship_after')}: ${state(after.deleted)}`,
+    t(operation==='unlink'?'relationship_unlink_scope':'relationship_restore_scope'),
+  ].join('\n');
+}
+
 export async function relationshipNode(ctx,personId){
   let includeDeleted=false;
   const root=h('div',{class:'tab-stack'});
@@ -25,8 +55,10 @@ export async function relationshipNode(ctx,personId){
     const preview=await data.previewRelationship(ctx,String(personId),operation,{...payload,idempotencyKey:nonce()});
     const review=preview.preview||{};
     const endpoints=review.fromPersonName&&review.toPersonName?`\n${review.fromPersonName} → ${review.toPersonName}`:'';
-    const detail=`${summary}${endpoints}\n${t('relationship_before')}: ${JSON.stringify(review.before||{})}\n${t('relationship_after')}: ${JSON.stringify(review.after||{})}`;
-    if(!window.confirm(`${t('relationship_review_required')}\n${detail}`))return false;
+    const detail=operation==='unlink'||operation==='restore'
+      ? lifecyclePreviewMessage(operation,personId,payload,preview)
+      : `${t('relationship_review_required')}\n${summary}${endpoints}\n${t('relationship_before')}: ${JSON.stringify(review.before||{})}\n${t('relationship_after')}: ${JSON.stringify(review.after||{})}`;
+    if(!window.confirm(detail))return false;
     await data.executeRelationship(ctx,preview.previewId);
     ctx.onWriteDone?.();
     return true;
