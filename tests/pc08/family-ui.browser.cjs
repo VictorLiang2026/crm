@@ -9,7 +9,8 @@ test('Person family page handles bilingual multi-household review flows at iPad 
   const browser = new Browser(path.resolve(__dirname, '../..'));
   try {
     await browser.start();
-    await browser.open('#/more');
+    await browser.openConsole('#/more');
+    await browser.wait("document.querySelector('.console-main')");
     await browser.evaluate(`(async()=>{
       const {renderPerson}=await import('/crm/js/modules/console/pages/person.js');
       const i18n=await import('/crm/js/modules/console/i18n.js');
@@ -22,7 +23,7 @@ test('Person family page handles bilingual multi-household review flows at iPad 
         {household:other,anchor:{id:2,display_name:'【系统测试·勿联系】另一锚点'},members:[
           {id:200,household_id:20,person_id:71,relationship_to_anchor:'child',confirmed_at:'2026-10-02',person:{id:71,display_name:'【系统测试·勿联系】虚构人物'}}],isAnchor:false,
           currentMembership:{id:200,relationship_to_anchor:'child'}}];
-      const ctx={main:document.getElementById('view'),toast(){},onWriteDone(){window.familyRefresh=(window.familyRefresh||0)+1},api:{call:async(name,args)=>{
+      const ctx={main:document.querySelector('.console-main'),toast(){},onWriteDone(){window.familyRefresh=(window.familyRefresh||0)+1},api:{call:async(name,args)=>{
         window.familyCalls.push({name,...args});
         if(name==='person_360'&&args.action==='get')return {person:{id:71,display_name:'【系统测试·勿联系】虚构人物'},household,members:groups[0].members,households:groups};
         if(name==='person_360'&&args.action==='resolveHouseholdMember')return {candidates:[{id:'4',displayName:'【系统测试·勿联系】候选成员',occupation:'顾问'}]};
@@ -36,7 +37,7 @@ test('Person family page handles bilingual multi-household review flows at iPad 
     await browser.wait("document.querySelectorAll('.tab').length>=8");
     await browser.evaluate(`(()=>[...document.querySelectorAll('.tab')].find(x=>x.textContent.trim()==='家庭与关系').click())()`);
     await browser.wait("document.querySelector('.family-household')?.innerText.includes('legacy unreviewed')");
-    assert.equal(await browser.evaluate("document.getElementById('view').innerText.includes('待核实')"), true);
+    assert.equal(await browser.evaluate("document.querySelector('.console-main').innerText.includes('待核实')"), true);
     assert.equal(await browser.evaluate("window.familyCalls.some(call=>call.action==='previewHousehold'||call.action==='executeHousehold')"), false);
     for (const [width,height] of [[820,1180],[1180,820]]) {
       await browser.send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:false});
