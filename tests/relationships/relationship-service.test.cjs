@@ -34,6 +34,10 @@ test('relationship create resolves selected candidate before preview RPC',async(
  assert.equal(calls[0].args.p_payload.fromPersonId,2);
  assert.equal(calls[0].args.p_payload.toPersonId,1);
  assert.equal(calls[0].args.p_payload.importance,4);
+ assert.deepEqual(Object.keys(calls[0].args.p_payload).sort(),
+   ['fromPersonId','importance','relationshipType','toPersonId'].sort(),
+   'database preview receives only allowed relationship fields, not display-only otherName');
+ assert.equal(result.preview.selectedPersonName,'Alex');
 });
 
 test('relationship write preview rejects ambiguous unsupported identity payloads',async()=>{
