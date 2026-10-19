@@ -11,7 +11,7 @@ const { spawn } = require('node:child_process');
 const followupId = process.argv[2];
 if (!/^[1-9]\d*$/.test(followupId || '')) throw Error('Expected fictional follow-up ID');
 const phase = process.argv[3] || 'initial';
-if (!['initial', 'after-legacy-edit'].includes(phase)) throw Error('Invalid E04 phase');
+if (!['initial', 'after-legacy-edit', 'after-expire'].includes(phase)) throw Error('Invalid E04 phase');
 const root = path.resolve(__dirname, '../..');
 const source = fs.readFileSync(path.join(root, 'admin.html'), 'utf8');
 const start = source.indexOf('var authInst = null;');
@@ -24,7 +24,7 @@ const nonce = crypto.randomBytes(24).toString('hex');
 async function probe(nonce, followupId, phase) {
   const view = document.getElementById('view');
   const records = [];
-  const expectedSummary = phase === 'after-legacy-edit'
+  const expectedSummary = phase !== 'initial'
     ? '【系统测试·勿联系】PC36 E04 虚构客户跟进；旧页修订；禁止联系和外发'
     : '【系统测试·勿联系】PC36 E04 虚构客户跟进；禁止联系和外发';
   try {
@@ -36,10 +36,14 @@ async function probe(nonce, followupId, phase) {
         const fact = value?.groups?.fact?.find(row => String(row.id) === '67');
         const signal = value?.groups?.signal?.find(row => String(row.id) === '68');
         return fact?.confirmed === true && String(fact?.interactionId) === '23' &&
+          (phase === 'after-expire' ? fact?.validity === 'expired' && fact?.lifecycle === 'expire'
+            : fact?.validity === 'current') &&
           signal?.confirmed === false && String(signal?.interactionId) === '23';
       }],
       ['ai-context', 'person_360', { action: 'getMeetingPrepContext', personId: '784' }, value =>
-        value?.facts?.some(row => String(row.source?.id) === '67' && row.confirmed === true) &&
+        (phase === 'after-expire'
+          ? !value?.facts?.some(row => String(row.source?.id) === '67')
+          : value?.facts?.some(row => String(row.source?.id) === '67' && row.confirmed === true)) &&
         value?.signals?.some(row => String(row.source?.id) === '68' && row.certainty === 'unverified_signal')],
       ['legacy-followup', 'followups', { action: 'list', customer_id: 791 }, value =>
         value?.rows?.some(row => String(row.Id) === followupId && String(row.customer_id) === '791' &&
