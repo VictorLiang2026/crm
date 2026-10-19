@@ -3080,20 +3080,20 @@
     },
     {
       "kind": "routine",
-      "name": "pmc18_collect_once_v1()",
+      "name": "pmc18_collect_metrics()",
       "detail": {
-        "anon_execute": true,
-        "service_execute": false,
+        "anon_execute": false,
+        "service_execute": true,
         "security_definer": true,
         "authenticated_execute": false
       }
     },
     {
       "kind": "routine",
-      "name": "pmc18_collect_metrics()",
+      "name": "pmc18_collect_once_v1()",
       "detail": {
-        "anon_execute": false,
-        "service_execute": true,
+        "anon_execute": true,
+        "service_execute": false,
         "security_definer": true,
         "authenticated_execute": false
       }

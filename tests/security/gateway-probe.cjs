@@ -13,6 +13,13 @@ function classify(status, range, expectsSelect) {
   return status === 401 || status === 403;
 }
 
+function observationCount(range) {
+  const match = typeof range === 'string' && range.match(/^\*\/(\d+)$/);
+  if (!match) return null;
+  const count = Number(match[1]);
+  return Number.isSafeInteger(count) && count > 0 && count % 20 === 0 ? count : null;
+}
+
 const funnelMetrics = ['current_count', 'entered_30d', 'moved_30d', 'overdue_count', 'dwell_median_days', 'stuck_count'];
 async function fetchGateway(url, options) {
   for (let attempt = 0; attempt < 3; attempt++) {
@@ -42,7 +49,7 @@ async function probe() {
   // 待 PMC 后续包将 identity helper 改走 service_role/person_360 委托后可移除此例外。
   const anonSelectExceptions = {
     persons: 'PMC-10 approved: anon reads non-deleted persons rows via rdb() gateway',
-    pmc18_observations: 'PMC-18 approved: anon reads bounded monitoring observations'
+    pmc18_observations: 'PM18 approved exact probe exception: aggregate observation count only; HEAD response, no row values fetched or stored'
   };
   const results = [];
   for (const item of objects) {
@@ -65,9 +72,12 @@ async function probe() {
     }
     const range = response.headers.get('content-range');
     const exception = anonSelectExceptions[item.name];
+    const observationRows = item.name === 'pmc18_observations' ? observationCount(range) : null;
     results.push({ object: item.name, status: response.status, empty: range === '*/0',
       expected: exception || (expectsSelect ? 'authorized, zero visible rows' : 'denied'),
-      pass: exception ? (response.status === 200 || response.status === 206) : classify(response.status, range, expectsSelect) });
+      ...(item.name === 'pmc18_observations' ? { visibleCount: observationRows } : {}),
+      pass: item.name === 'pmc18_observations' ? response.status === 206 && observationRows !== null
+        : exception ? (response.status === 200 || response.status === 206) : classify(response.status, range, expectsSelect) });
   }
   const failures = results.filter(result => !result.pass);
   return { environment: envId, checked: results.length, passed: results.length - failures.length,
@@ -88,4 +98,4 @@ if (require.main === module) main().catch(error => {
   console.error(`Anonymous gateway test failed closed: ${error.name}: ${error.message}`);
   process.exitCode = 1;
 });
-module.exports = { classify, emptyFunnelMetrics, probe };
+module.exports = { classify, emptyFunnelMetrics, observationCount, probe };

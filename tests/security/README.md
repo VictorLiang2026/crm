@@ -28,3 +28,7 @@
 2026-10-16 PC19 更新：已核对两个 public.crm_recruit_candidate_*_v1 RPC 的签名及有效执行权限，均为 SECURITY DEFINER 且仅 service_role 可执行；anon 与 authenticated 均无执行权。仅将这两个精确签名加入预期快照。
 
 2026-10-17 PC24 更新：已核对 `public.crm_search_people_v2(jsonb,integer,integer)` 为 SECURITY INVOKER，只授予 `service_role` 执行；`anon` 与 `authenticated` 均不可执行。只将该固定只读 RPC 签名加入预期快照。
+
+2026-10-19 PM18 兼容例外：`routine:pmc18_collect_once_v1()` 暂保留 anon-only ACL。实测撤销 anon 并授予 service_role 会使现有 `pmc18_observer` 的 `app.rdb()` 调用失败；恢复 anon 后返回当日已采集快照。例外仅接受 `anon=true`、`authenticated=false`、`service_role=false`、`SECURITY DEFINER=true` 的该精确签名，理由和预期 ACL 见 `routine-execution-exceptions.json`。其他例程仍必须有 service_role 执行权限。PM18 若改为 service_role 通道，需单独审批、部署并回归后移除此例外。
+
+2026-10-19 PM18 匿名网关探针例外：用户批准对 `public.pmc18_observations` 做单表、精确探针。探针只发送 HEAD 并记录 HTTP 状态与 Content-Range 的总行数，不发送 GET、不读取或保存行内容；只接受 HTTP 206 且总行数为正的 20 的倍数（采集器每个完整快照包含 20 项聚合指标）。此例外不授予新权限，也不改变现有 ACL / `pmc18_observer` 行为。若指标数、响应状态或计数格式异常，检查失败关闭。

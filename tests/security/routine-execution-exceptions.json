@@ -1,0 +1,14 @@
+{
+  "routines": [
+    {
+      "id": "routine:pmc18_collect_once_v1()",
+      "expectedDetail": {
+        "anon_execute": true,
+        "authenticated_execute": false,
+        "security_definer": true,
+        "service_execute": false
+      },
+      "reason": "The existing pmc18_observer Cloud Function uses app.rdb() as anon. On 2026-10-19, revoking anon and granting service_role caused its real collect invocation to fail with permission denied; restoring anon made it return the already-collected 20-metric snapshot. Keep this exact ACL until PM18 has an independently approved service_role caller migration."
+    }
+  ]
+}

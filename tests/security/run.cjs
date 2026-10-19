@@ -5,6 +5,8 @@ const { spawnSync } = require('node:child_process');
 
 const directory = __dirname;
 const baseline = JSON.parse(fs.readFileSync(path.join(directory, 'expected-public-baseline.json'), 'utf8'));
+const routineExceptions = JSON.parse(fs.readFileSync(path.join(directory, 'routine-execution-exceptions.json'), 'utf8'));
+const routineExceptionMap = new Map((routineExceptions.routines || []).map(item => [item.id, item]));
 const environment = 'crm-d1gkae8ddc930d151';
 
 function normalize(value) {
@@ -86,12 +88,13 @@ function evaluate(actual, approved = baseline) {
       }
     } else if (item.kind === 'routine') {
       counts.routines++;
-      if (item.name === 'pmc18_collect_once_v1()') {
-        check(item.detail?.anon_execute === true && item.detail?.service_execute === false,
-          `PMC18 bounded collector grant changed: ${id}`);
-      } else {
-        check(item.detail?.service_execute === true, `Service routine execution missing: ${id}`);
-      }
+      const exception = routineExceptionMap.get(id);
+      if (exception) {
+        check(typeof exception.reason === 'string' && exception.reason.trim().length > 0,
+          `Routine permission exception has no reason: ${id}`);
+        check(JSON.stringify(normalize(item.detail)) === JSON.stringify(normalize(exception.expectedDetail)),
+          `Routine permission exception mismatch: ${id}`);
+      } else check(item.detail?.service_execute === true, `Service routine execution missing: ${id}`);
     } else check(false, `Unexpected object kind: ${id}`);
   }
   for (const id of approvedMap.keys()) check(actualMap.has(id), `Approved object missing: ${id}`);

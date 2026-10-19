@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { unwrap, evaluate } = require('./run.cjs');
-const { classify, emptyFunnelMetrics } = require('./gateway-probe.cjs');
+const { classify, emptyFunnelMetrics, observationCount } = require('./gateway-probe.cjs');
 
 const expected = JSON.parse(fs.readFileSync(path.join(__dirname, 'expected-public-baseline.json'), 'utf8'));
 const copy = () => structuredClone(expected);
@@ -40,14 +40,17 @@ test('new or missing public objects cannot silently pass', () => {
   assert.match(evaluate(missing).failures.join('\n'), /Approved object missing/);
 });
 
-test('PMC18 bounded anon collector is the only approved service execution exception', () => {
+test('the PM18 routine exception is exact and cannot authorize other anon routines', () => {
   assert.deepEqual(evaluate(copy()).failures, []);
-  const missing = copy();
-  object(missing, 'pmc18_collect_once_v1()').detail.anon_execute = false;
-  assert.match(evaluate(missing).failures.join('\n'), /PMC18 bounded collector grant changed/);
-  const expanded = copy();
-  object(expanded, 'pmc18_collect_once_v1()').detail.service_execute = true;
-  assert.match(evaluate(expanded).failures.join('\n'), /PMC18 bounded collector grant changed/);
+  const changedAcl = copy();
+  object(changedAcl, 'pmc18_collect_once_v1()').detail.authenticated_execute = true;
+  assert.match(evaluate(changedAcl).failures.join('\n'), /Routine permission exception mismatch: routine:pmc18_collect_once_v1\(\)/);
+  const serviceAllowed = copy();
+  object(serviceAllowed, 'pmc18_collect_once_v1()').detail.service_execute = true;
+  assert.match(evaluate(serviceAllowed).failures.join('\n'), /Routine permission exception mismatch: routine:pmc18_collect_once_v1\(\)/);
+  const anotherAnonRoutine = copy();
+  object(anotherAnonRoutine, 'quick_capture_v2_command_v1(p_stage text, p_actor_uid text, p_command_id uuid, p_person_id bigint, p_selected_display_name text, p_draft jsonb, p_preview_hash text, p_ai_task_id bigint, p_ai_result_id bigint)').detail.service_execute = false;
+  assert.match(evaluate(anotherAnonRoutine).failures.join('\n'), /Service routine execution missing: routine:quick_capture_v2_command_v1/);
 });
 
 test('anonymous gateway checks reject visible rows and nonzero aggregate facts', () => {
@@ -60,4 +63,10 @@ test('anonymous gateway checks reject visible rows and nonzero aggregate facts',
   assert.equal(emptyFunnelMetrics([row]), true);
   assert.equal(emptyFunnelMetrics([{ ...row, current_count: 1 }]), false);
   assert.equal(emptyFunnelMetrics([{}]), false);
+  assert.equal(observationCount('*/20'), 20);
+  assert.equal(observationCount('*/40'), 40);
+  assert.equal(observationCount('*/0'), null);
+  assert.equal(observationCount('*/21'), null);
+  assert.equal(observationCount('0-19/20'), null);
+  assert.equal(observationCount(null), null);
 });
