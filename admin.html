@@ -2597,7 +2597,9 @@ function renderFollowups(cid, rows){
         }}, '删除'),
       ]),
     ]));
-    if(f.followup_notes) card.appendChild(el('p', {}, f.followup_notes));
+    if(f.interaction_summary) card.appendChild(el('p', {}, f.interaction_summary));
+    if(f.followup_notes && f.followup_notes !== f.interaction_summary)
+      card.appendChild(el('p', {}, f.followup_notes));
     if(f.recommendation_id){
       card.appendChild(el('div', {style:'font-size:12px;color:#047857;margin-top:2px'}, '🔗 关联经营建议 #' + f.recommendation_id));
     }
@@ -2610,8 +2612,12 @@ function renderFollowups(cid, rows){
   function c2name(){ return detailState.data ? detailState.data.customer.customer_name : ''; }
 }
 
-function openFollowupForm(cid, fol, customerName){
+async function openFollowupForm(cid, fol, customerName){
+  var summaryLabel = null;
+  try { summaryLabel = (await import('/crm/js/modules/console/i18n.js')).t('followup_summary_label'); }
+  catch(e) { /* Keep the original editor available if the dictionary cannot load. */ }
   var FIELDS = [
+    ...(summaryLabel ? [{name:'interaction_summary',label:summaryLabel,type:'textarea'}] : []),
     {name:'followup_notes',label:'跟进内容',type:'textarea'},
     {name:'followup_date',label:'跟进日期',type:'date'},
     {name:'next_followup_date',label:'下次跟进日期',type:'date'},

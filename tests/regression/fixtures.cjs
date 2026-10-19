@@ -148,7 +148,7 @@ function installFixtures() {
       return { rows: matched.slice((page - 1) * pageSize, page * pageSize),
         total: matched.length, page, pageSize };
     },
-    'customers:get': () => ({ customer, followups: mode === 'empty' ? [] : [followup], products: [], gifts: [], photos: [], recommendations: [],
+    'customers:get': () => ({ customer, followups: mode === 'empty' ? [] : followups, products: [], gifts: [], photos: [], recommendations: [],
       reports: mode === 'policy_report' ? [{ id: 940003, customer_id: customer.Id,
         report_date: '2026-10-04', report_type: marker + '虚构保单检视',
         summary: marker + '原始摘要', gaps_found: marker + 'AI未经核实的缺口',
