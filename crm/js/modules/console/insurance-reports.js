@@ -54,16 +54,19 @@ function fieldView(report, [key, editedKey, labelKey]) {
 
 function editForm(report, onCancel, onSaved) {
   const inputs = new Map();
+  const displayedValues = new Map();
   const body = h('div', { class: 'policy-report-edit' }, [
     h('p', { class: 'row-sub' }, t('insurance_report_edit_note')),
   ]);
   BLOCKS.forEach(([key, editedKey, labelKey]) => {
+    const displayed = editedValue(report, editedKey, key);
     const input = h('textarea', {
       class: 'policy-report-input',
       'aria-label': t(labelKey),
       rows: key === 'summary' || key === 'next_action' ? '4' : '6',
-    }, editedValue(report, editedKey, key));
+    }, displayed);
     inputs.set(editedKey, input);
+    displayedValues.set(editedKey, displayed);
     body.appendChild(h('label', { class: 'policy-report-label' }, [
       h('span', {}, t(labelKey)), input,
     ]));
@@ -74,7 +77,19 @@ function editForm(report, onCancel, onSaved) {
     save.disabled = true;
     save.textContent = t('saving');
     status.textContent = '';
-    const payload = Object.fromEntries([...inputs].map(([key, input]) => [key, input.value]));
+    const payload = {};
+    BLOCKS.forEach(([sourceKey, editedKey]) => {
+      const value = inputs.get(editedKey).value;
+      if (value === displayedValues.get(editedKey)) return;
+      // Returning to the AI original removes the override instead of labeling it a human edit.
+      payload[editedKey] = value === valueOf(report, sourceKey) ? '' : value;
+    });
+    if (!Object.keys(payload).length) {
+      status.textContent = t('edit_no_changes');
+      save.disabled = false;
+      save.textContent = t('insurance_report_save');
+      return;
+    }
     try {
       await data.updatePolicyReport(report._ctx, report.id, payload);
       const result = await data.policyReport(report._ctx, report.id);

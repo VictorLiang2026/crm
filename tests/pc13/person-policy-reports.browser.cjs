@@ -57,13 +57,76 @@ test('Person insurance reports preserve AI originals, show human revisions, and 
       const call=window.pc13State.calls.find(c=>c.args.action==='update');
       return {payload:call.args.data,source:window.pc13State.report};
     })()`);
-    assert.deepEqual(Object.keys(after.payload).sort(), [
-      'edited_asset_allocation','edited_gaps','edited_next_action','edited_recommendations','edited_summary',
-    ].sort());
+    assert.deepEqual(Object.keys(after.payload).sort(), ['edited_gaps','edited_summary']);
     assert.equal(after.payload.edited_summary, '人工再次修订');
     assert.equal(after.payload.edited_gaps, '再次待核实');
+    assert.equal(after.source.edited_recommendations, null);
+    assert.equal(after.source.edited_asset_allocation, null);
+    assert.equal(after.source.edited_next_action, null);
     assert.equal(after.source.summary, 'AI 摘要原文');
     assert.equal(after.source.raw, '原始模型输出 JSON');
+    await b.healthy();
+  } finally { await b.close(); }
+});
+
+test('report revision skips untouched blocks, clears an override returned to AI text, and reports no changes in English', async () => {
+  const b = new Browser(path.resolve(__dirname, '../..'));
+  try {
+    await b.start();
+    await b.open('#/more');
+    await b.evaluate(`(async()=>{
+      const {setLang}=await import('/crm/js/modules/console/i18n.js');
+      const {renderInsuranceReports}=await import('/crm/js/modules/console/insurance-reports.js');
+      setLang('en');
+      window.pc13Revision={calls:[],report:{id:33,customer_id:788,report_date:'2026-10-20',
+        report_type:'Fictional review',summary:'AI summary',edited_summary:null,
+        gaps_found:'AI gaps',edited_gaps:null,recommendations:'AI recommendations',edited_recommendations:null,
+        asset_allocation:'AI assets',edited_asset_allocation:null,next_action:'AI next step',edited_next_action:null,
+        raw:'AI original JSON'}};
+      const ctx={api:{call:async(name,args)=>{
+        window.pc13Revision.calls.push({name,args});
+        if(name!=='policy_review_reports')throw Error('unexpected function '+name);
+        if(args.action==='list')return {rows:[window.pc13Revision.report]};
+        if(args.action==='get')return {report:window.pc13Revision.report};
+        if(args.action==='update'){
+          const cleaned=Object.fromEntries(Object.entries(args.data).map(([key,value])=>[key,value===''?null:value]));
+          window.pc13Revision.report={...window.pc13Revision.report,...cleaned};
+          return {ok:true};
+        }
+        throw Error('unexpected action '+args.action);
+      }}};
+      const host=document.getElementById('pc13-revision-host')||document.body.appendChild(Object.assign(document.createElement('div'),{id:'pc13-revision-host'}));
+      host.replaceChildren(renderInsuranceReports(ctx,'788'));
+    })()`);
+    await b.wait("document.querySelector('#pc13-revision-host .policy-report-item')");
+    await b.evaluate("document.querySelector('#pc13-revision-host .policy-report-item').open=true");
+    await b.wait("document.querySelector('#pc13-revision-host .policy-report-field')");
+    await b.click('#pc13-revision-host button', 'Edit Report');
+    for (const [width,height] of [[1024,768],[768,1024]]) {
+      await b.send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:2,mobile:false});
+      const m=await b.evaluate(`(()=>{const e=document.querySelector('#pc13-revision-host .policy-reports');return {scroll:e.scrollWidth,client:e.clientWidth}})()`);
+      assert.ok(m.scroll<=m.client,`horizontal overflow ${JSON.stringify(m)}`);
+    }
+    await b.click('#pc13-revision-host button', 'Save Revision');
+    await b.wait("document.querySelector('#pc13-revision-host .policy-report-edit')?.innerText.includes('No changes')");
+    assert.equal(await b.evaluate("window.pc13Revision.calls.filter(c=>c.args.action==='update').length"),0);
+    await b.evaluate("document.querySelector('#pc13-revision-host textarea').value='Human summary'");
+    await b.click('#pc13-revision-host button', 'Save Revision');
+    await b.wait("window.pc13Revision.calls.filter(c=>c.args.action==='update').length===1");
+    let state=await b.evaluate(`(()=>({calls:window.pc13Revision.calls.filter(c=>c.args.action==='update'),report:window.pc13Revision.report}))()`);
+    assert.deepEqual(Object.keys(state.calls[0].args.data),['edited_summary']);
+    assert.equal(state.report.edited_summary,'Human summary');
+    assert.equal(state.report.edited_gaps,null);
+    assert.equal(state.report.raw,'AI original JSON');
+    await b.wait("document.querySelector('#pc13-revision-host .policy-report-field')?.innerText.includes('Human summary')");
+    await b.click('#pc13-revision-host button', 'Edit Report');
+    await b.evaluate("document.querySelector('#pc13-revision-host textarea').value='AI summary'");
+    await b.click('#pc13-revision-host button', 'Save Revision');
+    await b.wait("window.pc13Revision.calls.filter(c=>c.args.action==='update').length===2");
+    state=await b.evaluate(`(()=>({calls:window.pc13Revision.calls.filter(c=>c.args.action==='update'),report:window.pc13Revision.report}))()`);
+    assert.deepEqual(state.calls[1].args.data,{edited_summary:''});
+    assert.equal(state.report.edited_summary,null);
+    assert.equal(state.report.summary,'AI summary');
     await b.healthy();
   } finally { await b.close(); }
 });
