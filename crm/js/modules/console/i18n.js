@@ -2134,6 +2134,8 @@ const DICT = {
   'ocr_record_id': { 'zh-CN': 'OCR 记录', 'en': 'OCR record' },
   'ocr_updated': { 'zh-CN': '更新于', 'en': 'Updated' },
   'ocr_applied': { 'zh-CN': '解析已应用', 'en': 'Parse applied' },
+  'ocr_history_fields': { 'zh-CN': '应用字段', 'en': 'Applied fields' },
+  'ocr_field_separator': { 'zh-CN': '、', 'en': ', ' },
   'ocr_status_done': { 'zh-CN': '已完成', 'en': 'Completed' },
   'ocr_status_preview': { 'zh-CN': '待确认', 'en': 'Awaiting confirmation' },
   'ocr_undo_parse': { 'zh-CN': '审阅撤销', 'en': 'Review Undo' },

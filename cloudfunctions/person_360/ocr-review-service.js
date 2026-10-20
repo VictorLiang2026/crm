@@ -20,7 +20,7 @@ class OcrReviewService {
     const personId = id(personIdValue, 'Person');
     if (!actorUid) throw new Error('UNAUTHORIZED');
     return this.request('crm_ocr_parse_commands', 'GET', {
-      select: 'id,ocr_record_id,operation,parent_command_id,status,created_at,executed_at,result',
+      select: 'id,ocr_record_id,operation,parent_command_id,status,selected_fields,created_at,executed_at,result',
       actor_uid: `eq.${actorUid}`, person_id: `eq.${personId}`,
       order: 'created_at.desc,id.desc', limit: '50',
     });
@@ -57,11 +57,15 @@ class OcrReviewService {
 
   async previewUndo(data, actorUid) {
     if (!actorUid || data?.confirmed !== true) throw new Error('Human confirmation is required');
-    return this.rpc('crm_ocr_parse_undo_preview_v1', {
+    const result = await this.rpc('crm_ocr_parse_undo_preview_v1', {
       p_actor_uid: actorUid,
       p_idempotency_key: uuid(data.idempotencyKey),
       p_applied_command_id: uuid(data.commandId),
     });
+    if (result?.errorCode === 'OCR_UNDO_CONFLICT' && result.businessDataWritten === false) {
+      throw new Error('OCR_UNDO_CONFLICT');
+    }
+    return result;
   }
 }
 

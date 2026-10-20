@@ -20,6 +20,13 @@ function jsonArray(value) {
   } catch { return []; }
 }
 
+function selectedFieldKeys(value) {
+  if (typeof value === 'string' && /^\{(?:[a-z_]+(?:,[a-z_]+)*)?\}$/.test(value)) {
+    return value.slice(1, -1).split(',').filter(Boolean);
+  }
+  return jsonArray(value);
+}
+
 function uid() {
   if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
   const bytes = new Uint8Array(16);
@@ -89,10 +96,12 @@ function commandHistory(rows, ctx, personId, changed) {
   if (!rows?.length) return emptyNote(t('ocr_no_applied_records'), t('ocr_history_note'));
   return h('div', { class: 'ocr-history-list' }, rows.map(row => {
     const canUndo = row.operation === 'apply' && row.status === 'executed';
+    const fields = selectedFieldKeys(row.selected_fields).filter(key => FIELDS.some(([field]) => field === key));
     const item = h('div', { class: 'ocr-history-row' }, [
       h('div', { class: 'ocr-history-summary' }, [
         h('strong', {}, row.operation === 'undo' ? t('ocr_undo_applied') : t('ocr_applied')),
         h('span', {}, `${timestamp(row.executed_at || row.created_at)} · ${t('ocr_record_id')} ${row.ocr_record_id}`),
+        fields.length ? h('span', {}, `${t('ocr_history_fields')}: ${fields.map(fieldLabel).join(t('ocr_field_separator'))}`) : null,
         h('span', {}, row.status === 'undone' ? t('ocr_undone') : row.status === 'executed' ? t('ocr_status_done') : t('ocr_status_preview')),
       ]),
       canUndo ? h('button', { class: 'btn btn-ghost btn-sm', type: 'button',
@@ -129,7 +138,10 @@ function openUndo(ctx, row, personId, changed, trigger) {
           finally { execute.disabled = false; }
         });
         panel.append(confirm, execute);
-      } catch (error) { panel.append(messageNode(error.message || t('ocr_undo_conflict'), 'error')); }
+      } catch (error) {
+        panel.append(messageNode(error.message === 'OCR_UNDO_CONFLICT'
+          ? t('ocr_undo_conflict') : error.message || t('ocr_undo_conflict'), 'error'));
+      }
       finally { button.disabled = false; }
     } }, t('ocr_preview_undo')),
   ]);

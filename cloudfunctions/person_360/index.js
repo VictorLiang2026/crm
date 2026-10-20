@@ -1147,6 +1147,7 @@ exports.main = async event => {
     const diagnostic = event?.action === 'listPeople' &&
       /^Database request failed \((\d{3})(?:, ((?:PGRST\d{3}|[0-9A-Z]{5})))?\)$/.exec(error.message);
     return { error: error.message === 'UNAUTHORIZED' ? 'UNAUTHORIZED' :
+      event?.action === 'previewOcrUndo' && error.message === 'OCR_UNDO_CONFLICT' ? 'OCR_UNDO_CONFLICT' :
       diagnostic ? `Person 360 request failed (HTTP ${diagnostic[1]}${diagnostic[2] ? `, ${diagnostic[2]}` : ''})` :
       /^(Invalid |Person |Person-only recruit|Activity |Attendance |Post-event |Participant |Speaker |This customer|Both people|Human confirmation|Selected Person|Household |Important facts|Could not|Same-name|Deleted identity|Customer |Preview |Identity candidates|Idempotency key|Test account|Test parent|Work item|Action |Commitment |Opportunity |Context item)/.test(error.message)
         ? error.message : 'Person 360 request failed' };

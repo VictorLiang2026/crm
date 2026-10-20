@@ -51,3 +51,20 @@ test('execute and undo previews are actor-bound and require an explicit human co
   assert.equal(calls[0][1].p_actor_uid, 'actor-test');
   assert.equal(calls[1][1].p_actor_uid, 'actor-test');
 });
+
+test('OCR history returns selected fields and a fixed conflict receipt cannot become a preview', async () => {
+  const calls = [];
+  const service = new OcrReviewService({
+    request: async (table, method, filters) => {
+      calls.push([table, method, filters]);
+      return [{ id: commandId, selected_fields: ['hobbies'] }];
+    },
+    resolveName: async () => ({ candidates: [] }),
+    rpc: async () => ({ errorCode: 'OCR_UNDO_CONFLICT', businessDataWritten: false }),
+  });
+  const rows = await service.list('71', 'actor-test');
+  assert.deepEqual(rows[0].selected_fields, ['hobbies']);
+  assert.match(calls[0][2].select, /selected_fields/);
+  await assert.rejects(service.previewUndo({ commandId, idempotencyKey, confirmed: true }, 'actor-test'),
+    { message: 'OCR_UNDO_CONFLICT' });
+});

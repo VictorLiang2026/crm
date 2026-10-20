@@ -16,7 +16,7 @@ test('Person OCR review requires identity and field review before apply, and ver
         customer_name:'虚构客户甲',phone:'',gender:'未知',birthday:null,occupation:'',education:'',marital_status:'未婚',
         customer_stage:'新认识',sales_priority:'C',referral_priority:'C',hobbies:'',source:'人工新增',additional_info:''}},
         records:[{id:95,customer_id:788,summary:'虚构资料识别摘要',raw_text:'姓名：虚构客户甲；电话：13800000000',file_ids:'[96]',file_names:'["虚构文件.png"]',created_at:'2026-10-15T08:00:00Z'}],
-        commands:[{id:'11111111-1111-4111-8111-111111111111',ocr_record_id:95,operation:'apply',status:'executed',created_at:'2026-10-15T08:01:00Z',executed_at:'2026-10-15T08:02:00Z'}],
+        commands:[{id:'11111111-1111-4111-8111-111111111111',ocr_record_id:95,operation:'apply',status:'executed',selected_fields:'{hobbies}',created_at:'2026-10-15T08:01:00Z',executed_at:'2026-10-15T08:02:00Z'}],
         async call(name,args){this.calls.push({name,args});
           if(name==='person_360'&&args.action==='getCustomerProfile')return this.profile;
           if(name==='ocr_records'&&args.action==='list')return {rows:this.records};
@@ -25,7 +25,7 @@ test('Person OCR review requires identity and field review before apply, and ver
           if(name==='person_360'&&args.action==='resolveIdentity')return {candidates:[{id:71,displayName:'虚构客户甲',legacyCustomerId:788}]};
           if(name==='person_360'&&args.action==='previewOcrParse')return {previewId:'22222222-2222-4222-8222-222222222222',expiresAt:'2026-10-16T09:00:00Z',preview:{before:{phone:null,gender:'未知'},after:{phone:'13800000000',gender:'女'}}};
           if(name==='person_360'&&args.action==='previewOcrUndo'){
-            if(this.forceUndoConflict)throw Error('OCR undo conflict: profile version changed after parsing');
+            if(this.forceUndoConflict)return {error:'OCR_UNDO_CONFLICT'};
             return {previewId:'33333333-3333-4333-8333-333333333333',expiresAt:'2026-10-16T09:00:00Z',preview:{before:{phone:'13800000000'},after:{phone:null}}};
           }
           if(name==='person_360'&&args.action==='executeOcrParse'){this.executions.push(args);return {ok:true,commandId:'44444444-4444-4444-8444-444444444444'};}
@@ -38,6 +38,7 @@ test('Person OCR review requires identity and field review before apply, and ver
       await window.renderPc14();
     })()`);
     await b.wait("document.querySelector('#pc14-host .ocr-record')");
+    assert.ok((await b.evaluate("document.querySelector('#pc14-host .ocr-history-row').innerText")).includes('应用字段: 兴趣爱好'));
     await b.evaluate("document.querySelector('#pc14-host .ocr-record').open=true");
     await b.click('#pc14-host .ocr-source-actions button', '查看原文件');
     await b.wait("document.querySelector('#pc14-host .ocr-source-viewer img')");
@@ -80,10 +81,16 @@ test('Person OCR review requires identity and field review before apply, and ver
     await b.click('#pc14-host .ocr-history-row button', '审阅撤销');
     await b.click('#pc14-host .ocr-preview-panel button', '核对撤销预览');
     await b.wait("document.querySelector('#pc14-host .ocr-preview-panel .ocr-message-error')");
-    assert.ok((await b.evaluate("document.querySelector('#pc14-host .ocr-preview-panel').innerText")).includes('profile version changed'));
+    assert.ok((await b.evaluate("document.querySelector('#pc14-host .ocr-preview-panel').innerText")).includes('资料已变化，无法安全撤销'));
+    assert.equal(await b.evaluate('window.pc14.executions.length'), 2, 'conflict does not execute another undo');
 
     await b.evaluate(`(()=>{window.pc14I18n.setLang('en');return window.renderPc14()})()`);
     await b.wait("document.querySelector('#pc14-host').innerText.includes('OCR & Document Review')");
+    assert.ok((await b.evaluate("document.querySelector('#pc14-host .ocr-history-row').innerText")).includes('Applied fields: Interests'));
+    await b.click('#pc14-host .ocr-history-row button', 'Review Undo');
+    await b.click('#pc14-host .ocr-preview-panel button', 'Preview Undo');
+    await b.wait("document.querySelector('#pc14-host .ocr-preview-panel .ocr-message-error')");
+    assert.ok((await b.evaluate("document.querySelector('#pc14-host .ocr-preview-panel').innerText")).includes('Profile values changed'));
     for(const [width,height] of [[820,1180],[1180,820]]){
       await b.send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:false});
       const metrics=await b.evaluate(`(()=>({width:innerWidth,doc:document.documentElement.scrollWidth,host:document.querySelector('#pc14-host').scrollWidth,client:document.querySelector('#pc14-host').clientWidth}))()`);

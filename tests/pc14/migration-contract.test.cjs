@@ -63,3 +63,14 @@ test('PC14 row-version guards detect changes that are later reverted to the pars
   assert.match(down, /REVOKE ALL ON FUNCTION public\.crm_ocr_parse_execute_v1/);
   assert.match(down, /GRANT EXECUTE ON FUNCTION public\.crm_ocr_parse_execute_v1[^;]+TO service_role/);
 });
+
+test('PC36 OCR undo conflicts return a fixed receipt before a preview row is created and can roll back', () => {
+  const up = read('cloudbase/migrations/20261020083300_ocr_undo_conflict_receipt.sql');
+  const down = read('cloudbase/rollbacks/20261020083300_ocr_undo_conflict_receipt.rollback.sql');
+  assert.match(up, /CREATE OR REPLACE FUNCTION public\.crm_ocr_parse_undo_preview_v1/);
+  assert.equal((up.match(/RETURN jsonb_build_object\('errorCode','OCR_UNDO_CONFLICT','businessDataWritten',false\)/g) || []).length, 2);
+  assert.ok(up.lastIndexOf("'OCR_UNDO_CONFLICT'") < up.indexOf('INSERT INTO public.crm_ocr_parse_commands'));
+  assert.match(down, /OCR undo conflict: one or more fields changed after parsing/);
+  assert.match(down, /OCR undo conflict: profile version changed after parsing/);
+  assert.doesNotMatch(up + down, /\bpr\./i);
+});
