@@ -61,7 +61,31 @@ test('PC19 Person 360 exposes stage, profile, files, milestone history, and foll
       window.pc19ui.host=host;
     })()`);
     await browser.wait("document.querySelector('#pc19-host .recruit-followups-empty, #pc19-host .card')");
-    assert.equal(await browser.evaluate("document.querySelector('#pc19-host').textContent.includes('阶段历史')"), true);
+    assert.equal(await browser.evaluate("document.querySelector('#pc19-host').textContent.includes('阶段里程碑')"), true);
+    await browser.send('Emulation.setDeviceMetricsOverride', { width: 1024, height: 768, deviceScaleFactor: 1, mobile: false });
+    assert.deepEqual(await browser.evaluate(`(()=>{
+      const stage=document.querySelector('#recruit-stage-9202');
+      const input=document.querySelector('#recruit-stage-note-9202');
+      const label=input?.labels?.[0];
+      const box=label?.getBoundingClientRect();
+      const inputBox=input?.getBoundingClientRect();
+      const stageBox=stage?.getBoundingClientRect();
+      const button=[...document.querySelectorAll('#pc19-host .recruit-stage-editor button')][0];
+      const buttonBox=button?.getBoundingClientRect();
+      const sections=[...document.querySelectorAll('#pc19-host .recruit-detail-section')];
+      return { text:label?.textContent, linked:label?.control===input,
+        visible:!!box&&box.width>0&&box.height>0&&box.right<=window.innerWidth,
+        stageLabel:stage?.labels?.[0]?.textContent, stageLinked:stage?.labels?.[0]?.control===stage,
+        aligned:Math.abs(stageBox?.bottom-inputBox?.bottom)<4&&Math.abs(buttonBox?.bottom-inputBox?.bottom)<4,
+        sectionCount:sections.length, sectionDividers:sections.every(x=>getComputedStyle(x).borderTopWidth!=='0px') };
+    })()`), { text:'备注', linked:true, visible:true, stageLabel:'阶段', stageLinked:true,
+      aligned:true, sectionCount:3, sectionDividers:true });
+    await browser.send('Emulation.setDeviceMetricsOverride', { width: 768, height: 1024, deviceScaleFactor: 1, mobile: false });
+    assert.equal(await browser.evaluate(`(()=>{
+      const editor=document.querySelector('#pc19-host .recruit-stage-editor');
+      const rect=editor.getBoundingClientRect();
+      return editor.scrollWidth<=editor.clientWidth&&rect.right<=window.innerWidth;
+    })()`), true);
     await browser.evaluate("document.querySelector('#pc19-host select').value='精准面谈'");
     await browser.click('#pc19-host button', '保存阶段');
     await browser.wait("window.pc19ui.calls.some(x=>x.args.action==='transitionRecruitStage')");
@@ -78,6 +102,18 @@ test('PC19 Person 360 exposes stage, profile, files, milestone history, and foll
     const followup = calls.find(call => call.name === 'recruit_followups' && call.args.action === 'create');
     assert.equal(followup.args.data.candidate_id, '9202');
     assert.equal(followup.args.data.followup_notes, '【系统测试·勿联系】虚构招募跟进');
+    assert.equal(await browser.evaluate(`(async()=>{
+      const i18n=await import('/crm/js/modules/console/i18n.js');i18n.setLang('en');
+      const {renderRecruitSection}=await import('/crm/js/modules/console/recruit-write.js');
+      const ctx={api:{call:(name,args)=>window.pc19ui.call(name,args)},operator:{name:'Test'},toast:()=>{}};
+      window.pc19ui.host.replaceChildren(await renderRecruitSection(ctx,'9201',()=>{}));
+      const input=document.querySelector('#recruit-stage-note-9202');
+      const stage=document.querySelector('#recruit-stage-9202');
+      const text=window.pc19ui.host.textContent;
+      return input?.labels?.[0]?.textContent==='Note'&&input.labels[0].control===input
+        &&stage?.labels?.[0]?.textContent==='Stage'&&stage.labels[0].control===stage
+        &&text.includes('Stage Milestones');
+    })()`), true);
     await browser.healthy();
   } finally { await browser.close(); }
 });

@@ -728,6 +728,13 @@ body:has(.login), body.is-login { padding-top: env(safe-area-inset-top); }
 .sheet-preview { border: 1px dashed var(--line); border-radius: 12px; padding: 12px; background: #fafbfc; }
 .sheet-preview-label { margin: 8px 0 4px; font-size: 12px; font-weight: 700; color: var(--ink-2); }
 .sheet-stack { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.recruit-stage-editor { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; }
+.recruit-stage-editor .sheet-field { margin: 0; min-width: 0; }
+.recruit-stage-editor .sheet-field:first-child { flex: 1 1 180px; }
+.recruit-stage-editor .sheet-field:nth-child(2) { flex: 2 1 240px; }
+.recruit-stage-editor .btn { flex: 0 0 auto; white-space: nowrap; }
+.recruit-candidate-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.recruit-detail-section { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); }
 .row-actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .row-actions .btn, .list-row > .btn { flex: 0 0 auto; }
 .list-row details > summary { cursor: pointer; }

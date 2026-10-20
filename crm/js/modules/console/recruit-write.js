@@ -446,10 +446,18 @@ export async function renderRecruitSection(ctx, personId, onDone) {
     const detail = await data.recruitCandidateDetails(ctx, row.id, personId);
     const candidate = detail.candidate || {};
     const reload = () => onDone && onDone();
-    const stage = h('select', { class: 'sheet-select', 'aria-label': t('recruit_stage') }, STAGES.map(value => h('option', {
+    const stageId = `recruit-stage-${candidate.id}`;
+    const stage = h('select', { id: stageId, class: 'sheet-select', 'aria-label': t('recruit_stage') }, STAGES.map(value => h('option', {
       value, ...(value === candidate.stage ? { selected: true } : {}),
     }, translateEnum('recruit_stage', value))));
-    const note = field('recruit_stage_note', '');
+    const stageControl = h('div', { class: 'sheet-field' }, [
+      h('label', { for: stageId }, t('recruit_stage')), stage,
+    ]);
+    const noteId = `recruit-stage-note-${candidate.id}`;
+    const note = field('recruit_stage_note', '', 'text', { id: noteId });
+    const noteControl = h('div', { class: 'sheet-field' }, [
+      h('label', { for: noteId }, t('recruit_stage_note')), note,
+    ]);
     const stageButton = h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: async event => {
       const button = event.currentTarget; button.disabled = true;
       try {
@@ -470,19 +478,19 @@ export async function renderRecruitSection(ctx, personId, onDone) {
         h('span', { style: 'margin-left:auto' }, translateEnum('recruit_stage', candidate.stage)),
       ]),
       h('div', { class: 'card-body tab-stack' }, [
-        h('div', { class: 'form-row', style: 'display:flex;gap:8px;align-items:center;flex-wrap:wrap' }, [stage, note, stageButton]),
-        h('div', { style: 'display:flex;gap:8px;flex-wrap:wrap' }, [
+        h('div', { class: 'recruit-stage-editor' }, [stageControl, noteControl, stageButton]),
+        h('div', { class: 'recruit-candidate-actions' }, [
           h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => openProfileEditor(ctx, candidate, reload) }, t('recruit_profile_edit')),
           h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => openFollowupEditor(ctx, candidate, null, reload) }, t('recruit_followup_new')),
         ]),
-        h('div', {}, [sectionTitle(t('recruit_files')), renderAttachments(ctx, candidate, reload)]),
-        h('div', {}, [sectionTitle(t('recruit_milestones')), (detail.milestones || []).length
+        h('section', { class: 'recruit-detail-section' }, [sectionTitle(t('recruit_files')), renderAttachments(ctx, candidate, reload)]),
+        h('section', { class: 'recruit-detail-section' }, [sectionTitle(t('recruit_milestones')), (detail.milestones || []).length
           ? h('div', {}, detail.milestones.map(item => h('div', { class: 'row-sub' }, [
             `${fmtDate(item.happened_at)} · `,
             item.from_stage ? `${translateEnum('recruit_stage', item.from_stage)} → ` : '',
             translateEnum('recruit_stage', item.to_stage), item.note ? ` · ${item.note}` : '',
           ]))) : emptyNote(t('recruit_milestones_empty'), '')]),
-      h('div', {}, [sectionTitle(`${t('recruit_followups')} (${followups.length})`), followups.length
+      h('section', { class: 'recruit-detail-section' }, [sectionTitle(`${t('recruit_followups')} (${followups.length})`), followups.length
           ? h('div', {}, followups.map(item => h('div', { class: 'list-row', style: 'align-items:flex-start' }, [
             h('div', { style: 'flex:1;min-width:0' }, [
               h('b', {}, `${fmtDate(item.followup_date)} · ${item.contact_method || t('recruit_contact_unspecified')}`),
