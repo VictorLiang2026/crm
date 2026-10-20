@@ -10,6 +10,7 @@ const path=require('node:path');
 const {Browser}=require('../regression/browser.cjs');
 
 test('AI page offers read-only tasks, intent choice, Person choice, scope and source display',()=>{
+  assert.match(misc,/response\.ok !== true/);
   for(const token of ['assistantTaskPanel','data.assistantReadTask','needs_intent_choice','needs_person_selection',
     'assistant_task_scope_label','assistant_task_readonly','result.sources','search_v2_condition_']) assert.ok(misc.includes(token),token);
   for(const key of ['assistant_task_title','assistant_task_choose_intent','assistant_task_person_choice',

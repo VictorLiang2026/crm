@@ -60,7 +60,7 @@ async function runReadIntent(event, dependencies = {}) {
   });
   const parsed = validateIntentResult(task.result);
   if (selectedIntent && parsed.intent !== selectedIntent) fail('INVALID_RESULT','Selected intent did not match the request');
-  const base = {taskId:task.taskId,resultId:task.resultId,plan:{intent:parsed.intent,interpretation:parsed.interpretation,
+  const base = {ok:true,taskId:task.taskId,resultId:task.resultId,plan:{intent:parsed.intent,interpretation:parsed.interpretation,
     dataScope:parsed.intent==='search'?'allowlisted public Person and CRM records':
       parsed.intent==='summarize'||parsed.intent==='prepare'?'one human-selected active Person and bounded existing context':
         parsed.intent==='plan'?'today read-only CRM overview':'none'},
