@@ -13,8 +13,8 @@ test('PC18 displays review history and requires server preview then explicit con
       const {renderActivityReview}=await import('/crm/js/modules/console/activity-review.js');
       const review={summary:'【系统测试·勿联系】虚构复盘摘要',whoMattered:[{text:'到场反馈',sourceRefs:['public.interactions#50']}],
         whatChanged:[],relationshipsImproved:[],signalsAppeared:[],opportunitiesAppeared:[],followUpPeople:[],
-        actionCandidates:[{personId:9001,personName:'虚构人物甲',title:'跟进反馈',reason:'虚构理由',sourceRefs:['public.interactions#50']}],
-        opportunityCandidates:[{personId:9002,personName:'虚构人物乙',opportunityType:'activity',reason:'虚构理由',nextAction:'发送资料',sourceRefs:['public.interactions#51']}]};
+        actionCandidates:[{personId:9001,personName:'虚构人物甲',sourceIndex:1,title:'跟进反馈',reason:'虚构理由',sourceRefs:['public.interactions#50']}],
+        opportunityCandidates:[{personId:9002,personName:'虚构人物乙',sourceIndex:2,opportunityType:'activity',reason:'虚构理由',nextAction:'发送资料',sourceRefs:['public.interactions#51']}]};
       const history={activity:{id:42,name:'【系统测试·勿联系】活动甲'},versions:[{id:30,taskId:20,createdAt:'2026-10-16T01:00:00Z',summary:review.summary,
         review,actionCandidates:review.actionCandidates,opportunityCandidates:review.opportunityCandidates,decisions:[]}],outcomes:[],
         testData:{status:'verified',containsTestData:false}};
@@ -57,6 +57,8 @@ test('PC18 displays review history and requires server preview then explicit con
     await browser.wait("window.pc18.calls.some(c=>c.args.action==='previewActivityReview')");
     assert.equal(await browser.evaluate("window.pc18.writes.length"),0,'preview cannot write business data');
     assert.equal(await browser.evaluate("window.pc18.preview.operation"),'action');
+    assert.equal(await browser.evaluate("window.pc18.preview.candidateIndex"),1,
+      'the visible candidate must use its original AI result index');
     await browser.click('#pc18-host button','Confirm & Execute');
     await browser.wait("document.querySelector('#pc18-host .form-msg.error')");
     assert.equal(await browser.evaluate("window.pc18.writes.includes('action')"),false,'stale execution must fail without a write');
@@ -67,10 +69,13 @@ test('PC18 displays review history and requires server preview then explicit con
     await browser.click('#pc18-host button','Confirm & Execute');
     await browser.wait("window.pc18.writes.includes('action')");
     assert.ok((await browser.evaluate("document.querySelector('#pc18-host').innerText")).includes('71'));
+    assert.equal(await browser.evaluate("window.pc18.history.versions[0].decisions[0].candidateIndex"),1);
+    assert.ok((await browser.evaluate("document.querySelector('#pc18-host .pc18-candidate').innerText")).includes('Accepted'));
 
     await browser.evaluate(`(()=>[...document.querySelectorAll('#pc18-host .pc18-candidate button')].find(b=>b.innerText.includes('Edit')).click())()`);
     await browser.click('#pc18-host button','Preview Candidate Rejection');
     await browser.wait("window.pc18.preview?.operation==='reject_opportunity'");
+    assert.equal(await browser.evaluate("window.pc18.preview.candidateIndex"),2);
     assert.equal(await browser.evaluate("window.pc18.writes.includes('reject_opportunity')"),false);
     await browser.click('#pc18-host button','Confirm & Execute');
     await browser.wait("window.pc18.writes.includes('reject_opportunity')");

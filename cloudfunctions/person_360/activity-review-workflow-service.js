@@ -57,6 +57,43 @@ function payload(operation, value) {
   return {outcomeType:value.outcomeType.trim(),result:value.result.trim(),occurredAt};
 }
 
+function historyCandidates(review, snapshot, activityId, decisions) {
+  const context=plain(snapshot)&&snapshot._context?.recipe==='activity_review'&&
+    snapshot._context?.subjectType==='activity'&&
+    String(snapshot._context.subjectId)===String(activityId)?snapshot:{};
+  const rows=key=>Array.isArray(context[key])?context[key]:[];
+  const refs=new Set();
+  for(const value of Object.values(context)){
+    for(const row of Array.isArray(value)?value:[value]){
+      if(row?.source?.schema==='public'&&row.source.table&&row.source.id)
+        refs.add(`public.${row.source.table}#${row.source.id}`);
+    }
+  }
+  const persons=new Map(rows('persons').map(row=>[String(row?.data?.id),row?.data?.display_name]));
+  const positive=new Map(rows('activity_interactions').filter(row=>
+    Number(row?.data?.importance)>=3).map(row=>
+    [`public.interactions#${row.data.id}`,String(row.data.person_id)]));
+  const attendance=new Map(rows('participants').filter(row=>
+    row?.data?.status==='attended'&&row.data.resolved_person_id).map(row=>
+    [`public.activity_participants#${row.data.id}`,String(row.data.resolved_person_id)]));
+  const decided=new Set(decisions.map(row=>`${row.kind}:${row.candidateIndex}`));
+  const filter=(kind,list)=>{
+    if(!Array.isArray(list))return [];
+    return list.map((candidate,sourceIndex)=>({...candidate,sourceIndex})).filter(candidate=>{
+      if(decided.has(`${kind}:${candidate.sourceIndex}`))return true;
+      const candidateRefs=candidate.sourceRefs;
+      return persons.has(String(candidate.personId))&&Array.isArray(candidateRefs)&&
+        candidateRefs.length>0&&candidateRefs.every(ref=>refs.has(ref))&&
+        candidateRefs.some(ref=>positive.get(ref)===String(candidate.personId)||
+          (kind==='action'&&attendance.get(ref)===String(candidate.personId)));
+    }).map(candidate=>persons.has(String(candidate.personId))
+      ?{...candidate,personId:String(candidate.personId),
+        personName:persons.get(String(candidate.personId))}:candidate);
+  };
+  return {actionCandidates:filter('action',review.actionCandidates),
+    opportunityCandidates:filter('opportunity',review.opportunityCandidates)};
+}
+
 class ActivityReviewWorkflowService {
   constructor({request,rpc,disclosure=disclose}={}) {
     if (typeof request !== 'function' || typeof rpc !== 'function')
@@ -110,7 +147,7 @@ class ActivityReviewWorkflowService {
     });
     if (!activity.length) throw new Error('Activity unavailable');
     const tasks=await this.request('ai_tasks','GET',{
-      select:'id,task_type,subject_type,subject_id,status,created_at,completed_at',
+      select:'id,task_type,subject_type,subject_id,status,created_at,completed_at,context_snapshot',
       task_type:'eq.activity_review',subject_type:'eq.activity',subject_id:`eq.${idValue}`,
       status:'eq.completed',order:'created_at.desc,id.desc',limit:20,
     });
@@ -139,17 +176,18 @@ class ActivityReviewWorkflowService {
     const versions=(results||[]).map(row=>{
       const task=taskById.get(String(row.task_id));
       if(!task)return null;
-      const review=row.result_json&&typeof row.result_json==='object'?row.result_json:{};
+      const raw=row.result_json&&plain(row.result_json)?row.result_json:{};
       const decisions=(commandsByResult.get(String(row.id))||[]).map(command=>({
         candidateIndex:Number(command.candidate_index),
         kind:command.operation.includes('action')?'action':'opportunity',
         status:command.operation.startsWith('reject_')?'rejected':'accepted',
         result:command.result_json||{},executedAt:command.executed_at,
       }));
+      const candidates=historyCandidates(raw,task.context_snapshot,idValue,decisions);
+      const review={...raw,...candidates};
       return {id:row.id,taskId:row.task_id,createdAt:row.created_at,
         summary:review.summary||'',review,
-        actionCandidates:Array.isArray(review.actionCandidates)?review.actionCandidates:[],
-        opportunityCandidates:Array.isArray(review.opportunityCandidates)?review.opportunityCandidates:[],
+        ...candidates,
         decisions};
     }).filter(Boolean);
     const refs=[...refsForRows('activities',activity),...refsForRows('ai_tasks',tasks||[]),
@@ -168,4 +206,4 @@ class ActivityReviewWorkflowService {
       testData:await this.disclosure([...refs,...sourceRows])};
   }
 }
-module.exports={ActivityReviewWorkflowService,payload};
+module.exports={ActivityReviewWorkflowService,payload,historyCandidates};

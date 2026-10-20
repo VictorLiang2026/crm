@@ -107,7 +107,9 @@ function resultSummary(result) {
 }
 
 function candidateCard(ctx, activityId, version, kind, candidate, index, refresh) {
-  const decision = decisionFor(version, kind, index);
+  const sourceIndex = Number.isSafeInteger(candidate?.sourceIndex) && candidate.sourceIndex >= 0
+    ? candidate.sourceIndex : index;
+  const decision = decisionFor(version, kind, sourceIndex);
   const status = decision ? decision.status : 'pending';
   const operation = kind === 'action' ? 'action' : 'opportunity';
   const editor = h('div', {});
@@ -155,12 +157,12 @@ function candidateCard(ctx, activityId, version, kind, candidate, index, refresh
           const payload = draft();
           if (!payload.title && kind === 'action') throw new Error(t('pc18_title_required'));
           if (kind === 'opportunity' && (!payload.reason || !payload.nextAction)) throw new Error(t('pc18_fields_required'));
-          buildPreview(ctx, activityId, version.id, operation, index, payload, previewHost, refresh);
+          buildPreview(ctx, activityId, version.id, operation, sourceIndex, payload, previewHost, refresh);
         } catch (e) { error.textContent = e.message; }
       } }, t('pc18_preview_candidate'));
       const rejectButton = h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => {
         buildPreview(ctx, activityId, version.id, kind === 'action' ? 'reject_action' : 'reject_opportunity',
-          index, {}, previewHost, refresh);
+          sourceIndex, {}, previewHost, refresh);
       } }, t('pc18_reject_candidate'));
       const pendingButton = h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => editor.replaceChildren() }, t('pc18_keep_pending'));
       editor.replaceChildren(h('div', { class: 'card-body' }, [...fields,

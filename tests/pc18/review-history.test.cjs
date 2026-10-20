@@ -1,7 +1,7 @@
 'use strict';
 const test=require('node:test');
 const assert=require('node:assert/strict');
-const {ActivityReviewWorkflowService}=require('../../cloudfunctions/person_360/activity-review-workflow-service');
+const {ActivityReviewWorkflowService,historyCandidates}=require('../../cloudfunctions/person_360/activity-review-workflow-service');
 
 test('PC18 returns bounded activity-scoped versions, candidate decisions, outcomes, and disclosure',async()=>{
   const calls=[];
@@ -9,7 +9,11 @@ test('PC18 returns bounded activity-scoped versions, candidate decisions, outcom
     request:async(table,method,filters)=>{
       calls.push({table,method,filters});
       if(table==='activities')return [{id:42,name:'【系统测试·勿联系】活动甲',status:'ended'}];
-      if(table==='ai_tasks')return [{id:20,task_type:'activity_review',subject_type:'activity',subject_id:'42',status:'completed',created_at:'2026-10-16T01:00:00Z'}];
+      if(table==='ai_tasks')return [{id:20,task_type:'activity_review',subject_type:'activity',subject_id:'42',status:'completed',created_at:'2026-10-16T01:00:00Z',
+        context_snapshot:{_context:{recipe:'activity_review',subjectType:'activity',subjectId:42},
+          persons:[{data:{id:9001,display_name:'虚构人物'}}],
+          activity_interactions:[{source:{schema:'public',table:'interactions',id:50},
+            data:{id:50,person_id:9001,importance:3}}]}}];
       if(table==='ai_results')return [{id:30,task_id:20,rank:1,created_at:'2026-10-16T01:01:00Z',result_json:{
         summary:'【系统测试·勿联系】虚构总结',whoMattered:[{text:'虚构证据',sourceRefs:['public.interactions#50']}],
         actionCandidates:[{personId:9001,personName:'虚构人物',title:'回访',confidence:0.82,sourceRefs:['public.interactions#50']}],
@@ -29,6 +33,7 @@ test('PC18 returns bounded activity-scoped versions, candidate decisions, outcom
   assert.equal(result.versions.length,1);
   assert.equal(result.versions[0].id,30);
   assert.equal(result.versions[0].actionCandidates[0].confidence,0.82);
+  assert.equal(result.versions[0].actionCandidates[0].sourceIndex,0);
   assert.deepEqual(result.versions[0].decisions,[{candidateIndex:0,kind:'action',status:'accepted',
     result:{status:'accepted',kind:'action',actionId:71},executedAt:'2026-10-16T02:00:00Z'}]);
   assert.equal(result.outcomes[0].id,81);
@@ -39,7 +44,35 @@ test('PC18 returns bounded activity-scoped versions, candidate decisions, outcom
   assert.equal(commandCall.filters.activity_id,'eq.42');
   assert.equal(commandCall.filters.ai_result_id,'in.(30)');
   assert.equal(commandCall.filters.executed_at,'not.is.null');
+  assert.match(calls.find(call=>call.table==='ai_tasks').filters.select,/context_snapshot/);
   assert.ok(result.testData.receivedRefs.some(ref=>ref.table==='interactions'&&ref.id==='50'));
+});
+
+test('PC36 E09 filters unsupported pending candidates but retains original indices and decided audit',()=>{
+  const snapshot={_context:{recipe:'activity_review',subjectType:'activity',subjectId:11},
+    persons:[{data:{id:783,display_name:'【系统测试·勿联系】虚构体验甲'}}],
+    activity_interactions:[{source:{schema:'public',table:'interactions',id:11},
+      data:{id:11,person_id:783,importance:3}}],
+    recent_interactions:[{source:{schema:'public',table:'interactions',id:6},
+      data:{id:6,person_id:783,importance:4}}],
+    participants:[{source:{schema:'public',table:'activity_participants',id:18},
+      data:{id:18,resolved_person_id:783,status:'attended'}}]};
+  const candidate=sourceRefs=>({personId:783,title:'【系统测试·勿联系】核查',sourceRefs});
+  const review={actionCandidates:[candidate(['public.interactions#6']),
+    candidate(['public.interactions#11']),candidate(['public.interactions#6']),
+    candidate(['public.activity_participants#18'])],
+    opportunityCandidates:[candidate(['public.activity_participants#18']),
+      candidate(['public.interactions#11'])]};
+  const decisions=[{kind:'action',candidateIndex:2,status:'rejected'}];
+  const display=historyCandidates(review,snapshot,11,decisions);
+  assert.deepEqual(display.actionCandidates.map(row=>row.sourceIndex),[1,2,3]);
+  assert.deepEqual(display.opportunityCandidates.map(row=>row.sourceIndex),[1]);
+  assert.equal(display.actionCandidates[0].personName,'【系统测试·勿联系】虚构体验甲');
+  assert.deepEqual(review.actionCandidates.map(row=>row.sourceIndex),[undefined,undefined,undefined,undefined],
+    'saved AI result must remain unchanged');
+  assert.deepEqual(historyCandidates(review,{...snapshot,_context:{...snapshot._context,subjectId:12}},11,decisions)
+    .actionCandidates.map(row=>row.sourceIndex),[2],
+    'a mismatched snapshot must not authorize pending candidates');
 });
 
 test('PC18 rejects an unavailable or malformed activity before reading review history',async()=>{
