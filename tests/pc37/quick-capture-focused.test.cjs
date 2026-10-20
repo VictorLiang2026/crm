@@ -86,7 +86,9 @@ test('history reads are bounded, person-scoped and exclude expired/future memori
       limit(n) { call.limit = n; return { data: rows[table] }; },
     };
   } };
-  const result = await readContext({ personId: 1, selectedName: '张先生' },
+  const result = await readContext({ personId: 1, selectedName: '张先生',
+    memories: rows.context_items.map(row => ({ ...row, person_id: 1, confirmed: true })),
+    workItems: [{ id: 4, person_id: 1, kind: 'action', title: '发资料', status: 'open' }] },
     { rdb, assertOk: x => x }, '2026-10-20');
   assert.deepEqual(result.memories.map(x => x.id), ['3']);
   assert.equal(result.workItems[0].kind, 'action');
@@ -94,4 +96,8 @@ test('history reads are bounded, person-scoped and exclude expired/future memori
     assert.ok(call.filters.some(([field, value]) => field === 'person_id' && value === '1'));
     assert.ok(call.limit <= 50);
   }
+  assert.deepEqual(calls.map(call => call.table), ['persons']);
+  await assert.rejects(readContext({ personId: 1, selectedName: '张先生',
+    workItems: [{ id: 4, person_id: 2, kind: 'action', title: '他人的资料', status: 'open' }] },
+  { rdb, assertOk: x => x }, '2026-10-20'), /work context/);
 });

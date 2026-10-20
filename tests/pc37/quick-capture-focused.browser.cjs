@@ -7,6 +7,10 @@ const { Browser } = require('../regression/browser.cjs');
 async function setup(b, recordOnly = false) {
   await b.start(); await b.open('#/more');
   await b.evaluate(`(async()=>{
+    await new Promise((resolve,reject)=>{
+      const css=document.createElement('link');css.rel='stylesheet';css.href='/crm/css/console.css';
+      css.onload=resolve;css.onerror=reject;document.head.appendChild(css);
+    });
     const {openQuickCapture}=await import('/crm/js/modules/console/write.js');
     const {setLang}=await import('/crm/js/modules/console/i18n.js');setLang('zh-CN');
     window.focus={calls:[],done:0, async call(api,args){
@@ -19,6 +23,9 @@ async function setup(b, recordOnly = false) {
         commitments:[]}};
       if(args.action==='resolveQuickCaptureName')return {displayName:'虚构甲',status:'confirm_existing',
         candidates:[{id:783,displayName:'虚构甲'}]};
+      if(args.action==='listPersonWorkItems')return {personId:783,rows:[
+        {id:7,kind:'action',person_id:783,title:'原有发资料任务',status:'open'}]};
+      if(args.action==='getContextGroups')return {groups:{fact:[]}};
       if(args.action==='previewIdentity')return {previewId:'217ecbb5-aa90-4d8b-92ec-6a3b82202901',
         preview:{...args.data,newPerson:false,personId:783}};
       if(args.action==='executeIdentity')return {personId:783,interactionId:9003};

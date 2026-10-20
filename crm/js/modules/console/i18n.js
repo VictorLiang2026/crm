@@ -3,6 +3,7 @@ const DEFAULT = 'zh-CN';
 
 const DICT = {
   'capture_focus_intro': { 'zh-CN': '记下一次交流，让 AI 提炼摘要、重要变化和下一步。', 'en': 'Record a conversation. AI drafts a summary, important changes and next steps.' },
+  'capture_summary_hint': { 'zh-CN': '保存为一条交流记录，原话完整保留。', 'en': 'Save as one conversation, with the original note preserved.' },
   'capture_memories': { 'zh-CN': '值得记住的信息', 'en': 'Worth remembering' },
   'capture_memory_hint': { 'zh-CN': '默认 0–3 条。只保留以后有用的新信息；临时情况留在摘要中即可。', 'en': 'Usually 0–3 items. Keep useful new information; leave temporary details in the summary.' },
   'capture_record_only': { 'zh-CN': '仅保存记录，不增加记忆或待办', 'en': 'Save the conversation only, without memories or tasks' },
@@ -12,7 +13,7 @@ const DICT = {
   'capture_history_limited': { 'zh-CN': '已参考部分近期信息和未完成事项，历史较多，未全量检查。', 'en': 'Reviewed a limited recent history. Older information may not be included.' },
   'capture_history_failed': { 'zh-CN': '历史复核未完成，请重新选择人物重试。', 'en': 'History review failed. Select the person again to retry.' },
   'capture_changed_memory': { 'zh-CN': '可能有变化：旧信息不会自动覆盖，请在人物信息中核对。', 'en': 'Possible change: existing information stays unchanged. Review it in the person profile.' },
-  'capture_evidence': { 'zh-CN': '原话依据：', 'en': 'Source: ' },
+  'capture_evidence': { 'zh-CN': 'AI 初稿依据：', 'en': 'Original AI draft evidence: ' },
   'capture_next_steps': { 'zh-CN': '下一步', 'en': 'Next steps' },
   'capture_next_hint': { 'zh-CN': '建议最多 2 条，明确承诺单列。保存记录后，可逐条确认加入或调整待办。', 'en': 'Up to two suggestions, plus explicit promises. After saving, review tasks individually.' },
   'capture_promise': { 'zh-CN': '明确约定', 'en': 'Explicit promise' },

@@ -25,22 +25,34 @@ async function readContext(event, { rdb, assertOk }, today) {
   const persons = assertOk(await rdb.from('persons').select('id,display_name')
     .eq('id', id).is('deleted_at', null).limit(1)).data || [];
   if (!persons[0] || persons[0].display_name !== event.selectedName) throw new Error('Selected Person changed');
-  const read = async query => assertOk(await query).data || [];
-  const [memories, actions, commitments] = await Promise.all([
-    read(rdb.from('context_items').select('id,content,item_type,confirmed,valid_from,valid_to')
-      .eq('person_id', id).eq('item_type', 'fact').eq('confirmed', true)
-      .order('created_at', { ascending: false }).limit(50)),
-    read(rdb.from('actions').select('id,person_id,title,description,due_at,priority,status')
-      .eq('person_id', id).in('status', ['open', 'in_progress'])
-      .order('due_at', { ascending: true }).limit(30)),
-    read(rdb.from('commitments').select('id,person_id,content,due_at,commitment_type,status')
-      .eq('person_id', id).eq('status', 'open').order('due_at', { ascending: true }).limit(30)),
-  ]);
-  return { checked: true, limited: memories.length === 50 || actions.length === 30 || commitments.length === 30,
+  // History comes from existing authenticated person_360 read routes.
+  // It is untrusted draft context, NEVER execution authority. Every task
+  // change still requires that route's server-verified preview and confirmation.
+  const workItems = array(event.workItems, 60).map(row => {
+    if (!row || !['action', 'commitment'].includes(row.kind) ||
+        String(row.person_id) !== id || !/^[1-9]\d*$/.test(String(row.id)) ||
+        !['open', ...(row.kind === 'action' ? ['in_progress'] : [])].includes(row.status)) {
+      throw new Error('Invalid focused capture work context');
+    }
+    return { id: String(row.id), person_id: id, kind: row.kind, status: row.status,
+      ...(row.kind === 'action'
+        ? { title: text(row.title, 200), description: text(row.description || '', 4000, true),
+          priority: ['low', 'medium', 'high', 'urgent'].includes(row.priority) ? row.priority : 'medium' }
+        : { content: text(row.content, 4000), commitment_type:
+          ['I_PROMISED', 'THEY_PROMISED', 'MUTUAL'].includes(row.commitment_type) ? row.commitment_type : 'I_PROMISED' }),
+      due_at: typeof row.due_at === 'string' && Number.isFinite(Date.parse(row.due_at)) ? row.due_at : null };
+  });
+  const memories = array(event.memories, 50).map(row => {
+    if (!row || String(row.person_id) !== id || !/^[1-9]\d*$/.test(String(row.id)) ||
+        row.confirmed !== true) throw new Error('Invalid focused capture memory context');
+    return { id: String(row.id), content: text(row.content, 500), valid_from: row.valid_from,
+      valid_to: row.valid_to, needsReview: row.needsReview === true };
+  });
+  return { checked: true, limited: memories.length === 50 || event.workItemsLimited === true,
     memories: memories.filter(row => (!row.valid_from || String(row.valid_from).slice(0, 10) <= today) &&
-      (!row.valid_to || String(row.valid_to).slice(0, 10) >= today)).map(row => ({ id: String(row.id), content: String(row.content || '').slice(0, 500) })),
-    workItems: [...actions.map(row => ({ ...row, kind: 'action' })),
-      ...commitments.map(row => ({ ...row, kind: 'commitment' }))] };
+      (!row.valid_to || String(row.valid_to).slice(0, 10) >= today)).map(row => ({
+      id: row.id, content: row.content, needsReview: row.needsReview })),
+    workItems };
 }
 function prompt(today, language) {
   return [
@@ -55,6 +67,7 @@ function prompt(today, language) {
     'summary 概括发生了什么、重要变化和约定，不堆砌句子。不得加入原文没有的事实。',
     'memories 0–3 条：只保留未来有用的明确新信息或变化，如持续需求、沟通偏好、家庭/工作变化；同主题合并。吃饭、天气、寒暄、今天很忙等只进摘要。没有则空数组。',
     '历史已有相同含义的信息不要再列。与历史冲突/变化时 change=true，不能改写旧事实。猜测、星座推断、意向推断不可进入 memories。',
+    '历史内容也可能需要核实（needsReview=true）；历史只用于比较重复和变化，不能据此新增原话没有的信息。',
     'suggestions 0–2 条，说明为什么、何时、怎么做；没有必要则空数组。建议时间可为空。不得凭空判断购买意愿。',
     'commitments 必须保留原文中所有明确约定（最多40条，超过则拒绝生成，不可静默遗漏）；不占建议的两条额度。未约定日期填null，模糊日期勿猜，具体时间保留在title中。',
     '相同任务不要同时出现在建议和承诺中。与历史未完成任务重复时，existingId/existingKind 指向给定记录，建议查看或调整原任务，不新建。',

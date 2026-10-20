@@ -778,6 +778,36 @@ export function openCandidate(ctx, { row, onDone }) {
 
 // ---------- 快速记录（Quick Capture，生产链路） ----------
 export function openQuickCapture(ctx, { personId, onDone } = {}) {
+  async function parseFocused(text, selected = null) {
+    let workContext = {};
+    if (selected) {
+      const [work, context] = await Promise.all([
+        p360(ctx, 'listPersonWorkItems', { personId: String(selected.id) }),
+        p360(ctx, 'getContextGroups', { personId: String(selected.id) }),
+      ]);
+      if (!work || String(work.personId) !== String(selected.id) || !Array.isArray(work.rows) ||
+          !Array.isArray(context?.groups?.fact)) {
+        throw new Error(t('capture_history_failed'));
+      }
+      const open = work.rows.filter(row => String(row.person_id) === String(selected.id) &&
+        (row.status === 'open' || row.kind === 'action' && row.status === 'in_progress'));
+      const actions = open.filter(row => row.kind === 'action');
+      const commitments = open.filter(row => row.kind === 'commitment');
+      workContext = {
+        memories: context.groups.fact.filter(row => String(row.personId) === String(selected.id) &&
+          row.confirmed === true && row.validity === 'current').slice(0, 50).map(row => ({
+          id: String(row.id), person_id: String(selected.id), content: String(row.content || '').slice(0, 500),
+          confirmed: true, valid_from: row.validFrom, valid_to: row.validTo, needsReview: row.needsReview === true,
+        })),
+        workItems: [...actions.slice(0, 30), ...commitments.slice(0, 30)],
+        workItemsLimited: work.hasMore === true || actions.length > 30 || commitments.length > 30 ||
+          context.groups.fact.length >= 50,
+      };
+    }
+    return aiParse(ctx, { action: 'quick_capture', profile: 'focused', text, language: getLang(),
+      ...(selected ? { personId: String(selected.id), selectedName: selected.displayName || selected.display_name,
+        ...workContext } : {}) });
+  }
   const ta = h('textarea', {
     class: 'sheet-textarea', style: 'min-height:96px', maxlength: 10000,
     placeholder: t('quick_capture_placeholder'),
@@ -799,8 +829,7 @@ export function openQuickCapture(ctx, { personId, onDone } = {}) {
         const home = await p360(ctx, 'get', { personId: String(personId) });
         if (home?.person?.display_name) selected = { id: String(personId), displayName: home.person.display_name };
       }
-      const r = await aiParse(ctx, { action: 'quick_capture', profile: 'focused', text, language: getLang(),
-        ...(selected ? { personId: selected.id, selectedName: selected.displayName } : {}) });
+      const r = await parseFocused(text, selected);
       busy(btn, false, t('ai_parse'));
       await renderReview(r, text, btn, selected);
     } catch (err) {
@@ -848,8 +877,7 @@ export function openQuickCapture(ctx, { personId, onDone } = {}) {
           controls.forEach(control => { control.disabled = true; });
           status.textContent = t('capture_checking_history');
           try {
-            const refined = await aiParse(ctx, { action: 'quick_capture', profile: 'focused', text, language: getLang(),
-              personId: String(c.id), selectedName: c.displayName || c.display_name });
+            const refined = await parseFocused(text, c);
             await renderReview(refined, text, parseBtn, c);
           } catch (error) {
             // Failed history review must not silently claim deduplication succeeded.
@@ -958,7 +986,7 @@ export function openQuickCapture(ctx, { personId, onDone } = {}) {
         h('div', { class: 'sheet-field', style: 'flex:1' }, [h('label', {}, t('method')), typeSel]),
         h('div', { class: 'sheet-field', style: 'width:170px' }, [h('label', {}, t('date')), dateInput]),
       ]),
-      fieldRow(t('interaction_summary'), summaryTa, t('summary_note')),
+      fieldRow(t('interaction_summary'), summaryTa, t('capture_summary_hint')),
       h('label', { class: 'sheet-note', style: 'display:flex;gap:8px;align-items:center;margin:12px 0' },
         [recordOnly, t('capture_record_only')]),
       status,

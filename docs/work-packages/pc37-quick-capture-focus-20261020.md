@@ -10,6 +10,7 @@
 - 从最新 master 建立隔离工作区 `D:\CRM\crm-quick-capture`，分支 `codex/quick-capture-focus`。
 - 基线核验：线上 admin.html、75 个可达静态资源、29 个 CRM 函数的 201 个文件与开发基线一致。
 - 基线证据：`D:\Temp\crm-cloud-audit-c9a3e7fee45d4772b0696baf495f1265`。
+- 实施期间远端增加了仅更新 PC36 验收文档的 `2ccaedc`，已合并保留，没有覆盖该变更。
 
 ## 用户体验
 
@@ -25,11 +26,12 @@
 
 ## 接口、数据与兼容
 
-- 新解析模式：`ai_parse {action:"quick_capture", profile:"focused", text, language, personId?, selectedName?}`。
+- 新解析模式：`ai_parse {action:"quick_capture", profile:"focused", text, language, personId?, selectedName?, memories?, workItems?, workItemsLimited?}`。
 - 未传 focused 的 Legacy Quick Capture、version=2 测试解析、OCR 和客户资料解析维持既有分支。
 - 模型使用已有 `generateText` / CloudBase `AI_MODEL` 配置，不新增厂商或模型常量。
-- 只读访问既有 public 的 persons、context_items、actions、commitments。人物名称不匹配或读取失败时拒绝历史复核，不把读取失败当成“没有历史”。
-- 上下文上限：50 条已确认事实、30 条未完成行动、30 条未完成承诺；达到上限时明确标注并非全量去重。发送模型的历史不包含联系方式、完整工作项说明或无关人物。
+- AI 解析通道只读既有 public.persons 核对人物。历史事实复用已登录的 `person_360.getContextGroups`，未完成行动与承诺复用 `person_360.listPersonWorkItems` 受保护入口读取，再作为有数量、类型、人物范围约束的草稿上下文传给解析器；不增加 ai_parse 的数据库权限。人物名称不匹配或读取失败时拒绝历史复核，不把读取失败当成“没有历史”。
+- 客户端转交的历史只是 AI 参考材料，不是权威状态或执行授权。传入行的人物标识必须与所选人物一致，模型只能引用已提供的 ID；这不替代数据库真实性核实，后续编辑仍由既有服务端预览重新检查实际人物、事项和状态，不能凭历史快照直接写入。
+- 上下文上限：50 条近期事实中筛选已确认且有效的条目、30 条未完成行动、30 条未完成承诺；达到上限时明确标注并非全量去重。不会额外读取人物电话等字段；发送模型的历史不包含完整工作项说明或其他人物的数据。
 - 正式写入仍走 `PersonService.resolveName()` 所在的身份预览链路，用户确认后执行既有 `person_identity_preview_v1/person_identity_execute_v1` 事务。Person 不由 AI 选定。
 - 不新增/修改表、字段、视图、数据库函数或权限，因此不需要 migration / rollback SQL。
 - 不涉及 pr schema、pr_* 对象或函数。
@@ -56,11 +58,17 @@
 - PC06 / WP08 / Quick Capture V2：12/12，行动与承诺编辑、身份解析、确认和事务契约回归通过。
 - 模块化前端检查通过；变更 JS 语法和 diff 空白检查通过。
 - CloudBase 代码审查：未新增凭据回显、未修改 RLS、保留后端入口与人工预览确认。
-- WP01 完整发布门槛、线上 AI 只读调用与发布核验：待本轮发布记录补齐。
+- 最终 WP01 完整发布门槛：`PASS_WITH_LIMITATIONS`；公共 regression 108 PASS / 0 FAIL / 5 既有预设 SKIP，匿名探针 71/71，目录权限断言 1036/1036。
+- 未执行真实账号人工登录和生产新增/更新/删除/恢复的端到端验收；既有权限、事务与浏览器模拟测试不替代这些人工项目。移动端不在本轮验收范围。
+- 真实线上模型只读调用：明确偏好与约定场景返回 1 条记忆、0 条额外建议、2 条承诺；寒暄场景返回一段摘要，记忆/建议/承诺均为空。没有写入任何测试业务记录。
 
 ## 发布及恢复
 
-仅部署 `ai_parse` 源码，以及两个实际修改的前端文件 write.js、i18n.js。
+仅部署 `ai_parse` 源码，以及两个实际修改的前端文件 write.js、i18n.js。独立发布检出为 `D:\CRM\crm-qc-release`（master）。本轮标签：`release-20261020-171824`。
+
+新快速记录入口：<https://crm-d1gkae8ddc930d151-1434199662.tcloudbaseapp.com/crm/console.html>。Legacy admin 页面维持原入口。
+
+使用 `tools/release.ps1` 执行发布前完整云端核对、GitHub master 与标签原子推送、发布后三端核对。源码比对证据保存在 `D:\Temp\pc37-release-audit`。只有该脚本完整返回 PASS 才可对外报告发布成功。
 
 发布前执行 WP01 安全门槛；发布后核对 GitHub master、标签、静态资源和函数源码。原工作区存在其他改动，Git 发布使用干净的独立 master 检出，不能通过发布脚本顺带暂存原工作区文件。
 
@@ -69,3 +77,12 @@
 ## 验收边界
 
 模型对“值得记住”“语义重复”“明确约定”的判断仍需人核对；结构和逐字证据校验不代表语义完全正确。模拟浏览器和接口契约测试不冒充真实登录后的生产写入验收；本轮不使用真实客户数据做破坏性测试。
+
+## 线上验证发现与修正
+
+- MCP 的 invokeFunction 在当前环境级凭证下返回 CAM authentication failed；项目既有 CLI 凭证可正常调用，没有修改授权或读取密钥。
+- 第一条只读 AI 虚构输入生成 1 段摘要、1 条周末联系偏好、2 条明确承诺，没有把吃饭和天气拆成记忆。
+- 初次带历史调用暴露 `ai_parse` 的旧 anon 通道无 commitments SELECT 权限；随后只读核实 context_items、actions 同样仅允许受保护通道。前端尚未发布，原入口未受影响；停止收尾后改为上述既有 person_360 受保护读取链路，未扩大 grants/RLS、未复制服务密钥。修正后须重跑回归、门槛和线上调用再发布。
+- 修正后上述回归和门槛全部通过，函数与前端均重新按目标范围部署。线上寒暄调用 RequestId `c4d3bfc5-dfe0-48b0-841d-f6cc2d641e65` 成功，`contextChecked=true`，三类候选均为空。
+- 该线上调用使用既有虚构 Person #787；只读 SQL 核实其相关事实、未完成行动、承诺数量均为 0，传入对应空历史夹具。此调用验证模型与身份读取，已登录页面到受保护历史接口的完整生产链路仍属于人工验收项目。
+- 英文模式线上只读调用 RequestId `0aa4142c-ecd2-4c8a-ab74-c0422c57211d` 成功，摘要和内容为英文、内部枚举保持合法，返回 1 条邮件沟通偏好和 1 项明确承诺，无额外建议。
