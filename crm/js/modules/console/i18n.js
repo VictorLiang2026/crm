@@ -2,6 +2,28 @@
 const DEFAULT = 'zh-CN';
 
 const DICT = {
+  'capture_focus_intro': { 'zh-CN': '记下一次交流，让 AI 提炼摘要、重要变化和下一步。', 'en': 'Record a conversation. AI drafts a summary, important changes and next steps.' },
+  'capture_memories': { 'zh-CN': '值得记住的信息', 'en': 'Worth remembering' },
+  'capture_memory_hint': { 'zh-CN': '默认 0–3 条。只保留以后有用的新信息；临时情况留在摘要中即可。', 'en': 'Usually 0–3 items. Keep useful new information; leave temporary details in the summary.' },
+  'capture_record_only': { 'zh-CN': '仅保存记录，不增加记忆或待办', 'en': 'Save the conversation only, without memories or tasks' },
+  'capture_checking_history': { 'zh-CN': '正在结合此人的已有信息和未完成事项重新整理…', 'en': 'Reviewing this person’s existing information and open work…' },
+  'capture_history_hint': { 'zh-CN': '选择已有人物后，将结合其历史重新整理。', 'en': 'Select an existing person to review their history.' },
+  'capture_history_checked': { 'zh-CN': '已参考近期有效信息和未完成事项；语义重复仍请人工核对。', 'en': 'Recent active information and open work reviewed. Please check for semantic duplicates.' },
+  'capture_history_limited': { 'zh-CN': '已参考部分近期信息和未完成事项，历史较多，未全量检查。', 'en': 'Reviewed a limited recent history. Older information may not be included.' },
+  'capture_history_failed': { 'zh-CN': '历史复核未完成，请重新选择人物重试。', 'en': 'History review failed. Select the person again to retry.' },
+  'capture_changed_memory': { 'zh-CN': '可能有变化：旧信息不会自动覆盖，请在人物信息中核对。', 'en': 'Possible change: existing information stays unchanged. Review it in the person profile.' },
+  'capture_evidence': { 'zh-CN': '原话依据：', 'en': 'Source: ' },
+  'capture_next_steps': { 'zh-CN': '下一步', 'en': 'Next steps' },
+  'capture_next_hint': { 'zh-CN': '建议最多 2 条，明确承诺单列。保存记录后，可逐条确认加入或调整待办。', 'en': 'Up to two suggestions, plus explicit promises. After saving, review tasks individually.' },
+  'capture_promise': { 'zh-CN': '明确约定', 'en': 'Explicit promise' },
+  'capture_suggestion': { 'zh-CN': 'AI 建议', 'en': 'AI suggestion' },
+  'capture_date_unknown': { 'zh-CN': '时间待确认', 'en': 'Time to confirm' },
+  'capture_existing_task': { 'zh-CN': '已有相关未完成事项，优先核对或调整', 'en': 'Related open work exists; review or adjust it first' },
+  'capture_no_next': { 'zh-CN': '本次无需新增跟进事项。', 'en': 'No new follow-up is needed for this conversation.' },
+  'capture_saved_next': { 'zh-CN': '交流记录已保存。以下事项尚未写入待办；打开后核对内容和提醒时间，再预览确认。', 'en': 'Conversation saved. These tasks are not saved yet. Review content and reminder time, then preview and confirm.' },
+  'capture_review_existing': { 'zh-CN': '查看 / 调整已有事项', 'en': 'Review / adjust existing work' },
+  'capture_prepare_task': { 'zh-CN': '准备待办并预览', 'en': 'Prepare task for preview' },
+  'capture_done': { 'zh-CN': '关闭（未确认事项不进入待办）', 'en': 'Close (unconfirmed items are not tasks)' },
   // PC34-A: existing Console labels previously rendered as raw dictionary keys.
   'person': { 'zh-CN': '人物', 'en': 'Person' },
   'opportunities': { 'zh-CN': '机会', 'en': 'Opportunities' },

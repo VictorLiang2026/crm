@@ -267,14 +267,15 @@ function workItemValues(kind, draft, row) {
 
 /** Native Person/Today work item editor. All writes remain preview → confirm → execute. */
 export function openWorkItemEditor(ctx, { kind = 'action', row = null, personId = null,
-  personName = '', initialTitle = '', initialDescription = '', onDone } = {}) {
+  personName = '', initialTitle = '', initialDescription = '',
+  initialCommitmentType = '', onDone } = {}) {
   const isAction = kind === 'action';
   const initialPerson = row?.person_id || personId || '';
   const chosen = { id: initialPerson ? String(initialPerson) : '', name: row?.person_name || personName || '' };
   const title = row ? t(isAction ? 'edit_action' : 'edit_commitment')
     : t(isAction ? 'create_action' : 'create_commitment');
   const text = isAction ? h('input', { class: 'sheet-input', maxlength: 200, value: row?.title || initialTitle })
-    : h('textarea', { class: 'sheet-textarea', maxlength: 4000, rows: 3 }, row?.content || '');
+    : h('textarea', { class: 'sheet-textarea', maxlength: 4000, rows: 3 }, row?.content || initialTitle);
   const description = isAction ? h('textarea', { class: 'sheet-textarea', maxlength: 4000, rows: 2 }, row?.description || initialDescription) : null;
   const priority = isAction ? sel([
     ['low', t('priority_low')], ['medium', t('priority_medium')],
@@ -283,7 +284,7 @@ export function openWorkItemEditor(ctx, { kind = 'action', row = null, personId 
   const commitmentType = !isAction ? sel([
     ['I_PROMISED', t('commit_i_promised')], ['THEY_PROMISED', t('commit_they_promised')],
     ['MUTUAL', t('commit_mutual')],
-  ], row?.commitment_type || 'I_PROMISED', { 'aria-label': t('field_commitment_type') }) : null;
+  ], row?.commitment_type || initialCommitmentType || 'I_PROMISED', { 'aria-label': t('field_commitment_type') }) : null;
   const due = h('input', { class: 'sheet-input', type: 'datetime-local', value: workItemLocalDateTime(row?.due_at) });
   const personSearch = h('input', { class: 'sheet-input', type: 'search', maxlength: 80, placeholder: t('work_person_search') });
   const personMatches = h('div', { class: 'sheet-stack' });
@@ -778,13 +779,13 @@ export function openCandidate(ctx, { row, onDone }) {
 // ---------- 快速记录（Quick Capture，生产链路） ----------
 export function openQuickCapture(ctx, { personId, onDone } = {}) {
   const ta = h('textarea', {
-    class: 'sheet-textarea', style: 'min-height:96px',
+    class: 'sheet-textarea', style: 'min-height:96px', maxlength: 10000,
     placeholder: t('quick_capture_placeholder'),
   });
   const parseBtn = h('button', { class: 'btn btn-primary', type: 'button', onclick: (e) => doParse(e.currentTarget) }, t('ai_parse'));
   const sheet = openSheet({
     title: t('quick_record'),
-    sub: t('ai_parse_note'),
+    sub: t('capture_focus_intro'),
     body: h('div', {}, [ta, h('div', { class: 'sheet-actions' }, [parseBtn])]),
   });
   document.body.appendChild(sheet.overlay);
@@ -793,15 +794,21 @@ export function openQuickCapture(ctx, { personId, onDone } = {}) {
     if (!text) { sheet.showErr(t('enter_content')); return; }
     busy(btn, true, t('ai_parsing'));
     try {
-      const r = await aiParse(ctx, { action: 'quick_capture', text });
+      let selected = null;
+      if (personId) {
+        const home = await p360(ctx, 'get', { personId: String(personId) });
+        if (home?.person?.display_name) selected = { id: String(personId), displayName: home.person.display_name };
+      }
+      const r = await aiParse(ctx, { action: 'quick_capture', profile: 'focused', text, language: getLang(),
+        ...(selected ? { personId: selected.id, selectedName: selected.displayName } : {}) });
       busy(btn, false, t('ai_parse'));
-      await renderReview(r, text, btn);
+      await renderReview(r, text, btn, selected);
     } catch (err) {
       busy(btn, false, t('ai_parse'));
       sheet.showErr(`${t('ai_parse_failed')}${err.message}`);
     }
   }
-  async function renderReview(r, text, parseBtn) {
+  async function renderReview(r, text, parseBtn, reviewedPerson = null) {
     const p = r.parsed || {};
     // 服务端解析 canonical Person 候选（规则 14）：锁人直接复用；否则按 AI 识别的姓名解析。
     let fixed = null;
@@ -810,8 +817,9 @@ export function openQuickCapture(ctx, { personId, onDone } = {}) {
       const name = home && home.person && home.person.display_name;
       if (name) fixed = { id: String(personId), displayName: name };
     }
+    const resolvedName = reviewedPerson?.displayName || reviewedPerson?.display_name || p.person_name;
     const resolution = fixed ? null
-      : (p.person_name ? await p360(ctx, 'resolveQuickCaptureName', { name: p.person_name }) : null);
+      : (resolvedName ? await p360(ctx, 'resolveQuickCaptureName', { name: resolvedName }) : null);
     const candidates = fixed ? [fixed] : ((resolution && resolution.candidates) || []);
     // 服务端允许在无同名（available）或带限定无匹配（confirm_new_qualified）时人工确认新建 Person；
     // AI 未识别人名时也允许手动填写姓名，保存前先做同名解析。
@@ -822,7 +830,8 @@ export function openQuickCapture(ctx, { personId, onDone } = {}) {
       : canCreate ? t('no_same_name')
       : candidates.length ? t('select_confirmed') : t('many_names');
     const candBox = h('div', {});
-    let picked = fixed || null;
+    let picked = reviewedPerson || fixed || null;
+    let refining = false;
     const markActive = (node) => {
       candBox.querySelectorAll('.cand').forEach((n) => n.classList.remove('active'));
       node.classList.add('active');
@@ -830,7 +839,26 @@ export function openQuickCapture(ctx, { personId, onDone } = {}) {
     candidates.forEach((c) => {
       candBox.appendChild(h('div', {
         class: 'cand' + (picked && String(picked.id) === String(c.id) ? ' active' : ''),
-        onclick: (e) => { picked = c; markActive(e.currentTarget); },
+        onclick: async (e) => {
+          if (refining) return;
+          picked = c; markActive(e.currentTarget);
+          if (!p.focused || (reviewedPerson && String(reviewedPerson.id) === String(c.id))) return;
+          refining = true;
+          const controls = [...sheetBody.querySelectorAll('button,input,textarea,select')];
+          controls.forEach(control => { control.disabled = true; });
+          status.textContent = t('capture_checking_history');
+          try {
+            const refined = await aiParse(ctx, { action: 'quick_capture', profile: 'focused', text, language: getLang(),
+              personId: String(c.id), selectedName: c.displayName || c.display_name });
+            await renderReview(refined, text, parseBtn, c);
+          } catch (error) {
+            // Failed history review must not silently claim deduplication succeeded.
+            picked = null;
+            controls.forEach(control => { control.disabled = false; });
+            status.textContent = t('capture_history_failed');
+            sheet.showErr(error.message);
+          } finally { refining = false; }
+        },
       }, `${c.displayName || c.display_name}（${c.occupation || t('occupation_empty')} · ${c.organization || t('organization_empty')}）#${c.id}`));
     });
     if (canCreate) {
@@ -864,10 +892,62 @@ export function openQuickCapture(ctx, { personId, onDone } = {}) {
     if (p.recruit_signal && p.recruit_signal.has) pushSig(`${t('recruit')}：${p.recruit_signal.note || ''}`);
     if (p.referral_signal && p.referral_signal.has) pushSig(`${t('opp_type_referral')}：${p.referral_signal.note || ''}`);
     if (!sigList.length) sigList.push('');
-    const factsWrap = listEditor(factList, t('facts_label'), t('max_20_items'));
+    const factsWrap = listEditor(factList, t('capture_memories'), t('capture_memory_hint'));
     const sigsWrap = listEditor(sigList, t('signals_label'), t('max_12_signals'));
     const summaryTa = h('textarea', { class: 'sheet-textarea' },
-      (p.facts || []).join('；') || '');
+      p.summary || (p.facts || []).join('；') || '');
+    const status = h('p', { class: 'sheet-note', role: 'status' },
+      p.contextChecked ? t(p.contextLimited ? 'capture_history_limited' : 'capture_history_checked') : t('capture_history_hint'));
+    const recordOnly = h('input', { type: 'checkbox', 'data-capture-record-only': 'true',
+      onchange: () => {
+        extras.hidden = recordOnly.checked;
+        nextReview.hidden = recordOnly.checked;
+      } });
+    const memoryNotes = (p.memories || []).map(memory => h('div', { class: 'sheet-note' },
+      `${memory.change ? t('capture_changed_memory') + ' ' : ''}${t('capture_evidence')}${memory.evidence}`));
+    const extras = h('div', {}, [factsWrap, ...memoryNotes]);
+    // Compatibility responses retain their separate signal editor; focused drafts never promote guesses to facts.
+    if (!p.focused) extras.appendChild(sigsWrap);
+    const nextItems = [...(p.commitments || []), ...(p.suggestions || [])];
+    const nextReview = h('div', { class: 'sheet-field' }, [
+      h('label', {}, t('capture_next_steps')),
+      h('div', { class: 'sheet-note' }, t('capture_next_hint')),
+      ...(nextItems.length ? nextItems.map(item => h('div', { class: 'sheet-note', style: 'margin-top:8px' }, [
+        h('strong', {}, `${t(item.kind === 'commitment' ? 'capture_promise' : 'capture_suggestion')} · ${item.title}`),
+        h('div', {}, `${item.date || t('capture_date_unknown')} · ${item.method || item.evidence || ''}`),
+        item.reason ? h('div', {}, item.reason) : null,
+        item.existing ? h('div', {}, `${t('capture_existing_task')} #${item.existing.id}`) : null,
+      ])) : [h('div', { class: 'sheet-note' }, t('capture_no_next'))]),
+    ]);
+    function afterSave(savedPersonId, savedName) {
+      ctx.toast(t('interaction_saved'), 'ok');
+      if (onDone) onDone();
+      if (recordOnly.checked || !nextItems.length) { sheet.overlay.remove(); return; }
+      sheet.swap(h('div', {}, [
+        h('p', { class: 'sheet-note' }, t('capture_saved_next')),
+        ...nextItems.map(item => {
+          const button = h('button', { class: 'btn btn-soft', type: 'button', onclick: () => {
+            openWorkItemEditor(ctx, {
+              kind: item.existing?.kind || item.kind, row: item.existing || null,
+              personId: String(savedPersonId), personName: savedName,
+              initialTitle: item.title,
+              initialDescription: [item.reason, item.method, item.evidence].filter(Boolean).join('\n'),
+              // Date-only suggestions remain visible; the person chooses an actual reminder time.
+              initialCommitmentType: item.commitmentType || '',
+              onDone: () => { button.disabled = true; button.textContent = t('work_item_saved'); if (onDone) onDone(); },
+            });
+          } }, t(item.existing ? 'capture_review_existing' : 'capture_prepare_task'));
+          return h('div', { class: 'sheet-field' }, [
+            h('strong', {}, item.title),
+            h('p', { class: 'sheet-note' }, `${item.date || t('capture_date_unknown')} · ${item.method || item.evidence || ''}`),
+            button,
+          ]);
+        }),
+        h('div', { class: 'sheet-actions' }, [
+          h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => sheet.overlay.remove() }, t('capture_done')),
+        ]),
+      ]));
+    }
     let newCaptureKey = '';
     let newCaptureShape = '';
     let existingCaptureKey = '';
@@ -878,18 +958,23 @@ export function openQuickCapture(ctx, { personId, onDone } = {}) {
         h('div', { class: 'sheet-field', style: 'flex:1' }, [h('label', {}, t('method')), typeSel]),
         h('div', { class: 'sheet-field', style: 'width:170px' }, [h('label', {}, t('date')), dateInput]),
       ]),
-      factsWrap,
-      sigsWrap,
       fieldRow(t('interaction_summary'), summaryTa, t('summary_note')),
+      h('label', { class: 'sheet-note', style: 'display:flex;gap:8px;align-items:center;margin:12px 0' },
+        [recordOnly, t('capture_record_only')]),
+      status,
+      extras,
+      nextReview,
       h('div', { class: 'sheet-actions' }, [
         h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => sheet.overlay.remove() }, t('cancel')),
         h('button', {
           class: 'btn btn-primary', type: 'button',
           onclick: async (e) => {
             const b = e.currentTarget;
+            if (refining) return;
             if (!picked) { sheet.showErr(t('select_person_first')); return; }
-            const facts = factsWrap.readValues().filter((x) => x.trim()).slice(0, 20);
-            const signals = sigsWrap.readValues().filter((x) => x.trim()).slice(0, 12);
+            const facts = recordOnly.checked ? [] : [...new Set(factsWrap.readValues().filter((x) => x.trim()))];
+            const signals = recordOnly.checked || p.focused ? [] : sigsWrap.readValues().filter((x) => x.trim());
+            if (facts.length > 20 || signals.length > 12) { sheet.showErr(t('max_20_items')); return; }
             if (facts.some((x) => x.length > 500) || signals.some((x) => x.length > 500)) {
               sheet.showErr(t('max_500_chars')); return;
             }
@@ -950,9 +1035,7 @@ export function openQuickCapture(ctx, { personId, onDone } = {}) {
                         try {
                           const created = await p360(ctx, 'executeIdentity', { data: { previewId: pv.previewId } });
                           if (!created || !created.personId || !created.interactionId) throw new Error(t('create_failed'));
-                          sheet.overlay.remove();
-                          ctx.toast(`${t('new_person_saved')}${created.personId}`, 'ok');
-                          if (onDone) onDone();
+                          afterSave(created.personId, verified.displayName);
                         } catch (err) { busy(bb, false, t('confirm_create_save')); sheet.showErr(err.message); }
                       },
                     }, t('confirm_create_save')),
@@ -1002,9 +1085,7 @@ export function openQuickCapture(ctx, { personId, onDone } = {}) {
                         if (!saved || !saved.interactionId || String(saved.personId) !== String(picked.id)) {
                           throw new Error(t('save_failed'));
                         }
-                        sheet.overlay.remove();
-                        ctx.toast(t('interaction_saved'), 'ok');
-                        if (onDone) onDone();
+                        afterSave(saved.personId, verified.displayName);
                       } catch (err) { busy(bb, false, t('confirm_save')); sheet.showErr(err.message); }
                     },
                   }, t('confirm_save')),
