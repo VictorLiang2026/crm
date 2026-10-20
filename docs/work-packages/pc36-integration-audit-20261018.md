@@ -181,7 +181,11 @@ E08 OCR 来源仅使用已登记“勿联系”虚构 Person #783 / Customer #78
 
 两版原始 AI 结果中的候选只引用活动外的虚构互动 #6/#7 等来源，未引用该活动的有效互动 #11 或已到场参与者 #18。`public.crm_activity_review_preview_v1` 在回滚事务内对结果 #33 拒绝采纳，返回 `Action needs attendance or a substantive interaction`，未留下候选命令或业务 Action。生成入口原本用保存的上下文过滤这类候选，但 `person_360` 历史读取直接返回原始候选；Console 又按过滤后的显示位置作为数据库候选序号，可能错配。用户按 AGENTS.md 单独批准仅修历史候选过滤和原序号传递，保留原始 AI 结果、人工决策审计及服务端执行校验，不改数据库或旧入口。修复后隔离测试证明：不合格待处理候选不显示，符合活动证据的候选保留原序号，已有人工决策仍可查看；PC16 2/2、PC17 4/4、PC18 5/5、WP12 3/3、全站旧流程 108 PASS / 0 FAIL / 5 SKIP，安全专项 5/5。2026-10-20 以提交 `94d17d0ee085b043017931878e223147c8ea50b3`、标签 `release-20261020-102605` 发布，仅上传 `person_360` 和 `crm/js/modules/console/activity-review.js`；发布后本地、GitHub、云端 75 个静态资源和 29 个函数的 201 个源码文件一致。用户真实账号只读确认 #19/#33 历史和 Outcome #2 仍在，不合格待处理候选不再显示可审核卡片。
 
-用户随后对虚构活动 #11 仅生成一次新复盘：任务 #63、结果 #50，于 2026-10-20 10:39:58（北京时间）完成。其原始 Action 候选关联 Person #783，但 `sourceRefs` 仅为 `public.interactions#6`、`public.interactions#7`、`public.actions#6`；其中 #6/#7 的 `activity_id` 均为空，任务快照中的本场证据为 `public.interactions#11`（重要性 3）及 `public.activity_participants#18`（已到场）。因此这条候选仍不满足本场活动证据条件，不能采纳。生产只读核对结果 #50 的候选命令为 0，Outcome #2 保持；正在核对页面对 #50 的具体展示，并等待生成提示的单独范围授权。生成结果和页面描述不能替代服务端来源校验。
+用户随后对虚构活动 #11 仅生成一次新复盘：任务 #63、结果 #50，于 2026-10-20 10:39:58（北京时间）完成。其原始 Action 候选关联 Person #783，但 `sourceRefs` 仅为 `public.interactions#6`、`public.interactions#7`、`public.actions#6`；其中 #6/#7 的 `activity_id` 均为空，任务快照中的本场证据为 `public.interactions#11`（重要性 3）及 `public.activity_participants#18`（已到场）。因此这条候选仍不满足本场活动证据条件，不能采纳。生产只读核对结果 #50 的候选命令为 0，Outcome #2 保持；页面对 #50 的具体展示仍待用户确认。生成结果和页面描述不能替代服务端来源校验。
+
+用户随后单独批准仅修复 `ai_activity/activity-review-v2.js` 的生成提示。新提示从本次构建的活动上下文动态列出少量同人、本场的重要互动与到场来源，并明确要求 Action 候选至少引用前两者之一，Opportunity 候选至少引用本场重要互动；没有证据则返回空候选。提示有 500 字符上限，超过时保留通用证据规则；模型配置、原始 AI 结果、生成后的服务端过滤、候选预览及人工确认均未改。隔离回归：AI Gateway 18/18、PC16 2/2、PC17 4/4、PC18 5/5、WP12 3/3、全站 108 PASS / 0 FAIL / 5 SKIP、安全 5/5、AI Skill 11/11；云端发布和一次虚构活动真实生成另记，不把隔离回归当成真实模型成功证据。
+
+本提示子包的部署范围限定为 `ai_activity`，不部署页面或其他函数，不改数据库与权限。回退源码基线为 `release-20261020-104735`，若发布后发现回归，应仅恢复该函数旧源码、重新执行门禁并创建恢复提交/标签；不自动清理 AI 审计或任何人工决策。WP01 当前目录、身份、匿名网关与隔离回归已通过，真实账号登录证据过期、服务角色写探针及真实模型生成须另行核对；这些缺口不会被源码哈希替代。
 
 本次已发布的代码仅变更 `cloudfunctions/person_360/activity-review-workflow-service.js`、`crm/js/modules/console/activity-review.js` 及对应隔离测试；无数据库迁移、权限调整、模型配置或旧活动页改动。回退以此前的 `release-20261020-091653` 为源码基线，须恢复这两个受影响产物并走新提交与标签，不自动修改 AI 历史、已执行决策或 Outcome。来源合格新候选的人工预览/决策尚未验证，E09 不得据此宣布全部完成。
 

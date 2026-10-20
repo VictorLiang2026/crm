@@ -27,6 +27,24 @@ function sourceRefs(context) {
   return refs;
 }
 
+function candidateEvidenceHint(context) {
+  const substantive = context.activity_interactions.filter(row =>
+    Number(row?.data?.importance) >= 3 && row?.data?.person_id &&
+    row?.source?.schema === 'public' && row.source.table === 'interactions')
+    .slice(0, 3).map(row => `${row.data.person_id}:public.interactions#${row.source.id}`);
+  const attended = context.participants.filter(row =>
+    row?.data?.status === 'attended' && row.data.resolved_person_id &&
+    row?.source?.schema === 'public' && row.source.table === 'activity_participants')
+    .slice(0, 3).map(row => `${row.data.resolved_person_id}:public.activity_participants#${row.source.id}`);
+  return `本场合格来源（Person ID:来源）：重要互动 ${substantive.join('、') || '无'}；已到场 ${attended.join('、') || '无'}。`;
+}
+
+function reviewFocus(context) {
+  const rule = '只依据给定来源回答六项问题；缺证据时说明不足。引用 public.表#ID，不猜身份或期限。Action 候选仅关联已确认 Person，sourceRefs 至少包含同一 Person 的本场重要互动或已到场记录；Opportunity 候选至少包含同一 Person 的本场重要互动。缺少合格来源则返回空候选，不以旧互动或既有行动替代。本场到场本身不能推出机会。候选待人工审核，不写业务事实。';
+  const hint = candidateEvidenceHint(context);
+  return rule.length + hint.length <= 500 ? rule + hint : rule;
+}
+
 function reviewForDisplay(result, context) {
   const refs = sourceRefs(context);
   const persons = new Map(context.persons.map(row => [String(row.data.id), row.data.display_name]));
@@ -83,7 +101,7 @@ async function run(event, { app, rdb, gateway, engine } = {}) {
   const task = await aiGateway.runAITask({
     taskType: 'activity_review', skill: 'activity_review', capability: 'analysis',
     subjectType: 'activity', subjectId: activityId,
-    input: { activityId: String(activityId), focus: '只依据给定来源回答六项问题。关系改善与新机会属于待核实研判；没有前后证据时明确说证据不足。引用 source 的 public.表#ID，不猜测身份或截止日期。Action 与 Opportunity Candidate 只关联已确认的 Person，报名或到场本身不能推出机会，需人工审核，不写业务事实。' },
+    input: { activityId: String(activityId), focus: reviewFocus(built.context) },
     context: built.context, contextSnapshot: built.context_snapshot,
   });
   const display = reviewForDisplay(task.result, built.context);

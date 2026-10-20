@@ -52,6 +52,9 @@ test('review uses Gateway, checks the activity state and emits only sourced Pers
   assert.equal(calls.length, 2);
   assert.equal(calls[1][1].skill, 'activity_review');
   assert.equal(calls[1][1].context.activity.source.schema, 'public');
+  assert.match(calls[1][1].input.focus, /7:public.interactions#13/);
+  assert.match(calls[1][1].input.focus, /Opportunity 候选至少包含同一 Person 的本场重要互动/);
+  assert.ok(calls[1][1].input.focus.length <= 500);
   assert.equal(response.review.actionCandidates.length, 1);
   assert.equal(response.review.actionCandidates[0].personName, '测试人物');
   assert.equal(response.review.opportunityCandidates.length, 1);
@@ -62,6 +65,31 @@ test('review uses Gateway, checks the activity state and emits only sourced Pers
   assert.equal(response.discarded_unsupported_items, 3);
   assert.equal(response.requires_confirmation, true);
   assert.equal(response.business_data_written, false);
+});
+
+test('review prompt names attended evidence but does not treat attendance as opportunity evidence', async () => {
+  const attendanceContext = structuredClone(context);
+  attendanceContext.activity_interactions = [];
+  attendanceContext.participants[0].data.status = 'attended';
+  attendanceContext.participants[0].data.resolved_person_id = 7;
+  const attendanceResult = { ...result, actionCandidates: [{ personId: 7,
+    title: '人工核实', reason: '活动到场', sourceRefs: ['public.activity_participants#12'] }],
+  opportunityCandidates: [{ personId: 7, opportunityType: 'relationship',
+    reason: '仅到场', nextAction: '人工核实', sourceRefs: ['public.activity_participants#12'] }] };
+  let focus;
+  const response = await run({ activity_id: 11 }, {
+    app: { auth: () => ({ getUserInfo: () => ({ uid: 'test-uid', isAnonymous: false }) }) },
+    rdb: {},
+    engine: { buildContext: async () => ({ context: attendanceContext,
+      context_snapshot: { ...attendanceContext, _context: { recipe: 'activity_review' } } }) },
+    gateway: { runAITask: async request => { focus = request.input.focus;
+      return { taskId: 103, resultId: 104, result: attendanceResult }; } },
+  });
+  assert.match(focus, /7:public.activity_participants#12/);
+  assert.match(focus, /重要互动 无/);
+  assert.ok(focus.length <= 500);
+  assert.equal(response.review.actionCandidates.length, 1);
+  assert.equal(response.review.opportunityCandidates.length, 0);
 });
 
 test('server-only adapter restricts schema, tables and business writes', async () => {
