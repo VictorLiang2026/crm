@@ -22,7 +22,28 @@ function createSearchData({ env, key, fetchImpl = fetch } = {}) {
         body: body === undefined ? undefined : JSON.stringify(body),
         signal: controller.signal,
       });
-      if (!response.ok) throw new Error(`CRM search database request failed (${response.status})`);
+      if (!response.ok) {
+        if (path === 'rpc/crm_ai_claim_v2') {
+          let code = 'UNKNOWN';
+          let category = 'DB_ERROR_OTHER';
+          try {
+            const failure = JSON.parse(await response.text());
+            if (/^[A-Z0-9]{5,8}$/.test(failure?.code || '')) code = failure.code;
+            const message = String(failure?.message || '');
+            if (message === 'AI claim key reused with different input') category = 'CLAIM_INPUT_MISMATCH';
+            else if (message === 'Invalid AI claim key') category = 'INVALID_CLAIM_KEY';
+            else if (message === 'Invalid AI claim input') category = 'INVALID_CLAIM_INPUT';
+            else if (message === 'AI audit service role required') category = 'CLAIM_ROLE_DENIED';
+            else if (code === '42501') category = 'DB_PERMISSION_DENIED';
+            else if (code === '23505') category = 'DB_UNIQUE_VIOLATION';
+            else if (code === '23502') category = 'DB_NOT_NULL';
+            else if (code === '23514') category = 'DB_CHECK';
+            else if (code.startsWith('PGRST')) category = 'DB_SCHEMA_CACHE';
+          } catch (_) { /* Only fixed diagnostic codes are logged. */ }
+          console.error('CRM_AI_CLAIM_HTTP_FAIL', JSON.stringify({ status: response.status, code, category }));
+        }
+        throw new Error(`CRM search database request failed (${response.status})`);
+      }
       const payload = await response.text();
       return payload ? JSON.parse(payload) : null;
     } finally { clearTimeout(timer); }

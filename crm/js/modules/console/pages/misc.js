@@ -21,6 +21,23 @@ function searchLabels() {
   };
 }
 
+function searchReasonText(reason, criteria) {
+  const key = 'search_v2_condition_' + reason.condition;
+  const translated = t(key);
+  const label = translated === key ? t('search_v2_evidence') : translated;
+  const details = [];
+  const months = Number(reason.windowMonths ??
+    (reason.condition === 'followupState' ? criteria?.followupMonths : criteria?.[reason.condition]));
+  if (['attendanceMonths', 'followupState', 'followupMonths'].includes(reason.condition) &&
+      Number.isInteger(months) && months >= 1 && months <= 24) {
+    details.push(`${t('search_v2_recent_prefix')}${months}${t('search_v2_months_suffix')}`);
+  }
+  const references = (reason.records || []).map(ref => `public.${ref.table} #${ref.id}`);
+  if (references.length) details.push(references.join(', '));
+  if (reason.verifiedAbsence) details.push(t('search_v2_no_recent_followup'));
+  return details.length ? `${label}: ${details.join(' · ')}` : label;
+}
+
 function evidenceFor(row, template) {
   if (template === 'activity_no_followup') {
     return t('evidence_attendance_prefix') + row.participant_id + t('evidence_activity_prefix') + row.activity_id + ' · ' + (row.activity_date || '');
@@ -74,10 +91,10 @@ function searchPanel(ctx) {
               h('div', { class: 'row-title' }, r.display_name || `Person #${r.person_id}`),
               h('div', { class: 'row-sub' }, [
                 r.customer_id ? `Person #${r.person_id} · Customer #${r.customer_id}` : `Person #${r.person_id}`,
-                ...(r.matchReasons||[]).map(reason=>h('div',{class:'foot-note'},[
-                  t('search_v2_condition_'+reason.condition)+': '+(reason.records||[]).map(ref=>`public.${ref.table} #${ref.id}`).join(', '),
-                  (reason.evidence||[]).length ? ' · '+JSON.stringify(reason.evidence) : (reason.verifiedAbsence ? ' · '+t('search_v2_no_recent_followup') : ''),
-                ])),
+                ...(r.matchReasons||[])
+                  .filter(reason => reason.condition !== 'followupMonths' ||
+                    !(r.matchReasons||[]).some(other => other.condition === 'followupState'))
+                  .map(reason => h('div', {class:'foot-note'}, searchReasonText(reason, res.criteria))),
               ]),
             ]),
             ic('chevron'),
