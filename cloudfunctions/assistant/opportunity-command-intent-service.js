@@ -64,7 +64,7 @@ async function interpretOpportunityCommand(event,deps={}){
     contextSnapshot:{guidance:GUIDANCE,_context:{recipe:'assistant_opportunity_update_v1',version:'1.0.0',
       source:'bounded Person-only Opportunity update/stage/close proposal'}}});
   const proposal=validateProposal(task.result);
-  const base={taskId:task.taskId,resultId:task.resultId,proposal:{operation:proposal.operation,
+  const base={ok:true,taskId:task.taskId,resultId:task.resultId,proposal:{operation:proposal.operation,
     interpretation:proposal.interpretation,personMention:proposal.personMention,
     opportunityMention:proposal.opportunityMention,changes:proposal.changes},
     execution:{performed:false,modelCalled:true,businessDataRead:false,businessDataWritten:false}};

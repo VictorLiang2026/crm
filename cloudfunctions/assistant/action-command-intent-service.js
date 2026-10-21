@@ -65,7 +65,7 @@ async function interpretActionCommand(event,dependencies={}){
     capability:'structured_extraction',input:{text:query,language},context:{guidance:GUIDANCE},
     contextSnapshot:{guidance:GUIDANCE,_context:{recipe:'assistant_action_update_v1',version:'1.0.0',source:'bounded Action update/close proposal'}}});
   const proposal=validateProposal(task.result);
-  const base={taskId:task.taskId,resultId:task.resultId,proposal:{operation:proposal.operation,
+  const base={ok:true,taskId:task.taskId,resultId:task.resultId,proposal:{operation:proposal.operation,
     interpretation:proposal.interpretation,personMention:proposal.personMention,
     actionMention:proposal.actionMention,changes:proposal.changes},
     execution:{performed:false,modelCalled:true,businessDataRead:false,businessDataWritten:false}};

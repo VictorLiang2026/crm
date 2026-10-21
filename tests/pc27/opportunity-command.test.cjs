@@ -37,6 +37,7 @@ test('interpreter resolves candidates only after a supported model proposal',asy
     gateway:{runAITask:async input=>{assert.equal(input.taskType,'assistant_opportunity_update_v1');
       return {taskId:1,resultId:2,result:goodProposal};}},
   });
+  assert.equal(result.ok,true);
   assert.equal(result.status,'needs_person_selection');assert.deepEqual(calls,['Fictional Lin']);
   assert.equal(result.execution.businessDataWritten,false);
 });

@@ -28,11 +28,13 @@ test('parse asks for clarification or refuses unsupported requests without readi
   const database={auditRdb:{},resolveName:async()=>{reads++;return {candidates:[]};}};
   const gateway={runAITask:async()=>({taskId:1,resultId:2,result:{...supported,status:'needs_clarification',personMention:null}})};
   const unclear=await interpretActionCommand({query:'change something',language:'en'},{app:{},database,gateway});
+  assert.equal(unclear.ok,true);
   assert.equal(unclear.status,'needs_clarification');assert.equal(unclear.execution.businessDataRead,false);
   gateway.runAITask=async()=>({taskId:1,resultId:2,result:{status:'unsupported',operation:'unsupported',
     interpretation:'Only update or complete is supported.',personMention:null,actionMention:null,
     changes:{action_type:null,title:null,description:null,due_at:null,priority:null}}});
   const unsupported=await interpretActionCommand({query:'delete an action',language:'en'},{app:{},database,gateway});
+  assert.equal(unsupported.ok,true);
   assert.equal(unsupported.status,'unsupported');assert.equal(reads,0);
 });
 
@@ -43,6 +45,7 @@ test('parse resolves Person phrases but never auto-selects a same-name candidate
   const gateway={runAITask:async()=>({taskId:11,resultId:12,result:supported})};
   const result=await interpretActionCommand({query:'Update Alex Chen follow-up title',language:'en'},
     {app:{},database,gateway,listOpenActions:async()=>{listCalls++;return {rows:[]};}});
+  assert.equal(result.ok,true);
   assert.equal(result.status,'needs_person_selection');assert.equal(result.candidates.length,2);
   assert.equal(result.proposal.operation,'update');assert.equal(result.execution.businessDataWritten,false);
   assert.equal(listCalls,0);

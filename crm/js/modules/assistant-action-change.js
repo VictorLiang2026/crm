@@ -151,8 +151,10 @@ export function renderAssistantActionChange({ root, callFn }) {
   });
   plan.addEventListener('click', () => void withBusy(plan, async () => {
     if (!parsed || !person || !target) return;
+    const changes = Object.fromEntries(Object.entries(parsed.proposal.changes || {})
+      .filter(([key, value]) => FIELDS.includes(key) && value !== null && value !== undefined));
     const cmd = { operation: parsed.proposal.operation, resource: 'actions', personId: person.id,
-      targetActionId: target.id, changes: parsed.proposal.changes };
+      targetActionId: target.id, changes };
     const result = await api.call('assistant', { action: 'command', stage: 'plan', command: cmd });
     if (!active() || !result?.ok) throw new Error('PLAN_FAILED');
     commandId = result.commandId; review.disabled = false;

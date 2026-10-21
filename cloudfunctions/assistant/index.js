@@ -14,6 +14,16 @@ function recruitDeleteInput(event, allowed) {
       Object.keys(event).some(key=>RECRUIT_DELETE_BUSINESS_KEYS.has(key)&&!allowed.includes(key))) return null;
   return Object.fromEntries(allowed.filter(key=>Object.hasOwn(event,key)).map(key=>[key,event[key]]));
 }
+// CloudBase adds transport fields to event; never forward them into a command.
+// Reject known business fields for the wrong stage instead of silently ignoring forged input.
+const COMMAND_BUSINESS_KEYS = new Set([...RECRUIT_DELETE_BUSINESS_KEYS,
+  'targetActionId','actionId','opportunityId','targetOpportunityId','changes','outcomeResult',
+  'selectedOpportunityId','selectedActionId']);
+function commandInput(event, allowed) {
+  if (!event || typeof event !== 'object' || Array.isArray(event) ||
+      Object.keys(event).some(key=>COMMAND_BUSINESS_KEYS.has(key)&&!allowed.includes(key))) return null;
+  return Object.fromEntries(allowed.filter(key=>Object.hasOwn(event,key)).map(key=>[key,event[key]]));
+}
 
 function createMain(getIdentity, searchRunner = event => require('./search-service').runSearch(event),
   actionRunner = (event, uid) => require('./action-command-service').runActionCommand(event, uid),
@@ -74,10 +84,11 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
     }
     if (event?.action === 'actionCommandInterpret') {
       try {
-        if (Object.keys(event).some(key=>!['action','query','language'].includes(key))) {
+        const input=commandInput(event,['action','query','language']);
+        if (!input) {
           return {ok:false,error:{code:'INVALID_INPUT',message:'Action request could not be interpreted'}};
         }
-        return await actionIntentRunner({query:event.query,language:event.language});
+        return await actionIntentRunner({query:input.query,language:input.language});
       } catch (error) {
         const code=['INVALID_INPUT','INVALID_RESULT','INVALID_CONFIG','TIMEOUT','UPSTREAM_UNAVAILABLE',
           'PERSISTENCE_ERROR','AI_REQUEST_FAILED'].includes(error?.code) || AI_AUDIT_CODES.has(error?.code)?error.code:'ACTION_COMMAND_FAILED';
@@ -86,10 +97,12 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
     }
     if (event?.action === 'actionCommandTargets') {
       try {
-        if (Object.keys(event).some(key=>!['action','personMention','selectedPersonId'].includes(key))) {
+        const input=commandInput(event,['action','personMention','selectedPersonId']);
+        if (!input) {
           return {ok:false,error:{code:'INVALID_INPUT',message:'Action target selection could not be verified'}};
         }
-        return await actionTargetsRunner({personMention:event.personMention,selectedPersonId:event.selectedPersonId});
+        return await actionTargetsRunner({personMention:input.personMention,
+          selectedPersonId:input.selectedPersonId});
       } catch (error) {
         const code=['INVALID_INPUT','INVALID_CONFIG','UPSTREAM_UNAVAILABLE'].includes(error?.code)?error.code:'ACTION_COMMAND_FAILED';
         return {ok:false,error:{code,message:'Action target selection could not be verified'}};
@@ -97,10 +110,11 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
     }
     if (event?.action === 'opportunityCommandInterpret') {
       try {
-        if (Object.keys(event).some(key=>!['action','query','language'].includes(key))) {
+        const input=commandInput(event,['action','query','language']);
+        if (!input) {
           return {ok:false,error:{code:'INVALID_INPUT',message:'Opportunity request could not be interpreted'}};
         }
-        return await opportunityIntentRunner({query:event.query,language:event.language});
+        return await opportunityIntentRunner({query:input.query,language:input.language});
       } catch (error) {
         const code=['INVALID_INPUT','INVALID_RESULT','INVALID_CONFIG','TIMEOUT','UPSTREAM_UNAVAILABLE',
           'PERSISTENCE_ERROR','AI_REQUEST_FAILED'].includes(error?.code) || AI_AUDIT_CODES.has(error?.code)?error.code:'OPPORTUNITY_COMMAND_FAILED';
@@ -109,17 +123,26 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
     }
     if (event?.action === 'opportunityCommandTargets') {
       try {
-        if (Object.keys(event).some(key=>!['action','personMention','selectedPersonId'].includes(key))) {
+        const input=commandInput(event,['action','personMention','selectedPersonId']);
+        if (!input) {
           return {ok:false,error:{code:'INVALID_INPUT',message:'Opportunity target selection could not be verified'}};
         }
-        return await opportunityTargetsRunner({personMention:event.personMention,selectedPersonId:event.selectedPersonId},identity.uid);
+        return await opportunityTargetsRunner({personMention:input.personMention,
+          selectedPersonId:input.selectedPersonId},identity.uid);
       } catch (error) {
         const code=['INVALID_INPUT','INVALID_CONFIG','UPSTREAM_UNAVAILABLE'].includes(error?.code)?error.code:'OPPORTUNITY_COMMAND_FAILED';
         return {ok:false,error:{code,message:'Opportunity target selection could not be verified'}};
       }
     }
     if (event?.action === 'opportunityCommand') {
-      try { return await opportunityCommandRunner(event,identity.uid); }
+      try {
+        const fields=event.stage==='plan'?['action','stage','command','idempotencyKey']:
+          event.stage==='confirm'?['action','stage','commandId','previewHash']:
+          ['action','stage','commandId'];
+        const input=commandInput(event,fields);
+        if (!input) return {ok:false,error:{code:'INVALID_COMMAND',message:'Opportunity command could not be completed'}};
+        return await opportunityCommandRunner(input,identity.uid);
+      }
       catch (error) {
         const code=['INVALID_COMMAND','PREVIEW_STALE','CONFIRMATION_REQUIRED','OPPORTUNITY_COMMAND_FAILED'].includes(error?.code)?
           error.code:'OPPORTUNITY_COMMAND_FAILED';
@@ -175,9 +198,14 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
     const isActionNext = event?.action === 'command' && event.resource === 'actions' &&
       ['preview', 'confirm', 'execute'].includes(event.stage);
     if (isActionPlan || isActionNext) {
-      try { return await actionRunner({ action: 'command', stage: event.stage,
-        command: event.command, resource: event.resource,
-        commandId: event.commandId, previewHash: event.previewHash }, identity.uid); }
+      try {
+        const fields=isActionPlan?['action','stage','command']:
+          event.stage==='confirm'?['action','stage','resource','commandId','previewHash']:
+          ['action','stage','resource','commandId'];
+        const input=commandInput(event,fields);
+        if (!input) return {ok:false,error:{code:'INVALID_COMMAND',message:'Action command could not be completed'}};
+        return await actionRunner(input, identity.uid);
+      }
       catch (error) {
         const code = ['INVALID_COMMAND','DUPLICATE_ACTION','PREVIEW_STALE',
           'CONFIRMATION_REQUIRED','ACTION_COMMAND_FAILED'].includes(error?.code) ?

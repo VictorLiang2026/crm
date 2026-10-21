@@ -37,6 +37,8 @@ test('Action update and close UI requires Person, exact Action, verified preview
     await browser.wait("!document.querySelector('.crm-action-change-controls button').disabled");
     await browser.evaluate("[...document.querySelectorAll('.crm-action-change-controls button')].find(b=>b.textContent.includes('生成变更预览')).click()");
     await browser.wait("document.querySelector('.crm-action-change-controls button:nth-child(2)').disabled===false");
+    assert.deepEqual(await browser.evaluate("window.changeCalls.find(x=>x.p.stage==='plan').p.command.changes"),
+      {title:'Review renewal',due_at:'2026-10-30T17:00:00+08:00',priority:'high'});
     assert.match(await browser.evaluate("document.querySelector('.crm-action-change-test-notice').innerText"),/勿联系|do not contact/);
     await browser.evaluate("document.querySelectorAll('.crm-action-change-controls button')[1].click()");
     await browser.wait("document.querySelector('.crm-action-change-preview').innerText.includes('变更前')");
@@ -62,6 +64,7 @@ test('Action update and close UI requires Person, exact Action, verified preview
     await browser.wait("document.querySelector('.crm-action-change-controls button').disabled===false");
     await browser.evaluate("document.querySelectorAll('.crm-action-change-controls button')[0].click()");
     await browser.wait("document.querySelector('.crm-action-change-controls button:nth-child(2)').disabled===false");
+    assert.deepEqual(await browser.evaluate("window.changeCalls.filter(x=>x.p.stage==='plan').at(-1).p.command.changes"),{});
     await browser.evaluate("document.querySelectorAll('.crm-action-change-controls button')[1].click()");
     await browser.wait("document.querySelector('.crm-action-change-preview').innerText.includes('Completed')");
     const closePreview=await browser.evaluate("document.querySelector('.crm-action-change-preview').innerText");
