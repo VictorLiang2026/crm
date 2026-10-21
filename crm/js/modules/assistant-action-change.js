@@ -158,7 +158,7 @@ export function renderAssistantActionChange({ root, callFn }) {
     const result = await api.call('assistant', { action: 'command', stage: 'plan', command: cmd });
     if (!active() || !result?.ok) throw new Error('PLAN_FAILED');
     commandId = result.commandId; review.disabled = false;
-    setStatus(t('action_change_pending'));
+    setStatus(t('action_change_plan_ready'));
   }));
   review.addEventListener('click', () => void withBusy(review, async () => {
     if (!commandId) return;
@@ -172,7 +172,7 @@ export function renderAssistantActionChange({ root, callFn }) {
     preview.replaceChildren(el('h3', '', `${person.displayName} · #${target.id} · ${target.title || t('action_change_empty')}`),
       el('p', 'crm-action-change-expiry', `${t('action_change_expires')}: ${expiry}`), columns);
     confirm.disabled = false; execute.disabled = true;
-    setStatus(t('action_change_choose_action'));
+    setStatus(t('action_change_preview_ready'));
   }));
   confirm.addEventListener('click', () => void withBusy(confirm, async () => {
     if (!commandId || !previewHash) return;

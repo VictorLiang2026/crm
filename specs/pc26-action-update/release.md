@@ -36,3 +36,12 @@
 ## Git
 
 Release tag: `release-20261017-173414`. The repository release script creates the commit, pushes `master`, and pushes this tag after its cloud parity checks pass.
+
+## PC36 E12: Action change progress messages (2026-10-22)
+
+- Scope: the existing Action change page now shows a bilingual “plan ready; load verified preview” message after a successful Plan, and a “verified preview shown below” message after Preview. The Command → Plan → Preview → human Confirm → Execute sequence, buttons, backend, database, and manual workflows are unchanged. Only `/crm/js/modules/assistant-action-change.js` and `/crm/js/modules/console/i18n.js` were uploaded.
+- Production diagnosis: the fictional Person #786 / Action #18 produced correctly scoped, 15-minute `planned` commands, while the page remained on “处理中”. A read-only check found no preview, confirmation, execution, or Action mutation. The original title, medium priority, and open status remained intact. Expired plans are not reused.
+- Validation: `npm run test:pc26` 21/21, `npm run test:pc27` 20/20, `npm test` 108 PASS / 0 FAIL / 5 historical SKIP. The browser test now asserts both Chinese messages and the English Preview message in the iPad flow. Syntax and diff checks passed. CloudBase review found no changes to auth, RPC payloads, permissions, storage, or model selection.
+- Release gate: fresh `public` catalog and WP04 identity snapshots; WP04 retained the three documented participant exceptions. `npm run test:wp01` finished `PASS_WITH_LIMITATIONS`: catalog 1036 checks, anonymous gateway 71/71, isolated old-route regression 108 PASS / 0 FAIL / 5 SKIP. `npm run check:release-gate` passed. Manual login, service-role write probe, production Action mutation, and real iPad device checks remain unverified for this presentation-only patch.
+- Deployment: CloudBase static hosting accepted exactly the two files above (2/2). The `assistant` function and `public` schema were not changed. Rollback is a recovery commit based on the prior tag `release-20261021-111732`, uploading only these two prior static files; do not roll back business data.
+- Git release tag: `release-20261022-004100`; final cloud/GitHub parity and live page acceptance are recorded in the release result.

@@ -37,11 +37,13 @@ test('Action update and close UI requires Person, exact Action, verified preview
     await browser.wait("!document.querySelector('.crm-action-change-controls button').disabled");
     await browser.evaluate("[...document.querySelectorAll('.crm-action-change-controls button')].find(b=>b.textContent.includes('生成变更预览')).click()");
     await browser.wait("document.querySelector('.crm-action-change-controls button:nth-child(2)').disabled===false");
+    assert.match(await browser.evaluate("document.querySelector('.crm-action-change-notice').innerText"),/变更计划已生成/);
     assert.deepEqual(await browser.evaluate("window.changeCalls.find(x=>x.p.stage==='plan').p.command.changes"),
       {title:'Review renewal',due_at:'2026-10-30T17:00:00+08:00',priority:'high'});
     assert.match(await browser.evaluate("document.querySelector('.crm-action-change-test-notice').innerText"),/勿联系|do not contact/);
     await browser.evaluate("document.querySelectorAll('.crm-action-change-controls button')[1].click()");
     await browser.wait("document.querySelector('.crm-action-change-preview').innerText.includes('变更前')");
+    assert.match(await browser.evaluate("document.querySelector('.crm-action-change-notice').innerText"),/核验预览已显示在下方/);
     let state=await browser.evaluate(`({text:document.querySelector('.crm-action-change-preview').innerText,
       executeDisabled:document.querySelectorAll('.crm-action-change-controls button')[3].disabled,
       executeCalls:window.changeCalls.filter(x=>x.p.stage==='execute').length,
@@ -67,6 +69,7 @@ test('Action update and close UI requires Person, exact Action, verified preview
     assert.deepEqual(await browser.evaluate("window.changeCalls.filter(x=>x.p.stage==='plan').at(-1).p.command.changes"),{});
     await browser.evaluate("document.querySelectorAll('.crm-action-change-controls button')[1].click()");
     await browser.wait("document.querySelector('.crm-action-change-preview').innerText.includes('Completed')");
+    assert.match(await browser.evaluate("document.querySelector('.crm-action-change-notice').innerText"),/verified preview is shown below/i);
     const closePreview=await browser.evaluate("document.querySelector('.crm-action-change-preview').innerText");
     assert.match(closePreview,/Completed at/);assert.match(closePreview,/Completed by/);assert.match(closePreview,/Confirmation expires/);
     assert.equal(await browser.evaluate("window.changeCalls.filter(x=>x.p.stage==='execute').length"),1);

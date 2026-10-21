@@ -189,6 +189,8 @@ const DICT = {
   'action_change_priority': { 'zh-CN': '优先级', 'en': 'Priority' },
   'action_change_empty': { 'zh-CN': '未设置', 'en': 'Not set' },
   'action_change_pending': { 'zh-CN': '处理中…', 'en': 'Working…' },
+  'action_change_plan_ready': { 'zh-CN': '变更计划已生成。请点击“2. 读取核验预览”核对服务端影响范围。', 'en': 'Change plan ready. Select “2. Load verified preview” to review the server-verified impact.' },
+  'action_change_preview_ready': { 'zh-CN': '核验预览已显示在下方。请核对变更前后，再决定是否确认。', 'en': 'The verified preview is shown below. Review the before and after values before confirming.' },
   'action_change_choose_person': { 'zh-CN': '请人工选择人物，系统不会自动决定身份。', 'en': 'Select the Person manually. The system will not choose an identity for you.' },
   'action_change_choose_action': { 'zh-CN': '请人工选择具体行动，即使只有一条也需要确认。', 'en': 'Select the exact Action manually, even when only one is listed.' },
   'action_change_needs_clarification': { 'zh-CN': '要求不够明确。请补充人物、行动或精确时间后再试。', 'en': 'The request is unclear. Add the Person, Action, or an exact date and try again.' },
