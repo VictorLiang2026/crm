@@ -67,6 +67,40 @@ test('one matching Person is never automatically selected or duplicated', async 
   assert.equal(f.calls.filter(c => c.operation).length, 1);
 });
 
+test('a different qualified name can be manually created beside one same-base Person', async () => {
+  const existingName = '【系统测试·勿联系】虚构刘芬（儿科医生）';
+  const newName = '【系统测试·勿联系】虚构刘芬（上海外国语学校）';
+  const baseName = '【系统测试·勿联系】虚构刘芬';
+  const existing = { id: 783, display_name: existingName, name_key: baseName,
+    organization: null, occupation: null };
+  const f = fixture([existing]);
+  const resolved = await f.service.resolveIdentity(newName);
+  assert.equal(resolved.status, 'confirm_existing');
+  assert.equal(resolved.canCreateAfterConfirmation, true);
+  assert.equal(resolved.selectedPersonId, null);
+  const preview = await f.service.previewIdentity({ kind: 'person', idempotencyKey: key,
+    displayName: newName }, 'test-uid');
+  assert.equal(preview.previewId, previewId);
+  const rpc = f.calls.find(c => c.operation === 'person_identity_preview_v1');
+  assert.equal(rpc.body.p_payload.display_name, newName);
+  assert.equal(rpc.body.p_payload.name_key, baseName);
+  assert.equal(rpc.body.p_payload.person_id, undefined);
+
+  await f.service.previewIdentity({ kind: 'capture_v2_new',
+    idempotencyKey: 'd68063b8-480a-40a6-ac72-32760bfc9e4e', displayName: newName,
+    interaction: { type: '微信', at: '2026-10-22T12:00:00+08:00', channel: '',
+      summary: '【系统测试·勿联系】虚构交流', rawNote: '【系统测试·勿联系】虚构原话' },
+    facts: [], signals: [] }, 'test-uid');
+  assert.equal(f.calls.filter(c => c.operation === 'person_identity_preview_v1')[1].body.p_kind,
+    'capture_v2_new');
+
+  await assert.rejects(f.service.previewIdentity({ kind: 'person', idempotencyKey: key,
+    displayName: existingName }, 'test-uid'), /manual review/);
+  await assert.rejects(f.service.previewIdentity({ kind: 'person', idempotencyKey: key,
+    displayName: baseName }, 'test-uid'), /manual review/);
+  assert.equal(f.calls.filter(c => c.operation === 'person_identity_preview_v1').length, 2);
+});
+
 test('role conversion uses an explicit Person ID and recruit does not request customer', async () => {
   const person = { id: 783, display_name: name, name_key: name.toLowerCase(),
     organization: null, occupation: null, legacy_customer_id: null };

@@ -850,13 +850,15 @@ export function openQuickCapture(ctx, { personId, onDone } = {}) {
     const resolution = fixed ? null
       : (resolvedName ? await p360(ctx, 'resolveQuickCaptureName', { name: resolvedName }) : null);
     const candidates = fixed ? [fixed] : ((resolution && resolution.candidates) || []);
-    // 服务端允许在无同名（available）或带限定无匹配（confirm_new_qualified）时人工确认新建 Person；
+    // 服务端允许无同名或带限定无匹配时人工确认新建 Person（同名候选只有一人时也适用）；
     // AI 未识别人名时也允许手动填写姓名，保存前先做同名解析。
     const canCreate = !fixed && (!resolution ||
-      (!resolution.hasMore && ['available', 'confirm_new_qualified'].includes(resolution.status)));
+      (!resolution.hasMore && !resolution.deletedIdentity &&
+        (['available', 'confirm_new_qualified'].includes(resolution.status) ||
+          resolution.canCreateAfterConfirmation === true)));
     const hint = fixed ? t('person_locked')
       : !p.person_name ? t('ai_no_name')
-      : canCreate ? t('no_same_name')
+      : canCreate ? (candidates.length ? t('identity_confirm_new') : t('no_same_name'))
       : candidates.length ? t('select_confirmed') : t('many_names');
     const candBox = h('div', {});
     let picked = reviewedPerson || fixed || null;
@@ -1018,7 +1020,9 @@ export function openQuickCapture(ctx, { personId, onDone } = {}) {
                 if (!newName) { busy(b, false, t('confirm_save')); sheet.showErr(t('enter_new_person_name')); return; }
                 if (!res || newName !== res.displayName) {
                   res = await p360(ctx, 'resolveQuickCaptureName', { name: newName });
-                  if (res.hasMore || !['available', 'confirm_new_qualified'].includes(res.status)) {
+                  if (res.hasMore || res.deletedIdentity ||
+                      !(['available', 'confirm_new_qualified'].includes(res.status) ||
+                        res.canCreateAfterConfirmation === true)) {
                     busy(b, false, t('confirm_save'));
                     sheet.showErr(t('same_name_exists')); return;
                   }
@@ -1187,13 +1191,15 @@ export function openPersonNew(ctx, { onDone } = {}) {
 
   function render(res, name) {
     const candidates = res.candidates || [];
-    // 服务端契约（previewIdentity 同口径）：仅在 无同名过多 & 无回收站同名 & 状态可建 时允许新建
+    // 服务端契约（previewIdentity 同口径）：仅在无同名过多、无回收站同名且可人工确认时允许新建
     const canCreate = !res.hasMore && !res.deletedIdentity &&
-      ['available', 'confirm_new_qualified'].includes(res.status);
+      (['available', 'confirm_new_qualified'].includes(res.status) ||
+        res.canCreateAfterConfirmation === true);
     const rows = [];
     if (candidates.length) {
       rows.push(h('p', { class: 'sheet-note', style: 'margin:0 0 8px' },
-        `${t('identity_pick_existing')} ${t('identity_qualifier_hint')}`));
+        canCreate ? t('identity_confirm_new') :
+          `${t('identity_pick_existing')} ${t('identity_qualifier_hint')}`));
       candidates.forEach((c) => {
         const cName = c.displayName || c.display_name;
         const link = h('a', {

@@ -420,7 +420,8 @@ function createService({ request = pgRequest, rpc = pgRpc, disclosure = disclose
     } else {
       if (kind === 'customer' || kind === 'recruit') throw new Error('Selected Person is required');
       if (resolution.hasMore || resolution.deletedIdentity ||
-          !['available', 'confirm_new_qualified'].includes(resolution.status)) {
+          !(['available', 'confirm_new_qualified'].includes(resolution.status) ||
+            resolution.canCreateAfterConfirmation === true)) {
         throw new Error('Identity candidates need manual review');
       }
     }
