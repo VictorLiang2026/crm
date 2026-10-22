@@ -114,7 +114,7 @@ export function renderAssistantOpportunityChange({root,callFn}){
       idempotencyKey:crypto.randomUUID(),command:{resource:'opportunities',operation:parsed.proposal.operation,
         personId:person.id,opportunityId:target.id,changes}});
     if(!active()||!response?.ok)throw new Error('plan');commandId=response.commandId;
-    review.disabled=false;status(t('opp_change_pending'));
+    review.disabled=false;status(t('opp_change_planned'));
   }));
   review.addEventListener('click',()=>void work(review,async()=>{
     if(!commandId)return;const response=await api.call('assistant',{action:'opportunityCommand',stage:'preview',commandId});

@@ -244,6 +244,7 @@ const DICT = {
   'opp_change_outcome_closed': { 'zh-CN': '关闭结果', 'en': 'Opportunity closed' },
   'opp_change_expires': { 'zh-CN': '确认有效期至', 'en': 'Confirmation expires' },
   'opp_change_pending': { 'zh-CN': '处理中…', 'en': 'Working…' },
+  'opp_change_planned': { 'zh-CN': '变更计划已生成，请读取服务端预览。', 'en': 'Change plan ready. Load the server preview.' },
   'opp_change_choose_person': { 'zh-CN': '请人工选择人物，系统不会自动决定身份。', 'en': 'Select the Person manually. The system will not choose an identity for you.' },
   'opp_change_choose_opportunity': { 'zh-CN': '请人工选择确切机会，即使只有一条也需要确认。', 'en': 'Select the exact Opportunity manually, even when only one is listed.' },
   'opp_change_unsupported': { 'zh-CN': '目前只支持修改、推进或结束符合范围的 Person 机会。', 'en': 'Only in-scope Person Opportunity updates, stage changes and closes are supported.' },

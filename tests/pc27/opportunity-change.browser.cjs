@@ -47,6 +47,7 @@ test('Opportunity update and close require manual targets, result note, verified
     assert.match(await browser.evaluate("document.querySelector('.crm-opp-change-test-notice').innerText"),/勿联系|do not contact/);
     await browser.evaluate("document.querySelectorAll('.crm-opp-change-controls button')[0].click()");
     await browser.wait("document.querySelector('.crm-opp-change-controls button:nth-child(2)').disabled===false");
+    assert.match(await browser.evaluate("document.querySelector('.crm-opp-change-notice').innerText"),/变更计划已生成，请读取服务端预览/);
     await browser.evaluate("document.querySelectorAll('.crm-opp-change-controls button')[1].click()");
     await browser.wait("document.querySelector('.crm-opp-change-preview').innerText.includes('变更前')");
     const edit=await browser.evaluate(`({text:document.querySelector('.crm-opp-change-preview').innerText,
@@ -71,6 +72,7 @@ test('Opportunity update and close require manual targets, result note, verified
     await browser.wait("document.querySelector('.crm-opp-change-controls button').disabled===false");
     await browser.evaluate("document.querySelectorAll('.crm-opp-change-controls button')[0].click()");
     await browser.wait("document.querySelector('.crm-opp-change-controls button:nth-child(2)').disabled===false");
+    assert.match(await browser.evaluate("document.querySelector('.crm-opp-change-notice').innerText"),/Change plan ready\. Load the server preview/);
     await browser.evaluate("document.querySelectorAll('.crm-opp-change-controls button')[1].click()");
     await browser.wait("document.querySelector('.crm-opp-change-preview').innerText.includes('Opportunity closed')");
     const closePreview=await browser.evaluate("document.querySelector('.crm-opp-change-preview').innerText");
