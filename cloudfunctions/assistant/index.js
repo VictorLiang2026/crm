@@ -24,6 +24,26 @@ function commandInput(event, allowed) {
       Object.keys(event).some(key=>COMMAND_BUSINESS_KEYS.has(key)&&!allowed.includes(key))) return null;
   return Object.fromEntries(allowed.filter(key=>Object.hasOwn(event,key)).map(key=>[key,event[key]]));
 }
+// Preserve the strict AI Experience contract while excluding CloudBase transport metadata.
+const AI_EXPERIENCE_FIELDS = Object.freeze({
+  list: ['action','operation'],
+  targets: ['action','operation'],
+  decide: ['action','operation','eventId','aiResultId','decision','reason','editDelta'],
+  outcome: ['action','operation','idempotencyKey','targetType','targetId','aiResultId','result','occurredAt','evidence'],
+  learning: ['action','operation','candidateKey','payload'],
+  confirmLearning: ['action','operation','learningId','decision'],
+});
+const AI_EXPERIENCE_BUSINESS_KEYS = new Set([
+  ...COMMAND_BUSINESS_KEYS, ...Object.values(AI_EXPERIENCE_FIELDS).flat(),
+  'uid','recordedByUid','confirmedByUid',
+]);
+function aiExperienceInput(event) {
+  const allowed = Object.hasOwn(AI_EXPERIENCE_FIELDS, event?.operation)
+    ? AI_EXPERIENCE_FIELDS[event.operation] : null;
+  if (!event || typeof event !== 'object' || Array.isArray(event) || !allowed ||
+      Object.keys(event).some(key=>AI_EXPERIENCE_BUSINESS_KEYS.has(key)&&!allowed.includes(key))) return null;
+  return Object.fromEntries(allowed.filter(key=>Object.hasOwn(event,key)).map(key=>[key,event[key]]));
+}
 
 function createMain(getIdentity, searchRunner = event => require('./search-service').runSearch(event),
   actionRunner = (event, uid) => require('./action-command-service').runActionCommand(event, uid),
@@ -292,7 +312,11 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
       }
     }
     if (event?.action === 'aiExperience') {
-      try { return await require('./ai-experience-service').runAiExperience(event, identity.uid); }
+      try {
+        const input = aiExperienceInput(event);
+        if (!input) return { ok:false,error:{code:'INVALID_INPUT',message:'AI Experience request could not be completed'} };
+        return await require('./ai-experience-service').runAiExperience(input, identity.uid);
+      }
       catch (error) {
         const code = ['INVALID_INPUT','PERSISTENCE_ERROR','STALE','TIMEOUT'].includes(error?.code)
           ? error.code : 'AI_EXPERIENCE_FAILED';
@@ -317,3 +341,4 @@ function getIdentity() {
 
 exports.main = createMain(getIdentity);
 exports.createMain = createMain;
+exports.aiExperienceInput = aiExperienceInput;
