@@ -25,6 +25,91 @@ function uuid() {
 function safeJson(value) {
   try { return JSON.stringify(value ?? {}, null, 2); } catch (_) { return '{}'; }
 }
+function resultPayload(value) {
+  if (value && typeof value === 'object' && !Array.isArray(value)) return value;
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed;
+    } catch (_) { /* The unchanged original remains available below. */ }
+  }
+  return {};
+}
+function taskName(task) {
+  const keys = {
+    activity_review: 'ai_experience_task_activity_review',
+    assistant_opportunity_update_v1: 'ai_experience_task_opportunity_update',
+  };
+  return Object.hasOwn(keys, task.task_type) ? t(keys[task.task_type]) : (task.task_type || t('ai_experience_empty'));
+}
+function taskSubject(task) {
+  if (!task.subject_type || !task.subject_id) return t('ai_experience_unbound_subject');
+  return `${task.subject_type} #${task.subject_id}`;
+}
+function appendSources(host, refs) {
+  if (!Array.isArray(refs)) return;
+  const values = refs.filter(value => typeof value === 'string' && value.trim());
+  if (values.length) host.append(el('p', 'crm-ai-exp-evidence', `${t('ai_experience_sources_label')}: ${values.join(' · ')}`));
+}
+function appendActivitySection(host, key, entries) {
+  if (!Array.isArray(entries) || !entries.length) return;
+  const section = el('section', 'crm-ai-exp-readable-section');
+  section.append(el('h4', '', t(key)));
+  for (const item of entries) {
+    const card = el('div', 'crm-ai-exp-readable-card');
+    if (typeof item === 'string') card.append(el('p', '', item));
+    else if (item && typeof item === 'object') {
+      if (typeof item.title === 'string' && item.title.trim()) card.append(el('strong', '', item.title));
+      for (const field of ['text','reason']) {
+        if (typeof item[field] === 'string' && item[field].trim()) card.append(el('p', '', item[field]));
+      }
+      if (item.personId != null) card.append(el('p', 'crm-ai-exp-muted', `${t('ai_experience_person_label')} #${item.personId}`));
+      if (typeof item.nextAction === 'string' && item.nextAction.trim()) {
+        card.append(el('p', '', `${t('ai_experience_next_action_label')}: ${item.nextAction}`));
+      }
+      appendSources(card, item.sourceRefs);
+    }
+    if (card.childNodes.length) section.append(card);
+  }
+  if (section.childNodes.length > 1) host.append(section);
+}
+function readableResult(result, task) {
+  const original = result.final_result_json || result.result_json;
+  const payload = resultPayload(original);
+  const readable = el('div', 'crm-ai-exp-readable');
+  if (payload.status === 'unsupported' || payload.operation === 'unsupported') {
+    readable.append(el('strong', 'crm-ai-exp-unsupported', t('ai_experience_unsupported')));
+    if (typeof payload.interpretation === 'string' && payload.interpretation.trim()) {
+      readable.append(el('p', '', payload.interpretation));
+    }
+    readable.append(el('p', 'crm-ai-exp-muted', t('ai_experience_unsupported_no_action')));
+  } else if (task.task_type === 'activity_review') {
+    if (typeof payload.summary === 'string' && payload.summary.trim()) {
+      readable.append(el('p', 'crm-ai-exp-summary', payload.summary));
+    }
+    for (const [field,key] of [
+      ['whatChanged','ai_experience_what_changed'],
+      ['whoMattered','ai_experience_who_mattered'],
+      ['followUpPeople','ai_experience_followup_people'],
+      ['signalsAppeared','ai_experience_signals'],
+      ['actionCandidates','ai_experience_action_candidates'],
+      ['opportunitiesAppeared','ai_experience_opportunities'],
+      ['opportunityCandidates','ai_experience_opportunity_candidates'],
+      ['relationshipsImproved','ai_experience_relationships'],
+    ]) appendActivitySection(readable, key, payload[field]);
+  } else {
+    for (const field of ['summary','interpretation','nextStep']) {
+      if (typeof payload[field] === 'string' && payload[field].trim()) readable.append(el('p', '', payload[field]));
+    }
+  }
+  if (!readable.childNodes.length) readable.append(el('p', 'crm-ai-exp-muted', t('ai_experience_raw_hint')));
+  const raw = el('details', 'crm-ai-exp-raw');
+  raw.append(el('summary', '', t('ai_experience_raw_details')),
+    el('pre', 'crm-ai-exp-output', safeJson(original)));
+  const container = el('div', 'crm-ai-exp-result-content');
+  container.append(readable, raw);
+  return container;
+}
 function inputField(labelKey, { tag = 'input', type = 'text', required = false, maxLength, rows = 3 } = {}) {
   const label = el('label', 'crm-ai-exp-field');
   label.append(el('span', '', t(labelKey)));
@@ -63,6 +148,7 @@ export function renderAiExperience({ root, callFn }) {
   let model = { tasks: [], results: [], decisions: [], outcomes: [], learnings: [], metrics: null };
   let selectedResultId = '';
   const learningSelection = new Set();
+  const decisionKeys = new Map();
 
   function taskFor(result) { return model.tasks.find(task => String(task.id) === String(result.task_id)); }
   function latestDecision(resultId) {
@@ -106,7 +192,7 @@ export function renderAiExperience({ root, callFn }) {
       checkLabel.append(check, el('span', '', t('ai_experience_selected')));
       const decision = latestDecision(result.id);
       row.append(pick, el('span', 'crm-ai-exp-state', `${t(decision ? `ai_experience_${decision.decision}` : 'ai_experience_pending_value')}${decision?.legacy ? ` · ${t('ai_experience_legacy')}` : ''}`),
-        el('span', 'crm-ai-exp-muted', `${t('ai_experience_task')}: ${task.task_type || t('ai_experience_empty')} · ${task.created_at ? new Date(task.created_at).toLocaleDateString() : t('ai_experience_empty')}`), checkLabel);
+        el('span', 'crm-ai-exp-muted', `${t('ai_experience_task')}: ${taskName(task)} · ${task.created_at ? new Date(task.created_at).toLocaleDateString() : t('ai_experience_empty')}`), checkLabel);
       list.append(row);
     }
   }
@@ -116,9 +202,11 @@ export function renderAiExperience({ root, callFn }) {
     if (!result) { detail.append(el('p', 'crm-ai-exp-muted', t('ai_experience_no_selection'))); return; }
     const task = taskFor(result) || {};
     detail.append(el('h3', '', `${t('ai_experience_result_detail')} #${result.id}`),
-      el('p', 'crm-ai-exp-muted', `${t('ai_experience_task')}: ${task.task_type || t('ai_experience_empty')} · ${task.subject_type || t('ai_experience_empty')} ${task.subject_id || ''}`));
-    const output = el('pre', 'crm-ai-exp-output', safeJson(result.final_result_json || result.result_json));
-    detail.append(output);
+      el('p', 'crm-ai-exp-muted', `${t('ai_experience_task')}: ${taskName(task)} · ${taskSubject(task)}`));
+    detail.append(readableResult(result, task));
+    const current = latestDecision(result.id);
+    detail.append(el('p', 'crm-ai-exp-current', `${t('ai_experience_current_decision')}: ${t(current ? `ai_experience_${current.decision}` : 'ai_experience_pending_value')}${current?.created_at ? ` · ${new Date(current.created_at).toLocaleString()}` : ''}`));
+    if (typeof current?.reason === 'string' && current.reason.trim()) detail.append(el('p', 'crm-ai-exp-muted', current.reason));
     const decision = el('form', 'crm-ai-exp-form');
     const decisionLabel = el('label', 'crm-ai-exp-field'); decisionLabel.append(el('span', '', t('ai_experience_decision')));
     const decisionSelect = document.createElement('select');
@@ -140,15 +228,26 @@ export function renderAiExperience({ root, callFn }) {
     decision.append(decisionLabel, reason.label, delta.label, save);
     decision.addEventListener('submit', event => {
       event.preventDefault();
-      void work(save, async () => {
-        let editDelta = null;
-        if (decisionSelect.value === 'modified') {
-          try { editDelta = JSON.parse(delta.input.value); } catch (_) { throw new Error('request'); }
+      let editDelta = null;
+      if (decisionSelect.value === 'modified') {
+        try {
+          editDelta = JSON.parse(delta.input.value);
+          if (!editDelta || typeof editDelta !== 'object' || Array.isArray(editDelta) || !Object.keys(editDelta).length) throw new Error('invalid');
+        } catch (_) {
+          message(status, 'ai_experience_json_invalid', true);
+          delta.input.focus();
+          return;
         }
-        validResponse(await api.call('assistant', { action:'aiExperience', operation:'decide',
-          eventId:uuid(), aiResultId:result.id, decision:decisionSelect.value,
-          reason:reason.input.value.trim() || null, editDelta }));
-        message(status, 'ai_experience_saved'); await reload();
+      }
+      const reasonText = reason.input.value.trim() || null;
+      const requestKey = JSON.stringify([result.id, decisionSelect.value, reasonText, editDelta]);
+      if (!decisionKeys.has(requestKey)) decisionKeys.set(requestKey, uuid());
+      const eventId = decisionKeys.get(requestKey);
+      void work(save, async () => {
+        const response = validResponse(await api.call('assistant', { action:'aiExperience', operation:'decide',
+          eventId, aiResultId:result.id, decision:decisionSelect.value,
+          reason:reasonText, editDelta }));
+        await showSaved('ai_experience_decision_saved', response.eventId || eventId);
       });
     });
     detail.append(decision);
@@ -170,9 +269,9 @@ export function renderAiExperience({ root, callFn }) {
       const decision = inputField('ai_experience_learning_review', { required:true, maxLength:4000 });
       const confirm = el('button', 'btn btn-primary', t('ai_experience_confirm_learning')); confirm.type = 'button';
       confirm.addEventListener('click', () => void work(confirm, async () => {
-        validResponse(await api.call('assistant', { action:'aiExperience', operation:'confirmLearning',
+        const response = validResponse(await api.call('assistant', { action:'aiExperience', operation:'confirmLearning',
           learningId:candidate.id, decision:decision.input.value.trim() }));
-        message(status, 'ai_experience_saved'); await reload();
+        await showSaved('ai_experience_learning_confirmed_receipt', response.learningId || candidate.id);
       }));
       box.append(decision.label, confirm);
     }
@@ -215,11 +314,11 @@ export function renderAiExperience({ root, callFn }) {
     form.append(typeField,targetField,aiLink,actual.label,occurred.label,evidence.label,save);
     form.addEventListener('submit', event => {
       event.preventDefault(); void work(save, async () => {
-        validResponse(await api.call('assistant', { action:'aiExperience', operation:'outcome',
+        const response = validResponse(await api.call('assistant', { action:'aiExperience', operation:'outcome',
           idempotencyKey:uuid(), targetType:type.value, targetId:Number(target.value),
           aiResultId:aiResult.value || null, result:actual.input.value.trim(),
           occurredAt:new Date(occurred.input.value).toISOString(), evidence:evidence.input.value.trim() }));
-        message(status, 'ai_experience_saved'); await reload();
+        await showSaved('ai_experience_outcome_saved', response.outcomeId);
       });
     });
     outcomeSection.append(form);
@@ -246,11 +345,12 @@ export function renderAiExperience({ root, callFn }) {
       event.preventDefault(); void work(submit, async () => {
         const ids = [...learningSelection].map(Number);
         const counterIds = counterexamples.input.value.split(',').map(value => value.trim()).filter(Boolean).map(Number);
-        validResponse(await api.call('assistant', { action:'aiExperience', operation:'learning', candidateKey:uuid(),
+        const response = validResponse(await api.call('assistant', { action:'aiExperience', operation:'learning', candidateKey:uuid(),
           payload:{ sourceResultIds:ids, primaryResultId:Number(primarySelect.value), situation:situation.input.value.trim(),
             recommendation:recommendation.input.value.trim(), actualAction:actualAction.input.value.trim(),
             learning:learning.input.value.trim(), scope:scope.input.value.trim(), counterexampleIds:counterIds } }));
-        message(status, 'ai_experience_saved'); learningSelection.clear(); await reload();
+        learningSelection.clear();
+        await showSaved('ai_experience_learning_saved', response.learningId);
       });
     });
     learningSection.append(form);
@@ -262,20 +362,30 @@ export function renderAiExperience({ root, callFn }) {
     catch (_) { message(status, 'ai_experience_save_failed', true); }
     finally { if (location.hash === PAGE) button.disabled = false; }
   }
-  async function reload() {
+  async function showSaved(key, receiptId) {
+    const refreshed = await reload({ quiet:true });
     if (location.hash !== PAGE) return;
-    message(status, 'ai_experience_loading');
+    status.className = refreshed ? 'crm-ai-exp-notice' : 'crm-ai-exp-error';
+    status.textContent = `${t(key)}${receiptId != null ? ` ${receiptId}` : ''}${refreshed ? '' : ` · ${t('ai_experience_refresh_after_save_failed')}`}`;
+  }
+  async function reload({ quiet = false } = {}) {
+    if (location.hash !== PAGE) return false;
+    if (!quiet) message(status, 'ai_experience_loading');
     try {
       const [response] = await Promise.all([
         api.call('assistant', { action:'aiExperience', operation:'list' }), loadTargets(),
       ]);
       validResponse(response);
-      if (location.hash !== PAGE) return;
+      if (location.hash !== PAGE) return false;
       model = response;
       if (!model.results.some(result => String(result.id) === selectedResultId)) selectedResultId = String(model.results[0]?.id || '');
       metricsView(); resultRows(); detailView(); renderOutcome(); renderLearning();
-      status.textContent = '';
-    } catch (_) { message(status, 'ai_experience_save_failed', true); }
+      if (!quiet) status.textContent = '';
+      return true;
+    } catch (_) {
+      if (!quiet) message(status, 'ai_experience_load_failed', true);
+      return false;
+    }
   }
   refresh.addEventListener('click', () => void reload());
   root.replaceChildren(page);

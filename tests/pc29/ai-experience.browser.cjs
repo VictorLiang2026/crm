@@ -23,7 +23,12 @@ test('PC29 AI Experience hub route and iPad workspace record decisions, Outcomes
         if(p.operation==='targets')return {ok:true,actions:[{id:801,title:'[CRM_TEST_ONLY] Fictional completed Action',status:'completed'}],
           opportunities:[{id:802,opportunity_type:'insurance',status:'关闭'}],activities:[{id:803,name:'[CRM_TEST_ONLY] Fictional ended Activity',status:'ended'}],
           recruitFollowups:[{id:804,candidate_id:805,followup_date:'2026-10-17'}]};
-        if(p.operation==='decide'){window.pc29.decisions.unshift({id:p.eventId,ai_result_id:p.aiResultId,decision:p.decision,reason:p.reason,edit_delta:p.editDelta,created_at:new Date().toISOString()});return {ok:true,eventId:p.eventId,replayed:false};}
+        if(p.operation==='decide'){
+          const prior=window.pc29.decisions.find(row=>row.id===p.eventId);
+          if(prior)return {ok:true,eventId:p.eventId,replayed:true};
+          window.pc29.decisions.unshift({id:p.eventId,ai_result_id:p.aiResultId,decision:p.decision,reason:p.reason,edit_delta:p.editDelta,created_at:new Date().toISOString()});
+          return {ok:true,eventId:p.eventId,replayed:false};
+        }
         if(p.operation==='outcome'){window.pc29.outcomes.unshift({id:901,ai_result_id:p.aiResultId,action_id:p.targetId,result:p.result,occurred_at:p.occurredAt,evidence:p.evidence});return {ok:true,outcomeId:901,replayed:false};}
         if(p.operation==='learning'){window.pc29.learnings.unshift({id:902,source_id:p.payload.primaryResultId,learning:p.payload.learning,scope:p.payload.scope,
           sample_size:p.payload.sourceResultIds.length,counterexamples:p.payload.counterexampleIds,provenance:{sources:[701]},confirmed:false,candidate_key:p.candidateKey});return {ok:true,learningId:902,replayed:false};}
@@ -37,12 +42,25 @@ test('PC29 AI Experience hub route and iPad workspace record decisions, Outcomes
     await browser.wait("document.querySelector('.crm-ai-exp-page h2')?.innerText.includes('实际结果')");
     await browser.wait("document.querySelector('.crm-ai-exp-result-pick')");
     assert.match(await browser.evaluate("document.querySelector('.crm-ai-exp-state').innerText"),/旧记录|Legacy/);
+    await browser.evaluate(`(()=>{const f=document.querySelector('.crm-ai-exp-detail form');const s=f.querySelector('select');
+      s.value='modified';s.dispatchEvent(new Event('change',{bubbles:true}));f.querySelectorAll('textarea')[1].value='{"actionId":17,"titleEdited"}';f.requestSubmit()})()`);
+    assert.match(await browser.evaluate("document.querySelector('.crm-ai-exp-notice,.crm-ai-exp-error').innerText"),/有效且非空/);
+    assert.equal(await browser.evaluate("window.pc29.calls.filter(x=>x.p.operation==='decide').length"),0);
     await browser.evaluate(`(()=>{const d=document.querySelector('.crm-ai-exp-detail');const f=d.querySelector('form');
       const s=f.querySelector('select');s.value='modified';s.dispatchEvent(new Event('change',{bubbles:true}));
       const areas=f.querySelectorAll('textarea');areas[0].value='[CRM_TEST_ONLY] adjusted for fictional test';areas[1].value='{"before":"[CRM_TEST_ONLY] old","after":"[CRM_TEST_ONLY] new"}';f.requestSubmit()})()`);
     await browser.wait("window.pc29.calls.some(x=>x.p.operation==='decide')");
     const decision=await browser.evaluate("window.pc29.calls.find(x=>x.p.operation==='decide').p");
     assert.equal(decision.decision,'modified');assert.deepEqual(decision.editDelta,{before:'[CRM_TEST_ONLY] old',after:'[CRM_TEST_ONLY] new'});
+    await browser.wait("document.querySelector('.crm-ai-exp-notice')?.innerText.includes('人工判断已保存')");
+    assert.match(await browser.evaluate("document.querySelector('.crm-ai-exp-current').innerText"),/修改后采纳/);
+    await browser.evaluate(`(()=>{const f=document.querySelector('.crm-ai-exp-detail form');const s=f.querySelector('select');
+      s.value='modified';s.dispatchEvent(new Event('change',{bubbles:true}));const a=f.querySelectorAll('textarea');
+      a[0].value='[CRM_TEST_ONLY] adjusted for fictional test';a[1].value='{"before":"[CRM_TEST_ONLY] old","after":"[CRM_TEST_ONLY] new"}';f.requestSubmit()})()`);
+    await browser.wait("window.pc29.calls.filter(x=>x.p.operation==='decide').length===2");
+    const replay=await browser.evaluate("window.pc29.calls.filter(x=>x.p.operation==='decide').map(x=>x.p.eventId)");
+    assert.deepEqual(replay,[decision.eventId,decision.eventId]);
+    assert.equal(await browser.evaluate("window.pc29.decisions.length"),1);
     await browser.evaluate(`(()=>{const section=document.querySelectorAll('.crm-ai-exp-section')[0];const f=section.querySelector('form');
       const selects=f.querySelectorAll('select');selects[0].value='action';selects[0].dispatchEvent(new Event('change',{bubbles:true}));
       selects[1].value='801';selects[2].value='701';const areas=f.querySelectorAll('textarea');areas[0].value='[CRM_TEST_ONLY] actual fictional result';
@@ -51,6 +69,7 @@ test('PC29 AI Experience hub route and iPad workspace record decisions, Outcomes
     const outcome=await browser.evaluate("window.pc29.calls.find(x=>x.p.operation==='outcome').p");
     assert.equal(outcome.targetType,'action');assert.equal(outcome.targetId,801);assert.equal(outcome.aiResultId,'701');
     assert.match(outcome.evidence,/CRM_TEST_ONLY/);
+    await browser.wait("document.querySelector('.crm-ai-exp-notice')?.innerText.includes('实际结果已保存')");
     await browser.evaluate(`(()=>{const check=document.querySelector('.crm-ai-exp-result input[type="checkbox"]');check.checked=true;check.dispatchEvent(new Event('change',{bubbles:true}));
       const s=document.querySelectorAll('.crm-ai-exp-section')[1];const f=s.querySelector('form');const fields=f.querySelectorAll('input,textarea');
       fields[1].value='[CRM_TEST_ONLY] fictional selling situation';fields[2].value='[CRM_TEST_ONLY] verified suggestion';
@@ -59,11 +78,13 @@ test('PC29 AI Experience hub route and iPad workspace record decisions, Outcomes
     await browser.wait("window.pc29.calls.some(x=>x.p.operation==='learning')");
     const learning=await browser.evaluate("window.pc29.calls.find(x=>x.p.operation==='learning').p.payload");
     assert.deepEqual(learning.sourceResultIds,[701]);assert.equal(learning.primaryResultId,701);
+    await browser.wait("document.querySelector('.crm-ai-exp-notice')?.innerText.includes('待审核 Learning 已保存')");
     await browser.wait("document.querySelector('.crm-ai-exp-candidate button')");
     await browser.evaluate(`(()=>{const c=document.querySelector('.crm-ai-exp-candidate');c.querySelector('input').value='[CRM_TEST_ONLY] reviewed candidate';c.querySelector('button').click()})()`);
     await browser.wait("window.pc29.calls.some(x=>x.p.operation==='confirmLearning')");
     const review=await browser.evaluate("window.pc29.calls.find(x=>x.p.operation==='confirmLearning').p");
     assert.equal(review.learningId,902);assert.match(review.decision,/CRM_TEST_ONLY/);
+    await browser.wait("document.querySelector('.crm-ai-exp-notice')?.innerText.includes('Learning 已由人工确认')");
     for(const [width,height] of [[1180,820],[820,1180]]){
       await browser.send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:false});
       assert.equal(await browser.evaluate('document.documentElement.scrollWidth<=innerWidth+1'),true,`${width}x${height}`);
@@ -72,6 +93,55 @@ test('PC29 AI Experience hub route and iPad workspace record decisions, Outcomes
       const {dispatch}=await import('/crm/js/modules/console/router.js');dispatch('#/ai/experience',
         {main:document.querySelector('.console-main'),callFn:window.pc29Call,api:{},toast:()=>{}})})()`);
     await browser.wait("document.querySelector('.crm-ai-exp-page h2')?.innerText==='AI Results & Outcomes'");
+    await browser.healthy();
+  }finally{await browser.close();}
+});
+
+test('PC36 E13 AI result details are readable in both languages with original JSON on demand',async()=>{
+  const browser=new Browser(path.resolve(__dirname,'../..'));
+  try{
+    await browser.start();await browser.openConsole('#/ai','authCase=1');
+    await browser.wait("document.querySelector('.console-main')");
+    await browser.evaluate(`(async()=>{
+      const {setLang}=await import('/crm/js/modules/console/i18n.js');
+      const {dispatch}=await import('/crm/js/modules/console/router.js');
+      window.pc36UiCall=async(name,p)=>{
+        if(name!=='assistant')return {error:'unexpected'};
+        if(p.operation==='targets')return {ok:true,actions:[],opportunities:[],activities:[],recruitFollowups:[]};
+        if(p.operation==='list')return {ok:true,tasks:[
+          {id:60,task_type:'assistant_opportunity_update_v1',subject_type:null,subject_id:null},
+          {id:61,task_type:'activity_review',subject_type:'activity',subject_id:11}],results:[
+          {id:76,task_id:60,result_json:{status:'unsupported',operation:'unsupported',interpretation:'[CRM_TEST_ONLY] Action update is unsupported',changes:{title:null}}},
+          {id:51,task_id:61,result_json:{summary:'[CRM_TEST_ONLY] Fictional activity summary',actionCandidates:[{title:'[CRM_TEST_ONLY] Review feedback',personId:783,reason:'Evidence from this activity',sourceRefs:['public.interactions#11']}],opportunityCandidates:[]}}],
+          decisions:[{id:'feedback-51',ai_result_id:51,decision:'modified',reason:'[CRM_TEST_ONLY] Edited Action only',created_at:'2026-10-23T00:00:00Z'}],
+          outcomes:[],learnings:[],metrics:{numerator:1,denominator:2,pending:1}};
+        return {error:'unexpected'};
+      };
+      setLang('zh-CN');history.replaceState(null,'',location.pathname+location.search+'#/ai/experience');
+      dispatch('#/ai/experience',{main:document.querySelector('.console-main'),callFn:window.pc36UiCall,api:{},toast:()=>{}});
+    })()`);
+    await browser.wait("document.querySelectorAll('.crm-ai-exp-result-pick').length===2");
+    await browser.evaluate("document.querySelector('.crm-ai-exp-result-pick').click()");
+    assert.match(await browser.evaluate("document.querySelector('.crm-ai-exp-readable').innerText"),/不在可执行范围|未执行任何业务变更/);
+    assert.doesNotMatch(await browser.evaluate("document.querySelector('.crm-ai-exp-readable').innerText"),/"title": null/);
+    assert.equal(await browser.evaluate("document.querySelector('.crm-ai-exp-raw').open"),false);
+    assert.match(await browser.evaluate("document.querySelector('.crm-ai-exp-raw pre').textContent"),/"title": null/);
+    await browser.evaluate("document.querySelectorAll('.crm-ai-exp-result-pick')[1].click()");
+    assert.match(await browser.evaluate("document.querySelector('.crm-ai-exp-readable').innerText"),/Fictional activity summary/);
+    assert.match(await browser.evaluate("document.querySelector('.crm-ai-exp-readable').innerText"),/public.interactions#11/);
+    assert.match(await browser.evaluate("document.querySelector('.crm-ai-exp-current').innerText"),/修改后采纳/);
+    for(const [width,height] of [[1180,820],[820,1180]]){
+      await browser.send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:false});
+      assert.equal(await browser.evaluate('document.documentElement.scrollWidth<=innerWidth+1'),true,`${width}x${height}`);
+    }
+    await browser.evaluate(`(async()=>{const {setLang}=await import('/crm/js/modules/console/i18n.js');setLang('en');
+      const {dispatch}=await import('/crm/js/modules/console/router.js');dispatch('#/ai/experience',
+        {main:document.querySelector('.console-main'),callFn:window.pc36UiCall,api:{},toast:()=>{}})})()`);
+    await browser.wait("document.querySelectorAll('.crm-ai-exp-result-pick').length===2");
+    await browser.evaluate("document.querySelector('.crm-ai-exp-result-pick').click()");
+    assert.match(await browser.evaluate("document.querySelector('.crm-ai-exp-readable').innerText"),/outside the supported scope/);
+    await browser.evaluate("document.querySelectorAll('.crm-ai-exp-result-pick')[1].click()");
+    assert.match(await browser.evaluate("document.querySelector('.crm-ai-exp-readable').innerText"),/Sources: public.interactions#11/);
     await browser.healthy();
   }finally{await browser.close();}
 });

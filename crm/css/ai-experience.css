@@ -17,6 +17,12 @@
 .crm-ai-exp-state{align-self:center;padding:3px 8px;border-radius:999px;background:#f1f5f9;color:var(--text-secondary);font-size:12px;font-weight:650}
 .crm-ai-exp-check{display:flex;align-items:center;gap:7px;grid-column:1/-1;color:var(--text-secondary);font-size:13px}
 .crm-ai-exp-detail{display:grid;gap:12px}.crm-ai-exp-output{max-height:260px;overflow:auto;margin:0;padding:12px;border:1px solid var(--border);border-radius:8px;background:#f8fafc;color:var(--text);font:inherit;font-size:12px;line-height:1.55;white-space:pre-wrap;overflow-wrap:anywhere}
+.crm-ai-exp-readable,.crm-ai-exp-readable-section{display:grid;gap:8px;min-width:0}.crm-ai-exp-readable p,.crm-ai-exp-current{margin:0;line-height:1.6;overflow-wrap:anywhere}
+.crm-ai-exp-summary,.crm-ai-exp-current{padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:#f8fafc}
+.crm-ai-exp-readable-section{padding-top:10px;border-top:1px solid var(--border)}.crm-ai-exp-readable-section h4{font-size:14px}
+.crm-ai-exp-readable-card{display:grid;gap:5px;padding:10px 12px;border:1px solid var(--border);border-radius:8px}
+.crm-ai-exp-evidence{color:var(--text-secondary);font-size:12px}.crm-ai-exp-unsupported{color:#9a3412}
+.crm-ai-exp-raw summary{cursor:pointer;color:var(--pri);font-weight:650}.crm-ai-exp-raw[open] .crm-ai-exp-output{margin-top:8px}
 .crm-ai-exp-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;align-items:start}
 .crm-ai-exp-field{display:grid;gap:5px;min-width:0;color:var(--text-secondary);font-size:13px}
 .crm-ai-exp-field input,.crm-ai-exp-field select,.crm-ai-exp-field textarea{width:100%;min-height:40px;padding:8px 10px;border:1px solid var(--border);border-radius:7px;background:var(--card);color:var(--text);font:inherit}
