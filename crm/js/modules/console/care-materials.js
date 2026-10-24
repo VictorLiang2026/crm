@@ -346,6 +346,11 @@ export async function careMaterialsNode(ctx, personId, { onDone } = {}) {
   }));
 
   root.append(
+    h('div', { class: 'more-actions care-workspace-links' }, [
+      h('a', { class: 'btn btn-ghost btn-sm', href: `#/person/${personId}/insurance` }, t('tab_insurance')),
+      h('a', { class: 'btn btn-ghost btn-sm', href: `#/person/${personId}/ocr` }, t('tab_ocr_review')),
+    ]),
+    h('p', { class: 'foot-note' }, t('care_review_workflow_note')),
     h('div', { class: 'care-materials-grid' }, [
       h('section', { class: 'care-materials-section' }, [
         h('div', { class: 'care-section-head' }, [sectionTitle(t('care_gifts_title')), giftAdd]),

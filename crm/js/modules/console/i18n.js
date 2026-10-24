@@ -2,6 +2,8 @@
 const DEFAULT = 'zh-CN';
 
 const DICT = {
+  'insurance_workspace_note': { 'zh-CN': '维护客户已有保障、额度、保费及保单检视记录，资料来源可在附件和解析记录中核对。', 'en': 'Manage the customer’s existing coverage, amounts, premiums and policy reviews. Check sources in attachments and document reviews.' },
+  'care_review_workflow_note': { 'zh-CN': '附件用于保存原始资料；解析记录中的字段须经身份核对、预览和确认后才更新档案。', 'en': 'Attachments preserve original documents. Fields from a document review update the profile only after identity review, preview and confirmation.' },
   'people_open_followups': { 'zh-CN': '查看跟进时间线', 'en': 'Open follow-up timeline' },
   'people_legacy_tools': { 'zh-CN': '旧客户经营视图', 'en': 'Legacy Customer Workspace' },
   'people_legacy_tools_note': { 'zh-CN': '查看旧版经营状态、招募状态及批量工具；不会携带当前人物筛选。', 'en': 'Legacy business/recruitment statuses and batch tools. Current people filters are not carried over.' },
@@ -934,8 +936,8 @@ const DICT = {
   'legacy_ai_suggestions_desc': { 'zh-CN': '原 AI 建议记录', 'en': 'Original AI suggestion records' },
   'legacy_policy_review': { 'zh-CN': '保单检视', 'en': 'Policy Review' },
   'legacy_policy_review_desc': { 'zh-CN': '旧客户详情中的保单检视', 'en': 'Policy review in legacy customer detail' },
-  'legacy_products': { 'zh-CN': '产品', 'en': 'Products' },
-  'legacy_products_desc': { 'zh-CN': '旧客户详情中的产品资料', 'en': 'Products in legacy customer detail' },
+  'legacy_products': { 'zh-CN': '客户保障记录', 'en': 'Customer Coverage' },
+  'legacy_products_desc': { 'zh-CN': '旧客户详情中的保障额度、保费和缴费记录', 'en': 'Coverage amounts, premiums and payment records in legacy customer details' },
   'legacy_gifts': { 'zh-CN': '伴手礼', 'en': 'Gifts' },
   'legacy_gifts_desc': { 'zh-CN': '旧客户详情中的伴手礼', 'en': 'Gifts in legacy customer detail' },
   'legacy_photos': { 'zh-CN': '照片/OCR', 'en': 'Photos / OCR' },

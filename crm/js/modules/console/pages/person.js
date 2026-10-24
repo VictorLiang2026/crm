@@ -307,6 +307,11 @@ function provenanceRow(title, sub, badge) {
 function insuranceNode(ctx, id) {
   return Promise.all([data.insurance(ctx, id), renderInsuranceEditor(ctx, id)]).then(([d, editor]) => {
     const blocks = [];
+    blocks.push(h('p', { class: 'foot-note' }, t('insurance_workspace_note')));
+    blocks.push(h('div', { class: 'more-actions insurance-workspace-links' }, [
+      h('a', { class: 'btn btn-ghost btn-sm', href: `#/person/${id}/care` }, t('tab_care_materials')),
+      h('a', { class: 'btn btn-ghost btn-sm', href: `#/person/${id}/ocr` }, t('tab_ocr_review')),
+    ]));
     blocks.push(h('div', { class: 'stack-head' }, [
       sectionTitle(t('sec_insurance_overview')),
       bdg(d.evidenceStatus === 'recorded' ? t('badge_has_evidence') : t('badge_no_evidence'), d.evidenceStatus === 'recorded' ? 'jade' : 'gray'),

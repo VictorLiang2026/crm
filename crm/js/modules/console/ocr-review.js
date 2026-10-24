@@ -391,6 +391,10 @@ export async function renderOcrReview(ctx, personId) {
   historyHost.replaceChildren(commandHistory(commands, ctx, personId, changed));
   return h('div', { class: 'tab-stack ocr-review' }, [
     sectionTitle(t('ocr_title')),
+    h('div', { class: 'more-actions ocr-workspace-links' }, [
+      h('a', { class: 'btn btn-ghost btn-sm', href: `#/person/${personId}/care` }, t('tab_care_materials')),
+      h('a', { class: 'btn btn-ghost btn-sm', href: `#/person/${personId}/insurance` }, t('tab_insurance')),
+    ]),
     h('p', { class: 'sheet-note' }, t('ocr_safety_note')),
     sectionTitle(`${t('ocr_records')} (${rows.length})`),
     rows.length ? h('div', { class: 'ocr-record-list' }, rows.map(row =>
