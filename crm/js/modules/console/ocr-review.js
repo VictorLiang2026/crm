@@ -2,6 +2,7 @@ import { h } from './dom.js';
 import { data } from './data.js';
 import { t } from './i18n.js';
 import { emptyNote, fmtDate, sectionTitle } from './ui.js';
+import { fileImportNode } from './file-import.js';
 
 const FIELDS = [
   ['phone', 'ocr_field_phone'], ['gender', 'ocr_field_gender'], ['birthday', 'ocr_field_birthday'],
@@ -152,7 +153,7 @@ function openUndo(ctx, row, personId, changed, trigger) {
   }
 }
 
-function recordNode(ctx, personId, personName, customerId, record, changed) {
+function recordNode(ctx, personId, personName, customerId, record, changed, preparedFields) {
   const sourceViewer = h('div', { class: 'ocr-source-viewer' });
   const errorSlot = h('div', { class: 'ocr-error-slot' });
   const fileIds = jsonArray(record.file_ids);
@@ -175,11 +176,16 @@ function recordNode(ctx, personId, personName, customerId, record, changed) {
     ]) : messageNode(t('ocr_no_recognition_text')),
   ]);
   const working = h('div', { class: 'ocr-working-area' });
-  const parseBtn = h('button', { class: 'btn btn-primary btn-sm', type: 'button' }, t('ocr_parse_fields'));
+  const parseBtn = h('button', { class: 'btn btn-primary btn-sm', type: 'button' }, t(preparedFields ? 'file_import_review' : 'ocr_parse_fields'));
   parseBtn.addEventListener('click', async () => {
     parseBtn.disabled = true;
     working.replaceChildren(messageNode(t('ocr_parsing')));
     try {
+      if (preparedFields) {
+        renderCandidate(ctx, personId, personName, customerId, record, preparedFields,
+          ctx.profileFields || {}, working, changed);
+        return;
+      }
       const input = record.raw_text?.trim()
         ? { text: record.raw_text }
         : { images: await imageInputs(ctx, record), text: '' };
@@ -192,11 +198,17 @@ function recordNode(ctx, personId, personName, customerId, record, changed) {
     finally { parseBtn.disabled = false; }
   });
   content.append(h('div', { class: 'ocr-record-actions' }, [parseBtn]), working);
-  return h('details', { class: 'ocr-record' }, [
+  const node = h('details', { class: 'ocr-record' }, [
     h('summary', {}, [h('strong', {}, record.summary || fileNames.join(', ') || `${t('ocr_record_id')} ${record.id}`),
       h('span', { class: 'ocr-record-date' }, timestamp(record.created_at))]),
     content,
   ]);
+  if (preparedFields) {
+    node.open = true;
+    renderCandidate(ctx, personId, personName, customerId, record, preparedFields,
+      ctx.profileFields || {}, working, changed);
+  }
+  return node;
 }
 
 function renderCandidate(ctx, personId, personName, customerId, record, parsed, currentValues, host, changed) {
@@ -389,6 +401,36 @@ export async function renderOcrReview(ctx, personId) {
   const historyHost = h('div', { class: 'ocr-history-host' });
   const changed = () => ctx.onWriteDone?.();
   historyHost.replaceChildren(commandHistory(commands, ctx, personId, changed));
+  const recordHost = h('div', { class: 'ocr-record-list' });
+  const recordHeading = sectionTitle(`${t('ocr_records')} (${rows.length})`);
+  const drawRecords = items => recordHost.replaceChildren(...(items.length ? items.map(row =>
+    recordNode({ ...ctx, profileFields: profile.fields }, personId, personName, customerId, row, changed))
+    : [emptyNote(t('ocr_no_records'), t('ocr_no_records_note'))]));
+  drawRecords(rows);
+  const importPanel = await fileImportNode(ctx, personId, customerId, {
+    onSaved: async () => {
+      try {const current = await data.ocrRecords(ctx, customerId);
+        if (!Array.isArray(current.rows)) throw new Error('Invalid records');
+        recordHeading.querySelector('b').textContent = `${t('ocr_records')} (${current.rows.length})`;
+        drawRecords(current.rows);
+      } catch {ctx.toast?.(t('file_import_records_refresh_failed'), 'err');}
+    },
+    onReview: async (job, host) => {
+      if (String(job.person_id) !== String(personId) || Number(job.customer_id) !== Number(customerId) ||
+          job.status !== 'draft' || !job.parsed_fields || job.sourceAvailable === false || job.draftAvailable === false)
+        throw new Error('Invalid draft');
+      // Completed jobs return their receipt without another AI call; the server
+      // rechecks the current Person/customer link, original version and OCR source.
+      const verified = await data.parseFileDraft(ctx, job.id);
+      if (verified.job?.status !== 'draft' || String(verified.job.ocr_record_id) !== String(job.ocr_record_id))
+        throw new Error('Invalid draft receipt');
+      const current = await data.ocrRecords(ctx, customerId);
+      const record = current.rows?.find(row => String(row.id) === String(job.ocr_record_id));
+      if (!record || Number(record.customer_id) !== Number(customerId)) throw new Error('Invalid source');
+      host.replaceChildren(recordNode({ ...ctx, profileFields: profile.fields }, personId, personName,
+        customerId, record, changed, verified.job.parsed_fields));
+    },
+  });
   return h('div', { class: 'tab-stack ocr-review' }, [
     sectionTitle(t('ocr_title')),
     h('div', { class: 'more-actions ocr-workspace-links' }, [
@@ -396,10 +438,8 @@ export async function renderOcrReview(ctx, personId) {
       h('a', { class: 'btn btn-ghost btn-sm', href: `#/person/${personId}/insurance` }, t('tab_insurance')),
     ]),
     h('p', { class: 'sheet-note' }, t('ocr_safety_note')),
-    sectionTitle(`${t('ocr_records')} (${rows.length})`),
-    rows.length ? h('div', { class: 'ocr-record-list' }, rows.map(row =>
-      recordNode({ ...ctx, profileFields: profile.fields }, personId, personName, customerId, row, changed)))
-      : emptyNote(t('ocr_no_records'), t('ocr_no_records_note')),
+    importPanel,
+    recordHeading, recordHost,
     sectionTitle(t('ocr_applied_history')),
     historyHost,
   ]);

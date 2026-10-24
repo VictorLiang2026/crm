@@ -351,6 +351,7 @@ export async function careMaterialsNode(ctx, personId, { onDone } = {}) {
       h('a', { class: 'btn btn-ghost btn-sm', href: `#/person/${personId}/ocr` }, t('tab_ocr_review')),
     ]),
     h('p', { class: 'foot-note' }, t('care_review_workflow_note')),
+    h('a', { class: 'btn btn-soft', href: `#/person/${personId}/ocr` }, t('file_import_entry')),
     h('div', { class: 'care-materials-grid' }, [
       h('section', { class: 'care-materials-section' }, [
         h('div', { class: 'care-section-head' }, [sectionTitle(t('care_gifts_title')), giftAdd]),

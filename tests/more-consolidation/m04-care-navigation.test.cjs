@@ -12,6 +12,7 @@ test('M04 same-Person insurance, attachments and OCR links preserve review and c
    data.customerProfile=async()=>({status:'linked',customerId:71,fields:{customer_name:'[CRM_TEST_ONLY]客户甲'}});
    for(const method of ['gifts','photos','ocrRecords'])data[method]=async(ctx,id)=>{window.m04Reads.push({method,id});return{rows:[],hasMore:false}};
    data.ocrParseCommands=async()=>[];
+   data.fileImports=async(ctx,id)=>{if(String(id)!=='980001')throw Error('Wrong import Person');return{rows:[],hasMore:false}};
    data.conversationPlaybookHistory=async()=>({ok:true,hasResult:false});
    location.hash='#/person/980001/insurance';
   })()`);
