@@ -27,11 +27,11 @@ test('PC22 governance page is bilingual, iPad-safe, and uses the authenticated s
     assert.equal(first.writes, 0, 'opening the page does not write business data');
     assert.match(first.text, /Reviewed clause/);
     await browser.evaluate("window.kgI18n.setLang('en');window.kgRender()");
-    await browser.wait("document.querySelector('#console-main').innerText.includes('Knowledge & Strategy Governance')");
+    await browser.wait("document.querySelector('#console-main').innerText.includes('Knowledge & Playbooks')");
     const english = await browser.evaluate("document.querySelector('#console-main').innerText");
     assert.match(english, /Create synthetic fixtures/);
     await browser.evaluate("window.kgI18n.setLang('zh-CN');window.kgRender()");
-    await browser.wait("document.querySelector('#console-main').innerText.includes('知识与策略治理')");
+    await browser.wait("document.querySelector('#console-main').innerText.includes('知识与话术')");
     for (const [width,height] of [[820,1180],[1180,820]]) {
       await browser.send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:false});
       assert.equal(await browser.evaluate('document.documentElement.scrollWidth<=innerWidth+1'),true,`${width}x${height} overflow`);

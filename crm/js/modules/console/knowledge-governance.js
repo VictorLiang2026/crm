@@ -13,8 +13,19 @@ const select = () => h('select', { name: 'item_type' }, [
 ]);
 
 function status(row) { return text(`status_${row.lifecycle_status || (row.verified ? 'verified' : 'draft')}`); }
+export function knowledgeValidity(row, now = new Date()) {
+  const today = new Intl.DateTimeFormat('en-CA', {timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
+  const from = row.valid_from || null, to = row.valid_to || null;
+  const valid = value => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) &&
+    Number.isFinite(Date.parse(value)) && new Date(value).toISOString().slice(0,10) === value;
+  if ((from && !valid(from)) || (to && !valid(to)) || (from && to && from > to)) return 'invalid';
+  if (to && to < today) return 'expired';
+  if (from && from > today) return 'future';
+  return from || to ? 'within' : 'unspecified';
+}
 function renderRow(ctx, table, row, reload, onRevision, resolveRef, focusItemId) {
   const content = table === 'playbooks' ? `${row.scenario} · ${row.objection}\n${row.response_logic}` : row.content;
+  const validity = knowledgeValidity(row);
   const controls = [];
   if (row.lifecycle_status === 'draft' || (!row.lifecycle_status && !row.verified)) {
     controls.push(h('button', { class: 'btn btn-primary', type: 'button', onclick: async () => {
@@ -36,7 +47,15 @@ function renderRow(ctx, table, row, reload, onRevision, resolveRef, focusItemId)
     h('div', { class: 'kg-row-head' }, [h('b', {}, table === 'playbooks' ? text('playbook') : text(row.item_type || 'evidence')),
       h('span', { class: `kg-status kg-${row.lifecycle_status || (row.verified ? 'verified' : 'draft')}` }, status(row))]),
     h('p', { class: 'kg-copy' }, content || ''),
-    h('small', {}, `${row.source || '—'} · ${Number(row.confidence || 0).toFixed(2)} · v${row.version_no || 1}`),
+    h('p', {class:'foot-note'}, text(table === 'playbooks' ? 'playbook_boundary' : `kind_${row.item_type || 'evidence'}_note`)),
+    h('small', {}, `${text('source')}: ${row.source || text('source_unspecified')}`),
+    h('small', {}, `${text('source_date')}: ${row.source_date || '—'} · ${text('version')}: ${row.version_no || 1} · ${text('confidence')}: ${row.confidence == null ? '—' : Number(row.confidence).toFixed(2)}`),
+    h('small', {'data-kg-validity':validity}, `${text('date_validity')}: ${text(`validity_${validity}`)}`),
+    h('small', {}, `${text('valid_from')}: ${row.valid_from || '—'} · ${text('valid_to')}: ${row.valid_to || '—'}`),
+    ...(table === 'playbooks' && Array.isArray(row.possible_underlying_reasons) && row.possible_underlying_reasons.some(value=>typeof value==='string') ? [
+      h('details', {}, [h('summary', {}, text('possible_reasons')),
+        h('ul', {}, row.possible_underlying_reasons.filter(value=>typeof value==='string').map(value=>h('li',{},value)))])
+    ] : []),
     ...(table === 'playbooks' ? ['evidence_refs', 'case_refs', 'story_refs'].map(kind => {
       const type = kind.replace('_refs', '');
       const entries = (Array.isArray(row[kind]) ? row[kind] : []).map(id => resolveRef(type, id));
@@ -110,9 +129,11 @@ export function renderKnowledgeGovernance(ctx, { focusItemId = null } = {}) {
     const visiblePlaybooks = records.playbooks.filter(row => (typeFilter === 'all' || typeFilter === 'playbook') &&
       (statusFilter === 'all' || row.lifecycle_status === statusFilter));
     main.replaceChildren(pageHead({ kicker: text('kicker'), title: text('title'), sub: text('description') }),
+      h('p', {class:'foot-note'}, text('validity_scope')),
       h('div', { class: 'kg-layout' }, [
         card({ body: [form, playbookForm] }),
         h('section', { class: 'kg-list' }, [
+          h('p', {class:'foot-note'}, text('loaded_scope')),
           h('div', { class: 'kg-toolbar' }, [h('h2', {}, text('items')),
             h('div', { class: 'kg-actions' }, [
               h('select', { 'aria-label': text('filter_type'), onchange: event => { typeFilter = event.target.value; draw(); } }, [
