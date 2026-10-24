@@ -1,13 +1,15 @@
-.crm-ai-exp-page{max-width:1440px;margin:0 auto;padding:0 8px}
+.crm-ai-exp-page{--text:var(--ink);--text-secondary:var(--ink-2);--pri:var(--red);--border:var(--line);max-width:1440px;margin:0 auto;padding:0 8px}
+.crm-ai-history-filters{padding:14px 16px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius)}
+.crm-ai-history-filters fieldset{border:0;margin:0;padding:0;min-width:0}.ai-history-advanced{grid-column:1/-1;min-width:0}.ai-history-advanced summary{cursor:pointer;color:var(--pri);padding:8px 0}.ai-history-advanced p{color:var(--text-secondary);font-size:13px}.crm-ai-history-pager{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.crm-ai-history-pager p{flex-basis:100%;margin:0}.crm-ai-exp-legacy-copy{white-space:pre-wrap;overflow-wrap:anywhere;margin:0;line-height:1.6}
 .crm-ai-exp-page h2,.crm-ai-exp-page h3,.crm-ai-exp-page h4{margin:0;color:var(--text)}
 .crm-ai-exp-back{display:inline-block;margin:8px 0 14px;color:var(--pri);font-weight:650;text-decoration:none}
 .crm-ai-exp-intro{max-width:900px;margin:8px 0 18px;color:var(--text-secondary);line-height:1.65}
 .crm-ai-exp-notice,.crm-ai-exp-error{min-height:22px;margin:8px 0;color:var(--text-secondary)}
 .crm-ai-exp-error{padding:10px 12px;border:1px solid #fecaca;border-radius:8px;background:#fef2f2;color:#991b1b}
-.crm-ai-exp-metrics{display:grid;grid-template-columns:auto auto auto auto 1fr auto;align-items:center;gap:12px;margin:12px 0 18px;padding:14px 16px;background:var(--card);border:1px solid var(--border);border-left:4px solid var(--pri);border-radius:var(--radius)}
+.crm-ai-exp-metrics{display:grid;grid-template-columns:auto auto auto 1fr;align-items:center;gap:12px;margin:12px 0 18px;padding:14px 16px;background:var(--card);border:1px solid var(--border);border-left:4px solid var(--pri);border-radius:var(--radius)}
 .crm-ai-exp-metrics h3{font-size:15px}.crm-ai-exp-rate{font-size:26px;color:var(--pri)}
 .crm-ai-exp-muted{color:var(--text-secondary);font-size:13px;line-height:1.55}
-.crm-ai-exp-metrics p{margin:0}.crm-ai-exp-workspace{display:grid;grid-template-columns:minmax(300px,.82fr) minmax(480px,1.65fr);gap:14px;align-items:start}
+.crm-ai-exp-metrics p{margin:0;grid-column:1/-1}.crm-ai-exp-metrics>.btn{justify-self:start}.crm-ai-exp-workspace{display:grid;grid-template-columns:minmax(300px,.82fr) minmax(480px,1.65fr);gap:14px;align-items:start}
 .crm-ai-exp-list-panel,.crm-ai-exp-detail,.crm-ai-exp-section{min-width:0;padding:16px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius)}
 .crm-ai-exp-list-panel h3,.crm-ai-exp-detail h3,.crm-ai-exp-section h3{margin:0 0 12px}
 .crm-ai-exp-results{display:grid;gap:8px;max-height:720px;overflow:auto}
@@ -34,4 +36,4 @@
 .crm-ai-exp-section{display:grid;gap:10px}.crm-ai-exp-candidate{display:grid;gap:8px;padding:12px;border:1px solid var(--border);border-radius:8px}
 .crm-ai-exp-candidate p{margin:0;overflow-wrap:anywhere}
 .crm-ai-exp-page button:focus-visible,.crm-ai-exp-page input:focus-visible,.crm-ai-exp-page textarea:focus-visible,.crm-ai-exp-page select:focus-visible,.crm-ai-exp-page a:focus-visible{outline:3px solid #60a5fa;outline-offset:2px}
-@media(max-width:1000px){.crm-ai-exp-workspace,.crm-ai-exp-lower{grid-template-columns:1fr}.crm-ai-exp-results{max-height:360px}.crm-ai-exp-metrics{grid-template-columns:auto auto auto;justify-content:start}.crm-ai-exp-metrics p{grid-column:1/-1}}
+@media(max-width:1000px){.crm-ai-exp-workspace,.crm-ai-exp-lower{grid-template-columns:1fr}.crm-ai-exp-results{max-height:360px}.crm-ai-exp-metrics{grid-template-columns:auto auto minmax(0,1fr);justify-content:stretch}.crm-ai-exp-metrics p{grid-column:1/-1}}

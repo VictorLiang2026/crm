@@ -1,5 +1,6 @@
 import { createApi } from '../../core/api.js';
 import { t } from './i18n.js';
+import { createHistoryFilters, historyTaskLabel, historyTypeLabel } from './ai-history-filters.js';
 
 const PAGE = '#/ai/experience';
 const el = (tag, cls, value) => {
@@ -40,7 +41,7 @@ function taskName(task) {
     activity_review: 'ai_experience_task_activity_review',
     assistant_opportunity_update_v1: 'ai_experience_task_opportunity_update',
   };
-  return Object.hasOwn(keys, task.task_type) ? t(keys[task.task_type]) : (task.task_type || t('ai_experience_empty'));
+  return Object.hasOwn(keys, task.task_type) ? t(keys[task.task_type]) : (historyTaskLabel(task.task_type) || t('ai_experience_empty'));
 }
 function taskSubject(task) {
   if (!task.subject_type || !task.subject_id) return t('ai_experience_unbound_subject');
@@ -98,7 +99,7 @@ function readableResult(result, task) {
       ['relationshipsImproved','ai_experience_relationships'],
     ]) appendActivitySection(readable, key, payload[field]);
   } else {
-    for (const field of ['summary','interpretation','nextStep']) {
+    for (const field of ['summary','interpretation','nextStep','brief30Seconds','suggestedObjective','nextObjective']) {
       if (typeof payload[field] === 'string' && payload[field].trim()) readable.append(el('p', '', payload[field]));
     }
   }
@@ -149,6 +150,55 @@ export function renderAiExperience({ root, callFn }) {
   let selectedResultId = '';
   const learningSelection = new Set();
   const decisionKeys = new Map();
+  let activeFilters = {source:'runtime',page:1,limit:20};
+  let loading = false, saving = false, loadVersion = 0;
+  const filters = createHistoryFilters({api,onApply:next=>void reload({next}),
+    onError:key=>message(status,key,true)});
+  const pager = el('div','crm-ai-history-pager'); listPanel.append(pager);
+
+  function paginationView() {
+    pager.replaceChildren();
+    const p = model.pagination;
+    const scope=[t(`ai_history_source_${model.source}`),historyTypeLabel(model.source,activeFilters.type),
+      activeFilters.personId?`${t('ai_history_scope_person')} #${activeFilters.personId}`:t('ai_history_all_people'),
+      activeFilters.startDate||activeFilters.endDate?`${activeFilters.startDate||'…'} → ${activeFilters.endDate||'…'}`:t('ai_history_all_dates')];
+    pager.append(el('p','crm-ai-exp-muted',`${t('ai_history_current_scope')}: ${scope.join(' · ')}`));
+    pager.append(el('p','crm-ai-exp-muted',t(model.source==='legacy'?'ai_history_legacy_scope':'ai_history_runtime_scope')));
+    if (!p) { pager.append(el('p','crm-ai-exp-muted',t('ai_history_recent_only'))); return; }
+    const count = model.source==='legacy' ? model.legacy.length : model.tasks.length;
+    pager.append(el('p','crm-ai-exp-muted',t('ai_history_page_info').replace('{page}',String(p.page)).replace('{count}',String(count))));
+    const previous=el('button','btn',t('file_import_previous'));previous.type='button';previous.disabled=p.page<=1;
+    const next=el('button','btn',t('file_import_next'));next.type='button';next.disabled=!p.hasMore;
+    previous.addEventListener('click',()=>void reload({next:{...activeFilters,page:p.page-1}}));
+    next.addEventListener('click',()=>void reload({next:{...activeFilters,page:p.page+1}}));
+    pager.append(previous,next);
+    if(Object.values(p.relatedTruncated||{}).some(Boolean))pager.append(el('p','crm-ai-exp-error',t('ai_history_related_limit')));
+  }
+
+  function legacyRows() {
+    list.replaceChildren();
+    if(!model.legacy.length)list.append(el('p','crm-ai-exp-muted',t('ai_experience_no_records')));
+    for(const row of model.legacy){
+      const article=el('article',`crm-ai-exp-result${String(row.id)===selectedResultId?' is-selected':''}`);
+      const pick=el('button','crm-ai-exp-result-pick',`${t('ai_history_source_legacy')} #${row.id}`);pick.type='button';
+      pick.addEventListener('click',()=>{selectedResultId=String(row.id);legacyRows();detailView();});
+      article.append(pick,el('span','crm-ai-exp-state',t('ai_history_read_only')),
+        el('span','crm-ai-exp-muted',`${row.customer_name || t('ai_experience_empty')} · ${row.recommendation_date || ''}`));list.append(article);
+    }
+  }
+  function legacyDetail() {
+    const row=model.legacy.find(item=>String(item.id)===selectedResultId);
+    if(!row){detail.append(el('p','crm-ai-exp-muted',t('ai_experience_no_selection')));return;}
+    detail.append(el('h3','',`${t('ai_history_source_legacy')} #${row.id}`),el('p','crm-ai-exp-current',t('ai_history_readonly_note')),
+      el('p','crm-ai-exp-muted',`${t('ai_history_snapshot_name')}: ${row.customer_name || t('ai_experience_empty')}`));
+    for(const [key,value]of [['ai_history_recommended_on',row.recommendation_date],['ai_history_followup_on',row.suggested_followup_date],
+      ['ai_history_message',row.suggested_message],['ai_history_strategy',row.suggested_strategy]]){
+      if(value)detail.append(el('h4','',t(key)),el('p','crm-ai-exp-legacy-copy',value));
+    }
+    detail.append(el('p','crm-ai-exp-muted',`public.ai_recommendations #${row.id}`));
+    const raw=el('details','crm-ai-exp-raw');raw.append(el('summary','',t('ai_experience_raw_details')),el('pre','crm-ai-exp-output',safeJson(row)));detail.append(raw);
+    const old=el('a','btn',t('ai_history_legacy_tools'));old.href='/crm/admin.html#/ai-suggestions';detail.append(old);
+  }
 
   function taskFor(result) { return model.tasks.find(task => String(task.id) === String(result.task_id)); }
   function latestDecision(resultId) {
@@ -166,6 +216,7 @@ export function renderAiExperience({ root, callFn }) {
   }
   function metricsView() {
     metrics.replaceChildren();
+    if(model.source==='legacy') {metrics.append(el('p','crm-ai-exp-muted',t('ai_history_readonly_note')),refresh);return;}
     const value = model.metrics || {};
     const numerator = Number(value.numerator || 0), denominator = Number(value.denominator || 0);
     metrics.append(el('h3', '', t('ai_experience_metrics')),
@@ -173,9 +224,10 @@ export function renderAiExperience({ root, callFn }) {
       el('span', '', `${t('ai_experience_numerator')}: ${numerator} / ${denominator}`),
       el('span', '', `${t('ai_experience_pending')}: ${Number(value.pending || 0)}`),
       el('p', 'crm-ai-exp-muted', t('ai_experience_window')));
-    metrics.append(refresh);
+    metrics.append(el('p','crm-ai-exp-muted',t('ai_history_metrics_scope')),refresh);
   }
   function resultRows() {
+    if(model.source==='legacy'){legacyRows();return;}
     list.replaceChildren();
     if (!model.results.length) { list.append(el('p', 'crm-ai-exp-muted', t('ai_experience_no_records'))); return; }
     for (const result of model.results) {
@@ -198,12 +250,14 @@ export function renderAiExperience({ root, callFn }) {
   }
   function detailView() {
     detail.replaceChildren();
+    if(model.source==='legacy'){legacyDetail();return;}
     const result = model.results.find(item => String(item.id) === selectedResultId);
     if (!result) { detail.append(el('p', 'crm-ai-exp-muted', t('ai_experience_no_selection'))); return; }
     const task = taskFor(result) || {};
     detail.append(el('h3', '', `${t('ai_experience_result_detail')} #${result.id}`),
       el('p', 'crm-ai-exp-muted', `${t('ai_experience_task')}: ${taskName(task)} · ${taskSubject(task)}`));
     detail.append(readableResult(result, task));
+    detail.append(el('p','crm-ai-exp-muted',t('ai_history_execution_unknown')));
     const current = latestDecision(result.id);
     detail.append(el('p', 'crm-ai-exp-current', `${t('ai_experience_current_decision')}: ${t(current ? `ai_experience_${current.decision}` : 'ai_experience_pending_value')}${current?.created_at ? ` · ${new Date(current.created_at).toLocaleString()}` : ''}`));
     if (typeof current?.reason === 'string' && current.reason.trim()) detail.append(el('p', 'crm-ai-exp-muted', current.reason));
@@ -356,11 +410,12 @@ export function renderAiExperience({ root, callFn }) {
     learningSection.append(form);
   }
   async function work(button, action) {
-    if (button.disabled || location.hash !== PAGE) return;
+    if (button.disabled || loading || saving || model.source==='legacy' || location.hash !== PAGE) return;
+    saving=true; filters.setBusy(true);refresh.disabled=true;
     button.disabled = true;
     try { await action(); }
     catch (_) { message(status, 'ai_experience_save_failed', true); }
-    finally { if (location.hash === PAGE) button.disabled = false; }
+    finally { saving=false;filters.setBusy(loading);refresh.disabled=loading;if (location.hash === PAGE) button.disabled = false; }
   }
   async function showSaved(key, receiptId) {
     const refreshed = await reload({ quiet:true });
@@ -368,27 +423,42 @@ export function renderAiExperience({ root, callFn }) {
     status.className = refreshed ? 'crm-ai-exp-notice' : 'crm-ai-exp-error';
     status.textContent = `${t(key)}${receiptId != null ? ` ${receiptId}` : ''}${refreshed ? '' : ` · ${t('ai_experience_refresh_after_save_failed')}`}`;
   }
-  async function reload({ quiet = false } = {}) {
-    if (location.hash !== PAGE) return false;
+  async function reload({ quiet = false, next = activeFilters } = {}) {
+    if (location.hash !== PAGE || (saving&&!quiet)) return false;
+    const version=++loadVersion;
+    const requested={...next};
+    loading=true;filters.setBusy(true);refresh.disabled=true;detail.inert=true;lower.inert=true;pager.inert=true;
     if (!quiet) message(status, 'ai_experience_loading');
     try {
       const [response] = await Promise.all([
-        api.call('assistant', { action:'aiExperience', operation:'list' }), loadTargets(),
+        api.call('assistant', { action:'aiExperience', operation:'list', filters:requested }),
+        requested.source==='legacy' ? Promise.resolve() : loadTargets(),
       ]);
       validResponse(response);
-      if (location.hash !== PAGE) return false;
-      model = response;
-      if (!model.results.some(result => String(result.id) === selectedResultId)) selectedResultId = String(model.results[0]?.id || '');
-      metricsView(); resultRows(); detailView(); renderOutcome(); renderLearning();
+      if (location.hash !== PAGE || version!==loadVersion) return false;
+      if(response.source && response.source!==requested.source)throw Error('source');
+      if(requested.source==='legacy'&&!Array.isArray(response.legacy))throw Error('legacy');
+      const changed=JSON.stringify(requested)!==JSON.stringify(activeFilters);
+      model = {...response,source:response.source||requested.source,legacy:response.legacy||[]};
+      activeFilters=requested;
+      if(changed) {learningSelection.clear();selectedResultId='';}
+      const visible=model.source==='legacy'?model.legacy:model.results;
+      if (!visible.some(result => String(result.id) === selectedResultId)) selectedResultId = String(visible[0]?.id || '');
+      metricsView(); resultRows(); detailView();paginationView();
+      lower.style.display=model.source==='legacy'?'none':'';
+      if(model.source==='legacy'){outcomeSection.replaceChildren();learningSection.replaceChildren();}
+      else{renderOutcome();renderLearning();}
       if (!quiet) status.textContent = '';
       return true;
     } catch (_) {
-      if (!quiet) message(status, 'ai_experience_load_failed', true);
+      if (!quiet && version===loadVersion) message(status, 'ai_history_load_preserved', true);
       return false;
+    } finally {
+      if(version===loadVersion){loading=false;filters.setBusy(saving);refresh.disabled=saving;detail.inert=false;lower.inert=false;pager.inert=false;}
     }
   }
   refresh.addEventListener('click', () => void reload());
   root.replaceChildren(page);
-  page.append(metrics, status, workspace, lower);
+  page.append(filters.node, metrics, status, workspace, lower);
   void reload();
 }

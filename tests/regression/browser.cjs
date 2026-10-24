@@ -62,6 +62,7 @@ class Browser {
       else if (pathname === '/crm/css/assistant-opportunity-change.css') { res.setHeader('Content-Type', 'text/css; charset=utf-8'); res.end(fs.readFileSync(path.join(this.root, 'crm/css/assistant-opportunity-change.css'))); }
       else if (pathname === '/crm/css/ai-crm-search.css') { res.setHeader('Content-Type', 'text/css; charset=utf-8'); res.end(fs.readFileSync(path.join(this.root, 'crm/css/ai-crm-search.css'))); }
       else if (pathname === '/crm/css/activity-review-v2.css') { res.setHeader('Content-Type', 'text/css; charset=utf-8'); res.end(fs.readFileSync(path.join(this.root, 'crm/css/activity-review-v2.css'))); }
+      else if (pathname === '/crm/css/ai-experience.css') { res.setHeader('Content-Type', 'text/css; charset=utf-8'); res.end(fs.readFileSync(path.join(this.root, 'crm/css/ai-experience.css'))); }
       else if (pathname === '/crm/js/core/api.js' || pathname === '/crm/js/core/feature-flags.js' ||
                pathname === '/crm/js/modules/quick-capture-v2.js') {
         res.setHeader('Content-Type', 'text/javascript; charset=utf-8');
