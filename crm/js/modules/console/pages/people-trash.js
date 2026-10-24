@@ -106,7 +106,8 @@ export function renderPeopleTrash(ctx) {
     pageHead({
       kicker: t('kicker_people_trash'), title: t('title_people_trash'),
       sub: t('sub_people_trash'),
-      actions: [h('a', { class: 'btn btn-ghost', href: '#/people' }, [ic('users'), t('title_people')])],
+      actions: [h('a', { class: 'btn btn-ghost', href: '#/recycle' }, [ic('refresh'), t('trash_hub_back')]),
+        h('a', { class: 'btn btn-ghost', href: '#/people' }, [ic('users'), t('title_people')])],
     }),
     h('section', { class: 'card' }, [
       listEl,

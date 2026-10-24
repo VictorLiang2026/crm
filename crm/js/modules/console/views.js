@@ -2,7 +2,7 @@
 export { renderToday } from './pages/today.js';
 export { renderPeople } from './pages/people.js';
 export { renderPeopleTrash } from './pages/people-trash.js';
-export { renderCustomerTrash, renderRecruitTrash } from './pages/recycle.js';
+export { renderCustomerTrash, renderRecruitTrash, renderRecycleHub } from './pages/recycle.js';
 export { renderPerson } from './pages/person.js';
 export { renderOpportunities } from './pages/opportunities.js';
 export { renderActivities, renderActivity } from './pages/activities.js';

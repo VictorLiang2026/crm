@@ -7,6 +7,28 @@ import { pageHead, emptyNote, loadInto } from '../ui.js';
 import { t } from '../i18n.js';
 
 const PAGE_SIZE = 20;
+export function renderRecycleHub(ctx) {
+  const entries = [
+    ['#/people-trash', 'person_trash_entry'],
+    ['#/recycle/customers', 'customer_trash_entry'],
+    ['#/recycle/recruit', 'recruit_trash_entry'],
+  ];
+  ctx.main.replaceChildren(
+    pageHead({ kicker: t('trash_kicker'), title: t('more_recycle_title'), sub: t('trash_hub_note'),
+      actions: [h('a', { class: 'btn btn-ghost', href: '#/more' }, t('title_more'))] }),
+    h('div', { class: 'tile-grid recycle-hub' }, entries.map(([href, key]) =>
+      h('a', { class: 'tile', href }, [ic('refresh'), h('b', {}, t(key)), h('span', {}, t(key + '_desc'))]))),
+    h('details', { class: 'card card-body recycle-legacy' }, [
+      h('summary', {}, t('trash_legacy_batch')),
+      h('p', { class: 'foot-note' }, t('trash_legacy_batch_note')),
+      h('div', { class: 'more-actions' }, [
+        h('a', { class: 'btn btn-ghost', href: '/crm/admin.html#/customers/trash' }, t('legacy_customers_trash')),
+        h('a', { class: 'btn btn-ghost', href: '/crm/admin.html#/recruit/trash' }, t('legacy_recruit_trash')),
+      ]),
+    ]),
+  );
+}
+
 const COUNT_KEYS = [
   ['followups', 'trash_count_followups'], ['gifts', 'trash_count_gifts'],
   ['photos', 'trash_count_photos'], ['policy_review_reports', 'trash_count_reports'],
@@ -173,7 +195,8 @@ function renderTrash(ctx, kind) {
   ctx.main.replaceChildren(
     pageHead({ kicker: t('trash_kicker'), title: t(recruit ? 'recruit_trash_entry' : 'customer_trash_entry'),
       sub: t(recruit ? 'trash_recruit_sub' : 'trash_customer_sub'),
-      actions: [h('a', { class: 'btn btn-ghost', href: '#/more' }, [ic('grid'), t('title_more')])] }),
+      actions: [h('a', { class: 'btn btn-ghost', href: '#/recycle' }, [ic('refresh'), t('trash_hub_back')]),
+        h('a', { class: 'btn btn-ghost', href: '#/more' }, [ic('grid'), t('title_more')])] }),
     h('section', { class: 'card' }, [
       h('div', { class: 'card-body' }, [form, sort]), list,
       h('div', { class: 'card-foot' }, [totalInfo,

@@ -358,6 +358,7 @@ export function renderMore(ctx) {
     ]),
     h('section', { class: 'more-section' }, [
       sectionTitle(t('more_recycle_title')),
+      h('div', { class: 'more-actions' }, h('a', { class: 'btn btn-ghost', href: '#/recycle' }, t('trash_hub_open'))),
       h('p', { class: 'foot-note', style: 'margin:0 0 12px' }, t('more_recycle_desc')),
       h('div', { class: 'tile-grid' }, [
         moreEntry(recycleEntries[0], 'status_live'),
