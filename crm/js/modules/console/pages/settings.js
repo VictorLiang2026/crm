@@ -97,8 +97,22 @@ function maintenanceCard() {
     body: [
       h('button', {
         class: 'btn btn-ghost', type: 'button',
-        onclick: () => { try { localStorage.removeItem('console__init_ts'); } catch (_) {} location.reload(true); },
+        onclick: () => {
+          if (!window.confirm(t('setting_reload_confirm'))) return;
+          const url = new URL(location.href);
+          url.searchParams.set('_fresh', String(Date.now()));
+          location.replace(url.href);
+        },
       }, [ic('refresh'), t('setting_reload')]),
+      h('p', { class: 'foot-note' }, t('setting_reload_note')),
+      h('details', { class: 'settings-advanced' }, [
+        h('summary', {}, t('setting_advanced_tools')),
+        h('p', { class: 'foot-note' }, t('setting_advanced_note')),
+        h('div', { class: 'more-actions' }, [
+          h('a', { class: 'btn btn-ghost', href: '/crm/admin.html#/account' }, t('legacy_account')),
+          h('a', { class: 'btn btn-ghost', href: '/crm/admin.html#/test-scenario' }, t('legacy_test_scenario')),
+        ]),
+      ]),
     ],
   });
 }
