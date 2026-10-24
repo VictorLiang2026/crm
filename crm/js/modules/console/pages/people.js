@@ -75,6 +75,10 @@ export function renderPeople(ctx) {
   const pageInfo = h('span', { class: 'pager-info' }, '');
   const filterButton = h('button', { class: 'btn btn-dark people-filter-trigger', type: 'button' });
   const customerViewButton = h('button', { class: 'btn btn-soft', type: 'button' });
+  const legacyCustomerTools = h('a', {
+    class: 'btn btn-ghost people-legacy-tools', href: '/crm/admin.html#/customers', hidden: true, style: 'display:none',
+    title: t('people_legacy_tools_note'),
+  }, t('people_legacy_tools'));
   const filterPanel = h('div', { class: 'people-filter-panel', hidden: true });
   const priorityFilters = h('div', { class: 'people-filter-priorities' });
 
@@ -86,6 +90,8 @@ export function renderPeople(ctx) {
   function runQuery() {
     loadInto(listEl, async () => {
       const customerView = state.filters.roles.length === 1 && state.filters.roles[0] === 'customer';
+      legacyCustomerTools.hidden = !customerView;
+      legacyCustomerTools.style.display = customerView ? '' : 'none';
       const res = await data.listPeople(ctx, {
         page: state.page, pageSize: peoplePageSize(), keyword: state.keyword,
         sortField: state.sortField, sortDir: state.sortDir,
@@ -143,12 +149,18 @@ export function renderPeople(ctx) {
             },
           }, t(kind === 'customer' ? 'btn_convert_customer' : 'btn_convert_recruit'));
         const cell = (key, content) => h('td', { class: `people-col-${key}` }, content);
-        const dateCell = (key, value) => cell(key, [
-          h('span', { class: 'people-date-full' }, fmtDate(value)),
-          h('span', { class: 'people-date-mobile', title: fmtDate(value) }, fmtDateShort(value)),
-        ]);
+        const dateCell = (key, value) => {
+          const labels = [
+            h('span', { class: 'people-date-full' }, fmtDate(value)),
+            h('span', { class: 'people-date-mobile', title: fmtDate(value) }, fmtDateShort(value)),
+          ];
+          return cell(key, value && ['latest_followup', 'next_followup'].includes(key)
+            ? h('a', { href: `#/person/${p.id}/timeline`, title: t('people_open_followups'),
+              onclick: event => event.stopPropagation() }, labels)
+            : labels);
+        };
         const cells = [
-          cell('name', h('a', {}, [p.display_name, h('span', { class: 'badge-stack' }, badges)])),
+          cell('name', h('a', { href: `#/person/${p.id}` }, [p.display_name, h('span', { class: 'badge-stack' }, badges)])),
           ...(customerView ? [cell('customer_stage', p.customer_stage ? translateEnum('customer_stage', p.customer_stage) : '-') ] : []),
           cell('customer_priority', p.sales_priority ? translateEnum('sales_priority', p.sales_priority) : '-'),
           cell('recruit_priority', p.recruitment_priority ? translateEnum('sales_priority', p.recruitment_priority) : '-'),
@@ -285,6 +297,7 @@ export function renderPeople(ctx) {
       ]),
       h('div', { class: 'people-filter-anchor' }, [filterButton, filterPanel]),
       customerViewButton,
+      legacyCustomerTools,
       h('a', {
         class: 'btn btn-ghost', href: '#/people-trash',
       }, [ic('trash'), t('btn_trash')]),

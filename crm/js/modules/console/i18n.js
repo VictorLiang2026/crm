@@ -2,6 +2,9 @@
 const DEFAULT = 'zh-CN';
 
 const DICT = {
+  'people_open_followups': { 'zh-CN': '查看跟进时间线', 'en': 'Open follow-up timeline' },
+  'people_legacy_tools': { 'zh-CN': '旧客户经营视图', 'en': 'Legacy Customer Workspace' },
+  'people_legacy_tools_note': { 'zh-CN': '查看旧版经营状态、招募状态及批量工具；不会携带当前人物筛选。', 'en': 'Legacy business/recruitment statuses and batch tools. Current people filters are not carried over.' },
   'capture_focus_intro': { 'zh-CN': '记下一次交流，让 AI 提炼摘要、重要变化和下一步。', 'en': 'Record a conversation. AI drafts a summary, important changes and next steps.' },
   'capture_summary_hint': { 'zh-CN': '保存为一条交流记录，原话完整保留。', 'en': 'Save as one conversation, with the original note preserved.' },
   'capture_memories': { 'zh-CN': '值得记住的信息', 'en': 'Worth remembering' },
