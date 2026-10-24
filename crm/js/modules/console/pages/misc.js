@@ -268,115 +268,71 @@ export function renderAI(ctx) {
   );
 }
 
-// 旧版功能入口：跨页跳转 admin.html 对应路由（console 路由不处理这些 hash）。
-// 整合策略：console 原生等价功能上线后，从 LEGACY_ENTRIES 移除对应项。
+// More uses explicit route kinds; all legacy URLs remain available.
 const LEGACY_ADMIN = '/crm/admin.html';
 const LEGACY_ENTRIES = [
-  ['gear', 'legacy_account', '#/account'],
-  ['file', 'legacy_test_scenario', '#/test-scenario'],
-  ['users', 'legacy_customers', '#/customers'],
-  ['chat', 'legacy_followups', '#/more/followups'],
-  ['target', 'legacy_funnels', '#/funnels'],
-  ['sparkle', 'legacy_ai_suggestions', '#/ai-suggestions'],
-  ['shield', 'legacy_policy_review', '#/more/policy-review'],
-  ['grid', 'legacy_products', '#/more/products'],
-  ['bell', 'legacy_gifts', '#/more/gifts'],
-  ['search', 'legacy_photos', '#/more/photos'],
-  ['mic', 'legacy_speakers', '#/speakers'],
-  ['calendar', 'legacy_topics', '#/topics'],
-  ['recruit', 'legacy_recruit_goals', '#/recruit/goals'],
-  ['clock', 'legacy_activity_customer', '#/activity/customer'],
-  ['target', 'legacy_activity_recruit', '#/activity/recruit'],
-  ['refresh', 'legacy_customers_trash', '#/customers/trash'],
-  ['refresh', 'legacy_recruit_trash', '#/recruit/trash'],
-];
+  ['gear', 'legacy_account', '#/account', 'm17_reason_account'],
+  ['file', 'legacy_test_scenario', '#/test-scenario', 'm17_reason_test'],
+  ['users', 'legacy_customers', '#/customers', 'm17_reason_customers'],
+  ['chat', 'legacy_followups', '#/more/followups', 'm17_reason_followups'],
+  ['target', 'legacy_funnels', '#/funnels', 'm17_reason_funnels'],
+  ['sparkle', 'legacy_ai_suggestions', '#/ai-suggestions', 'm17_reason_ai'],
+  ['shield', 'legacy_policy_review', '#/more/policy-review', 'm17_reason_insurance'],
+  ['grid', 'legacy_products', '#/more/products', 'm17_reason_insurance'],
+  ['bell', 'legacy_gifts', '#/more/gifts', 'm17_reason_care'],
+  ['search', 'legacy_photos', '#/more/photos', 'm17_reason_photos'],
+  ['mic', 'legacy_speakers', '#/speakers', 'm17_reason_resources'],
+  ['calendar', 'legacy_topics', '#/topics', 'm17_reason_resources'],
+  ['recruit', 'legacy_recruit_goals', '#/recruit/goals', 'm17_reason_goals'],
+  ['clock', 'legacy_activity_customer', '#/activity/customer', 'm17_reason_reports'],
+  ['target', 'legacy_activity_recruit', '#/activity/recruit', 'm17_reason_reports'],
+  ['refresh', 'legacy_customers_trash', '#/customers/trash', 'm17_reason_trash'],
+  ['refresh', 'legacy_recruit_trash', '#/recruit/trash', 'm17_reason_trash'],
+].map(([icon, key, hash, reasonKey]) => ({ kind: 'legacy', icon, key, hash, reasonKey }));
 
-const ENTRY_KEYS = Object.fromEntries(LEGACY_ENTRIES.map(entry => [entry[1], entry]));
-const LEGACY_BUSINESS_GROUPS = [
-  ['legacy_customer_group', ['legacy_customers', 'legacy_followups']],
-  ['legacy_activity_group', ['legacy_activity_customer', 'legacy_activity_recruit', 'legacy_speakers', 'legacy_topics']],
-  ['legacy_recruit_group', ['legacy_recruit_goals']],
-];
-
-function moreEntry(entry, status) {
-  const [icon, key, hash] = entry;
-  const href = key === 'knowledge_governance' || hash.startsWith('#/people-trash') || hash.startsWith('#/recycle/')
-    ? hash : LEGACY_ADMIN + hash;
-  return h('a', { class: 'tile', href }, [
-    ic(icon), h('b', {}, t(key)), bdg(t(status), status === 'status_live' ? 'jade' : 'ink'),
-    h('span', {}, t(key + '_desc')),
-  ]);
-}
-
-function moreGroup(titleKey, descriptionKey, entries, actions = null) {
-  return h('section', { class: 'more-section' }, [
-    sectionTitle(t(titleKey)),
-    h('p', { class: 'foot-note', style: 'margin:0 0 12px' }, t(descriptionKey)),
-    h('div', { class: 'tile-grid' }, entries.map(entry => moreEntry(entry, 'status_legacy'))),
-    actions,
+function moreEntry({ kind, icon, key, hash, descKey, reasonKey }) {
+  if (kind !== 'native' && kind !== 'legacy') throw new Error('Invalid More route kind');
+  return h('a', { class: 'tile', href: kind === 'legacy' ? LEGACY_ADMIN + hash : hash, 'data-entry-kind': kind }, [
+    ic(icon), h('b', {}, t(key)),
+    kind === 'legacy' ? bdg(t('status_legacy'), 'ink') : null,
+    h('span', { 'data-entry-description': '' }, t(descKey || key + '_desc')),
+    reasonKey ? h('span', { class: 'foot-note', 'data-compat-reason': '' }, t(reasonKey)) : null,
   ]);
 }
 
 export function renderMore(ctx) {
-  const tiles = [
-    ['#/today', 'home', t('nav_today'), t('tile_today_desc')],
-    ['#/people', 'users', t('nav_people'), t('tile_people_desc')],
-    ['#/opportunities', 'target', t('nav_opportunities'), t('tile_opportunities_desc')],
-    ['#/activities', 'calendar', t('nav_activities'), t('tile_activities_desc')],
-    ['#/recruit', 'recruit', t('nav_recruit'), t('tile_recruit_desc')],
-    ['#/ai', 'sparkle', t('nav_ai'), t('tile_ai_desc')],
-    ['#/settings', 'gear', t('nav_settings'), t('tile_settings_desc')],
-    [null, 'mic', t('nav_quick_record'), t('tile_quick_record_desc')],
+  const primary = [
+    { kind: 'native', icon: 'file', key: 'knowledge_governance', hash: '#/knowledge-governance' },
+    { kind: 'native', icon: 'chart', key: 'm16_title', descKey: 'm16_desc', hash: '#/analytics' },
+    { kind: 'native', icon: 'gear', key: 'nav_settings', descKey: 'tile_settings_desc', hash: '#/settings' },
+    { kind: 'native', icon: 'refresh', key: 'more_recycle_title', descKey: 'trash_hub_note', hash: '#/recycle' },
   ];
-  const systemEntries = [ENTRY_KEYS.legacy_account, ENTRY_KEYS.legacy_test_scenario];
-  const knowledgeEntries = [
-    ['file', 'knowledge_governance', '#/knowledge-governance'],
-    ENTRY_KEYS.legacy_funnels, ENTRY_KEYS.legacy_ai_suggestions, ENTRY_KEYS.legacy_policy_review,
-    ENTRY_KEYS.legacy_products, ENTRY_KEYS.legacy_gifts, ENTRY_KEYS.legacy_photos,
-  ];
-  const recycleEntries = [
-    ['refresh', 'person_trash_entry', '#/people-trash'],
-    ['refresh', 'customer_trash_entry', '#/recycle/customers'],
-    ['refresh', 'recruit_trash_entry', '#/recycle/recruit'],
-  ];
+  const workspaces = [
+    ['home', 'today'], ['users', 'people'], ['target', 'opportunities'],
+    ['calendar', 'activities'], ['recruit', 'recruit'], ['sparkle', 'ai'],
+  ].map(([icon, name]) => ({ kind: 'native', icon, key: 'nav_' + name, descKey: 'tile_' + name + '_desc', hash: '#/' + name }));
+  const shortcuts = h('details', { class: 'more-section more-workspaces', open: window.innerWidth < 768 }, [
+    h('summary', { class: 'section-title', style: 'cursor:pointer;display:list-item;list-style-position:inside;min-height:44px;padding:10px 0' }, t('m17_workspaces')),
+    h('p', { class: 'foot-note' }, t('m17_workspaces_note')),
+    h('div', { class: 'tile-grid' }, [
+      ...workspaces.map(moreEntry),
+      h('button', { class: 'tile', type: 'button', 'data-more-capture': '', onclick: () => openQuickCapture(ctx) }, [
+        ic('mic'), h('b', {}, t('nav_quick_record')), h('span', {}, t('tile_quick_record_desc')),
+      ]),
+    ]),
+  ]);
+  const legacy = h('details', { class: 'more-section more-compat' }, [
+    h('summary', { class: 'section-title', style: 'cursor:pointer;display:list-item;list-style-position:inside;min-height:44px;padding:10px 0' }, t('more_legacy_title')),
+    h('p', { class: 'foot-note' }, t('m17_compat_note')),
+    h('div', { class: 'tile-grid' }, LEGACY_ENTRIES.map(moreEntry)),
+  ]);
   ctx.main.replaceChildren(
     pageHead({ kicker: t('kicker_more'), title: t('title_more'), sub: t('sub_more') }),
-    h('div', { class: 'tile-grid' }, tiles.map(([hash, icon, name, desc]) =>
-      hash
-        ? h('a', { class: 'tile', href: hash }, [ic(icon), h('b', {}, name), h('span', {}, desc)])
-        : h('button', { class: 'tile', type: 'button', onclick: () => openQuickCapture(ctx) }, [ic(icon), h('b', {}, name), h('span', {}, desc)]))),
-    h('div', { style: 'height:16px' }),
-    moreGroup('more_system_title', 'more_system_desc', systemEntries,
-      h('div', { class: 'more-actions' }, h('button', {
-        class: 'btn btn-ghost', type: 'button', onclick: () => ctx.signOut(),
-      }, [ic('logout'), t('setting_signout')]))),
-    h('section', { class: 'more-section' }, [
-      sectionTitle(t('more_knowledge_title')),
-      h('p', { class: 'foot-note', style: 'margin:0 0 12px' }, t('more_knowledge_desc')),
-      h('div', { class: 'tile-grid' }, knowledgeEntries.map(entry => moreEntry(entry,
-        entry[1] === 'knowledge_governance' ? 'status_live' : 'status_legacy'))),
+    h('section', { class: 'more-section more-primary' }, [
+      sectionTitle(t('m17_tools')),
+      h('div', { class: 'tile-grid' }, primary.map(moreEntry)),
     ]),
-    h('section', { class: 'more-section' }, [
-      sectionTitle(t('more_recycle_title')),
-      h('div', { class: 'more-actions' }, h('a', { class: 'btn btn-ghost', href: '#/recycle' }, t('trash_hub_open'))),
-      h('p', { class: 'foot-note', style: 'margin:0 0 12px' }, t('more_recycle_desc')),
-      h('div', { class: 'tile-grid' }, [
-        moreEntry(recycleEntries[0], 'status_live'),
-        ...recycleEntries.slice(1).map(entry => moreEntry(entry, 'status_live')),
-      ]),
-    ]),
-    h('section', { class: 'more-section' }, [
-      sectionTitle(t('more_legacy_title')),
-      h('p', { class: 'foot-note', style: 'margin:0 0 12px' }, t('more_legacy_desc')),
-      ...LEGACY_BUSINESS_GROUPS.map(([titleKey, keys]) => h('div', { class: 'more-business-group' }, [
-        h('h3', { class: 'more-business-title' }, t(titleKey)),
-        h('div', { class: 'tile-grid' }, keys.map(key => moreEntry(ENTRY_KEYS[key], 'status_legacy'))),
-      ])),
-      h('div', { class: 'more-business-group' }, [
-        h('h3', { class: 'more-business-title' }, t('more_legacy_trash_title')),
-        h('div', { class: 'tile-grid' }, [ENTRY_KEYS.legacy_customers_trash, ENTRY_KEYS.legacy_recruit_trash]
-          .map(entry => moreEntry(entry, 'status_legacy'))),
-      ]),
-    ]),
+    shortcuts, legacy,
+    h('div', { class: 'more-actions' }, h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => ctx.signOut() }, [ic('logout'), t('setting_signout')])),
   );
 }

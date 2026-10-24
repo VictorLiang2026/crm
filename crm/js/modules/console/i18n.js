@@ -2,6 +2,23 @@
 const DEFAULT = 'zh-CN';
 
 const DICT = {
+  'm17_tools': { 'zh-CN': '常用工具', 'en': 'Tools' },
+  'm17_workspaces': { 'zh-CN': '工作区捷径与快速记录', 'en': 'Workspaces & Quick Record' },
+  'm17_workspaces_note': { 'zh-CN': '日常工作也可从主导航进入；这里保留活动、招募和AI等全部捷径。', 'en': 'Daily work is also available from the main navigation. All shortcuts, including activities, recruiting and AI, remain here.' },
+  'm17_compat_note': { 'zh-CN': '保留全部旧地址与尚需使用的高级操作。优先使用新工作区，需要以下功能时再打开；不会自动迁移或改写数据。', 'en': 'All legacy URLs and required advanced tools remain available. Prefer the new workspaces and open these entries as needed. No data is automatically migrated or rewritten.' },
+  'm17_reason_account': { 'zh-CN': '保留原因：旧账号维护流程；日常语言、改密和退出已在设置中。', 'en': 'Kept for legacy account care. Language, password changes and sign-out are available in Settings.' },
+  'm17_reason_test': { 'zh-CN': '保留原因：受控虚构场景仍使用旧页和原白名单。', 'en': 'Kept for controlled fictional scenarios using the existing page and allowlist.' },
+  'm17_reason_customers': { 'zh-CN': '保留原因：旧经营状态、招募状态和批量工具。', 'en': 'Kept for legacy business/recruiting statuses and batch tools.' },
+  'm17_reason_followups': { 'zh-CN': '保留原因：跨客户旧跟进入口；日常跟进已在人物时间线。', 'en': 'Kept for the legacy cross-customer entry. Daily follow-ups are in the Person timeline.' },
+  'm17_reason_funnels': { 'zh-CN': '保留原因：完整旧漏斗指标展示；日常汇总可用经营分析。', 'en': 'Kept for the full legacy funnel metrics. Use Business Insights for a daily overview.' },
+  'm17_reason_ai': { 'zh-CN': '保留原因：旧建议原始页面与兼容流程；新AI历史已支持分来源查询。', 'en': 'Kept for original suggestions and compatibility workflows. New AI history supports separate source queries.' },
+  'm17_reason_insurance': { 'zh-CN': '保留原因：原客户保障与检视工具；常用操作已整合到人物保障页。', 'en': 'Kept for original customer coverage and review tools. Common actions are in Person Insurance.' },
+  'm17_reason_care': { 'zh-CN': '保留原因：旧客户关怀入口；人物关怀页沿用相同记录。', 'en': 'Kept for legacy customer care. Person Care uses the same records.' },
+  'm17_reason_photos': { 'zh-CN': '保留原因：旧附件上传和OCR兼容行为；新导入采用原件与草稿分离。', 'en': 'Kept for legacy attachment upload and OCR behavior. New imports separate originals from drafts.' },
+  'm17_reason_resources': { 'zh-CN': '保留原因：旧资源推荐与高级工具；目录维护已在活动资源中。', 'en': 'Kept for legacy resource recommendations and advanced tools. Directory care is in Activity Resources.' },
+  'm17_reason_goals': { 'zh-CN': '保留原因：高级基准与目标反推；日常目标在招募工作区。', 'en': 'Kept for advanced benchmarks and target planning. Daily goals are in the recruit workspace.' },
+  'm17_reason_reports': { 'zh-CN': '保留原因：原报表地址与展示；新工作量报表沿用原统计口径。', 'en': 'Kept for the original report URL and display. New workload reports use the existing definitions.' },
+  'm17_reason_trash': { 'zh-CN': '保留原因：旧批量恢复；日常单项恢复可从统一回收站进入。', 'en': 'Kept for legacy batch restore. Use the unified Recycle Bin for individual restores.' },
   'm16_title': { 'zh-CN': '经营分析', 'en': 'Business Insights' },
   'm16_desc': { 'zh-CN': '查看经营分布、工作量与目标，按需获取解读。', 'en': 'Review stage distributions, workload and goals; request an interpretation when needed.' },
   'm16_customer': { 'zh-CN': '客户经营分布', 'en': 'Customer Stages' },

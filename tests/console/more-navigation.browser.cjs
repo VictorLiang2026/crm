@@ -33,22 +33,23 @@ test('Console More keeps all legacy routes grouped, bilingual, and reachable', a
     await browser.evaluate("localStorage.setItem('crm_lang', 'en')");
     await browser.openConsole('#/more', 'authCase=1');
     await browser.wait("document.querySelector('#console-main .more-section')");
+    await browser.evaluate("document.querySelector('.more-workspaces').open=true;document.querySelector('.more-compat').open=true");
 
     const english = await browser.evaluate(`({
       headings: [...document.querySelectorAll('#console-main .more-section > .section-title')].map(x => x.innerText.trim()),
       legacyHrefs: [...document.querySelectorAll('#console-main a[href^="/crm/admin.html#"]')].map(x => x.getAttribute('href')).sort(),
       legacyStatusCount: [...document.querySelectorAll('#console-main a[href^="/crm/admin.html#"]')].filter(x => x.innerText.includes('Legacy')).length,
       subtitle: document.querySelector('#console-main .page-sub')?.innerText,
-      currentRecycle: document.querySelector('#console-main a[href="#/people-trash"]')?.innerText,
+      currentRecycle: document.querySelector('#console-main a[href="#/recycle"]')?.innerText,
       quickRecord: document.querySelector('#console-main .tile-grid button')?.innerText,
       signOut: document.querySelector('#console-main .more-actions button')?.innerText,
       nav: [...document.querySelectorAll('.console-nav .nav-item')].map(x => x.getAttribute('href')),
     })`);
-    assert.deepEqual(english.headings, ['System & Account', 'Knowledge & Strategy', 'Recycle Bin', 'Legacy Compatibility']);
+    assert.deepEqual(english.headings, ['Tools', 'Workspaces & Quick Record', 'Legacy Compatibility']);
     assert.deepEqual(english.legacyHrefs, LEGACY_ROUTES.map(([hash]) => '/crm/admin.html' + hash).sort());
     assert.equal(english.legacyStatusCount, 17);
     assert.equal(english.subtitle, 'Workspaces, system tools, and compatibility links.');
-    assert.match(english.currentRecycle || '', /Person Recycle Bin/);
+    assert.match(english.currentRecycle || '', /Recycle Bin/);
     assert.match(english.quickRecord || '', /confirm the Person/);
     assert.match(english.signOut || '', /Sign Out/);
     assert.deepEqual(english.nav, ['#/today', '#/people', '#/opportunities', '#/activities', '#/recruit', '#/ai', '#/more']);
@@ -56,8 +57,9 @@ test('Console More keeps all legacy routes grouped, bilingual, and reachable', a
     await browser.evaluate("localStorage.setItem('crm_lang', 'zh-CN')");
     await browser.openConsole('#/more', 'authCase=1');
     await browser.wait("document.querySelector('#console-main')?.innerText.includes('旧版兼容') === true");
+    await browser.evaluate("document.querySelector('.more-workspaces').open=true;document.querySelector('.more-compat').open=true");
     const chinese = await browser.evaluate("document.querySelector('#console-main').innerText");
-    for (const label of ['工作区域、系统工具与兼容入口。', '系统与账号', '知识与策略', '回收站', '旧版兼容', '客户经营', '活动与内容', '组织发展', 'Person 回收站', '旧版']) {
+    for (const label of ['工作区域、系统工具与兼容入口。', '常用工具', '知识与话术', '经营分析', '回收站', '旧版兼容', '工作区捷径与快速记录', '保留原因', '旧版']) {
       assert.ok(chinese.includes(label), `Missing Chinese label: ${label}`);
     }
     assert.equal(/WP[0-9]/.test(chinese), false);
@@ -81,6 +83,7 @@ test('Console More keeps all legacy routes grouped, bilingual, and reachable', a
       await browser.wait("document.querySelector('#console-main .more-section')");
       const selector = `a[href="/crm/admin.html${hash}"]`;
       const clickResult = await browser.evaluate(`(() => {
+        document.querySelector('.more-compat').open=true;
         const target = ${JSON.stringify('/crm/admin.html' + hash)};
         const link = [...document.querySelectorAll('#console-main a')].find(a => a.getAttribute('href') === target);
         if (!link) return { missing: target, path: location.pathname, hash: location.hash,
@@ -99,7 +102,9 @@ test('Console More keeps all legacy routes grouped, bilingual, and reachable', a
 
     await browser.openConsole('#/more', 'authCase=1');
     await browser.wait("document.querySelector('#console-main .more-section')");
-    await browser.evaluate("document.querySelector('#console-main a[href=\"#/people-trash\"]').click()");
+    await browser.evaluate("document.querySelector('#console-main a[href=\"#/recycle\"]').click()");
+    await browser.wait("document.querySelector('.recycle-hub')");
+    await browser.evaluate("document.querySelector('.recycle-hub a[href=\"#/people-trash\"]').click()");
     await browser.wait("location.hash === '#/people-trash' && document.querySelector('#console-main')?.innerText.includes('回收站')");
     await browser.openConsole('#/more', 'authCase=1');
     await browser.wait("document.querySelector('#console-main .more-section')");
