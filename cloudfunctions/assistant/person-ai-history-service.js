@@ -69,6 +69,15 @@ function nbaView(value) {
 async function getPersonAIHistory(event, { read = restGet } = {}) {
   const personId = String(event?.personId || '').trim();
   if (!positiveId(personId)) { const error = new Error('personId must be a positive integer'); error.code = 'INVALID_INPUT'; throw error; }
+  // Opt-in paged contract; requests without filters retain the original generated/legacy projection.
+  if (Object.hasOwn(event, 'filters')) {
+    const { validateHistory, readAIHistory } = require('./ai-history-query');
+    const filters = validateHistory(event.filters);
+    if (filters.personId && filters.personId !== personId) {
+      const error = new Error('Person filter mismatch'); error.code = 'INVALID_INPUT'; throw error;
+    }
+    return { ok:true, format:'paged-v1', ...(await readAIHistory({...filters,personId},{read})) };
+  }
   const people = await read('persons', { select: 'id', id: `eq.${personId}`, deleted_at: 'is.null', limit: 1 });
   if (!Array.isArray(people) || !people.length) { const error = new Error('Person not found'); error.code = 'NOT_FOUND'; throw error; }
   const [tasks, customers] = await Promise.all([

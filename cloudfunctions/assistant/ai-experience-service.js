@@ -77,6 +77,8 @@ async function runAiExperience(event, actorUid, deps = {}) {
       typeof event.operation !== 'string') fail();
   const data = deps.data || createAiExperienceData({ env: process.env.TCB_ENV, key: process.env.CRM_ASSISTANT_DB_API_KEY });
   if (event.operation === 'list' && exact(event, ['action','operation'])) return { ok:true, ...(await data.list()) };
+  if (event.operation === 'list' && exact(event, ['action','operation','filters']))
+    return { ok:true, ...(await data.history(require('./ai-history-query').validateHistory(event.filters))) };
   if (event.operation === 'targets' && exact(event, ['action','operation'])) return { ok:true, ...(await data.targets()) };
   if (event.operation === 'decide') return { ok:true, ...(await data.decide(validateDecision(event, actorUid))) };
   if (event.operation === 'outcome') return { ok:true, ...(await data.outcome(validateOutcome(event, actorUid))) };

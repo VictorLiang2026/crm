@@ -26,7 +26,7 @@ function commandInput(event, allowed) {
 }
 // Preserve the strict AI Experience contract while excluding CloudBase transport metadata.
 const AI_EXPERIENCE_FIELDS = Object.freeze({
-  list: ['action','operation'],
+  list: ['action','operation','filters'],
   targets: ['action','operation'],
   decide: ['action','operation','eventId','aiResultId','decision','reason','editDelta'],
   outcome: ['action','operation','idempotencyKey','targetType','targetId','aiResultId','result','occurredAt','evidence'],
@@ -318,7 +318,7 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
         return await require('./ai-experience-service').runAiExperience(input, identity.uid);
       }
       catch (error) {
-        const code = ['INVALID_INPUT','PERSISTENCE_ERROR','STALE','TIMEOUT'].includes(error?.code)
+        const code = ['INVALID_INPUT','NOT_FOUND','PERSISTENCE_ERROR','STALE','TIMEOUT'].includes(error?.code)
           ? error.code : 'AI_EXPERIENCE_FAILED';
         return { ok:false,error:{code,message:'AI Experience request could not be completed'} };
       }

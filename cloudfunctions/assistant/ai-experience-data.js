@@ -102,6 +102,18 @@ function createAiExperienceData({ env, key, fetchImpl = fetch } = {}) {
 
   return {
     list,
+    history: async filters => {
+      const result = await require('./ai-history-query').readAIHistory(filters, {
+        read: (table, query) => request(table, 'GET', query),
+      });
+      if (result.source === 'runtime') {
+        const response = await rpc('crm_ai_experience_metrics_v1', { p_window_days: 30 });
+        result.metrics = Array.isArray(response) ? response[0] : response;
+        if (!result.metrics || typeof result.metrics !== 'object') throw new Error('Invalid AI decision metrics');
+        result.metricsScope = {windowDays:30,filtered:false};
+      }
+      return result;
+    },
     targets,
     decide: input => rpc('crm_ai_experience_decide_v1', {
       p_actor_uid: input.actorUid, p_event_id: input.eventId, p_ai_result_id: input.aiResultId,
