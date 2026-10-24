@@ -75,6 +75,9 @@ exports.main = async (event, context) => {
     }
     if (action === 'quick_capture') return await quickCapture(event);
 
+    // M08 is a pure draft parser. Legacy parsing and Quick Capture keep their timeout/contract.
+    const parseTimeout = action === 'parse_import_draft' ? 45000 : 120000;
+
     const text = ((event && event.text) || '').trim();
     // 组装多图数组：优先 images，兼容旧的单图入参
     let images = (event && Array.isArray(event.images)) ? event.images : [];
@@ -100,14 +103,14 @@ exports.main = async (event, context) => {
         { role: 'system', content: SYSTEM_VISION },
         { role: 'user', content: content },
       ];
-      const res = await generateText(messages, { timeout: 120000, model: VISION_MODEL });
+      const res = await generateText(messages, { timeout: parseTimeout, model: VISION_MODEL });
       raw = res.text;
     } else {
       const messages = [
         { role: 'system', content: SYSTEM },
         { role: 'user', content: text },
       ];
-      const res = await generateText(messages, { timeout: 120000 });
+      const res = await generateText(messages, { timeout: parseTimeout });
       raw = res.text;
     }
 

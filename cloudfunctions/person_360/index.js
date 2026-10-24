@@ -22,6 +22,7 @@ const { HouseholdService } = require('./household-service');
 const { RelationshipService } = require('./relationship-service');
 const { RelationshipNetworkService } = require('./relationship-network-service');
 const { OcrReviewService } = require('./ocr-review-service');
+const { FileImportService } = require('./file-import-service');
 const { RecruitDirectoryService } = require('./recruit-directory-service');
 const { RecruitCandidateService } = require('./recruit-candidate-service');
 const aiStandards = require('./ai');
@@ -147,7 +148,7 @@ async function pgRpc(name, body) {
     'crm_relationship_preview_v1','crm_relationship_execute_v1',
     'crm_ocr_parse_preview_v1','crm_ocr_parse_undo_preview_v1','crm_ocr_parse_execute_v1',
     'crm_recruit_candidate_create_v1','crm_recruit_candidate_transition_v1','crm_recruit_coach_outcome_v1',
-    'crm_knowledge_review_v1','crm_proactive_coach_decision_v1']).has(name)) throw new Error('Invalid RPC');
+    'crm_knowledge_review_v1','crm_proactive_coach_decision_v1','crm_file_import_v1']).has(name)) throw new Error('Invalid RPC');
   const env = process.env.TCB_ENV;
   const key = process.env.CRM_PERSON360_DB_API_KEY;
   if (!/^crm-[a-z0-9]+$/.test(env || '') || !key) throw new Error('Person 360 is not configured');
@@ -1056,6 +1057,21 @@ exports.main = async event => {
         });
       }
       case 'getInsuranceContext': return await service.getInsuranceContext(event.personId);
+      case 'saveFileOriginal':
+        return await new FileImportService({rpc:pgRpc}).save(event.data,uid);
+      case 'listFileImports':
+        return await new FileImportService({rpc:pgRpc}).list(event.personId,event.page,uid);
+      case 'parseFileDraft':
+        return await new FileImportService({rpc:pgRpc,parse:async data=>{
+          let timer;
+          try {
+            const response=await Promise.race([
+              app.callFunction({name:'ai_parse',data}),
+              new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error('PARSE_FAILED')),60000);}),
+            ]);
+            return typeof response.result==='string'?JSON.parse(response.result):response.result;
+          } finally {clearTimeout(timer);}
+        }}).parseDraft(event.jobId,uid);
       case 'listOcrParseCommands':
         return await new OcrReviewService({request:pgRequest,rpc:pgRpc,
           resolveName:name=>new PersonService({request:pgRequest}).resolveName(name)})
