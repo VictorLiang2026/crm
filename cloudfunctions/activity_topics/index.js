@@ -17,6 +17,7 @@
 'use strict';
 
 const { rdb, normFields, assertOk, nowIso } = require('./db');
+const { directoryPage } = require('./resource-directory');
 
 const TP_FIELDS = ['topic_name', 'category', 'description', 'target_audience',
   'keywords', 'status', 'ai_summary', 'notes'];
@@ -27,6 +28,7 @@ exports.main = async (event, context) => {
     const action = (event && event.action) || '';
     switch (action) {
       case 'list':    return await list(event);
+      case 'directory': return await directory(event);
       case 'get':     return await get(event);
       case 'create':  return await create(event);
       case 'update':  return await update(event);
@@ -83,6 +85,20 @@ async function list(event) {
   const kw = String(event.keyword || '').trim().toLowerCase();
   if (kw) rows = rows.filter(function (t) { return topicMatches(t, kw); });
   return { rows: rows };
+}
+
+async function directory(event) {
+  if (event.stage) throw new Error('Topic directory has no relationship stage');
+  return directoryPage(event, {
+    read: async (options, offset, count) => {
+      let q = rdb.from('activity_topics').select().is('deleted_at', null);
+      if (options.status) q = q.eq('status', options.status);
+      const result = assertOk(await q.order('updated_at', { ascending: false })
+        .order('id', { ascending: false }).range(offset, offset + count - 1));
+      return result.data || [];
+    },
+    matches: topicMatches,
+  });
 }
 
 async function get(event) {

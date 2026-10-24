@@ -5,7 +5,7 @@
  * 做法：拦截 cloudfunctions/activity_speakers/db.js 本地副本，注入内存 RDB，
  *       直接运行真实 index.js main()，断言：
  *   1) enrichIdentity（裁决①）：name/phone/wechat/organization 从 Person 优先读，
- *      person 有值时覆盖原值，person_id 缺失时回退原值；
+ *      person 有值时覆盖原值，person_id 缺失时仅 name 回退；已退出的基础信息副本不回退；
  *      新增 linked_person={id,name} 字段；linked_customer/linked_recruit 保持不变；
  *   2) create（裁决②）：去掉自动建 Person+customers 分支，只写 activity_speakers 行；
  *      未传 customer_id 返回 customer_id:null；不调用 customers/persons 表 insert；
@@ -178,15 +178,15 @@ test('T2 enrichIdentity: phone/wechat/organization 从 Person 优先读（覆盖
   assert.equal(s101.organization, 'Person机构', 'organization 取 person.organization');
 });
 
-test('T3 enrichIdentity: person_id 为空时回退原值（name/phone/wechat/organization 用原值）', async () => {
+test('T3 enrichIdentity: 未关联 Person 仅保留旧姓名，不回退已退出的基础信息副本', async () => {
   harness.db = baseDb();
   const res = await speakerFn.main({ action: 'list' });
   const s102 = res.rows.find(r => r.id === 102);
   assert.ok(s102, 'list 返回 speaker 102');
   assert.equal(s102.name, '独立嘉宾', 'name 回退原值');
-  assert.equal(s102.phone, '13900001234', 'phone 回退原值');
-  assert.equal(s102.wechat, 'wx_indep', 'wechat 回退原值');
-  assert.equal(s102.organization, '独立机构', 'organization 回退原值');
+  assert.equal(s102.phone, null, 'phone 只取 Person，不采用夹具中的旧副本');
+  assert.equal(s102.wechat, null, 'wechat 只取 Person，不采用夹具中的旧副本');
+  assert.equal(s102.organization, null, 'organization 只取 Person，不采用夹具中的旧副本');
 });
 
 test('T4 enrichIdentity: 返回 linked_person 字段（有 person_id 非空，无则 null）', async () => {

@@ -177,6 +177,11 @@ export const data = {
     action: 'removeConsole', id: Number(id), expectedUpdatedAt, expectedParticipantRows,
   }),
   activityTopics: (ctx) => call(ctx, 'activity_topics', { action: 'list' }),
+  resourceDirectory: (ctx, kind, { keyword = '', status = '', page = 1, pageSize = 20 } = {}) => {
+    if (!['speaker', 'topic'].includes(kind)) throw new Error('Invalid resource kind');
+    return call(ctx, kind === 'speaker' ? 'activity_speakers' : 'activity_topics',
+      { action: 'directory', keyword, status, page, pageSize });
+  },
   createActivityTopic: (ctx, payload) => call(ctx, 'activity_topics', { action: 'create', data: payload }),
   updateActivityTopic: (ctx, id, payload) => call(ctx, 'activity_topics', { action: 'update', id: Number(id), data: payload }),
   previewRemoveTopic: (ctx, id) => call(ctx, 'activity_topics', { action: 'previewRemoveConsole', id: Number(id) }),

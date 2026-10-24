@@ -6,6 +6,7 @@ export { renderCustomerTrash, renderRecruitTrash, renderRecycleHub } from './pag
 export { renderPerson } from './pages/person.js';
 export { renderOpportunities } from './pages/opportunities.js';
 export { renderActivities, renderActivity } from './pages/activities.js';
+export { renderResourceDirectory } from './activity-people.js';
 export { renderRecruit } from './pages/recruit.js';
 export { renderRecruitGoals } from './recruit-goals.js';
 export { renderActivityReport } from './activity-report.js';

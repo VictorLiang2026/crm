@@ -81,6 +81,7 @@ export function renderActivities(ctx) {
       kicker: 'ACTIVITIES', title: t('title_activities'), tag: wpTag(t('act_manage_tag')),
       sub: t('sub_activities'),
       actions: [
+        h('a', { class: 'btn btn-ghost', href: '#/activity-resources' }, t('resource_directory_title')),
         h('button', { class: 'btn btn-ghost', type: 'button', title: t('act_daily_report'), onclick: () => {
           const range = selectedDate ? `?startDate=${selectedDate}&endDate=${selectedDate}` : '';
           location.hash = `#/activity-report/customer${range}`;

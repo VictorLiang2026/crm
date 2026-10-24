@@ -1520,6 +1520,18 @@ const DICT = {
   'act_tab_review': { 'zh-CN': '复盘', 'en': 'Review' },
   'act_tab_resources': { 'zh-CN': '嘉宾与主题', 'en': 'Resources' },
   'act_resources_note': { 'zh-CN': '嘉宾资料与主题由对应资源池维护。到场只记录签到状态；不会自动创建有效互动。', 'en': 'Speaker profiles and topics use their resource pools. Check-in records attendance only; it never creates a substantive interaction.' },
+  'resource_directory_title': { 'zh-CN': '嘉宾与主题', 'en': 'Speakers & Topics' },
+  'resource_directory_note': { 'zh-CN': '独立维护可复用的活动资源；选择类型和条件后查询。搜索按服务端匹配结果分页。', 'en': 'Manage reusable resources without an activity. Choose a type and filters; results are searched and paged on the server.' },
+  'resource_directory_kind': { 'zh-CN': '资源类型', 'en': 'Resource Type' },
+  'resource_directory_search': { 'zh-CN': '搜索名称、机构、专业或关键词', 'en': 'Search name, organization, expertise or keywords' },
+  'resource_directory_status': { 'zh-CN': '资源状态', 'en': 'Resource Status' },
+  'resource_directory_all': { 'zh-CN': '全部状态', 'en': 'All Statuses' },
+  'resource_directory_page': { 'zh-CN': '第 {page} 页', 'en': 'Page {page}' },
+  'resource_directory_invalid': { 'zh-CN': '资源查询返回不完整，请重试。', 'en': 'Incomplete directory response. Please retry.' },
+  'resource_directory_limit': { 'zh-CN': '匹配扫描达到上限，请缩小状态或搜索范围后重试。结果未被当作完整列表显示。', 'en': 'Search reached its scan limit. Narrow the status or search criteria and retry; incomplete results are not shown as complete.' },
+  'resource_directory_retry': { 'zh-CN': '重试当前查询', 'en': 'Retry Current Query' },
+  'resource_directory_legacy': { 'zh-CN': '旧版资源与 AI 推荐', 'en': 'Legacy Resources & AI Recommendations' },
+  'resource_directory_legacy_note': { 'zh-CN': '旧版推荐和高级工具继续保留在以下入口。', 'en': 'Existing recommendations and advanced tools remain available here.' },
   'act_attendance_not_interaction': { 'zh-CN': '签到只记录邀约、到场或缺席，不代表有效交流，也不会自动新增互动记录。', 'en': 'Check-in records invited, attended, or absent only. It does not prove a substantive conversation or create an Interaction.' },
   'act_participant_add': { 'zh-CN': '添加参与者', 'en': 'Add Participant' },
   'act_participant_add_title': { 'zh-CN': '添加活动参与者', 'en': 'Add Activity Participant' },
@@ -2565,6 +2577,11 @@ export const ENUM_I18N = {
   // 事实类别（context_items.category，系统英文 key）
   fact_category: {
     'quick_capture': 'fact_cat_quick_capture', 'manual': 'fact_cat_manual',
+  },
+  speaker_stage: {
+    new: 'act_speaker_stage_new', contacted: 'act_speaker_stage_contacted',
+    cooperated: 'act_speaker_stage_cooperated', stable: 'act_speaker_stage_stable',
+    deep: 'act_speaker_stage_deep', inactive: 'act_speaker_stage_inactive',
   },
   // write.js opportunity advance options (superset of opportunity_status)
   opportunity_stage: {

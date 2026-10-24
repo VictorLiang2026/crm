@@ -15,6 +15,7 @@
 'use strict';
 
 const { rdb, normFields, assertOk, nowIso } = require('./db');
+const { directoryPage } = require('./resource-directory');
 
 const SP_FIELDS = ['name', 'position', 'relationship_stage',
   'expertise', 'topic_summary', 'last_contact_date', 'next_contact_date', 'last_contact_note',
@@ -27,6 +28,7 @@ exports.main = async (event, context) => {
     const action = (event && event.action) || '';
     switch (action) {
       case 'list':    return await list(event);
+      case 'directory': return await directory(event);
       case 'get':     return await get(event);
       case 'create':  return await create(event);
       case 'update':  return await update(event);
@@ -81,7 +83,7 @@ async function matchingPersonIds(kw) {
 }
 
 // 身份合并（PMC-13：Person 优先读基础信息，customers 回退；弱关联只读展示，失败不阻塞主流程）
-async function enrichIdentity(rows) {
+async function enrichIdentity(rows, strict = false) {
   if (!rows || !rows.length) return rows;
   var pids = [], cids = [], rids = [];
   rows.forEach(function (r) {
@@ -97,7 +99,7 @@ async function enrichIdentity(rows) {
         .select('id, display_name, phone, wechat, organization, occupation')
         .in('id', pids).is('deleted_at', null));
       (pr.data || []).forEach(function (p) { pmap[p.id] = p; });
-    } catch (e) { /* Person 合并失败不阻塞 */ }
+    } catch (e) { if (strict) throw e; /* Legacy Person 合并失败不阻塞 */ }
   }
   if (cids.length) {
     try {
@@ -143,6 +145,22 @@ async function list(event) {
   if (event.stage) q = q.eq('relationship_stage', event.stage);
   const r = assertOk(await q.order('updated_at', { ascending: false }).limit(100));
   return { rows: await enrichIdentity(r.data || []) };
+}
+
+async function directory(event) {
+  return directoryPage(event, {
+    read: async (options, offset, count) => {
+      let q = rdb.from('activity_speakers').select().is('deleted_at', null);
+      if (options.status) q = q.eq('status', options.status);
+      if (options.stage) q = q.eq('relationship_stage', options.stage);
+      const result = assertOk(await q.order('updated_at', { ascending: false })
+        .order('id', { ascending: false }).range(offset, offset + count - 1));
+      return result.data || [];
+    },
+    enrich: rows => enrichIdentity(rows, true),
+    matches: (row, keyword) => [row.name, row.organization, row.phone, row.position,
+      row.expertise, row.topic_summary, row.notes].some(value => String(value || '').toLowerCase().includes(keyword)),
+  });
 }
 
 async function get(event) {

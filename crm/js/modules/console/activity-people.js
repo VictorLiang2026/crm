@@ -2,7 +2,7 @@ import { h } from './dom.js';
 import { data } from './data.js';
 import { openSheet } from './write.js';
 import { t, translateEnum } from './i18n.js';
-import { bdg, emptyNote, sectionTitle } from './ui.js';
+import { bdg, emptyNote, sectionTitle, pageHead } from './ui.js';
 
 const PARTICIPANT_TYPES = ['customer', 'recruit', 'speaker'];
 const PARTICIPANT_STATUSES = ['invited', 'attended', 'absent'];
@@ -449,20 +449,60 @@ function renderTopicAssignment(ctx, activity, topics, onDone) {
   ]);
 }
 
-export async function renderActivityResources(ctx, activityId, onDone) {
-  const root = h('div', { class: 'tab-stack act-resources' }, [h('p', { class: 'muted' }, t('act_resources_note'))]);
+export function renderResourceDirectory(ctx) {
+  const state = { kind: 'speaker', keyword: '', status: '', page: 1, pageSize: 20 };
+  const host = h('div', { class: 'resource-directory-results' });
+  const kind = select([['speaker', t('act_speakers_title')], ['topic', t('act_topics_title')]], state.kind);
+  kind.setAttribute('aria-label', t('resource_directory_kind'));
+  const keyword = input('search', '', { placeholder: t('resource_directory_search'), 'aria-label': t('resource_directory_search'), maxlength: '120' });
+  const status = select([['', t('resource_directory_all')], ['active', t('act_resource_active')], ['inactive', t('act_resource_inactive')]], '');
+  status.setAttribute('aria-label', t('resource_directory_status'));
+  let request = 0;
+  async function load() {
+    const version = ++request;
+    host.replaceChildren(h('p', { class: 'muted' }, t('loading')));
+    const node = await renderActivityResources(ctx, null, load, { ...state });
+    if (version === request && host.isConnected) host.replaceChildren(node);
+  }
+  const form = h('form', { class: 'more-actions', onsubmit: event => {
+    event.preventDefault(); state.kind = kind.value; state.keyword = keyword.value.trim();
+    state.status = status.value; state.page = 1; load();
+  } }, [kind, keyword, status, h('button', { class: 'btn btn-primary', type: 'submit' }, t('pc21_query'))]);
+  ctx.main.replaceChildren(
+    pageHead({ title: t('resource_directory_title'), sub: t('resource_directory_note'),
+      actions: [h('a', { class: 'btn btn-ghost', href: '#/activities' }, t('title_activities'))] }),
+    form, host,
+    h('details', { class: 'card card-body' }, [h('summary', {}, t('resource_directory_legacy')),
+      h('p', { class: 'foot-note' }, t('resource_directory_legacy_note')),
+      h('div', { class: 'more-actions' }, [
+        h('a', { class: 'btn btn-ghost', href: '/crm/admin.html#/speakers' }, t('act_speakers_title')),
+        h('a', { class: 'btn btn-ghost', href: '/crm/admin.html#/topics' }, t('act_topics_title')),
+      ]),
+    ]),
+  );
+  load();
+}
+
+export async function renderActivityResources(ctx, activityId, onDone, directory = null) {
+  const root = h('div', { class: 'tab-stack act-resources' }, [h('p', { class: 'muted' }, t(directory ? 'resource_directory_note' : 'act_resources_note'))]);
   try {
-    const [detail, speakerResult, topicResult] = await Promise.all([
+    const showSpeakers = !directory || directory.kind === 'speaker';
+    const showTopics = !directory || directory.kind === 'topic';
+    const [detail, speakerResult, topicResult] = directory ? [null,
+      showSpeakers ? await data.resourceDirectory(ctx, 'speaker', directory) : { rows: [] },
+      showTopics ? await data.resourceDirectory(ctx, 'topic', directory) : { rows: [] },
+    ] : await Promise.all([
       data.activityDetail(ctx, activityId), data.activitySpeakers(ctx), data.activityTopics(ctx),
     ]);
-    if (!detail.activity) throw new Error(t('act_activity_not_found'));
-    const refresh = () => renderActivityResources(ctx, activityId, onDone).then(node => root.replaceWith(node)).catch(() => {});
+    if (!directory && !detail.activity) throw new Error(t('act_activity_not_found'));
+    const refresh = () => renderActivityResources(ctx, activityId, onDone, directory).then(node => root.replaceWith(node)).catch(() => {});
     const speakers = speakerResult.rows || [], topics = topicResult.rows || [];
+    if (showSpeakers) {
     root.append(sectionTitle(t('act_speakers_title'), h('button', { class: 'btn btn-primary btn-sm', type: 'button', onclick: () => openSpeakerEditor(ctx, null, refresh) }, t('act_speaker_add'))));
     root.append(speakers.length ? h('div', {}, speakers.map(speaker => h('article', { class: 'list-row act-resource-row' }, [
       h('div', { class: 'act-resource-main' }, [h('div', { class: 'row-title' }, [speaker.linked_person
         ? h('a', { href: `#/person/${speaker.linked_person.id}`, class: 'act-person-link' }, speaker.linked_person.name)
-        : h('span', {}, speaker.name), bdg(speaker.relationship_stage || 'new', 'ink'),
+        : h('span', {}, speaker.name), bdg(translateEnum('speaker_stage', speaker.relationship_stage || 'new'), 'ink'),
         bdg(t(speaker.status === 'active' ? 'act_resource_active' : 'act_resource_inactive'), speaker.status === 'active' ? 'jade' : 'gray')]),
         h('div', { class: 'row-sub' }, [speaker.position, speaker.organization, speaker.expertise].filter(Boolean).join(' · ') || t('act_speaker_profile_empty')),
         speaker.topic_summary ? h('div', { class: 'row-sub' }, speaker.topic_summary) : null,
@@ -481,8 +521,10 @@ export async function renderActivityResources(ctx, activityId, onDone) {
       ]),
     ]))) : emptyNote(t('act_speakers_empty'), t('act_speakers_empty_note')));
 
+    }
+    if (showTopics) {
     root.append(sectionTitle(t('act_topics_title'), h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => openTopicEditor(ctx, null, refresh) }, t('act_topic_add'))));
-    root.append(renderTopicAssignment(ctx, detail.activity, topics, refresh));
+    if (!directory) root.append(renderTopicAssignment(ctx, detail.activity, topics, refresh));
     root.append(h('div', { class: 'act-topic-catalog' }, topics.map(topic => h('article', { class: 'list-row act-resource-row' }, [
       h('div', { class: 'act-resource-main' }, [h('div', { class: 'row-title' }, [h('span', {}, topic.topic_name),
         bdg(t(topic.status === 'active' ? 'act_resource_active' : 'act_resource_inactive'), topic.status === 'active' ? 'jade' : 'gray')]),
@@ -500,6 +542,29 @@ export async function renderActivityResources(ctx, activityId, onDone) {
         } }, t('act_resource_remove')),
       ]),
     ]))));
-  } catch (error) { root.append(emptyNote(t('act_load_failed'), errorText(error))); }
+    if (directory && !topics.length) root.append(emptyNote(t('act_topics_empty'), t('act_topics_empty_note')));
+    }
+    if (directory) {
+      const result = showSpeakers ? speakerResult : topicResult;
+      if (!Array.isArray(result.rows) || typeof result.hasMore !== 'boolean') throw new Error(t('resource_directory_invalid'));
+      const move = delta => {
+        root.querySelectorAll('.pager button').forEach(button => { button.disabled = true; });
+        renderActivityResources(ctx, activityId, onDone, { ...directory, page: directory.page + delta })
+          .then(node => root.replaceWith(node));
+      };
+      root.append(h('div', { class: 'pager' }, [
+        h('button', { class: 'btn btn-ghost', type: 'button', disabled: directory.page <= 1, onclick: () => move(-1) }, t('btn_prev')),
+        h('span', { class: 'pager-info' }, t('resource_directory_page').replace('{page}', String(directory.page))),
+        h('button', { class: 'btn btn-ghost', type: 'button', disabled: !result.hasMore, onclick: () => move(1) }, t('btn_next')),
+      ]));
+    }
+  } catch (error) {
+    const message = String(error?.message || '').includes('RESOURCE_SEARCH_LIMIT') ? t('resource_directory_limit') : errorText(error);
+    if (directory) root.replaceChildren(emptyNote(t('act_load_failed'), message),
+      h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => {
+        renderActivityResources(ctx, activityId, onDone, directory).then(node => root.replaceWith(node));
+      } }, t('resource_directory_retry')));
+    else root.append(emptyNote(t('act_load_failed'), message));
+  }
   return root;
 }

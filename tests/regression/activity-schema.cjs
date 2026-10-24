@@ -25,7 +25,10 @@ function harness(name){
  for(const method of ['insert','update'])q[method]=p=>{operation=method;payload=p;return q;};
  for(const method of ['delete','upsert'])q[method]=()=>{throw Error('Unexpected write '+table);};return q;}};
  const exports={};const db={rdb,assertOk:r=>{if(r.error)throw Error(r.error.message);return r;},normFields:(v,fields)=>Object.fromEntries(Object.entries(v).filter(([k])=>fields.includes(k))),nowIso:()=>new Date().toISOString(),generateText:async messages=>{prompts.push(JSON.stringify(messages));return {text:'{}'};},extractJson:()=>({})};
- const ctx=vm.createContext({exports,console:{log(){},warn(){},error(){}},setTimeout,clearTimeout,require:p=>{if(p!=='./db')throw Error(p);return db;}});
+ const ctx=vm.createContext({exports,console:{log(){},warn(){},error(){}},setTimeout,clearTimeout,require:p=>{
+  if(p==='./resource-directory'&&name==='activity_speakers')return require('../../cloudfunctions/activity_speakers/resource-directory');
+  if(p!=='./db')throw Error(p);return db;
+ }});
  const hooks=name==='activity_tasks'?'{enrichRelated}':name==='activities'?'{personTable}':name==='activity_speakers'?'{enrichIdentity}':'{loadActivityContext}';
  new vm.Script(fs.readFileSync(path.join(root,'cloudfunctions',name,'index.js'),'utf8')+'\nexports.hooks='+hooks).runInContext(ctx);
  return {exports,data,invalid,prompts,writes};
