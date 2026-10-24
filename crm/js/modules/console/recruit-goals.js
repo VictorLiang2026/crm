@@ -45,10 +45,11 @@ function targetEditor(ctx, month, rows, afterSaved) {
 
 function progressPanel(progress) {
   if (!progress || progress.error) return emptyNote(t('data_load_failed'), progress?.error || t('pc21_no_progress'));
-  const heads = [t('pc21_stage'), t('pc21_target'), t('pc21_actual'), t('pc21_achievement'), t('pc21_conversion'), t('pc21_benchmark')];
+  const heads = [t('pc21_stage'), t('pc21_target'), t('pc21_actual'), t('goal_gap'), t('pc21_achievement'), t('pc21_conversion'), t('pc21_benchmark')];
   const rows = (progress.rows || []).map(row => h('tr', {}, [
     h('th', { scope: 'row' }, translateEnum('recruit_stage', row.stage)),
     h('td', {}, String(row.target ?? 0)), h('td', {}, String(row.actual ?? 0)),
+    h('td', { class: 'goal-gap', title: t('goal_gap_note') }, String(Number(row.target ?? 0) - Number(row.actual ?? 0))),
     h('td', {}, `${row.achieve_rate ?? 0}%`),
     h('td', {}, row.conv_rate == null ? '—' : `${row.conv_rate}%`),
     h('td', {}, row.conv_bench ? `${row.conv_bench.min}% / ${row.conv_bench.avg}% / ${row.conv_bench.good}%` : '—'),
@@ -66,6 +67,7 @@ function progressPanel(progress) {
     progress.testData?.status === 'unverified' ? h('p', { class: 'status-error' }, t('pc21_test_unverified'))
       : progress.testData?.containsTestData ? h('p', { class: 'status-error' }, t('pc21_test_notice').replace('{count}', String(progress.testData.recordCount))) : null,
     h('h3', { class: 'section-title' }, t('pc21_period_summary')),
+    h('p', { class: 'foot-note' }, t('goal_gap_note')),
     table(heads, rows),
     h('h3', { class: 'section-title' }, t('pc21_monthly_history')),
     table([t('pc21_month'), ...STAGES.map(stage => translateEnum('recruit_stage', stage))], trends),
@@ -84,7 +86,7 @@ export function renderRecruitGoals(ctx) {
     targetHost.replaceChildren(h('p', { class: 'row-sub' }, t('loading')));
     try {
       const result = await data.recruitGoals(ctx, targetMonth.value, targetMonth.value);
-      targetHost.replaceChildren(targetEditor(ctx, targetMonth.value, result.rows || [], loadTarget));
+      targetHost.replaceChildren(targetEditor(ctx, targetMonth.value, result.rows || [], () => { loadTarget(); loadHistory(); }));
     } catch (error) { targetHost.replaceChildren(errorBox(error, loadTarget)); }
   }
   async function loadHistory() {
@@ -113,6 +115,11 @@ export function renderRecruitGoals(ctx) {
         h('div', { class: 'form-row', style: 'display:flex;gap:12px;align-items:end;flex-wrap:wrap' }, [
           h('label', { class: 'sheet-field' }, [h('span', {}, t('pc21_goal_month')), targetMonth]),
         ]), targetHost,
+      ]),
+      h('details', { class: 'card card-body recruit-goals-advanced' }, [
+        h('summary', {}, t('goal_advanced')),
+        h('p', { class: 'foot-note' }, t('goal_advanced_note')),
+        h('a', { class: 'btn btn-ghost', href: '/crm/admin.html#/recruit/goals' }, t('goal_advanced_open')),
       ]),
     ]),
   );
