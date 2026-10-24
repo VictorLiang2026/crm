@@ -52,6 +52,9 @@ function openOpportunityDetails(ctx, row, onDone) {
     const linkedActions = Array.isArray(result.actions) ? result.actions : [];
     const outcomes = Array.isArray(result.outcomes) ? result.outcomes : [];
     const personOnly = opportunity.customer_id == null && opportunity.person_id != null;
+    const legacyCustomerId = String(opportunity.customer_id ?? '');
+    const legacyCustomerHref = /^[1-9][0-9]*$/.test(legacyCustomerId) && Number.isSafeInteger(Number(legacyCustomerId))
+      ? `/crm/admin.html#/customer/${legacyCustomerId}` : null;
     const core = h('div', { class: 'opp-detail-core' }, [
       h('div', { class: 'opp-detail-status' }, [bdg(statusLabel(opportunity.status), statusTone(opportunity.status)),
         h('span', { class: 'opp-source-kind' }, personOnly ? t('opp_source_person') : t('opp_source_customer'))]),
@@ -97,8 +100,8 @@ function openOpportunityDetails(ctx, row, onDone) {
           openOpportunityAdvance(ctx, { opportunity, personName: person?.display_name, onDone });
         },
       }, [ic('check'), t('opp_btn_advance_close')]) : null,
-      !personOnly && opportunity.customer_id ? h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => {
-        sheet.overlay.remove(); location.hash = '#/customers';
+      !personOnly && legacyCustomerHref ? h('a', { class: 'btn btn-ghost', href: legacyCustomerHref, onclick: () => {
+        sheet.overlay.remove();
       } }, [ic('users'), t('opp_open_legacy_customer')]) : null,
     ]);
     body.replaceChildren(core, actionSection, outcomeSection, controls);

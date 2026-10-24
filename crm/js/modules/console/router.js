@@ -66,7 +66,7 @@ export function dispatch(raw, ctx) {
   const hash = raw || '#/today';
   for (const p of PATTERNS) {
     const m = hash.match(p.re);
-    if (m) return p.render(ctx, m[1]);
+    if (m) return p.render(ctx, ...m.slice(1));
   }
   (EXACT.get(hash) || renderToday)(ctx);
 }
