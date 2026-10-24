@@ -8,6 +8,7 @@ import {
 } from '../write.js';
 import { wpTag, pageHead, card, emptyNote, loadInto, bdg, fmtDate, textOf } from '../ui.js';
 import { t, tFull, translateEnum } from '../i18n.js';
+import { openLegacyOpportunity, legacyOpportunityTypeLabel } from '../legacy-opportunity.js';
 
 const PAGE_SIZE = 20;
 const FILTER_TYPES = [
@@ -15,9 +16,8 @@ const FILTER_TYPES = [
   '医疗保障','重疾保障','养老规划','教育规划','财富规划','家庭保障','转介绍',
 ];
 const ACTIVE_STAGES = ['发现','沟通','方案','潜在线索','已介绍','已联系','已建立关系'];
-const statusLabel = (value) => translateEnum('opportunity_status', value) ||
-  translateEnum('opportunity_stage', value) || value || '';
-const typeLabel = (value) => translateEnum('opportunity_type', value) || value || t('opp_default_title');
+const statusLabel = (value) => translateEnum('opportunity_stage', value) || value || '';
+const typeLabel = (value) => legacyOpportunityTypeLabel(value) || value || t('opp_default_title');
 
 function describeDraft(d) {
   if (!d) return t('candidate_preview');
@@ -100,6 +100,14 @@ function openOpportunityDetails(ctx, row, onDone) {
           openOpportunityAdvance(ctx, { opportunity, personName: person?.display_name, onDone });
         },
       }, [ic('check'), t('opp_btn_advance_close')]) : null,
+      !personOnly && legacyCustomerHref && person && !['成交','关闭'].includes(opportunity.status)
+        ? h('button', { class:'btn btn-ghost legacy-opp-edit', type:'button', onclick:()=>{
+          sheet.overlay.remove();openLegacyOpportunity(ctx,{opportunity,person,actions:linkedActions,mode:'edit',onDone});
+        } }, [ic('edit'),t('opp_edit_title')]) : null,
+      !personOnly && legacyCustomerHref && person && !['成交','关闭'].includes(opportunity.status)
+        ? h('button', { class:'btn btn-primary legacy-opp-advance', type:'button', onclick:()=>{
+          sheet.overlay.remove();openLegacyOpportunity(ctx,{opportunity,person,actions:linkedActions,mode:'advance',onDone});
+        } }, [ic('check'),t('opp_btn_advance_close')]) : null,
       !personOnly && legacyCustomerHref ? h('a', { class: 'btn btn-ghost', href: legacyCustomerHref, onclick: () => {
         sheet.overlay.remove();
       } }, [ic('users'), t('opp_open_legacy_customer')]) : null,
