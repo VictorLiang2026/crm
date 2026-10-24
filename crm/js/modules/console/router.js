@@ -3,7 +3,7 @@ import {
   renderToday, renderPeople, renderPeopleTrash, renderCustomerTrash, renderRecruitTrash, renderPerson, renderOpportunities,
   renderActivities, renderActivity, renderRecruit, renderAI, renderMore,
   renderSettings, renderRecruitGoals, renderActivityReport, renderAiExperience, renderRecycleHub,
-  renderKnowledgeGovernance, renderResourceDirectory,
+  renderKnowledgeGovernance, renderResourceDirectory, renderAnalytics,
 } from './views.js';
 
 const EXACT = new Map([
@@ -21,6 +21,7 @@ const EXACT = new Map([
   ['#/ai', renderAI],
   ['#/ai/experience', ctx => renderAiExperience({ root:ctx.main, callFn:ctx.callFn })],
   ['#/more', renderMore],
+  ['#/analytics', renderAnalytics],
   ['#/settings', renderSettings],
   ['#/knowledge-governance', renderKnowledgeGovernance],
 ]);
@@ -58,6 +59,7 @@ const NAV_OF = {
   '#/ai': '#/ai',
   '#/ai/experience': '#/ai',
   '#/more': '#/more',
+  '#/analytics': '#/more',
   '#/settings': '#/more',
   '#/knowledge-governance': '#/more',
   '#/activity-report/customer': '#/today',

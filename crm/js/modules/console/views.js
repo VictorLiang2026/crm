@@ -10,6 +10,7 @@ export { renderResourceDirectory } from './activity-people.js';
 export { renderRecruit } from './pages/recruit.js';
 export { renderRecruitGoals } from './recruit-goals.js';
 export { renderActivityReport } from './activity-report.js';
+export { renderAnalytics } from './analytics.js';
 export { renderAI, renderMore } from './pages/misc.js';
 export { renderAiExperience } from './ai-experience.js';
 export { renderSettings } from './pages/settings.js';
