@@ -2,6 +2,11 @@
 const DEFAULT = 'zh-CN';
 
 const DICT = {
+  'm15_invalid_range': { 'zh-CN': '请选择有效的起止日期，结束日期不能早于开始日期，范围最多366天。', 'en': 'Choose valid dates in order, covering no more than 366 days.' },
+  'm15_coverage_customer': { 'zh-CN': '客户口径：客户角色资料、传统跟进、礼品、附件、解析、旧建议及保障记录；不代表全部人物、行动或活动出席量。', 'en': 'Customer scope: customer-role records, legacy follow-ups, gifts, files, parsing, legacy suggestions and insurance records. This is not a count of all people, actions or event attendance.' },
+  'm15_coverage_recruit': { 'zh-CN': '招募口径：有效候选人、招募跟进与阶段里程碑，包含仅关联Person的候选人；不把通用互动计入招募工作量。', 'en': 'Recruit scope: active candidates, recruit follow-ups and stage milestones, including Person-only candidates. General interactions are not added to recruit workload.' },
+  'm15_source_limits': { 'zh-CN': '沿用既有统计服务及软删除规则；来源明细最多显示300条，合计基于服务实际读到的记录，不保证完整覆盖所有历史数据。', 'en': 'Uses the existing reporting service and soft-delete rules. Source details show up to 300 rows. Totals reflect records read by the service and do not guarantee complete historical coverage.' },
+  'm15_generated': { 'zh-CN': '报表生成时间', 'en': 'Report generated at' },
   'kg_version': { 'zh-CN': '版本', 'en': 'Version' },
   'kg_source_unspecified': { 'zh-CN': '来源未提供，请核对', 'en': 'Source not provided; check it' },
   'kg_date_validity': { 'zh-CN': '日期有效性', 'en': 'Date Validity' },
@@ -2449,7 +2454,7 @@ const DICT = {
   'pc21_recent_limit': { 'zh-CN': '显示最近 {shown} 条，共 {total} 条。', 'en': 'Showing the latest {shown} of {total} records.' },
   'pc21_goal_progress': { 'zh-CN': '招募目标进度', 'en': 'Recruit Goal Progress' },
   'pc21_open_goals': { 'zh-CN': '查看月度目标', 'en': 'View Monthly Goals' },
-  'pc21_open_report': { 'zh-CN': '经营日报', 'en': 'Daily Report' },
+  'pc21_open_report': { 'zh-CN': '工作量报表', 'en': 'Workload Reports' },
 
   'knowledge_governance': { 'zh-CN': '知识与话术', 'en': 'Knowledge & Playbooks' },
   'knowledge_governance_desc': { 'zh-CN': '查找证据、案例、故事与话术，核对来源、版本和有效期。', 'en': 'Find evidence, cases, stories and playbooks; check sources, versions and validity.' },

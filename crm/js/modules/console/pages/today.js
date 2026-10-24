@@ -346,7 +346,7 @@ export function renderToday(ctx) {
     pageHead({
       kicker: t('kicker_today'), title: `${t('good_morning')}，${ctx.operator.name || 'Victor'} · ${t('today_first')}`,
       sub: t('today_sub'),
-      actions: [h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => { location.hash = '#/activity-report/customer'; } }, [ic('calendar'), t('pc21_open_report')])],
+      actions: [h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => { location.hash = '#/activity-report'; } }, [ic('calendar'), t('pc21_open_report')])],
     }),
     h('div', { class: 'today-grid' }, [
       h('div', {}, [

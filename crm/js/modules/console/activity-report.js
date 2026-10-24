@@ -29,6 +29,13 @@ const localDay = () => {
 const dateInput = value => h('input', { class: 'sheet-input', type: 'date', value });
 const metricValue = value => value == null ? '—' : `${value}${typeof value === 'number' && value !== 0 ? '' : ''}`;
 
+export function validReportRange(start, end) {
+  const validDay = value => /^\d{4}-\d{2}-\d{2}$/.test(value) && Number(value.slice(0, 4)) >= 1000 &&
+    Number.isFinite(Date.parse(value + 'T00:00:00Z')) && new Date(value + 'T00:00:00Z').toISOString().slice(0, 10) === value;
+  return validDay(start) && validDay(end) && start <= end &&
+    (Date.parse(end + 'T00:00:00Z') - Date.parse(start + 'T00:00:00Z')) / 86400000 < 366;
+}
+
 function testDataNotice(summary) {
   if (!summary || summary.status === 'unverified') return h('p', { class: 'status-error' }, t('pc21_test_unverified'));
   if (!summary.containsTestData) return null;
@@ -90,8 +97,12 @@ function renderDaily(report, type) {
   ] });
   return h('div', { class: 'tab-stack' }, [
     testDataNotice(report.testData),
-    h('p', { class: 'row-sub' }, summary),
-    h('p', { class: 'row-sub' }, t('pc21_no_interaction_double_count')),
+    h('p', { class: 'foot-note' }, summary),
+    h('p', { class: 'foot-note', 'data-report-coverage': currentCoverage(type) }, t('m15_coverage_' + currentCoverage(type))),
+    h('p', { class: 'foot-note', 'data-report-limits': '' }, t('m15_source_limits')),
+    report.generatedAt && Number.isFinite(Date.parse(report.generatedAt))
+      ? h('p', { class: 'row-sub' }, `${t('m15_generated')}: ${report.generatedAt}`) : null,
+    h('p', { class: 'foot-note' }, t('pc21_no_interaction_double_count')),
     ...metricCards, dailyTable, feedCard,
     type === 'recruit' && report.goalProgress && !report.goalProgress.error
       ? card({ title: t('pc21_goal_progress'), icon: 'target', body: [
@@ -101,6 +112,8 @@ function renderDaily(report, type) {
   ]);
 }
 
+const currentCoverage = type => type === 'recruit' ? 'recruit' : 'customer';
+
 export function renderActivityReport(ctx, type = 'customer', initialRange = {}) {
   const currentType = type === 'recruit' ? 'recruit' : 'customer';
   const todayDate = localDay();
@@ -108,22 +121,48 @@ export function renderActivityReport(ctx, type = 'customer', initialRange = {}) 
   const end = dateInput(initialRange.endDate || todayDate);
   const status = h('div', { class: 'tab-stack' }, h('p', { class: 'row-sub' }, t('loading')));
   let mode = initialRange.startDate && initialRange.endDate ? 'range' : 'today';
+  let requestVersion = 0;
+  const todayButton = h('button', { class: 'btn btn-ghost', type: 'button', 'data-report-mode': 'today', onclick: () => load('today') }, t('pc21_today_button'));
+  const rangeButton = h('button', { class: 'btn btn-ghost', type: 'button', 'data-report-mode': 'range', onclick: () => load('range') }, t('pc21_query_range'));
+  const showMode = () => {
+    for (const button of [todayButton, rangeButton]) {
+      const selected = button.dataset.reportMode === mode;
+      button.className = `btn ${selected ? 'btn-primary' : 'btn-ghost'}`;
+      button.setAttribute('aria-pressed', String(selected));
+    }
+  };
   async function load(nextMode = mode) {
-    mode = nextMode;
+    const version = ++requestVersion;
+    const params = nextMode === 'range' ? { mode: nextMode, startDate: start.value, endDate: end.value } : { mode: 'today' };
+    if (nextMode === 'range' && !validReportRange(params.startDate, params.endDate)) {
+      status.replaceChildren(h('p', { class: 'status-error', role: 'alert' }, t('m15_invalid_range')));
+      return;
+    }
     status.replaceChildren(h('p', { class: 'row-sub' }, t('loading')));
-    const params = mode === 'range' ? { mode, startDate: start.value, endDate: end.value } : { mode: 'today' };
     try {
       const result = await data.activityReport(ctx, currentType, params);
+      if (version !== requestVersion || !ctx.main.contains(status)) return;
       if (result.error) throw new Error(result.error);
+      mode = nextMode;
+      if (mode === 'today' && validReportRange(result.range?.start || '', result.range?.end || '')) {
+        start.value = result.range.start; end.value = result.range.end;
+      }
+      showMode();
       status.replaceChildren(renderDaily(result, currentType));
-    } catch (error) { status.replaceChildren(errorBox(error, () => load(mode))); }
+      if (/^#\/activity-report(?:\/(?:customer|recruit))?(?:\?|$)/.test(location.hash)) {
+        const range = mode === 'range' ? `?startDate=${encodeURIComponent(params.startDate)}&endDate=${encodeURIComponent(params.endDate)}` : '';
+        history.replaceState(history.state, '', `#/activity-report/${currentType}${range}`);
+      }
+    } catch (error) {
+      if (version === requestVersion && ctx.main.contains(status)) status.replaceChildren(errorBox(error, () => load(nextMode)));
+    }
   }
   const switchTo = target => {
     const range = mode === 'range' ? `?startDate=${encodeURIComponent(start.value)}&endDate=${encodeURIComponent(end.value)}` : '';
     location.hash = `#/activity-report/${target}${range}`;
   };
   ctx.main.replaceChildren(
-    pageHead({ kicker: t('pc21_report_kicker'), title: t(currentType === 'customer' ? 'pc21_customer_report' : 'pc21_recruit_report'), tag: wpTag(t('fact')),
+    pageHead({ kicker: t('pc21_report_kicker'), title: t('pc21_open_report'), sub: t(currentType === 'customer' ? 'pc21_customer_report' : 'pc21_recruit_report'), tag: wpTag(t('fact')),
       actions: [h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => { location.hash = '#/today'; } }, t('pc21_back_today'))] }),
     h('section', { class: 'card card-body tab-stack' }, [
       h('div', { class: 'form-row', style: 'display:flex;gap:10px;flex-wrap:wrap;align-items:end' }, [
@@ -133,12 +172,12 @@ export function renderActivityReport(ctx, type = 'customer', initialRange = {}) 
       h('div', { class: 'form-row', style: 'display:flex;gap:10px;flex-wrap:wrap;align-items:end' }, [
         h('label', { class: 'sheet-field' }, [h('span', {}, t('pc21_start_date')), start]),
         h('label', { class: 'sheet-field' }, [h('span', {}, t('pc21_end_date')), end]),
-        h('button', { class: `btn ${mode === 'today' ? 'btn-primary' : 'btn-ghost'}`, type: 'button', onclick: () => load('today') }, t('pc21_today_button')),
-        h('button', { class: `btn ${mode === 'range' ? 'btn-primary' : 'btn-ghost'}`, type: 'button', onclick: () => load('range') }, t('pc21_query_range')),
+        todayButton, rangeButton,
         h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => load(mode) }, t('btn_refresh')),
       ]),
     ]),
     status,
   );
+  showMode();
   load(mode);
 }
