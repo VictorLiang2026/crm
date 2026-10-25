@@ -1,0 +1,57 @@
+{
+  "scope": "public only; read-only catalog and aggregated observation metadata; no business row content",
+  "baseline": "16dee465f24b80bd034516fb0ee947442bc7022b",
+  "queries": {
+    "m19query0": [
+      {
+        "evidence": "{\"views\": [{\"name\": \"public.ai_recommendations_view\", \"anonSelect\": true, \"definitionHash\": \"ee6f718d0552cf3842d0b8d3f7f2c021\", \"securityInvoker\": true, \"authenticatedSelect\": false}, {\"name\": \"public.customers_view\", \"anonSelect\": true, \"definitionHash\": \"334b371fa1c618316b38112eab632f09\", \"securityInvoker\": true, \"authenticatedSelect\": false}, {\"name\": \"public.followups_view\", \"anonSelect\": true, \"definitionHash\": \"dace16de0afc28cbe495fdffb09fc231\", \"securityInvoker\": true, \"authenticatedSelect\": false}, {\"name\": \"public.gifts_view\", \"anonSelect\": true, \"definitionHash\": \"4b1dfb2d01c243beecfc9b67e6dfdd26\", \"securityInvoker\": true, \"authenticatedSelect\": false}, {\"name\": \"public.photos_view\", \"anonSelect\": false, \"definitionHash\": \"31bc8a4da1d57471a0911ab45b3c80fa\", \"securityInvoker\": true, \"authenticatedSelect\": false}, {\"name\": \"public.products_view\", \"anonSelect\": true, \"definitionHash\": \"17b53f3821e844f68e51a96aca1b3aac\", \"securityInvoker\": true, \"authenticatedSelect\": false}], \"observedAt\": \"2026-10-25T15:05:25.535777+08:00\", \"publicViewDependents\": [], \"publicRoutineLiteralReferences\": [], \"publicRoutineCatalogDependencies\": []}"
+      }
+    ],
+    "m19query1": [
+      {
+        "first_day": "2026-10-19",
+        "last_day": "2026-10-25",
+        "observed_days": "7",
+        "rows": "140",
+        "minimum_daily_metrics": "20",
+        "maximum_daily_metrics": "20",
+        "critical_rows": "0",
+        "warning_rows": "7"
+      }
+    ],
+    "m19extra0": [
+      {
+        "view_name": "ai_recommendations_view",
+        "public_source_relations": "[\"public.ai_recommendations\", \"public.customers\", \"public.followups\", \"public.gifts\", \"public.persons\"]"
+      },
+      {
+        "view_name": "customers_view",
+        "public_source_relations": "[\"public.ai_recommendations\", \"public.customers\", \"public.followups\", \"public.gifts\", \"public.persons\", \"public.photos\", \"public.recruit_candidates\"]"
+      },
+      {
+        "view_name": "followups_view",
+        "public_source_relations": "[\"public.ai_recommendations\", \"public.customers\", \"public.followups\", \"public.gifts\", \"public.persons\"]"
+      },
+      {
+        "view_name": "gifts_view",
+        "public_source_relations": "[\"public.ai_recommendations\", \"public.customers\", \"public.followups\", \"public.gifts\", \"public.persons\"]"
+      },
+      {
+        "view_name": "photos_view",
+        "public_source_relations": "[\"public.customers\", \"public.persons\", \"public.photos\"]"
+      },
+      {
+        "view_name": "products_view",
+        "public_source_relations": "[\"public.ai_recommendations\", \"public.customers\", \"public.followups\", \"public.gifts\", \"public.persons\", \"public.products\"]"
+      }
+    ],
+    "m19extra1": [
+      {
+        "metric": "persons_without_role",
+        "warning_rows": "7",
+        "first_day": "2026-10-19",
+        "last_day": "2026-10-25"
+      }
+    ]
+  }
+}
