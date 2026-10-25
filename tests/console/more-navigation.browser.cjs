@@ -25,7 +25,9 @@ const LEGACY_ROUTES = [
   ['#/recruit/trash', '[CRM_TEST_ONLY]已删除候选人'],
 ];
 
-test('Console More keeps all legacy routes grouped, bilingual, and reachable', async () => {
+const REMAINING_MORE_ROUTES = ['#/customers', '#/funnels', '#/ai-suggestions', '#/more/photos', '#/speakers', '#/recruit/goals'];
+
+test('Console More removes 11 duplicate cards, keeps six gaps bilingual, and preserves all 17 old URLs', async () => {
   const browser = new Browser(path.resolve(__dirname, '../..'));
   try {
     await browser.start();
@@ -46,8 +48,8 @@ test('Console More keeps all legacy routes grouped, bilingual, and reachable', a
       nav: [...document.querySelectorAll('.console-nav .nav-item')].map(x => x.getAttribute('href')),
     })`);
     assert.deepEqual(english.headings, ['Tools', 'Workspaces & Quick Record', 'Legacy Compatibility']);
-    assert.deepEqual(english.legacyHrefs, LEGACY_ROUTES.map(([hash]) => '/crm/admin.html' + hash).sort());
-    assert.equal(english.legacyStatusCount, 17);
+    assert.deepEqual(english.legacyHrefs, REMAINING_MORE_ROUTES.map(hash => '/crm/admin.html' + hash).sort());
+    assert.equal(english.legacyStatusCount, 6);
     assert.equal(english.subtitle, 'Workspaces, system tools, and compatibility links.');
     assert.match(english.currentRecycle || '', /Recycle Bin/);
     assert.match(english.quickRecord || '', /confirm the Person/);
@@ -81,16 +83,18 @@ test('Console More keeps all legacy routes grouped, bilingual, and reachable', a
     for (const [hash, marker] of LEGACY_ROUTES) {
       await browser.openConsole('#/more', 'authCase=1');
       await browser.wait("document.querySelector('#console-main .more-section')");
-      const selector = `a[href="/crm/admin.html${hash}"]`;
-      const clickResult = await browser.evaluate(`(() => {
-        document.querySelector('.more-compat').open=true;
-        const target = ${JSON.stringify('/crm/admin.html' + hash)};
-        const link = [...document.querySelectorAll('#console-main a')].find(a => a.getAttribute('href') === target);
-        if (!link) return { missing: target, path: location.pathname, hash: location.hash,
-          text: document.querySelector('#app')?.innerText?.slice(0, 240) };
-        link.click(); return { clicked: target };
-      })()`);
-      assert.ok(clickResult.clicked, `Could not click ${selector}: ${JSON.stringify(clickResult)}`);
+      const target = '/crm/admin.html' + hash;
+      if (REMAINING_MORE_ROUTES.includes(hash)) {
+        await browser.evaluate(`(() => {
+          document.querySelector('.more-compat').open=true;
+          [...document.querySelectorAll('#console-main a')].find(a => a.getAttribute('href') === ${JSON.stringify(target)}).click();
+        })()`);
+      } else {
+        assert.equal(await browser.evaluate(`[...document.querySelectorAll('#console-main a')].some(a=>a.getAttribute('href')===${JSON.stringify(target)})`), false,
+          `Duplicate More card remains: ${hash}`);
+        // These bookmarks must still work even though the duplicate card was removed.
+        await browser.send('Page.navigate', { url: browser.origin + '/crm/admin.html?authCase=1&run=' + Date.now() + hash });
+      }
       await browser.wait(`location.pathname === '/crm/admin.html' && location.hash === ${JSON.stringify(hash)}`);
       await browser.wait(`document.getElementById('view')?.innerText?.includes(${JSON.stringify(marker)})`, 15000);
       const pageText = await browser.evaluate("document.getElementById('view').innerText");

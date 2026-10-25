@@ -1,5 +1,7 @@
 # CRM 架构单页图（v2.0 现状）
 
+> 2026-10-25 最新导航增量：[旧版工作区精简与升级方案](work-packages/legacy-workspace-upgrade-20261025.md)。用户逐项批准从More移除11张重复卡片，兼容区17→6；17旧URL、设置维护入口和统一回收站内旧批量恢复均保留。仅misc.js/i18n.js变化，无数据/API/权限/数据库/云函数变更。六项剩余能力的迁移方案见[后续L01–L08](../specs/legacy-workspace-exit/tasks.md)，尚未授权实施；本轮证据见[L00](../specs/legacy-workspace-exit/evidence/L00.md)。下方17项菜单描述属于前轮历史。
+
 > 2026-10-24 当前增量：[更多整合与交接验收](work-packages/more-consolidation-integration-20261024.md)、[逐包状态](../specs/more-consolidation/tasks.md)。M01–M17已逐包发布：Console按Person/活动/招募组织日常工作，More收拢为知识与话术、经营分析、设置、回收站四主入口；17个Legacy地址折叠保留，admin.html未重构。新增原件/解析任务与旧客户机会预览命令两个public底座，AI历史分新旧来源查询。最新只读基线为public 61表、12视图、37序列、68例程；29个CRM函数、207源码配置文件，79个实际引用静态资源（这些数量均不含受排除的环境/对象）。下方2026-09-06图仍是历史记录，不应据其表数或模型描述设计新变更。
 
 > 2026-10-19 当前增量：[PC36 集成验收台账](work-packages/pc36-integration-audit-20261018.md)。下图是 2026-09-06 历史版本，函数数量、入口与表数不再代表现网；现网发布基线已有 29 个 CRM 函数，Console 模块与 Legacy 并存。PC36 对 21 个生产只读入口的登录调用及登录态 71 个 `public` relation 的拒绝核查均通过；PMC18 受限采集 RPC 已真实写入 20 项指标，02:00 定时触发成功复用同日批次。连续多日观察和完整 E01–E16 写入与兼容验收尚未完成。改架构前同时核对台账和实时 `public` 元数据。

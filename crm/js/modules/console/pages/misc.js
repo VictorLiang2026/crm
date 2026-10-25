@@ -268,26 +268,15 @@ export function renderAI(ctx) {
   );
 }
 
-// More uses explicit route kinds; all legacy URLs remain available.
+// More shows only unresolved legacy capabilities; all legacy URLs remain available.
 const LEGACY_ADMIN = '/crm/admin.html';
 const LEGACY_ENTRIES = [
-  ['gear', 'legacy_account', '#/account', 'm17_reason_account'],
-  ['file', 'legacy_test_scenario', '#/test-scenario', 'm17_reason_test'],
   ['users', 'legacy_customers', '#/customers', 'm17_reason_customers'],
-  ['chat', 'legacy_followups', '#/more/followups', 'm17_reason_followups'],
   ['target', 'legacy_funnels', '#/funnels', 'm17_reason_funnels'],
   ['sparkle', 'legacy_ai_suggestions', '#/ai-suggestions', 'm17_reason_ai'],
-  ['shield', 'legacy_policy_review', '#/more/policy-review', 'm17_reason_insurance'],
-  ['grid', 'legacy_products', '#/more/products', 'm17_reason_insurance'],
-  ['bell', 'legacy_gifts', '#/more/gifts', 'm17_reason_care'],
   ['search', 'legacy_photos', '#/more/photos', 'm17_reason_photos'],
   ['mic', 'legacy_speakers', '#/speakers', 'm17_reason_resources'],
-  ['calendar', 'legacy_topics', '#/topics', 'm17_reason_resources'],
   ['recruit', 'legacy_recruit_goals', '#/recruit/goals', 'm17_reason_goals'],
-  ['clock', 'legacy_activity_customer', '#/activity/customer', 'm17_reason_reports'],
-  ['target', 'legacy_activity_recruit', '#/activity/recruit', 'm17_reason_reports'],
-  ['refresh', 'legacy_customers_trash', '#/customers/trash', 'm17_reason_trash'],
-  ['refresh', 'legacy_recruit_trash', '#/recruit/trash', 'm17_reason_trash'],
 ].map(([icon, key, hash, reasonKey]) => ({ kind: 'legacy', icon, key, hash, reasonKey }));
 
 function moreEntry({ kind, icon, key, hash, descKey, reasonKey }) {

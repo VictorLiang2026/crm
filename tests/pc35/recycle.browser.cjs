@@ -38,9 +38,8 @@ test('More opens the unified hub with three native recycle bins and preserves ol
       await browser.evaluate(`localStorage.setItem('crm_lang',${JSON.stringify(lang)})`);
       await browser.openConsole('#/more', 'authCase=1&mode=pc35');
       await browser.wait("document.querySelector('.more-primary a[href=\"#/recycle\"]')");
-      await browser.evaluate("document.querySelector('.more-compat summary').click()");
       for (const href of legacy) {
-        assert.equal(await browser.evaluate(`document.querySelector('a[href="${href}"]').getBoundingClientRect().width>0`), true, href);
+        assert.equal(await browser.evaluate(`document.querySelector('#console-main a[href="${href}"]')===null`), true, href);
       }
       await browser.evaluate("document.querySelector('.more-primary a[href=\"#/recycle\"]').click()");
       await browser.wait("location.hash==='#/recycle' && document.querySelector('.recycle-hub')");
