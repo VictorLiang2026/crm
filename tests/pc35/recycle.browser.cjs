@@ -27,22 +27,39 @@ test('nonempty Person trash renders roles and historical restore scope', async (
   } finally { await browser.close(); }
 });
 
-test('More exposes three native recycle bins and preserves old links in both languages', async () => {
+test('More opens the unified hub with three native recycle bins and preserves old links in both languages', async () => {
   const browser = new Browser(ROOT);
   try {
     await browser.start();
     await browser.openConsole('#/more', 'authCase=1&mode=pc35');
     await browser.wait("document.querySelector('#console-main .more-section')");
-    const links = await browser.evaluate(`[...document.querySelectorAll('#console-main a')]
-      .map(a=>a.getAttribute('href')).filter(x=>x?.includes('trash')||x?.includes('recycle'))`);
-    for (const href of ['#/people-trash','#/recycle/customers','#/recycle/recruit',
-      '/crm/admin.html#/customers/trash','/crm/admin.html#/recruit/trash']) assert.ok(links.includes(href), href);
-    await browser.evaluate("localStorage.setItem('crm_lang','en')");
-    await browser.openConsole('#/more', 'authCase=1&mode=pc35');
-    await browser.wait("document.querySelector('#console-main .more-section')");
-    const english = await browser.evaluate("document.querySelector('#console-main').innerText");
-    for (const word of ['Person Recycle Bin','Customer Recycle Bin','Recruit Recycle Bin',
-      'Legacy Recycle Bins']) assert.ok(english.includes(word), word);
+    const legacy = ['/crm/admin.html#/customers/trash','/crm/admin.html#/recruit/trash'];
+    for (const lang of ['zh-CN', 'en']) {
+      await browser.evaluate(`localStorage.setItem('crm_lang',${JSON.stringify(lang)})`);
+      await browser.openConsole('#/more', 'authCase=1&mode=pc35');
+      await browser.wait("document.querySelector('.more-primary a[href=\"#/recycle\"]')");
+      await browser.evaluate("document.querySelector('.more-compat summary').click()");
+      for (const href of legacy) {
+        assert.equal(await browser.evaluate(`document.querySelector('a[href="${href}"]').getBoundingClientRect().width>0`), true, href);
+      }
+      await browser.evaluate("document.querySelector('.more-primary a[href=\"#/recycle\"]').click()");
+      await browser.wait("location.hash==='#/recycle' && document.querySelector('.recycle-hub')");
+      const links = await browser.evaluate("[...document.querySelectorAll('#console-main a')].map(a=>a.getAttribute('href'))");
+      for (const href of ['#/people-trash','#/recycle/customers','#/recycle/recruit',...legacy]) assert.ok(links.includes(href), href);
+      await browser.evaluate("document.querySelector('.recycle-legacy summary').click()");
+      const labels = lang==='en'
+        ? ['Person Recycle Bin','Customer Recycle Bin','Recruit Recycle Bin','Legacy Batch Restore']
+        : ['Person 回收站','客户回收站','增员回收站','旧版批量恢复'];
+      const content = await browser.evaluate("document.querySelector('#console-main').innerText");
+      for (const word of labels) assert.ok(content.includes(word), word);
+      for (const route of ['#/people-trash','#/recycle/customers','#/recycle/recruit']) {
+        await browser.evaluate(`document.querySelector('.recycle-hub a[href="${route}"]').click()`);
+        await browser.wait(`location.hash===${JSON.stringify(route)} && document.querySelector('#console-main a[href="#/recycle"]')`);
+        await browser.evaluate("document.querySelector('#console-main a[href=\"#/recycle\"]').click()");
+        await browser.wait("document.querySelector('.recycle-hub')");
+      }
+      assert.equal(await browser.evaluate("window.__crmTest.calls.some(x=>/restore|remove|delete|execute/i.test(x.action))"), false);
+    }
     for (const size of [{width:820,height:1180},{width:1180,height:820}]) {
       await browser.send('Emulation.setDeviceMetricsOverride',{...size,deviceScaleFactor:2,mobile:false});
       assert.equal(await browser.evaluate('document.documentElement.scrollWidth<=innerWidth+1'), true);

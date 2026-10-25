@@ -1,5 +1,7 @@
 # 更多入口覆盖矩阵（M00 基线）
 
+> 当前状态已推进至M17发布；本页前半部分保留M00历史基线，不能再据其“尚缺”文字重复开发。最新覆盖与保留理由见本页末尾“最终覆盖矩阵”，综合验收见M18。
+
 核对日期：2026-10-24。源码 1e46c83。基线文件：crm/js/modules/console/pages/misc.js、router.js、data.js 及各页面/函数。
 统计：8 个工作区快捷入口 + 2 个系统旧入口 + 7 个知识/策略入口 + 3 个原生回收站 + 9 个业务兼容入口 = 29；17 Legacy、12 原生。退出按钮另计。
 
@@ -65,3 +67,31 @@
 - M01：深链参数和旧客户机会跳转已发布，见 evidence/M01.md。
 - M02：设置刷新确认与折叠维护入口已发布，见 evidence/M02.md。
 - M03：复用既有客户筛选/阶段/优先级/日期和原跟进 CRUD；补充日期→时间线捷径，旧经营/招募状态及批量工具仍有上下文兼容入口。验证和发布状态见 tasks.md / evidence/M03.md。
+
+## 最终覆盖矩阵（M17已发布，2026-10-24）
+
+More默认四主卡片：#/knowledge-governance、#/analytics、#/settings、#/recycle；六工作区捷径+快速记录可展开，17个旧入口可展开。iPad默认折叠，窄屏初始化保留工作区捷径可见。原先29个平铺卡片变为4个主卡片；总功能并未删掉25项。
+
+| 旧入口 | 当前原生归属 / 实现 | 继续保留原因 |
+| --- | --- | --- |
+| account | settings：语言、改密、退出、确认刷新、折叠维护 | 旧账号维护与兼容流程 |
+| test-scenario | settings维护区可达 | 原受控测试页/白名单不替换 |
+| customers | people目录与Person编辑器、时间线 | 旧经营/招募状态和批量工具 |
+| more/followups | Person时间线；原followups记录 | 跨客户旧入口、原编辑流程 |
+| funnels | analytics三类事实、显式解读；机会页精确筛选 | 旧完整指标展示；新页不伪造全局口径 |
+| ai-suggestions | ai/experience来源/日期/类型/人物分页；Person原历史保留 | 旧原始页和兼容操作；新旧ID不能混写 |
+| more/policy-review | Person insurance保单检视 | 原客户保障工作流兼容 |
+| more/products | Person insurance保障额度/保费/缴费资料 | 原客户资料；并非公司产品库 |
+| more/gifts | Person care礼品CRUD | 原客户关怀入口，保留customer角色约束 |
+| more/photos | Person care + file-import + OCR审核/撤销 | 旧上传/解析行为保留；新导入不替换旧ai_parse默认模式 |
+| speakers | activity-resources独立服务端检索目录，复用原CRUD | 旧推荐/高级工具 |
+| topics | activity-resources主题目录与关联管理 | 旧推荐/高级工具 |
+| recruit/goals | recruit/goals编辑、差距和历史刷新 | 高级基准与目标反推 |
+| activity/customer | activity-report/customer，统一入口和日期保留 | 旧报表URL/展示；统计口径不变 |
+| activity/recruit | activity-report/recruit，同上 | 同上；不叠加通用互动 |
+| customers/trash | recycle→customers，原单项恢复 | 旧批量恢复 |
+| recruit/trash | recycle→recruit，关联客户/Person-only分路恢复 | 旧批量恢复及原删除批次语义 |
+
+额外闭环：M10–M11让customer-linked机会以原ID在新页面预览确认编辑/关闭；M08–M09提供原件→草稿→PC14人工应用；M12–M13复用现有AI历史，旧建议只读；M14知识类型不变，异议原因不作为事实；M15–M16明确服务读数与分页/截断限制。
+
+本表表示整合覆盖，不表示全部旧功能已等价替代，更不是删除授权。最新测试、真实调用与未验证边界分别见evidence及M18交接验收。公司产品政策导入、星座、团队BI和自动外发未纳入本轮。

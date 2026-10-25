@@ -43,3 +43,14 @@ AI 历史优先来源分栏和服务端分页，避免把截断列表当全部�
 每包按真实影响跑专项和相邻回归，再通过 WP01 安全门槛。仅上传变更静态文件和受影响函数。Git 原子推送提交/发布标签，逐包三端源码核对；源码一致与真实业务验证分别记录。
 
 UI/函数回退用上一已核对版本的精确文件及恢复提交；数据迁移单独评估 rollback，不回滚用户业务数据。M18 汇总四条端到端链及实际未验证项，M19 只给清退建议。
+
+## 已落地结构（2026-10-24）
+
+- 导航：#/analytics、#/activity-report、#/activity-resources、#/recycle新增整合入口；所有原typed报表、人物页签、旧admin路由继续有效。More使用显式native/legacy类型，不以字典key猜测地址。
+- 文件：person_360的file-import-service负责原件/任务身份与归属；ai_parse新模式只生成草稿。public.crm_file_import_jobs和crm_file_import_v1负责同事务保存、请求幂等、解析租约、结果回执；PC14仍负责审核应用/撤销。单文件4MiB、队列10项；JPEG/PNG/WebP、UTF-8 TXT/CSV可解析，PDF/DOCX仅保留原件，不宣称支持内容解析。
+- 机会：person_360/legacy-opportunity-service和public.crm_legacy_opportunity_commands、crm_legacy_opportunity_v1仅覆盖已有customer-linked机会的受限编辑/关闭。PC27 Person-only保护保留；未扩大自然语言命令范围。
+- AI历史：assistant现有aiExperience/personAIHistory扩展可选filters；不带filters保留旧响应。新Runtime以任务分页，旧ai_recommendations独立只读；不把旧ID送入新反馈链。日期字段、时间窗、相关记录上限和非筛选全局指标分别说明。
+- 知识：保留Evidence/Case/Story/Playbook，审核状态与北京时间有效期分别显示；异议原因仅是假设。各类最多加载200条，前端筛选只针对已加载内容。
+- 统计：activity_reports和public.v_funnel_stats事实计算不变；报表明细上限300，旧机会漏斗不含Person-only，当前阶段分布不宣称历史转化率。AI解读点击后调用既有funnel_insight服务，失败不丢事实。
+
+本轮只新增上述2表/2例程，没有新增云函数或修改共享运行时。数据迁移均为加法且配rollback；有记录时rollback保护阻止误删任务/命令历史。源码回退和数据回滚必须分开评估。
