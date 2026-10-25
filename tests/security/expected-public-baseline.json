@@ -2,6 +2,16 @@
   "schema": "public",
   "objects": [
     {
+      "kind": "routine",
+      "name": "person_customer_worklist_v1(p_criteria jsonb)",
+      "detail": {
+        "anon_execute": false,
+        "service_execute": true,
+        "security_definer": false,
+        "authenticated_execute": false
+      }
+    },
+    {
       "kind": "relation",
       "name": "actions",
       "detail": {

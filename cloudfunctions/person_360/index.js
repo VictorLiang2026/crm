@@ -137,7 +137,7 @@ async function pgRequest(table, method, filters = {}, body) {
 
 async function pgRpc(name, body) {
   if (!new Set(['quick_capture_v2_commit', 'person_directory_page_v1', 'person_directory_filtered_page_v1',
-    'person_trash_page_v1',
+    'person_trash_page_v1', 'person_customer_worklist_v1',
     'person_identity_preview_v1', 'person_identity_execute_v1',
     'crm_person_only_recruit_delete_v1', 'crm_work_item_preview_v1',
     'crm_work_item_execute_v1', 'crm_opportunity_directory_v1', 'crm_opportunity_preview_v1',
@@ -304,8 +304,9 @@ function createService({ request = pgRequest, rpc = pgRpc, disclosure = disclose
     }
     const sortField = String(event.sortField || 'id');
     const sortDir = String(event.sortDir || 'desc');
+    const customerWorklist = event.customerWorklist === true;
     if (!['id', 'display_name', 'updated_at', 'sales_priority', 'recruitment_priority',
-      'referral_priority', 'latest_followup_date', 'next_followup_date'].includes(sortField) || !['asc', 'desc'].includes(sortDir)) {
+      'referral_priority', 'latest_followup_date', 'next_followup_date', ...(customerWorklist ? ['wb_status'] : [])].includes(sortField) || !['asc', 'desc'].includes(sortDir)) {
       throw new Error('Invalid directory sort');
     }
     const rolesAllowed = new Set(['customer', 'recruit', 'referrer', 'speaker', 'participant', 'partner', 'alumni', 'other']);
@@ -325,6 +326,16 @@ function createService({ request = pgRequest, rpc = pgRpc, disclosure = disclose
       || (recruitPriorities.length && !roles.includes('recruit'))
       || (referralPriorities.length && !roles.includes('referrer'))) {
       throw new Error('Priority filters require the matching role');
+    }
+    if (customerWorklist) {
+      const status = event.worklistStatus ?? 'all';
+      if (roles.length !== 1 || roles[0] !== 'customer' || recruitPriorities.length || referralPriorities.length
+        || !['all', 'overdue', 'today', 'month', 'stale', 'normal', 'unknown', 'unlinked'].includes(status)) {
+        throw new Error('Invalid customer worklist filters');
+      }
+      return rpc('person_customer_worklist_v1', { p_criteria: {
+        page, pageSize, keyword, sortField, sortDir, status, customerPriorities,
+      } });
     }
     const hasFilters = roles.length || customerPriorities.length || recruitPriorities.length || referralPriorities.length;
     const rpcName = hasFilters

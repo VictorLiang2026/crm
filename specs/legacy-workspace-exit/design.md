@@ -1,6 +1,14 @@
 # 设计与影响边界
 
-详细产品方案见[17项矩阵、六项升级与退出标准](../../docs/work-packages/legacy-workspace-upgrade-20261025.md)。本文件记录已批准L00实现边界，后续包设计仍待确认。
+详细产品方案见[17项矩阵、六项升级与退出标准](../../docs/work-packages/legacy-workspace-upgrade-20261025.md)。本文件记录 L00 实现边界。2026-10-25 用户已进一步授权 L01–L08 按方案逐包实施。
+
+## L01 客户经营视图
+
+新增只读 public.person_customer_worklist_v1(jsonb)，仅 service_role 可执行，SECURITY INVOKER。旧目录 RPC、基表、视图、权限与旧 URL 不变。person_360.listPeople 仅在 customerWorklist=true 且唯一角色为 customer 时选择新查询；旧请求保持原行为。按 Person 聚合角色，客户和招募各选最新有效关联，避免多角色重复分页。
+
+工作台沿用最新有效客户跟进（followup_date、Id 倒序）及 first_contact_date/客户 created_at 的旧回退口径；日期以 Asia/Shanghai 的今天判定，created_at 保留旧查询 UTC 日期口径。逾期、今天、未来30天优先，其后判断至少30天未联系；未关联客户和日期未知分别显示。招募跟进不进入客户日期，全部人物视图仍保留原合并日期。筛选、排序、计数和分页在同一个数据库查询中完成，末尾以 Person ID 稳定排序。
+
+仅 people.js、i18n.js、person_360 和成对 migration/rollback 需要发布，新增只读函数对应权限基线增加一项明确允许记录。无基表列变化，无视图重建。回退先恢复 L00 前端和 person_360，再运行 rollback 将新增函数变成拒绝执行的占位实现；保留函数及服务端专用权限，不删除对象、不回滚业务数据。回退提交保留新增对象权限登记。
 
 ## L00实现
 

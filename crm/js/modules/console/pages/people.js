@@ -40,7 +40,11 @@ function compactColumnLabel(label, key) {
 
 const SORT_COLUMNS = (customerView = false) => ([
   { key: 'name', field: 'display_name', label: t('col_name') },
-  ...(customerView ? [{ key: 'customer_stage', field: 'customer_stage', label: t('customer_view_stage'), sortable: false }] : []),
+  ...(customerView ? [
+    { key: 'customer_stage', field: 'customer_stage', label: t('customer_view_stage'), sortable: false },
+    { key: 'wb_status', field: 'wb_status', label: t('l01_status') },
+    { key: 'recruit_status', field: 'recruit_status', label: t('l01_recruit'), sortable: false },
+  ] : []),
   { key: 'customer_priority', field: 'sales_priority', label: t('col_customer_priority'), mobileLabel: compactColumnLabel(t('col_customer_priority'), 'customer_priority') },
   { key: 'recruit_priority', field: 'recruitment_priority', label: t('col_recruit_priority'), mobileLabel: compactColumnLabel(t('col_recruit_priority'), 'recruit_priority') },
   { key: 'referral_priority', field: 'referral_priority', label: t('col_referral_priority'), mobileLabel: compactColumnLabel(t('col_referral_priority'), 'referral_priority') },
@@ -66,7 +70,7 @@ function fmtDateShort(v) {
 
 export function renderPeople(ctx) {
   const emptyFilters = () => ({ roles: [], customerPriorities: [], recruitPriorities: [], referralPriorities: [] });
-  const state = { page: 1, keyword: '', sortField: 'id', sortDir: 'desc', filters: emptyFilters(), pendingFilters: emptyFilters() };
+  const state = { page: 1, keyword: '', sortField: 'id', sortDir: 'desc', worklistStatus: 'all', filters: emptyFilters(), pendingFilters: emptyFilters() };
   const listEl = h('div', {});
   const metaEl = h('span', { class: 'foot-note' }, '');
   const input = h('input', { placeholder: t('search_name_ph') });
@@ -81,6 +85,16 @@ export function renderPeople(ctx) {
   }, t('people_legacy_tools'));
   const filterPanel = h('div', { class: 'people-filter-panel', hidden: true });
   const priorityFilters = h('div', { class: 'people-filter-priorities' });
+  const worklistFilter = h('select', { 'aria-label': t('l01_status'), onchange: () => {
+    state.worklistStatus = worklistFilter.value;
+    state.page = 1; state.sortField = 'wb_status'; state.sortDir = 'asc'; runQuery();
+  } }, ['all', 'overdue', 'today', 'month', 'stale', 'normal', 'unknown', 'unlinked'].map(value =>
+    h('option', { value }, t('l01_' + value))));
+  const worklistTools = h('div', { class: 'toolbar', hidden: true, style: 'display:none' }, [
+    h('label', {}, [t('l01_status'), ' ', worklistFilter]),
+    h('span', { class: 'foot-note', title: t('l01_basis') }, t('l01_basis')),
+  ]);
+  let cancelQuery = () => {}, queryVersion = 0;
 
   function arrow(field) {
     if (state.sortField !== field) return '';
@@ -88,15 +102,25 @@ export function renderPeople(ctx) {
   }
 
   function runQuery() {
-    loadInto(listEl, async () => {
+    cancelQuery();
+    const version = ++queryVersion;
+    cancelQuery = loadInto(listEl, async () => {
       const customerView = state.filters.roles.length === 1 && state.filters.roles[0] === 'customer';
+      worklistTools.hidden = !customerView;
+      worklistTools.style.display = customerView ? '' : 'none';
+      if (!customerView) {
+        state.worklistStatus = 'all'; worklistFilter.value = 'all';
+        if (state.sortField === 'wb_status') { state.sortField = 'id'; state.sortDir = 'desc'; }
+      }
       legacyCustomerTools.hidden = !customerView;
       legacyCustomerTools.style.display = customerView ? '' : 'none';
       const res = await data.listPeople(ctx, {
         page: state.page, pageSize: peoplePageSize(), keyword: state.keyword,
         sortField: state.sortField, sortDir: state.sortDir,
         ...state.filters, includeCustomerStage: customerView,
+        customerWorklist: customerView, worklistStatus: state.worklistStatus,
       });
+      if (version !== queryVersion) return h('span', {});
       const rows = res.rows || [];
       metaEl.textContent = state.keyword
         ? t('meta_total_kw').replace('{kw}', state.keyword).replace('{total}', res.total)
@@ -161,7 +185,15 @@ export function renderPeople(ctx) {
         };
         const cells = [
           cell('name', h('a', { href: `#/person/${p.id}` }, [p.display_name, h('span', { class: 'badge-stack' }, badges)])),
-          ...(customerView ? [cell('customer_stage', p.customer_stage ? translateEnum('customer_stage', p.customer_stage) : '-') ] : []),
+          ...(customerView ? [
+            cell('customer_stage', p.customer_stage ? translateEnum('customer_stage', p.customer_stage) : '-'),
+            cell('wb_status', bdg(t('l01_' + (['overdue', 'today', 'month', 'stale', 'normal', 'unlinked'].includes(p.wb_status) ? p.wb_status : 'unknown')),
+              p.wb_status === 'overdue' ? 'red' : p.wb_status === 'today' ? 'gold' : 'gray')),
+            cell('recruit_status', p.recruit_status === 'active'
+              ? h('a', { href: `#/person/${p.id}/recruit`, onclick: ev => ev.stopPropagation() },
+                [t('l01_recruit_active'), p.recruit_stage ? ` · ${translateEnum('recruit_stage', p.recruit_stage)}` : ''])
+              : t('l01_recruit_' + (p.recruit_status === 'historical' ? 'historical' : p.recruit_status === 'none' ? 'none' : 'unknown'))),
+          ] : []),
           cell('customer_priority', p.sales_priority ? translateEnum('sales_priority', p.sales_priority) : '-'),
           cell('recruit_priority', p.recruitment_priority ? translateEnum('sales_priority', p.recruitment_priority) : '-'),
           cell('referral_priority', p.referral_priority ? translateEnum('sales_priority', p.referral_priority) : '-'),
@@ -244,6 +276,7 @@ export function renderPeople(ctx) {
     const active = state.filters.roles.length === 1 && state.filters.roles[0] === 'customer';
     const next = active ? emptyFilters() : { ...emptyFilters(), roles: ['customer'] };
     state.filters = next;
+    if (!active) { state.sortField = 'wb_status'; state.sortDir = 'asc'; }
     state.pendingFilters = Object.fromEntries(Object.entries(next).map(([key, values]) => [key, [...values]]));
     state.page = 1;
     filterPanel.hidden = true;
@@ -306,6 +339,7 @@ export function renderPeople(ctx) {
         onclick: () => openPersonNew(ctx, { onDone: (newId) => { if (newId) location.hash = `#/person/${newId}`; else runQuery(); } }),
       }, [ic('plus'), t('btn_new_person')]),
     ]),
+    worklistTools,
     h('section', { class: 'card' }, [
       listEl,
       h('div', { class: 'card-foot' }, [

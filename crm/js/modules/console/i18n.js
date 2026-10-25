@@ -2,6 +2,21 @@
 const DEFAULT = 'zh-CN';
 
 const DICT = {
+  'l01_status': { 'zh-CN': '客户跟进状态', 'en': 'Customer follow-up status' },
+  'l01_recruit': { 'zh-CN': '关联招募', 'en': 'Linked recruiting' },
+  'l01_all': { 'zh-CN': '全部状态', 'en': 'All statuses' },
+  'l01_overdue': { 'zh-CN': '逾期', 'en': 'Overdue' },
+  'l01_today': { 'zh-CN': '今天', 'en': 'Today' },
+  'l01_month': { 'zh-CN': '30天内', 'en': 'Within 30 days' },
+  'l01_stale': { 'zh-CN': '久未联系', 'en': 'No contact for 30+ days' },
+  'l01_normal': { 'zh-CN': '正常', 'en': 'Normal' },
+  'l01_unknown': { 'zh-CN': '日期未知', 'en': 'Dates unknown' },
+  'l01_unlinked': { 'zh-CN': '未关联客户档案', 'en': 'No linked customer record' },
+  'l01_recruit_active': { 'zh-CN': '招募档案', 'en': 'Recruit record' },
+  'l01_recruit_historical': { 'zh-CN': '曾经招募', 'en': 'Past recruit' },
+  'l01_recruit_none': { 'zh-CN': '暂无招募记录', 'en': 'No recruit record' },
+  'l01_recruit_unknown': { 'zh-CN': '招募状态未知', 'en': 'Recruit status unknown' },
+  'l01_basis': { 'zh-CN': '按北京时间和最新客户跟进计算；招募跟进不混入。逾期、今天和30天内计划优先归类，其后才判断30天未联系。', 'en': 'Uses Beijing time and the latest customer follow-up, excluding recruiting. Overdue, today and next-30-day plans take precedence over 30+ days without contact.' },
   'm17_tools': { 'zh-CN': '常用工具', 'en': 'Tools' },
   'm17_workspaces': { 'zh-CN': '工作区捷径与快速记录', 'en': 'Workspaces & Quick Record' },
   'm17_workspaces_note': { 'zh-CN': '日常工作也可从主导航进入；这里保留活动、招募和AI等全部捷径。', 'en': 'Daily work is also available from the main navigation. All shortcuts, including activities, recruiting and AI, remain here.' },
