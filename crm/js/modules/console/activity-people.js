@@ -457,6 +457,14 @@ export function renderResourceDirectory(ctx) {
   const keyword = input('search', '', { placeholder: t('resource_directory_search'), 'aria-label': t('resource_directory_search'), maxlength: '120' });
   const status = select([['', t('resource_directory_all')], ['active', t('act_resource_active')], ['inactive', t('act_resource_inactive')]], '');
   status.setAttribute('aria-label', t('resource_directory_status'));
+  const stage = select([['', t('l05_all_stages')], ...['new', 'contacted', 'cooperated', 'stable', 'deep', 'inactive']
+    .map(value => [value, translateEnum('speaker_stage', value)])], '');
+  stage.setAttribute('aria-label', t('act_speaker_stage'));
+  const due = select(['', 'overdue', 'today', 'next7', 'unscheduled'].map(value => [value, t('l05_due_' + (value || 'all'))]), '');
+  due.setAttribute('aria-label', t('l05_due_label'));
+  const contactNote = h('p', { class: 'foot-note' }, t('l05_time_note'));
+  const syncType = () => { stage.hidden = due.hidden = contactNote.hidden = kind.value !== 'speaker'; };
+  kind.addEventListener('change', syncType);
   let request = 0;
   async function load() {
     const version = ++request;
@@ -464,18 +472,20 @@ export function renderResourceDirectory(ctx) {
     const node = await renderActivityResources(ctx, null, load, { ...state });
     if (version === request && host.isConnected) host.replaceChildren(node);
   }
-  const form = h('form', { class: 'more-actions', onsubmit: event => {
+  const form = h('form', { class: 'more-actions resource-directory-filters', onsubmit: event => {
     event.preventDefault(); state.kind = kind.value; state.keyword = keyword.value.trim();
-    state.status = status.value; state.page = 1; load();
-  } }, [kind, keyword, status, h('button', { class: 'btn btn-primary', type: 'submit' }, t('pc21_query'))]);
+    state.status = status.value; state.page = 1;
+    delete state.stage; delete state.due;
+    if (state.kind === 'speaker') { state.stage = stage.value; state.due = due.value; }
+    syncType(); load();
+  } }, [kind, keyword, status, stage, due, h('button', { class: 'btn btn-primary', type: 'submit' }, t('l05_query'))]);
   ctx.main.replaceChildren(
     pageHead({ title: t('resource_directory_title'), sub: t('resource_directory_note'),
       actions: [h('a', { class: 'btn btn-ghost', href: '#/activities' }, t('title_activities'))] }),
-    form, host,
+    form, contactNote, host,
     h('details', { class: 'card card-body' }, [h('summary', {}, t('resource_directory_legacy')),
       h('p', { class: 'foot-note' }, t('resource_directory_legacy_note')),
       h('div', { class: 'more-actions' }, [
-        h('a', { class: 'btn btn-ghost', href: '/crm/admin.html#/speakers' }, t('act_speakers_title')),
         h('a', { class: 'btn btn-ghost', href: '/crm/admin.html#/topics' }, t('act_topics_title')),
       ]),
     ]),
@@ -484,7 +494,7 @@ export function renderResourceDirectory(ctx) {
 }
 
 export async function renderActivityResources(ctx, activityId, onDone, directory = null) {
-  const root = h('div', { class: 'tab-stack act-resources' }, [h('p', { class: 'muted' }, t(directory ? 'resource_directory_note' : 'act_resources_note'))]);
+  const root = h('div', { class: 'tab-stack act-resources' }, directory ? [] : [h('p', { class: 'muted' }, t('act_resources_note'))]);
   try {
     const showSpeakers = !directory || directory.kind === 'speaker';
     const showTopics = !directory || directory.kind === 'topic';
@@ -506,6 +516,13 @@ export async function renderActivityResources(ctx, activityId, onDone, directory
         bdg(t(speaker.status === 'active' ? 'act_resource_active' : 'act_resource_inactive'), speaker.status === 'active' ? 'jade' : 'gray')]),
         h('div', { class: 'row-sub' }, [speaker.position, speaker.organization, speaker.expertise].filter(Boolean).join(' · ') || t('act_speaker_profile_empty')),
         speaker.topic_summary ? h('div', { class: 'row-sub' }, speaker.topic_summary) : null,
+        directory ? h('div', { class: 'row-sub l05-contact-summary' }, [
+          `${t('act_speaker_last_date')}: ${speaker.last_contact_date || t('l05_unknown')}`,
+          `${t('act_speaker_next_date')}: ${speaker.next_contact_date || t('l05_due_unscheduled')}`,
+          `${t('l05_cooperation_manual')}: ${speaker.cooperation_count == null ? t('l05_unknown') : speaker.cooperation_count}`,
+        ].join(' · ')) : null,
+        directory && speaker.last_contact_note ? h('div', { class: 'row-sub', title: speaker.last_contact_note },
+          `${t('act_speaker_last_note')}: ${String(speaker.last_contact_note).slice(0, 240)}${String(speaker.last_contact_note).length > 240 ? '…' : ''}`) : null,
         !speaker.person_id ? h('div', { class: 'row-sub' }, t('act_speaker_unlinked_note')) : null]),
       h('div', { class: 'act-resource-actions' }, [
         h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => openSpeakerEditor(ctx, speaker, refresh) }, t('btn_edit')),

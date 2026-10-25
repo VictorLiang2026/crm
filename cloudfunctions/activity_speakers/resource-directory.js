@@ -4,13 +4,27 @@ function directoryOptions(event) {
   const page = Number(event.page ?? 1), pageSize = Number(event.pageSize ?? 20);
   const keyword = String(event.keyword || '').trim().toLowerCase();
   const status = String(event.status || ''), stage = String(event.stage || '');
+  const due = event.due == null ? '' : event.due;
   if (!Number.isInteger(page) || page < 1 || page > 10000 ||
       !Number.isInteger(pageSize) || pageSize < 1 || pageSize > 50 ||
       keyword.length > 120 || !['', 'active', 'inactive'].includes(status) ||
-      !['', 'new', 'contacted', 'cooperated', 'stable', 'deep', 'inactive'].includes(stage)) {
+      !['', 'new', 'contacted', 'cooperated', 'stable', 'deep', 'inactive'].includes(stage) ||
+      typeof due !== 'string' || !['', 'overdue', 'today', 'next7', 'unscheduled'].includes(due)) {
     throw new Error('Invalid resource directory query');
   }
-  return { page, pageSize, keyword, status, stage };
+  const today = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10);
+  return { page, pageSize, keyword, status, stage, due, today };
+}
+function contactFilter(query, options) {
+  const { due, today } = options;
+  if (due === 'overdue') return query.lt('next_contact_date', today);
+  if (due === 'today') return query.eq('next_contact_date', today);
+  if (due === 'unscheduled') return query.is('next_contact_date', null);
+  if (due === 'next7') {
+    const until = new Date(Date.parse(today + 'T00:00:00Z') + 7 * 86400000).toISOString().slice(0, 10);
+    return query.gt('next_contact_date', today).lte('next_contact_date', until);
+  }
+  return query;
 }
 async function directoryPage(event, { read, enrich = async rows => rows, matches, now = Date.now }) {
   const options = directoryOptions(event);
@@ -39,4 +53,4 @@ async function directoryPage(event, { read, enrich = async rows => rows, matches
   // Never report an incomplete scan as an empty/final page.
   throw new Error('RESOURCE_SEARCH_LIMIT: narrow the status, stage or search criteria');
 }
-module.exports = { directoryOptions, directoryPage };
+module.exports = { directoryOptions, directoryPage, contactFilter };

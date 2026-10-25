@@ -1,6 +1,8 @@
 # CRM 架构单页图（v2.0 现状）
 
-> 2026-10-25 L04b（验收中）：复用public.crm_file_import_jobs支持尚未关联Person的原件；新增service_role专用crm_person_file_commands及crm_person_file_v1，强制RLS、actor隔离、身份预览及人物/原件版本校验。Person-only导入不造客户角色，应用与撤销在单事务执行；原件与人物保留。旧crm_file_import_v1维持客户模式DTO与列表范围，无视图依赖变化。More兼容区4→2，客户/照片旧URL保留。成对迁移20261025212000及别名修正20261025212500；实际证据与回退限制见[L04b](../specs/legacy-workspace-exit/evidence/L04b.md)。
+> 2026-10-25 L05（验收中）：嘉宾目录按阶段/状态/关键词/联系到期组合查询，日期按北京时间，过滤在服务端分页前完成。显示现有联系摘要和手动合作次数，不复制Person基础资料、不生成新提醒。More兼容卡片2→1，旧嘉宾URL保留；无数据库或共享模块变更。见[L05](../specs/legacy-workspace-exit/evidence/L05.md)。
+
+> 2026-10-25 L04b（已发布）：复用public.crm_file_import_jobs支持尚未关联Person的原件；新增service_role专用crm_person_file_commands及crm_person_file_v1，强制RLS、actor隔离、身份预览及人物/原件版本校验。Person-only导入不造客户角色，应用与撤销在单事务执行；原件与人物保留。旧crm_file_import_v1维持客户模式DTO与列表范围，无视图依赖变化。More兼容区4→2，客户/照片旧URL保留。成对迁移20261025212000及别名修正20261025212500；实际证据与回退限制见[L04b](../specs/legacy-workspace-exit/evidence/L04b.md)。
 
 > 2026-10-25 L04a：person_360为既有文件导入增加受限PDF文字提取，独立子进程隔离；复用原AI草稿/审核链，仅扩充导入任务错误码，public对象数量/权限/视图不变。旧客户及照片入口等待L04b，详见[L04a](../specs/legacy-workspace-exit/evidence/L04a.md)。
 

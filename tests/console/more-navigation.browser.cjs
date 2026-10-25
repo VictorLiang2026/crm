@@ -25,7 +25,7 @@ const LEGACY_ROUTES = [
   ['#/recruit/trash', '[CRM_TEST_ONLY]已删除候选人'],
 ];
 
-const REMAINING_MORE_ROUTES = ['#/speakers', '#/recruit/goals'];
+const REMAINING_MORE_ROUTES = ['#/recruit/goals'];
 
 test('Console More keeps only uncovered gaps bilingual and preserves all 17 old URLs', async () => {
   const browser = new Browser(path.resolve(__dirname, '../..'));

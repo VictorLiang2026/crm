@@ -502,6 +502,10 @@ body:has(.login), body.is-login { padding-top: env(safe-area-inset-top); }
 .tab-stack { display: flex; flex-direction: column; }
 .l04-file-form { gap: 12px; max-width: 880px; margin-top: 16px; }
 .l04-file-form[hidden], .l04-file-error:empty { display: none; }
+.resource-directory-filters { flex-wrap: wrap; gap: 8px; }
+.resource-directory-filters .sheet-select { flex: 1 1 170px; width: auto; min-width: 0; }
+.resource-directory-filters .sheet-input { flex: 2 1 220px; width: auto; min-width: 0; }
+.resource-directory-filters .btn, .resource-directory-filters .sheet-select, .resource-directory-filters .sheet-input { min-height: 44px; }
 .l04-file-form > button { align-self: flex-start; min-height: 44px; }
 .l04-identity-choice { min-height: 44px; white-space: normal; overflow-wrap: anywhere; }
 .fact-text { font-size: 13.5px; color: var(--ink-2); background: #f7f8fa; border-radius: var(--radius-sm); padding: 12px 14px; }

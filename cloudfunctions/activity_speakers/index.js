@@ -15,7 +15,7 @@
 'use strict';
 
 const { rdb, normFields, assertOk, nowIso } = require('./db');
-const { directoryPage } = require('./resource-directory');
+const { directoryPage, contactFilter } = require('./resource-directory');
 
 const SP_FIELDS = ['name', 'position', 'relationship_stage',
   'expertise', 'topic_summary', 'last_contact_date', 'next_contact_date', 'last_contact_note',
@@ -153,6 +153,7 @@ async function directory(event) {
       let q = rdb.from('activity_speakers').select().is('deleted_at', null);
       if (options.status) q = q.eq('status', options.status);
       if (options.stage) q = q.eq('relationship_stage', options.stage);
+      q = contactFilter(q, options);
       const result = assertOk(await q.order('updated_at', { ascending: false })
         .order('id', { ascending: false }).range(offset, offset + count - 1));
       return result.data || [];

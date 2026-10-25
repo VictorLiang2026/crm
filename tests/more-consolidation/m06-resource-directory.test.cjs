@@ -7,6 +7,8 @@ function service(name,tables,{personError=false}={}){
   if(!Object.hasOwn(tables,table))throw Error('Unexpected table '+table);
   calls.push(table);const filters=[],sorts=[];let start=0,end=Infinity;
   const q={select(){return q},is(k,v){filters.push(r=>r[k]==v);return q},eq(k,v){filters.push(r=>r[k]===v);return q},
+   lt(k,v){filters.push(r=>r[k]!=null&&r[k]<v);return q},gt(k,v){filters.push(r=>r[k]!=null&&r[k]>v);return q},
+   lte(k,v){filters.push(r=>r[k]!=null&&r[k]<=v);return q},
    in(k,values){filters.push(r=>values.includes(r[k]));return q},order(k,o){sorts.push([k,o]);return q},
    range(a,b){start=a;end=b+1;return q},limit(n){end=n;return q},
    then(resolve,reject){return Promise.resolve().then(()=>{
@@ -57,4 +59,23 @@ test('M06 rejects invalid paging and never represents a capped search as complet
  await assert.rejects(directoryPage({keyword:'slow'},{now:()=>clock,read:async()=>{clock=7000;return[]},matches:()=>false}),/RESOURCE_SEARCH_LIMIT/);
  const page=await directoryPage({page:2,pageSize:20},{read:async(o,start,count)=>{assert.equal(start,20);assert.equal(count,21);return Array.from({length:21},(_,id)=>({id}))}});
  assert.equal(page.rows.length,20);assert.equal(page.hasMore,true);assert.equal(page.total,null);
+});
+
+test('L05 actual speaker directory combines server due/stage/status with canonical name before paging',async()=>{
+ const today=new Date(Date.now()+8*3600000).toISOString().slice(0,10);
+ const rows=Array.from({length:260},(_,i)=>({id:i+1,person_id:i+1,name:'old',updated_at:'2026-10-24',
+  deleted_at:null,status:i%2?'active':'inactive',relationship_stage:i%3?'stable':'new',
+  next_contact_date:i%5===0?null:i%5===1?today:'2000-01-01'}));
+ const persons=rows.map(r=>({id:r.id,display_name:'Fictional needle '+r.id,deleted_at:null}));
+ const expected=rows.filter(r=>r.status==='active'&&r.relationship_stage==='stable'&&r.next_contact_date==='2000-01-01').reverse();
+ const f=service('activity_speakers',{activity_speakers:rows,persons});
+ const collected=[];
+ for(const page of [1,2]){
+  const result=await f.call({action:'directory',page,pageSize:20,keyword:'needle',status:'active',stage:'stable',due:'overdue'});
+  assert.equal(result.error,undefined);collected.push(...result.rows.map(r=>r.id));
+ }
+ assert.deepEqual(collected,expected.slice(0,40).map(r=>r.id));
+ const before=f.calls.length;
+ assert.match((await f.call({action:'directory',due:'unsafe'})).error,/Invalid resource/);
+ assert.equal(f.calls.length,before);
 });
