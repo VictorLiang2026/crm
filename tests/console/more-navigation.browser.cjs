@@ -25,9 +25,9 @@ const LEGACY_ROUTES = [
   ['#/recruit/trash', '[CRM_TEST_ONLY]已删除候选人'],
 ];
 
-const REMAINING_MORE_ROUTES = ['#/customers', '#/funnels', '#/ai-suggestions', '#/more/photos', '#/speakers', '#/recruit/goals'];
+const REMAINING_MORE_ROUTES = ['#/customers', '#/ai-suggestions', '#/more/photos', '#/speakers', '#/recruit/goals'];
 
-test('Console More removes 11 duplicate cards, keeps six gaps bilingual, and preserves all 17 old URLs', async () => {
+test('Console More keeps only uncovered gaps bilingual and preserves all 17 old URLs', async () => {
   const browser = new Browser(path.resolve(__dirname, '../..'));
   try {
     await browser.start();
@@ -49,7 +49,7 @@ test('Console More removes 11 duplicate cards, keeps six gaps bilingual, and pre
     })`);
     assert.deepEqual(english.headings, ['Tools', 'Workspaces & Quick Record', 'Legacy Compatibility']);
     assert.deepEqual(english.legacyHrefs, REMAINING_MORE_ROUTES.map(hash => '/crm/admin.html' + hash).sort());
-    assert.equal(english.legacyStatusCount, 6);
+    assert.equal(english.legacyStatusCount, REMAINING_MORE_ROUTES.length);
     assert.equal(english.subtitle, 'Workspaces, system tools, and compatibility links.');
     assert.match(english.currentRecycle || '', /Recycle Bin/);
     assert.match(english.quickRecord || '', /confirm the Person/);

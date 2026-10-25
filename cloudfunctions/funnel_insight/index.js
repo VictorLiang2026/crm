@@ -20,6 +20,7 @@
 
 const { rdb, generateText } = require('./db');
 const testData = require('./test-data');
+const { stageFacts, stageMessages, stageRule } = require('./stage-facts');
 
 const META = {
   customer: { label: '客户经营漏斗', source: 'customers.customer_stage' },
@@ -155,8 +156,10 @@ function buildStats(rows) {
   });
 }
 
-async function getStats() {
-  const funnels = buildStats(await loadRows());
+async function getStats(factsOnly = false) {
+  const rows = await loadRows();
+  const legacy = buildStats(rows);
+  const funnels = factsOnly ? stageFacts(legacy, rows) : legacy;
   const summary = await testData.disclose([], {rdb, scope:'funnel'});
   for (const funnel of funnels) funnel.testData = summary;
   return funnels;
@@ -303,12 +306,13 @@ function ruleExplain(funnels) {
   return out.join('\n');
 }
 
-async function explain() {
-  const funnels = await getStats();
+async function explain(factsOnly = false, language = 'zh-CN') {
+  const funnels = await getStats(factsOnly);
+  const fallback = () => factsOnly ? stageRule(funnels, language) : ruleExplain(funnels);
   const disclosure = funnels[0]?.testData;
   const today = new Date(Date.now() + 8 * 3600 * 1000).toISOString().slice(0, 10);
   try {
-    const messages = testData.withMessages(buildMessages(funnels, today), funnels[0]?.testData);
+    const messages = testData.withMessages(factsOnly ? stageMessages(funnels, today, language) : buildMessages(funnels, today), funnels[0]?.testData);
     const task = generateText(messages, { temperature: 0.4, maxTokens: 900 });
     const timer = new Promise(function (resolve) { setTimeout(function () { resolve(null); }, AI_TIMEOUT_MS); });
     const res = await Promise.race([task, timer]);
@@ -317,12 +321,12 @@ async function explain() {
       return { ok: true, testData: disclosure, text: text, source: 'ai', degraded: false, generated_at: new Date().toISOString() };
     }
     return {
-      ok: true, testData: disclosure, text: ruleExplain(funnels), source: 'rule', degraded: true,
+      ok: true, testData: disclosure, text: fallback(), source: 'rule', degraded: true,
       reason: 'AI 返回为空', generated_at: new Date().toISOString(),
     };
   } catch (e) {
     return {
-      ok: true, testData: disclosure, text: ruleExplain(funnels), source: 'rule', degraded: true,
+      ok: true, testData: disclosure, text: fallback(), source: 'rule', degraded: true,
       reason: String(e && e.message || e), generated_at: new Date().toISOString(),
     };
   }
@@ -331,10 +335,13 @@ async function explain() {
 exports.main = async function (event) {
   const action = event && event.action;
   try {
+    if (event?.presentation != null && event.presentation !== 'stage_facts') return {ok:false,error:'Invalid analytics presentation'};
+    const factsOnly = event?.presentation === 'stage_facts';
+    const language = event?.language === 'en' ? 'en' : 'zh-CN';
     if (action === 'stats') {
-      return { ok: true, generated_at: new Date().toISOString(), funnels: await getStats() };
+      return { ok: true, generated_at: new Date().toISOString(), funnels: await getStats(factsOnly) };
     }
-    if (action === 'explain') return await explain();
+    if (action === 'explain') return await explain(factsOnly, language);
     return { ok: false, error: 'unknown action: ' + action };
   } catch (e) {
     return { ok: false, error: String(e && e.message || e) };

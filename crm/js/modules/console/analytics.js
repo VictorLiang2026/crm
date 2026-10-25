@@ -1,6 +1,6 @@
 import { h } from './dom.js';
 import { data } from './data.js';
-import { t, translateEnum } from './i18n.js';
+import { t, translateEnum, getLang } from './i18n.js';
 import { card, errorBox, pageHead, wpTag } from './ui.js';
 
 const KINDS = ['customer', 'opportunity', 'recruit'];
@@ -12,6 +12,31 @@ const provenance = summary => !summary || summary.status !== 'verified'
   ? h('p', { class: 'foot-note status-error' }, t('pc21_test_unverified'))
   : summary.containsTestData ? h('p', { class: 'foot-note status-error' }, t('pc21_test_notice').replace('{count}', String(summary.recordCount))) : null;
 
+function stageDetails(key, row) {
+  const metrics = ['count', 'overdue', 'dwell_median_days', 'stuck', 'entered_30d', 'moved_30d'];
+  const value = (stage, field) => {
+    if (['dwell_median_days', 'stuck'].includes(field) && stage.kind === 'terminal') return t('l02_na');
+    if (key === 'customer' && ['dwell_median_days', 'stuck', 'moved_30d'].includes(field)) return t('l02_unknown');
+    if (key === 'opportunity' && field === 'moved_30d') return t('l02_unknown');
+    return count(stage[field]) === '—' ? t('l02_unknown') : count(stage[field]);
+  };
+  return h('details', { 'data-stage-details': key }, [
+    h('summary', {}, t('l02_details')),
+    h('p', { class: 'foot-note' }, t('l02_basis_' + key)),
+    h('p', { class: 'foot-note' }, t('l02_distribution')),
+    row.total === 0 ? h('p', { class: 'foot-note' }, t('l02_empty'))
+      : !Number.isInteger(row.total) || row.total < 10 ? h('p', { class: 'foot-note' }, t('l02_small')) : null,
+    h('div', { class: 'table-scroll' }, h('table', { class: 'people-table analytics-stage-table' }, [
+      h('thead', {}, h('tr', {}, [h('th', {}, t('pc21_stage')),
+        ...metrics.map(field => h('th', { title: t('l02_' + field + '_full') }, t('l02_' + field)))])),
+      h('tbody', {}, (row.stages || []).map(stage => h('tr', { 'data-stage-kind': stage.kind, style: 'cursor:default' }, [
+        h('th', { scope: 'row' }, stage.kind === 'unclassified' ? t('m16_unclassified') : translateEnum(ENUMS[key], stage.stage)),
+        ...metrics.map(field => h('td', { 'data-stage-metric': field }, value(stage, field))),
+      ]))),
+    ])),
+  ]);
+}
+
 function funnelCard(key, row) {
   return card({ title: t('m16_' + key), icon: 'chart', body: [
     provenance(row?.testData),
@@ -21,6 +46,7 @@ function funnelCard(key, row) {
       h('span', { style: 'flex:1;min-width:0;overflow-wrap:anywhere' }, stage.kind === 'unclassified' ? t('m16_unclassified') : translateEnum(ENUMS[key], stage.stage)),
       h('b', {}, count(stage.count)),
     ]))) : h('p', { class: 'foot-note' }, t('m16_missing')),
+    row ? stageDetails(key, row) : null,
     row ? h('details', {}, [
       h('summary', {}, t('m16_source_notes')),
       h('p', { class: 'foot-note' }, t('m16_original_language')),
@@ -59,7 +85,7 @@ export function renderAnalytics(ctx) {
     explaining = true; buttons();
     explanation.replaceChildren(h('p', { class: 'foot-note' }, t('loading')));
     try {
-      const result = await data.explainFunnels(ctx);
+      const result = await data.explainFunnels(ctx, getLang());
       if (!ctx.main.contains(facts)) return;
       if (result.ok !== true || typeof result.text !== 'string' || !result.text.trim() || !['ai', 'rule'].includes(result.source)) throw new Error(t('m16_invalid'));
       explanation.replaceChildren(
@@ -85,7 +111,6 @@ export function renderAnalytics(ctx) {
     h('p', { class: 'foot-note' }, t('m16_counts_scope')),
     status, facts,
     card({ title: t('m16_interpretation'), icon: 'sparkle', body: [h('p', { class: 'foot-note' }, t('m16_explain_scope')), explain, explanation] }),
-    h('p', { class: 'foot-note' }, [t('m16_legacy_note'), ' ', h('a', { href: '/crm/admin.html#/funnels' }, t('legacy_funnels'))]),
   );
   load();
 }

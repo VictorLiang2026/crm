@@ -1,5 +1,7 @@
 # CRM 架构单页图（v2.0 现状）
 
+> 2026-10-25 L02：经营分析新增折叠阶段详情，funnel_insight 增加 stage_facts 可选展示口径，旧请求默认不变；新AI解释不再使用未经验证的阶段人数比作为历史转化。More兼容入口6→5，旧分析URL保留。无数据库变更，public对象数量仍为61表/12视图/37序列/69例程；部署源码新增stage-facts.js。详见[L02](../specs/legacy-workspace-exit/evidence/L02.md)。
+
 > 2026-10-25 L01 客户经营视图增量：用户已批准 L01–L08 按方案自动逐包实施，以下“尚未授权”是 L00 交付时的历史状态。L01 新增 service_role 专用只读 public.person_customer_worklist_v1(jsonb)，人物客户视图按客户跟进状态筛选排序并展示招募状态，全部人物视图保持原行为。现有 public 对象数量变为61表、12视图、37序列、69例程。旧客户入口等待L04闭环验收；详见[L01证据](../specs/legacy-workspace-exit/evidence/L01.md)及[任务状态](../specs/legacy-workspace-exit/tasks.md)。
 
 > 2026-10-25 最新导航增量：[旧版工作区精简与升级方案](work-packages/legacy-workspace-upgrade-20261025.md)。用户逐项批准从More移除11张重复卡片，兼容区17→6；17旧URL、设置维护入口和统一回收站内旧批量恢复均保留。仅misc.js/i18n.js变化，无数据/API/权限/数据库/云函数变更。六项剩余能力的迁移方案见[后续L01–L08](../specs/legacy-workspace-exit/tasks.md)，尚未授权实施；本轮证据见[L00](../specs/legacy-workspace-exit/evidence/L00.md)。下方17项菜单描述属于前轮历史。

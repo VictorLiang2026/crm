@@ -15,7 +15,7 @@ test('M17 More has four primary entries, explicit route kinds, justified compati
     assert.deepEqual(await b.evaluate("[document.querySelector('.more-workspaces').open,document.querySelector('.more-compat').open]"),[false,false]);
     assert.equal(await b.evaluate("[...document.querySelectorAll('#console-main details>summary')].every(x=>getComputedStyle(x).display==='list-item'&&x.getBoundingClientRect().height>=44)"),true);
     assert.deepEqual(await b.evaluate("[...document.querySelectorAll('.more-compat a')].map(x=>x.getAttribute('href'))"),
-      ['#/customers','#/funnels','#/ai-suggestions','#/more/photos','#/speakers','#/recruit/goals'].map(hash=>'/crm/admin.html'+hash));
+      ['#/customers','#/ai-suggestions','#/more/photos','#/speakers','#/recruit/goals'].map(hash=>'/crm/admin.html'+hash));
     assert.equal(await b.evaluate("[...document.querySelectorAll('.more-compat a')].every(x=>x.dataset.entryKind==='legacy' && x.getAttribute('href').startsWith('/crm/admin.html#/') && x.querySelector('[data-compat-reason]').textContent.length>20)"),true);
     assert.equal(await b.evaluate("[...document.querySelectorAll('a[data-entry-kind=native]')].every(x=>x.getAttribute('href').startsWith('#/'))"),true);
     assert.equal(await b.evaluate('document.documentElement.scrollWidth<=innerWidth+1'),true);
