@@ -500,6 +500,10 @@ body:has(.login), body.is-login { padding-top: env(safe-area-inset-top); }
 .section-title:first-child { margin-top: 0; }
 .section-title .bdg { margin-left: auto; }
 .tab-stack { display: flex; flex-direction: column; }
+.l04-file-form { gap: 12px; max-width: 880px; margin-top: 16px; }
+.l04-file-form[hidden], .l04-file-error:empty { display: none; }
+.l04-file-form > button { align-self: flex-start; min-height: 44px; }
+.l04-identity-choice { min-height: 44px; white-space: normal; overflow-wrap: anywhere; }
 .fact-text { font-size: 13.5px; color: var(--ink-2); background: #f7f8fa; border-radius: var(--radius-sm); padding: 12px 14px; }
 
 .tl-item { position: relative; display: flex; gap: 14px; padding: 10px 0 10px 4px; }

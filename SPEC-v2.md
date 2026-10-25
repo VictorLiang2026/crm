@@ -1,5 +1,7 @@
 # 个人 CRM — 技术规格 v2.0
 
+> **2026-10-25 L04b 增量（验收中）**：既有导入任务增加nullable person_id/customer_id/photo_id及original_data/raw_text/apply_command_id，模式CHECK区分客户附件和独立人物原件。新增public.crm_person_file_commands、crm_person_file_v1(text,text,jsonb)，仅service_role访问；明确actor、原件摘要、租约、幂等、身份候选、15分钟预览和updated_at版本。身份创建与选中基础字段应用同事务，不自动产生客户/事实/行动。撤销保留人物和原件，后续人物改动拒绝覆盖。数据库脚本及验证详见[L04b证据](specs/legacy-workspace-exit/evidence/L04b.md)；旧DTO、路由、客户OCR保持。以下2026-09-06数量与模型是历史描述。
+
 > CloudBase 个人版 + 事件云函数 + 共享集群 PostgreSQL 的个人 CRM 系统。
 > **v2.0 现状规格**（2026-09-06 重写）—— 对应已部署 **16 个云函数 / 13 张业务表 / 8 个视图**。
 > v1 见 [`SPEC-v1.md`](./SPEC-v1.md)（早期 6 张表 / 8 云函数 + PGHOST 直连方案，已弃用）。

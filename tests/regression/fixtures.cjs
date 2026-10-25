@@ -260,6 +260,7 @@ function installFixtures() {
       household: mode === 'family' ? { id: 981001, important_facts: marker + '周末一起探望父母' } : null,
       members: mode === 'family' ? [{ id: 982001, person_id: 980002, relationship_to_anchor: 'spouse',
         person: { id: 980002, display_name: marker + '家人乙' } }] : [] }),
+    'person_360:listPersonFiles': () => ({rows:[],page:1,pageSize:20,hasMore:false,total:null}),
     'person_360:getCustomerProfile': () => ({ personId:'980001', customerId:String(customer.Id), status:'linked',
       source:'public.customers', fields:{...customer}, roles:[{role:'customer',origin:'legacy_backfill'}],
       contactAllowed:false, testData:{status:'verified',containsTestData:true,recordCount:1,

@@ -21,7 +21,9 @@ function errorText(code) {
     PDF_ENCRYPTED:'l04_pdf_encrypted',PDF_NO_TEXT:'l04_pdf_no_text',PDF_LIMIT:'l04_pdf_limit',PDF_TIMEOUT:'l04_pdf_timeout'})[code]||'file_import_parse_failed');
 }
 
-export async function fileImportNode(ctx,personId,customerId,{onReview,onSaved}={}) {
+export async function fileImportNode(ctx,personId,customerId,{onReview,onSaved,onOriginal,standalone=false}={}) {
+  const api=standalone?{save:data.savePersonFileOriginal,list:data.personFiles,parse:data.parsePersonFileDraft}:
+    {save:data.saveFileOriginal,list:data.fileImports,parse:data.parseFileDraft};
   const root=h('section',{class:'care-materials-section file-import'});
   const input=h('input',{type:'file',multiple:true,'aria-label':t('file_import_choose')});
   const queueHost=h('div',{class:'care-materials-list file-import-queue'});
@@ -39,22 +41,27 @@ export async function fileImportNode(ctx,personId,customerId,{onReview,onSaved}=
   async function review(job,button) {
     if(reviewing)return;reviewing=true;button.disabled=true;
     reviewHost.replaceChildren(h('p',{role:'status'},t('loading')));
-    try {await onReview?.(job,reviewHost);}
+    try {await onReview?.(job,reviewHost,()=>load(page));}
     catch {reviewHost.replaceChildren(h('p',{role:'alert'},t('file_import_review_failed')));}
     finally {reviewing=false;button.disabled=false;}
   }
   function jobRow(job) {
     const actions=h('div',{class:'care-record-actions'});
     const available=job.sourceAvailable!==false;
+    if(onOriginal&&available){
+      const source=h('button',{class:'btn btn-ghost btn-sm',type:'button'},t('l04_download'));
+      source.onclick=async()=>{source.disabled=true;try{await onOriginal(job);}catch{message.textContent=t('file_import_source_missing');}finally{source.disabled=false;}};
+      actions.append(source);
+    }
     if(job.status==='draft'&&available&&job.draftAvailable!==false&&onReview){
-      const button=h('button',{class:'btn btn-soft btn-sm',type:'button'},t('file_import_review'));
+      const button=h('button',{class:'btn btn-soft btn-sm',type:'button'},t(job.apply_command_id?'l04_view_file':'file_import_review'));
       button.addEventListener('click',()=>review(job,button));actions.append(button);
     }else if(job.status!=='draft'&&available&&supported(job)){
       const active=job.status==='parsing'&&Date.parse(job.lease_expires_at)>Date.now();
       const button=h('button',{class:'btn btn-soft btn-sm',type:'button',disabled:busy||active},t('file_import_retry_parse'));
       button.addEventListener('click',async()=>{
         if(busy||loading)return;busy=true;draw();
-        try {const result=await data.parseFileDraft(ctx,job.id);if(!result.job)throw Error('Invalid receipt');
+        try {const result=await api.parse(ctx,job.id);if(!result.job)throw Error('Invalid receipt');
           Object.assign(job,result.job);if(job.status==='draft')await onSaved?.();}
         catch {message.textContent=t('file_import_parse_failed');}
         finally {busy=false;draw();await load(page);}
@@ -90,7 +97,7 @@ export async function fileImportNode(ctx,personId,customerId,{onReview,onSaved}=
   }
   async function load(target) {
     if(loading)return;loading=true;draw();historyStatus.textContent=t('loading');
-    try {const result=await data.fileImports(ctx,personId,target);
+    try {const result=await api.list(ctx,personId,target);
       if(!Array.isArray(result.rows)||typeof result.hasMore!=='boolean')throw Error('Invalid page');
       jobs=result.rows;page=target;hasMore=result.hasMore;
       historyStatus.textContent=jobs.length?t('file_import_page').replace('{page}',String(page)):t('file_import_no_history');
@@ -105,14 +112,14 @@ export async function fileImportNode(ctx,personId,customerId,{onReview,onSaved}=
         try {
           if(!item.job){item.status='saving';draw();
             // Keep the same key and original payload when a network response is uncertain.
-            item.payload ||= {personId:String(personId),customerId:Number(customerId),idempotencyKey:item.key,
+            item.payload ||= {...(standalone?{}:{personId:String(personId),customerId:Number(customerId)}),idempotencyKey:item.key,
               fileName:item.file.name,contentType:item.file.type||'application/octet-stream',base64:await base64(item.file)};
-            const saved=await data.saveFileOriginal(ctx,item.payload);
+            const saved=await api.save(ctx,item.payload);
             if(!saved.job?.id)throw Error('Invalid receipt');item.job=saved.job;item.status=item.job.status;
             await onSaved?.();
           }
           if(parse&&supported(item.file)&&item.job.status!=='draft'){
-            item.status='parsing';draw();const result=await data.parseFileDraft(ctx,item.job.id);
+            item.status='parsing';draw();const result=await api.parse(ctx,item.job.id);
             if(!result.job)throw Error('Invalid receipt');item.job=result.job;item.status=item.job.status;
             if(item.job.error_code)item.error=errorText(item.job.error_code);
             if(item.job.status==='draft')await onSaved?.();

@@ -1,6 +1,7 @@
 // Console 页面 barrel（WP1）：路由层只依赖本文件；实现拆分到 pages/。
 export { renderToday } from './pages/today.js';
 export { renderPeople } from './pages/people.js';
+export { renderPersonFileImport } from './person-files.js';
 export { renderPeopleTrash } from './pages/people-trash.js';
 export { renderCustomerTrash, renderRecruitTrash, renderRecycleHub } from './pages/recycle.js';
 export { renderPerson } from './pages/person.js';

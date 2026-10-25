@@ -79,10 +79,6 @@ export function renderPeople(ctx) {
   const pageInfo = h('span', { class: 'pager-info' }, '');
   const filterButton = h('button', { class: 'btn btn-dark people-filter-trigger', type: 'button' });
   const customerViewButton = h('button', { class: 'btn btn-soft', type: 'button' });
-  const legacyCustomerTools = h('a', {
-    class: 'btn btn-ghost people-legacy-tools', href: '/crm/admin.html#/customers', hidden: true, style: 'display:none',
-    title: t('people_legacy_tools_note'),
-  }, t('people_legacy_tools'));
   const filterPanel = h('div', { class: 'people-filter-panel', hidden: true });
   const priorityFilters = h('div', { class: 'people-filter-priorities' });
   const worklistFilter = h('select', { 'aria-label': t('l01_status'), onchange: () => {
@@ -112,8 +108,6 @@ export function renderPeople(ctx) {
         state.worklistStatus = 'all'; worklistFilter.value = 'all';
         if (state.sortField === 'wb_status') { state.sortField = 'id'; state.sortDir = 'desc'; }
       }
-      legacyCustomerTools.hidden = !customerView;
-      legacyCustomerTools.style.display = customerView ? '' : 'none';
       const res = await data.listPeople(ctx, {
         page: state.page, pageSize: peoplePageSize(), keyword: state.keyword,
         sortField: state.sortField, sortDir: state.sortDir,
@@ -330,7 +324,7 @@ export function renderPeople(ctx) {
       ]),
       h('div', { class: 'people-filter-anchor' }, [filterButton, filterPanel]),
       customerViewButton,
-      legacyCustomerTools,
+      h('a',{class:'btn btn-ghost',href:'#/people/import'},t('l04_import_title')),
       h('a', {
         class: 'btn btn-ghost', href: '#/people-trash',
       }, [ic('trash'), t('btn_trash')]),

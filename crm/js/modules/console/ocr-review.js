@@ -3,6 +3,7 @@ import { data } from './data.js';
 import { t } from './i18n.js';
 import { emptyNote, fmtDate, sectionTitle } from './ui.js';
 import { fileImportNode } from './file-import.js';
+import { personFileHistory } from './person-files.js';
 
 const FIELDS = [
   ['phone', 'ocr_field_phone'], ['gender', 'ocr_field_gender'], ['birthday', 'ocr_field_birthday'],
@@ -386,10 +387,12 @@ function renderApplyPreview(ctx, result, host, changed) {
 
 export async function renderOcrReview(ctx, personId) {
   const profile = await data.customerProfile(ctx, personId);
+  const originals = await personFileHistory(ctx, personId);
   if (profile.status !== 'linked' || !profile.customerId) {
     return h('div', { class: 'tab-stack' }, [
       sectionTitle(t('ocr_title')),
-      emptyNote(t('ocr_customer_required'), t('ocr_customer_required_note')),
+      originals,
+      h('p',{class:'sheet-note'},t('l04_customer_import_note')),
     ]);
   }
   const customerId = profile.customerId;
@@ -439,6 +442,7 @@ export async function renderOcrReview(ctx, personId) {
     ]),
     h('p', { class: 'sheet-note' }, t('ocr_safety_note')),
     importPanel,
+    originals,
     recordHeading, recordHost,
     sectionTitle(t('ocr_applied_history')),
     historyHost,

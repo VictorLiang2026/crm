@@ -23,6 +23,7 @@ const { RelationshipService } = require('./relationship-service');
 const { RelationshipNetworkService } = require('./relationship-network-service');
 const { OcrReviewService } = require('./ocr-review-service');
 const { FileImportService } = require('./file-import-service');
+const { PersonFileService } = require('./person-file-service');
 const { LegacyOpportunityService } = require('./legacy-opportunity-service');
 const { RecruitDirectoryService } = require('./recruit-directory-service');
 const { RecruitCandidateService } = require('./recruit-candidate-service');
@@ -1074,12 +1075,19 @@ exports.main = async event => {
         return await new LegacyOpportunityService({rpc:pgRpc}).preview(event.data,uid);
       case 'executeLegacyOpportunity':
         return await new LegacyOpportunityService({rpc:pgRpc}).execute(event.previewId,uid);
+      case 'savePersonFileOriginal': return await new PersonFileService({rpc:pgRpc}).save(event.data,uid);
+      case 'listPersonFiles': return await new PersonFileService({rpc:pgRpc}).list(event.personId,event.page,uid);
+      case 'getPersonFile': return await new PersonFileService({rpc:pgRpc,request:pgRequest}).get(event.jobId,uid,{history:true});
+      case 'previewPersonFile': return await new PersonFileService({rpc:pgRpc,previewIdentity:service.previewIdentity}).preview(event.data,uid);
+      case 'previewPersonFileUndo': return await new PersonFileService({rpc:pgRpc}).undo(event.data,uid);
+      case 'executePersonFile': return await new PersonFileService({rpc:pgRpc}).execute(event.previewId,uid);
       case 'saveFileOriginal':
         return await new FileImportService({rpc:pgRpc}).save(event.data,uid);
       case 'listFileImports':
         return await new FileImportService({rpc:pgRpc}).list(event.personId,event.page,uid);
+      case 'parsePersonFileDraft':
       case 'parseFileDraft':
-        return await new FileImportService({rpc:pgRpc,parse:async data=>{
+        return await new (event.action==='parsePersonFileDraft'?PersonFileService:FileImportService)({rpc:pgRpc,parse:async data=>{
           let timer;
           try {
             const response=await Promise.race([

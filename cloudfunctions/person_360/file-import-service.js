@@ -21,6 +21,13 @@ function original(data) {
     throw new Error('Invalid file import payload');
   const personId=id(data.personId),customerId=id(data.customerId);
   if(Number(customerId)>2147483647)throw new Error('Invalid file import customer');
+  validateContent(data);
+  const payload={personId,customerId,fileName:data.fileName.trim(),contentType:data.contentType,
+    base64:data.base64,notes:data.notes||''};
+  return {...payload,idempotencyKey:uuid(data.idempotencyKey),
+    payloadHash:createHash('sha256').update(JSON.stringify(payload)).digest('hex')};
+}
+function validateContent(data) {
   if(typeof data.fileName!=='string'||!data.fileName.trim()||data.fileName.length>255||/[\x00-\x1f]/.test(data.fileName)||
     typeof data.contentType!=='string'||!/^[a-z0-9][a-z0-9.+-]*\/[a-z0-9][a-z0-9.+-]*$/.test(data.contentType)||data.contentType.length>120||
     typeof data.base64!=='string'||!data.base64||data.base64.length>Math.ceil(MAX_BYTES/3)*4||
@@ -28,10 +35,6 @@ function original(data) {
     (data.notes!=null&&(typeof data.notes!=='string'||data.notes.length>4000)))throw new Error('Invalid file import content');
   const bytes=Buffer.from(data.base64,'base64');
   if(bytes.length>MAX_BYTES||bytes.toString('base64')!==data.base64)throw new Error('Invalid file import size or encoding');
-  const payload={personId,customerId,fileName:data.fileName.trim(),contentType:data.contentType,
-    base64:data.base64,notes:data.notes||''};
-  return {...payload,idempotencyKey:uuid(data.idempotencyKey),
-    payloadHash:createHash('sha256').update(JSON.stringify(payload)).digest('hex')};
 }
 function parseInput(source) {
   const match=/^data:([^;,]+);base64,([A-Za-z0-9+/=]+)$/.exec(source.photo_url||'');
@@ -98,4 +101,4 @@ class FileImportService {
     return this.call(actor,'complete',{jobId,leaseToken:claim.leaseToken,...parsed});
   }
 }
-module.exports={FileImportService,original,parseInput,draft};
+module.exports={FileImportService,original,validateContent,parseInput,draft};
