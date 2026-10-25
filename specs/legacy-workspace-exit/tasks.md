@@ -36,7 +36,9 @@
 
 验收：0/空值/缺字段、终态、小样本和失败状态有明确显示；AI失败保留事实；未经验证的指标不能被AI提升成结论；钻取仅允许精确同范围，否则只提供工作区导航。回归M16/M15/机会和招募。核心旧指标已替代或明确不保留后，移出funnels卡片及新版页内相应旧快捷链接（URL保留）。_R5–R7。_
 
-## L03：AI历史补建议日期轴与列表（已批准，实施中，P1）
+## L03：AI历史补建议日期轴与列表（已完成，P1）
+
+已发布56de3c2 / release-20261025-203000，完整三端核验通过；证据见[evidence/L03.md](evidence/L03.md)。
 
 增强现有ai-experience.js/ai-history-filters.js及assistant/ai-history-query.js，Legacy增加受限dateField枚举recommendation_date/suggested_followup_date及稳定排序，缺省请求保持原行为。Runtime只允许其真实支持的字段；服务端验证日期、分页和身份范围。加今天/逾期/未来7天查询快捷项；显示话术、策略、目标摘要，保留原始结果和来源。
 
@@ -44,7 +46,7 @@
 
 验收：两日期不同的记录、空日期、边界日期、筛选翻页、稳定排序、同名候选人为选择、旧无filters请求、actor权限、原反馈/Outcome/Learning通过。回归M12/M13及PC23/PC29。核心筛选/阅读完成后移出ai-suggestions卡片；是否加入行动草稿不作为清退必要条件。_R5–R7。_
 
-## L04：资料解析闭环补齐（已批准，待实施，P1/P2，分两个可独立发布子包）
+## L04：资料解析闭环补齐（已批准，L04a实施中，P1/P2，分两个可独立发布子包）
 
 L04a：在既有file-import和ai_parse.parse_import_draft链补可提取文字PDF；先确认解析运行位置、依赖、4MiB/10文件边界、页数/字符/超时限制、原件保护及授权。扫描/加密/不支持文件明确失败可重试，原件保留；不改变Legacy ai_parse默认请求。DOCX解析另列可选，不默认纳入。
 

@@ -1,5 +1,7 @@
 # CRM 架构单页图（v2.0 现状）
 
+> 2026-10-25 L04a：person_360为既有文件导入增加受限PDF文字提取，独立子进程隔离；复用原AI草稿/审核链，仅扩充导入任务错误码，public对象数量/权限/视图不变。旧客户及照片入口等待L04b，详见[L04a](../specs/legacy-workspace-exit/evidence/L04a.md)。
+
 > 2026-10-25 L03：AI历史支持Legacy生成/建议日期轴、稳定排序和快捷日期范围，补齐话术/策略/目标摘要；Runtime默认行为及反馈隔离保持。More兼容入口5→4，旧AI建议URL保留。无数据库变更；详见[L03](../specs/legacy-workspace-exit/evidence/L03.md)。
 
 > 2026-10-25 L02：经营分析新增折叠阶段详情，funnel_insight 增加 stage_facts 可选展示口径，旧请求默认不变；新AI解释不再使用未经验证的阶段人数比作为历史转化。More兼容入口6→5，旧分析URL保留。无数据库变更，public对象数量仍为61表/12视图/37序列/69例程；部署源码新增stage-facts.js。详见[L02](../specs/legacy-workspace-exit/evidence/L02.md)。

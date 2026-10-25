@@ -3,7 +3,7 @@ import { data } from './data.js';
 import { t } from './i18n.js';
 import { sectionTitle, fmtDate } from './ui.js';
 
-const TYPES = new Set(['image/jpeg','image/png','image/webp','text/plain','text/csv']);
+const TYPES = new Set(['image/jpeg','image/png','image/webp','text/plain','text/csv','application/pdf']);
 const MAX_BYTES = 4 * 1024 * 1024;
 function base64(file) {
   return new Promise((resolve,reject)=>{
@@ -17,7 +17,8 @@ function base64(file) {
 function supported(file) {return TYPES.has(file.content_type||file.type||'application/octet-stream');}
 function errorText(code) {
   return t(({UNSUPPORTED_TYPE:'file_import_unsupported',INVALID_CONTENT:'file_import_invalid_content',
-    INVALID_RESULT:'file_import_invalid_result',SOURCE_UNAVAILABLE:'file_import_source_missing'})[code]||'file_import_parse_failed');
+    INVALID_RESULT:'file_import_invalid_result',SOURCE_UNAVAILABLE:'file_import_source_missing',
+    PDF_ENCRYPTED:'l04_pdf_encrypted',PDF_NO_TEXT:'l04_pdf_no_text',PDF_LIMIT:'l04_pdf_limit',PDF_TIMEOUT:'l04_pdf_timeout'})[code]||'file_import_parse_failed');
 }
 
 export async function fileImportNode(ctx,personId,customerId,{onReview,onSaved}={}) {

@@ -30,7 +30,7 @@ test('M09 save-only, uncertain response retry, parse retry, stored review, pagin
    await m09Render();
   })()`);
   await b.evaluate(`(()=>{const input=document.querySelector('.file-import input[type=file]');
-   Object.defineProperty(input,'files',{configurable:true,value:[new File(['姓名虚构甲'],'note.txt',{type:'text/plain'}),new File(['pdf'],'manual.pdf',{type:'application/pdf'})]});input.dispatchEvent(new Event('change'));})()`);
+   Object.defineProperty(input,'files',{configurable:true,value:[new File(['姓名虚构甲'],'note.txt',{type:'text/plain'}),new File(['docx'],'manual.docx',{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'})]});input.dispatchEvent(new Event('change'));})()`);
   assert.equal(await b.evaluate("document.querySelectorAll('.file-import-item').length"),2);
   await b.click('.file-import > .care-record-actions button','保存全部原件');
   await b.wait("document.querySelector('.file-import-item').textContent.includes('尚未确认保存成功')");
@@ -42,7 +42,7 @@ test('M09 save-only, uncertain response retry, parse retry, stored review, pagin
   assert.equal(keys.length,2);assert.equal(keys[0],keys[1]);
   await b.click('.file-import > .care-record-actions button','保存并解析支持的文件');
   await b.wait("document.querySelector('.file-import-item').textContent.includes('解析暂未完成')");
-  assert.equal(await b.evaluate("m09.calls.filter(x=>x.action==='parse').length"),1,'PDF not sent for parsing');
+  assert.equal(await b.evaluate("m09.calls.filter(x=>x.action==='parse').length"),1,'unsupported DOCX not sent for parsing');
   await b.click('.file-import-item:first-child button','保存并解析');
   await b.wait("document.querySelector('.file-import-item').textContent.includes('草稿已保存')");
   assert.equal(await b.evaluate("m09.calls.filter(x=>x.action==='save').length"),3,'parse retry does not upload again');

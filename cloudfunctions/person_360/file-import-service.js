@@ -39,6 +39,10 @@ function parseInput(source) {
   const bytes=Buffer.from(match[2],'base64');
   if(bytes.length>MAX_BYTES)throw new Error('SOURCE_UNAVAILABLE');
   const type=match[1];
+  if(type==='application/pdf'){
+    if(!bytes.subarray(0,5).equals(Buffer.from('%PDF-')))throw new Error('INVALID_CONTENT');
+    return require('./pdf-text').extractPdfText(bytes).then(text=>({text}));
+  }
   if(['image/jpeg','image/png','image/webp'].includes(type)){
     const valid=type==='image/jpeg'?bytes.subarray(0,3).equals(Buffer.from([255,216,255])):
       type==='image/png'?bytes.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10])):
@@ -82,11 +86,12 @@ class FileImportService {
     if(!claim.leaseToken)return claim;
     let parsed;
     try{
-      const input=parseInput(claim.source);
+      const input=await parseInput(claim.source);
       const result=await this.parse({action:'parse_import_draft',...input});
       parsed=draft(result,input);
     }catch(error){
-      const code=['SOURCE_UNAVAILABLE','UNSUPPORTED_TYPE','INVALID_CONTENT','INVALID_RESULT'].includes(error.message)?error.message:'PARSE_FAILED';
+      const code=['SOURCE_UNAVAILABLE','UNSUPPORTED_TYPE','INVALID_CONTENT','INVALID_RESULT',
+        'PDF_ENCRYPTED','PDF_NO_TEXT','PDF_LIMIT','PDF_TIMEOUT'].includes(error.message)?error.message:'PARSE_FAILED';
       return this.call(actor,'fail',{jobId,leaseToken:claim.leaseToken,errorCode:code});
     }
     // Never turn an uncertain commit into a failure write: retry reads the committed job.

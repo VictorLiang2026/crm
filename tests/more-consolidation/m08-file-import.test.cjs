@@ -10,10 +10,11 @@ test('original validation: canonical encoding, limits, allowlist, stable content
   {contentType:'text/plain;evil'},{base64:Buffer.alloc(4*1024*1024+1).toString('base64')}])assert.throws(()=>original({...input,...patch}),/Invalid/);
  assert.doesNotThrow(()=>original({...input,base64:Buffer.alloc(4*1024*1024).toString('base64')}));
 });
-test('parsing types do not pretend PDF/DOCX extraction; UTF8 and image signatures checked',()=>{
+test('text/image signatures and invalid PDF rejected; unsupported formats remain originals only',()=>{
  const source={photo_url:'data:text/plain;base64,'+input.base64,content_type:'text/plain'};
  assert.equal(parseInput(source).text,'姓名：虚构甲');
- assert.throws(()=>parseInput({photo_url:'data:application/pdf;base64,YQ==',content_type:'application/pdf'}),/UNSUPPORTED_TYPE/);
+ assert.throws(()=>parseInput({photo_url:'data:application/pdf;base64,YQ==',content_type:'application/pdf'}),/INVALID_CONTENT/);
+ assert.throws(()=>parseInput({photo_url:'data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,YQ==',content_type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}),/UNSUPPORTED_TYPE/);
  assert.throws(()=>parseInput({photo_url:'data:image/png;base64,YQ==',content_type:'image/png'}),/INVALID_CONTENT/);
  assert.throws(()=>parseInput({photo_url:'data:text/plain;base64,//8=',content_type:'text/plain'}),/INVALID_CONTENT/);
  assert.deepEqual(draft({parsed:{customer_name:'甲',phone:'123',opportunity:{},facts:['x']}},{text:'source'}),
