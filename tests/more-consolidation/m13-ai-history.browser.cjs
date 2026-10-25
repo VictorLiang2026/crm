@@ -59,7 +59,7 @@ test('M13 filters and pages on server, waits for Person choice, keeps failed vie
   assert.match(await b.evaluate("document.querySelector('.crm-ai-exp-detail').innerText"),/public.ai_recommendations #71/);
   assert.equal(await b.evaluate("document.querySelector('.crm-ai-exp-raw').open"),false);
   assert.equal(await b.evaluate("m13.calls.some(x=>['decide','outcome','learning','confirmLearning'].includes(x.p.operation))"),false);
-  assert.equal(await b.evaluate("document.querySelector('.crm-ai-exp-detail a').getAttribute('href')"),'/crm/admin.html#/ai-suggestions');
+  assert.equal(await b.evaluate("document.querySelector('.crm-ai-exp-detail a[href*=\"admin.html#/ai-suggestions\"]')"),null);
   for(const lang of ['en','zh-CN']){
    await b.evaluate('m13render('+JSON.stringify(lang)+')');await b.wait("document.querySelector('.crm-ai-exp-readable')");
    for(const [width,height]of [[820,1180],[1180,820]]){

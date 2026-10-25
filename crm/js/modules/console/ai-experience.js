@@ -165,6 +165,8 @@ export function renderAiExperience({ root, callFn }) {
     pager.append(el('p','crm-ai-exp-muted',`${t('ai_history_current_scope')}: ${scope.join(' · ')}`));
     pager.append(el('p','crm-ai-exp-muted',t(model.source==='legacy'?'ai_history_legacy_scope':'ai_history_runtime_scope')));
     if (!p) { pager.append(el('p','crm-ai-exp-muted',t('ai_history_recent_only'))); return; }
+    const dateField=p.dateField || (model.source==='legacy'?'recommendation_date':'created_at');
+    pager.append(el('p','crm-ai-exp-muted',`${t('l03_date_axis')}: ${t('l03_axis_'+dateField)} · ${t('l03_sort_'+(activeFilters.sortDir||'desc'))}`));
     const count = model.source==='legacy' ? model.legacy.length : model.tasks.length;
     pager.append(el('p','crm-ai-exp-muted',t('ai_history_page_info').replace('{page}',String(p.page)).replace('{count}',String(count))));
     const previous=el('button','btn',t('file_import_previous'));previous.type='button';previous.disabled=p.page<=1;
@@ -183,7 +185,14 @@ export function renderAiExperience({ root, callFn }) {
       const pick=el('button','crm-ai-exp-result-pick',`${t('ai_history_source_legacy')} #${row.id}`);pick.type='button';
       pick.addEventListener('click',()=>{selectedResultId=String(row.id);legacyRows();detailView();});
       article.append(pick,el('span','crm-ai-exp-state',t('ai_history_read_only')),
-        el('span','crm-ai-exp-muted',`${row.customer_name || t('ai_experience_empty')} · ${row.recommendation_date || ''}`));list.append(article);
+        el('span','crm-ai-exp-muted',row.customer_name || t('ai_experience_empty')));
+      for(const [key,value]of [['ai_history_recommended_on',row.recommendation_date],['ai_history_followup_on',row.suggested_followup_date],
+        ['ai_history_message',row.suggested_message],['ai_history_strategy',row.suggested_strategy],['l03_goal',row.suggested_followup_goal]]){
+        if(value){const display=key==='l03_goal'?historyTypeLabel('legacy',value):String(value);
+          const summary=el('p','crm-ai-exp-muted',`${t(key)}: ${display.slice(0,160)}${display.length>160?'…':''}`);
+          summary.title=display;article.append(summary);}
+      }
+      list.append(article);
     }
   }
   function legacyDetail() {
@@ -192,12 +201,11 @@ export function renderAiExperience({ root, callFn }) {
     detail.append(el('h3','',`${t('ai_history_source_legacy')} #${row.id}`),el('p','crm-ai-exp-current',t('ai_history_readonly_note')),
       el('p','crm-ai-exp-muted',`${t('ai_history_snapshot_name')}: ${row.customer_name || t('ai_experience_empty')}`));
     for(const [key,value]of [['ai_history_recommended_on',row.recommendation_date],['ai_history_followup_on',row.suggested_followup_date],
-      ['ai_history_message',row.suggested_message],['ai_history_strategy',row.suggested_strategy]]){
-      if(value)detail.append(el('h4','',t(key)),el('p','crm-ai-exp-legacy-copy',value));
+      ['ai_history_message',row.suggested_message],['ai_history_strategy',row.suggested_strategy],['l03_goal',row.suggested_followup_goal]]){
+      if(value)detail.append(el('h4','',t(key)),el('p','crm-ai-exp-legacy-copy',key==='l03_goal'?historyTypeLabel('legacy',value):value));
     }
     detail.append(el('p','crm-ai-exp-muted',`public.ai_recommendations #${row.id}`));
     const raw=el('details','crm-ai-exp-raw');raw.append(el('summary','',t('ai_experience_raw_details')),el('pre','crm-ai-exp-output',safeJson(row)));detail.append(raw);
-    const old=el('a','btn',t('ai_history_legacy_tools'));old.href='/crm/admin.html#/ai-suggestions';detail.append(old);
   }
 
   function taskFor(result) { return model.tasks.find(task => String(task.id) === String(result.task_id)); }

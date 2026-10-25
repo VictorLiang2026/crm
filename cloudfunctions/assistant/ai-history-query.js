@@ -16,7 +16,7 @@ function day(value) {
   return value;
 }
 function validateHistory(filters) {
-  const allowed = ['source','page','limit','personId','type','startDate','endDate'];
+  const allowed = ['source','page','limit','personId','type','startDate','endDate','dateField','sortDir'];
   if (!filters || typeof filters !== 'object' || Array.isArray(filters) || Object.keys(filters).some(k => !allowed.includes(k))) invalid();
   const source = filters.source ?? 'runtime', page = filters.page ?? 1, limit = filters.limit ?? 20;
   if (!['runtime','legacy'].includes(source) || !Number.isInteger(page) || page < 1 || page > 10000 ||
@@ -26,7 +26,12 @@ function validateHistory(filters) {
     ? !/^[a-z][a-z0-9_]{0,79}$/.test(type) : !GOALS.includes(type)))) invalid();
   const startDate = day(filters.startDate), endDate = day(filters.endDate);
   if (startDate && endDate && startDate > endDate) invalid();
+  if (filters.dateField !== undefined && !(source === 'runtime' ? ['created_at']
+    : ['recommendation_date','suggested_followup_date']).includes(filters.dateField)) invalid();
+  if (filters.sortDir !== undefined && !['asc','desc'].includes(filters.sortDir)) invalid();
   return { source, page, limit, type, startDate, endDate,
+    ...(filters.dateField !== undefined ? {dateField:filters.dateField} : {}),
+    ...(filters.sortDir !== undefined ? {sortDir:filters.sortDir} : {}),
     personId: filters.personId == null || filters.personId === '' ? null : id(filters.personId) };
 }
 function rows(value, max) {
@@ -36,7 +41,7 @@ function rows(value, max) {
   return value;
 }
 function dateFilters(q) {
-  const field = q.source === 'runtime' ? 'created_at' : 'recommendation_date';
+  const field = q.dateField || (q.source === 'runtime' ? 'created_at' : 'recommendation_date');
   const conditions = [];
   if (q.startDate) conditions.push(`${field}.gte.${q.startDate}${q.source === 'runtime' ? 'T00:00:00+08:00' : ''}`);
   if (q.endDate) {
@@ -52,7 +57,7 @@ async function readAIHistory(filters, { read }) {
   const result = { source:q.source, filters:q, tasks:[], results:[], decisions:[], outcomes:[], learnings:[], legacy:[], metrics:null,
     pagination:{ page:q.page, limit:q.limit, hasMore:false, total:null,
       unit:q.source === 'runtime' ? 'task' : 'recommendation',
-      dateField:q.source === 'runtime' ? 'created_at' : 'recommendation_date', timezone:'Asia/Shanghai',
+      dateField:q.dateField || (q.source === 'runtime' ? 'created_at' : 'recommendation_date'), timezone:'Asia/Shanghai',
       personScope:q.source === 'runtime' ? 'direct-person-subject' : 'active-customer-link',
       relatedTruncated:{results:false,decisions:false,outcomes:false,learnings:false} } };
   if (q.personId) {
@@ -70,7 +75,7 @@ async function readAIHistory(filters, { read }) {
     }
     const page = rows(await read('ai_recommendations', {
       select:'id,customer_id,customer_name,recommendation_date,suggested_followup_date,suggested_message,suggested_strategy,suggested_customer_stage,suggested_followup_goal,nba,created_at',
-      order:'recommendation_date.desc.nullslast,id.desc',...paging,...customerFilter,
+      order:`${q.dateField || 'recommendation_date'}.${q.sortDir || 'desc'}.nullslast,id.${q.sortDir || 'desc'}`,...paging,...customerFilter,
       ...(q.type ? {suggested_followup_goal:`eq.${q.type}`} : {}),
     }),q.limit+1);
     result.pagination.hasMore = page.length > q.limit;
@@ -79,7 +84,7 @@ async function readAIHistory(filters, { read }) {
   }
   const page = rows(await read('ai_tasks', {
     select:'id,task_type,skill_name,subject_type,subject_id,status,created_at,completed_at',
-    status:'eq.completed',order:'created_at.desc,id.desc',...paging,
+    status:'eq.completed',order:`created_at.${q.sortDir || 'desc'},id.${q.sortDir || 'desc'}`,...paging,
     ...(q.personId ? {subject_type:'eq.person',subject_id:`eq.${q.personId}`} : {}),
     ...(q.type ? {task_type:`eq.${q.type}`} : {}),
   }),q.limit+1);

@@ -6,6 +6,14 @@ const TASKS = [
   ['assistant_opportunity_update_v1','ai_experience_task_opportunity_update'],
 ];
 const GOALS = ['建立联系','约见面','邀请活动','获取家庭信息','推进签单','推进招募','推进转介绍'];
+export function historyDatePreset(kind, now = Date.now()) {
+  const today = new Date(now + 8 * 3600000).toISOString().slice(0,10);
+  const shift = days => new Date(Date.parse(today) + days * 86400000).toISOString().slice(0,10);
+  if (kind === 'today') return {startDate:today,endDate:today};
+  if (kind === 'overdue') return {endDate:shift(-1)};
+  if (kind === 'next7') return {startDate:shift(1),endDate:shift(7)};
+  throw Error('Invalid history date preset');
+}
 export function historyTaskLabel(type) {
   const entry = TASKS.find(([value]) => value === type);
   return entry ? t(entry[1]) : type;
@@ -31,9 +39,17 @@ export function createHistoryFilters({api,onApply,onError}) {
   const advanced=node('details');advanced.className='ai-history-advanced';advanced.append(node('summary','ai_history_filters'));
   const fields=node('div');fields.className='crm-ai-exp-form';
   const type=field('ai_history_type','select');type.input.className='ai-history-type';
+  const axis=field('l03_date_axis','select');axis.input.className='ai-history-date-axis';
+  const sort=field('l03_date_sort','select');sort.input.className='ai-history-date-sort';
+  for(const value of ['desc','asc'])sort.input.add(new Option(t('l03_sort_'+value),value));
+  const shortcuts=node('div');shortcuts.className='crm-ai-exp-form ai-history-date-shortcuts';
   function types(){type.input.replaceChildren(new Option(t('ai_history_all_types'),''));
     const entries=source.input.value==='runtime'?TASKS:GOALS.map((value,i)=>[value,`ai_history_goal_${i}`]);
-    for(const [value,key]of entries)type.input.add(new Option(t(key),value));}
+    for(const [value,key]of entries)type.input.add(new Option(t(key),value));
+    axis.input.replaceChildren(...(source.input.value==='legacy'?['recommendation_date','suggested_followup_date']:['created_at'])
+      .map(value=>new Option(t('l03_axis_'+value),value)));
+    shortcuts.hidden=source.input.value!=='legacy';shortcuts.style.display=shortcuts.hidden?'none':'';
+  }
   source.input.addEventListener('change',types);types();
   const from=field('ai_history_from','input','date'),to=field('ai_history_to','input','date');
   from.input.className='ai-history-from';to.input.className='ai-history-to';
@@ -59,16 +75,25 @@ export function createHistoryFilters({api,onApply,onError}) {
     finally{search.disabled=false;}
   });
   const reset=node('button','ai_history_reset');reset.type='button';reset.className='btn';
-  reset.addEventListener('click',()=>{type.input.value='';from.input.value='';to.input.value='';name.input.value='';clearPeople();
+  reset.addEventListener('click',()=>{types();sort.input.value='desc';from.input.value='';to.input.value='';name.input.value='';clearPeople();
     onApply({source:source.input.value,page:1,limit:20});});
-  fields.append(type.label,from.label,to.label,name.label,search,people.label,reset);
-  advanced.append(fields,node('p','ai_history_filter_scope'));
+  for(const kind of ['today','overdue','next7']){
+    const button=node('button','l03_preset_'+kind);button.type='button';button.className='btn btn-ghost';button.dataset.historyPreset=kind;
+    button.addEventListener('click',()=>{
+      const range=historyDatePreset(kind);axis.input.value='suggested_followup_date';sort.input.value='asc';
+      from.input.value=range.startDate||'';to.input.value=range.endDate||'';form.requestSubmit();
+    });shortcuts.append(button);
+  }
+  fields.append(type.label,axis.label,sort.label,from.label,to.label,name.label,search,people.label,reset);
+  advanced.append(fields,shortcuts,node('p','l03_date_note'),node('p','ai_history_filter_scope'));
   fieldset.append(source.label,apply,advanced);form.append(fieldset);
   form.addEventListener('submit',event=>{
     event.preventDefault();
     if(name.input.value.trim()&&!people.input.value){onError('ai_history_choose_person');return;}
     if(from.input.value&&to.input.value&&from.input.value>to.input.value){onError('ai_history_invalid_dates');return;}
     onApply({source:source.input.value,page:1,limit:20,
+      ...(source.input.value==='legacy'&&axis.input.value==='suggested_followup_date'?{dateField:axis.input.value}:{}),
+      ...(sort.input.value==='asc'?{sortDir:'asc'}:{}),
       ...(type.input.value?{type:type.input.value}:{}),...(people.input.value?{personId:people.input.value}:{}),
       ...(from.input.value?{startDate:from.input.value}:{}),...(to.input.value?{endDate:to.input.value}:{})});
   });

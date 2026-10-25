@@ -272,7 +272,6 @@ export function renderAI(ctx) {
 const LEGACY_ADMIN = '/crm/admin.html';
 const LEGACY_ENTRIES = [
   ['users', 'legacy_customers', '#/customers', 'm17_reason_customers'],
-  ['sparkle', 'legacy_ai_suggestions', '#/ai-suggestions', 'm17_reason_ai'],
   ['search', 'legacy_photos', '#/more/photos', 'm17_reason_photos'],
   ['mic', 'legacy_speakers', '#/speakers', 'm17_reason_resources'],
   ['recruit', 'legacy_recruit_goals', '#/recruit/goals', 'm17_reason_goals'],

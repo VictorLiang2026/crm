@@ -28,15 +28,15 @@
 
 验收：超过一页的虚构数据排序/筛选正确；一人多角色不重复；逾期与久未联系边界、无日期、未关联客户、中文/英文、返回和失败重试通过；点击同一Person时间线。回归人物编辑、角色转换、跟进、招募、PC05/M03。退出条件：L01核心通过且L04中旧“AI解析新增”的实际常用途径有替代/明确取舍后，才移出旧customers卡片。_R5–R7。_
 
-## L02：经营分析补阶段详情（实现与回归完成，发布核验中，P1）
+## L02：经营分析补阶段详情（已完成，P1）
 
-发布标签 release-20261025-201200，证据见[evidence/L02.md](evidence/L02.md)。
+已发布 1a1b3aa / release-20261025-201200，完整三端核验通过；证据见[evidence/L02.md](evidence/L02.md)。
 
 在console/analytics.js中复用funnel_insight.stats返回字段，增加折叠的overdue、dwell_median_days、stuck、entered_30d、moved_30d；先核对各字段来源、终态、空值和时间窗。保留范围说明及当前Person-only覆盖限制。不要为了显示字段新建聚合表或复制SQL。任何“转化率”必须经分母/时间窗验证，静态占比不得冒充历史转化。
 
 验收：0/空值/缺字段、终态、小样本和失败状态有明确显示；AI失败保留事实；未经验证的指标不能被AI提升成结论；钻取仅允许精确同范围，否则只提供工作区导航。回归M16/M15/机会和招募。核心旧指标已替代或明确不保留后，移出funnels卡片及新版页内相应旧快捷链接（URL保留）。_R5–R7。_
 
-## L03：AI历史补建议日期轴与列表（已批准，待实施，P1）
+## L03：AI历史补建议日期轴与列表（已批准，实施中，P1）
 
 增强现有ai-experience.js/ai-history-filters.js及assistant/ai-history-query.js，Legacy增加受限dateField枚举recommendation_date/suggested_followup_date及稳定排序，缺省请求保持原行为。Runtime只允许其真实支持的字段；服务端验证日期、分页和身份范围。加今天/逾期/未来7天查询快捷项；显示话术、策略、目标摘要，保留原始结果和来源。
 

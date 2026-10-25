@@ -2,6 +2,18 @@
 const DEFAULT = 'zh-CN';
 
 const DICT = {
+  'l03_date_axis': { 'zh-CN': '日期口径', 'en': 'Date field' },
+  'l03_date_sort': { 'zh-CN': '日期排序', 'en': 'Date order' },
+  'l03_axis_created_at': { 'zh-CN': '生成时间', 'en': 'Created on' },
+  'l03_axis_recommendation_date': { 'zh-CN': '建议生成日期', 'en': 'Recommendation date' },
+  'l03_axis_suggested_followup_date': { 'zh-CN': '建议跟进日期', 'en': 'Suggested follow-up date' },
+  'l03_sort_desc': { 'zh-CN': '日期从晚到早', 'en': 'Latest first' },
+  'l03_sort_asc': { 'zh-CN': '日期从早到晚', 'en': 'Earliest first' },
+  'l03_preset_today': { 'zh-CN': '建议今天跟进', 'en': 'Suggested for today' },
+  'l03_preset_overdue': { 'zh-CN': '已过建议日期', 'en': 'Past suggested dates' },
+  'l03_preset_next7': { 'zh-CN': '建议未来7天跟进', 'en': 'Suggested for the next 7 days' },
+  'l03_date_note': { 'zh-CN': '快捷查询按北京时间：今天、今天之前、明天起7天。历史建议可能已完成，不代表当前待办；无日期的记录不会命中日期范围。', 'en': 'Shortcuts use Beijing time: today, before today, or tomorrow through the next 7 days. Historical advice may already be completed; it is not a current task list. Undated records do not match date ranges.' },
+  'l03_goal': { 'zh-CN': '建议目标', 'en': 'Suggested goal' },
   'l02_details': { 'zh-CN': '逐阶段详情与口径', 'en': 'Stage details and definitions' },
   'l02_na': { 'zh-CN': '不适用', 'en': 'Not applicable' },
   'l02_unknown': { 'zh-CN': '未知', 'en': 'Unknown' },
@@ -44,7 +56,7 @@ const DICT = {
   'm17_compat_note': { 'zh-CN': '这里只保留新版尚未完全覆盖的功能。日常操作请使用新工作区；测试工具在设置中，旧批量恢复在回收站中。原有地址和数据保持不变。', 'en': 'Only capabilities not yet fully covered by the new workspaces remain here. Use Settings for test tools and the Recycle Bin for legacy batch restore. Existing URLs and data are preserved.' },
   'm17_reason_account': { 'zh-CN': '保留原因：旧账号维护流程；日常语言、改密和退出已在设置中。', 'en': 'Kept for legacy account care. Language, password changes and sign-out are available in Settings.' },
   'm17_reason_test': { 'zh-CN': '保留原因：受控虚构场景仍使用旧页和原白名单。', 'en': 'Kept for controlled fictional scenarios using the existing page and allowlist.' },
-  'm17_reason_customers': { 'zh-CN': '保留原因：工作台状态排序、关联招募状态与旧解析新增；日常资料和跟进已在人物中。', 'en': 'Kept for follow-up status sorting, linked recruit status and legacy parsing for new customers. Use People for daily records and follow-ups.' },
+  'm17_reason_customers': { 'zh-CN': '保留原因：资料解析后新增人物的流程仍待补齐。日常资料、跟进状态筛选排序和关联招募已在人物中。', 'en': 'Kept until creating a Person from imported material is fully covered. Use People for daily records, follow-up status filters and sorting, and linked recruiting.' },
   'm17_reason_followups': { 'zh-CN': '保留原因：跨客户旧跟进入口；日常跟进已在人物时间线。', 'en': 'Kept for the legacy cross-customer entry. Daily follow-ups are in the Person timeline.' },
   'm17_reason_funnels': { 'zh-CN': '保留原因：逐阶段逾期、停留与近期推进等详细指标；日常汇总已在经营分析中。', 'en': 'Kept for stage-level overdue, dwell and recent movement metrics. Use Business Insights for a daily overview.' },
   'm17_reason_ai': { 'zh-CN': '保留原因：按建议跟进日期筛选和旧列表排序；新AI历史已支持来源、人物与生成日期查询。', 'en': 'Kept for suggested follow-up date filtering and legacy list sorting. AI history supports source, Person and generation-date queries.' },
