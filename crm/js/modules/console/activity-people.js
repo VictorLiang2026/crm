@@ -483,12 +483,7 @@ export function renderResourceDirectory(ctx) {
     pageHead({ title: t('resource_directory_title'), sub: t('resource_directory_note'),
       actions: [h('a', { class: 'btn btn-ghost', href: '#/activities' }, t('title_activities'))] }),
     form, contactNote, host,
-    h('details', { class: 'card card-body' }, [h('summary', {}, t('resource_directory_legacy')),
-      h('p', { class: 'foot-note' }, t('resource_directory_legacy_note')),
-      h('div', { class: 'more-actions' }, [
-        h('a', { class: 'btn btn-ghost', href: '/crm/admin.html#/topics' }, t('act_topics_title')),
-      ]),
-    ]),
+
   );
   load();
 }

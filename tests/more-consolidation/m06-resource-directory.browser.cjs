@@ -40,6 +40,7 @@ test('M06 standalone resources page searches and pages without an activity, reus
    assert.equal(await b.evaluate('document.documentElement.scrollWidth<=innerWidth+1'),true);
   }
   assert.equal(await b.evaluate("document.querySelector('#console-main a[href=\"/crm/admin.html#/speakers\"]')"), null);
+  assert.equal(await b.evaluate("document.querySelector('#console-main a[href=\"/crm/admin.html#/topics\"]')"), null);
   await b.evaluate(`(async()=>{const {setLang}=await import('/crm/js/modules/console/i18n.js');setLang('en');const {renderResourceDirectory}=await import('/crm/js/modules/console/activity-people.js');renderResourceDirectory({main:document.querySelector('#console-main')})})()`);
   await b.wait("document.querySelector('.page-title')?.textContent==='Speakers & Topics'");
   assert.match(await b.evaluate("document.querySelector('#console-main').innerText"),/Manage reusable resources/);

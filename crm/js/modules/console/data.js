@@ -64,6 +64,7 @@ export const data = {
 
   // ---------- Person 360 ----------
   personHome: (ctx, personId) => p360(ctx, 'get', { personId }),
+  personRelationshipCadence: (ctx, personId) => p360(ctx, 'getRelationshipDecay', { personId }),
   resolveHouseholdMember: (ctx, name) => p360(ctx, 'resolveHouseholdMember', { name }),
   previewHousehold: (ctx, personId, operation, data) => p360(ctx, 'previewHousehold', { personId, operation, data }),
   executeHousehold: (ctx, previewId) => p360(ctx, 'executeHousehold', { previewId }),

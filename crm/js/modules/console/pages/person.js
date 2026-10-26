@@ -5,6 +5,7 @@
 import { h } from '../dom.js';
 import { ic } from '../icons.js';
 import { data } from '../data.js';
+import { personCadence } from '../person-cadence.js';
 import { openContextItemAction } from '../context-actions.js';
 import { renderRecruitSection } from '../recruit-write.js';
 import { renderFamily } from '../family-actions.js';
@@ -149,6 +150,7 @@ function overviewNode(ctx, id, setName) {
           : bdg(t('badge_customer_linked'), 'jade'),
       ]),
       kvGrid(infoPairs),
+      personCadence(ctx, id),
       profile.status === 'linked' ? h('div', { class: 'tab-stack' }, [
         h('div', { class: 'stack-head' }, [
           sectionTitle(t('sec_customer_specific_info')),
@@ -764,10 +766,6 @@ export function renderPerson(ctx, id, initialSection) {
             onDone: () => { location.hash = '#/people'; },
           }),
         }, [ic('trash'), t('btn_delete_person')]),
-        h('a', {
-          class: 'btn btn-ghost', href: `/crm/admin.html#/person/${id}`,
-          target: '_blank', rel: 'noopener',
-        }, [ic('file'), t('btn_full_profile')]),
       ],
     }),
     h('div', { class: 'ai-history-toolbar', style: 'display:flex;justify-content:flex-end;margin-bottom:10px' }, [

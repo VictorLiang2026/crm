@@ -109,7 +109,6 @@ function maintenanceCard() {
         h('summary', {}, t('setting_advanced_tools')),
         h('p', { class: 'foot-note' }, t('setting_advanced_note')),
         h('div', { class: 'more-actions' }, [
-          h('a', { class: 'btn btn-ghost', href: '/crm/admin.html#/account' }, t('legacy_account')),
           h('a', { class: 'btn btn-ghost', href: '/crm/admin.html#/test-scenario' }, t('legacy_test_scenario')),
         ]),
       ]),

@@ -108,9 +108,12 @@ function openOpportunityDetails(ctx, row, onDone) {
         ? h('button', { class:'btn btn-primary legacy-opp-advance', type:'button', onclick:()=>{
           sheet.overlay.remove();openLegacyOpportunity(ctx,{opportunity,person,actions:linkedActions,mode:'advance',onDone});
         } }, [ic('check'),t('opp_btn_advance_close')]) : null,
-      !personOnly && legacyCustomerHref ? h('a', { class: 'btn btn-ghost', href: legacyCustomerHref, onclick: () => {
-        sheet.overlay.remove();
-      } }, [ic('users'), t('opp_open_legacy_customer')]) : null,
+      !personOnly && legacyCustomerHref ? h('details', { class: 'opp-maintenance', style:'flex-basis:100%' }, [
+        h('summary', {style:'min-height:44px;cursor:pointer'}, t('l08_opportunity_maintenance')),
+        h('p', { class:'foot-note' }, t(person ? 'l08_opportunity_maintenance_note' : 'l08_opportunity_unlinked_note')),
+        h('a', { class:'btn btn-ghost', href:legacyCustomerHref, onclick:()=>sheet.overlay.remove() },
+          [ic('users'),t('l08_open_original_maintenance')]),
+      ]) : null,
     ]);
     body.replaceChildren(core, actionSection, outcomeSection, controls);
   }).catch((error) => {

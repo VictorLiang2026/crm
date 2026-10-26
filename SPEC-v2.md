@@ -1,6 +1,8 @@
 # 个人 CRM — 技术规格 v2.0
 
-> **2026-10-26 L07（验收中）**：统一回收站支持当前页最多20条原生批量恢复，服务端15分钟范围预览、人工确认、逐条事务回执和仅失败项重试。新增public.crm_recycle_commands及crm_recycle_batch_v1，仅服务端访问；旧单项接口和所有旧URL保持。退出回收站两条重复旧批量入口。详见[L07证据](specs/legacy-workspace-exit/evidence/L07.md)。
+> **2026-10-26 L08 最终收尾**：More的17张旧兼容卡片及空容器已退出。人物概览补既有关系节奏只读依据，移除账号/主题/人物详情/机会编辑的重复跳转；受控测试工具和历史机会维护明确保留。原URL、数据和后台保持，未将终态修订或软删除冒充已迁移。见[最终17项矩阵与接手说明](docs/work-packages/legacy-workspace-final-handoff-20261026.md)；发布验证见对应L08证据。
+
+> **2026-10-26 L07（已发布）**：统一回收站支持当前页最多20条原生批量恢复，服务端15分钟范围预览、人工确认、逐条事务回执和仅失败项重试。新增public.crm_recycle_commands及crm_recycle_batch_v1，仅服务端访问；旧单项接口和所有旧URL保持。退出回收站两条重复旧批量入口。详见[L07证据](specs/legacy-workspace-exit/evidence/L07.md)。
 
 > **2026-10-26 L06（已发布）**：新版招募目标增加上月草稿、按签约目标倒推及个人假设编辑，均须显式保存；假设版本校验与原子更新使用新增public.crm_recruit_benchmarks_save_v1，旧接口默认行为和历史实际数不变。More最后一张旧目标卡片及空兼容区退出，全部旧URL保留。迁移、回退和验证见[L06证据](specs/legacy-workspace-exit/evidence/L06.md)。
 

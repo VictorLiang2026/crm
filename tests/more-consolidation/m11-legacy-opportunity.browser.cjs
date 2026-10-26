@@ -40,9 +40,10 @@ test('M11 legacy same-ID edit/close, stale preview reset, uncertain execute repl
   })()`);
   await b.wait("document.querySelector('.opp-row-main')");await b.evaluate("document.querySelector('.opp-row-main').click()");
   await b.wait("document.querySelector('.legacy-opp-edit')");
-  assert.equal(await b.evaluate("document.querySelector('.opp-detail-actions a').getAttribute('href')"),'/crm/admin.html#/customer/301');
+  assert.equal(await b.evaluate("document.querySelector('.opp-maintenance a').getAttribute('href')"),'/crm/admin.html#/customer/301');
   await b.evaluate("document.querySelector('.legacy-opp-edit').click()");
   await b.wait("document.querySelector('.legacy-opportunity-form')");
+  assert.equal(await b.evaluate("document.querySelector('.legacy-opportunity-form a[href*=admin]')"),null);
   assert.deepEqual(await b.evaluate("['type','status','referredName'].map(k=>document.querySelector('.legacy-opportunity-fields [name='+k+']').value)"),['转介绍','潜在线索','虚构乙']);
   await b.evaluate("document.querySelector('[name=progress]').value='新进展';document.querySelector('[name=progress]').dispatchEvent(new Event('input'))");
   await b.click('.legacy-opportunity-form > button','生成服务端预览');

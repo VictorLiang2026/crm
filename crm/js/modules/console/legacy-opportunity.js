@@ -36,7 +36,6 @@ export function openLegacyOpportunity(ctx,{opportunity,person,actions=[],mode='e
  const receiptHost=h('div',{class:'legacy-opportunity-receipt',role:'status'});
  const errorHost=h('p',{class:'sheet-err',role:'alert',style:'display:none'});
  const previewButton=h('button',{class:'btn btn-primary',type:'button'},t('legacy_opp_preview'));
- const legacyLink=h('a',{class:'btn btn-ghost',href:`/crm/admin.html#/customer/${customerId}`},t('opp_open_legacy_customer'));
  let busy=false,requestKey=null,preview=null,executed=null,notified=false,reading=false;
  const typeValue=opportunity.opportunity_type;
  controls.status=control('status',opportunity.status,{options:[...stages(typeValue),...(mode==='advance'?['成交','关闭']:[])].map(s=>[s,translateEnum('opportunity_stage',s)])});
@@ -130,8 +129,7 @@ export function openLegacyOpportunity(ctx,{opportunity,person,actions=[],mode='e
    }catch{previewHost.replaceChildren();showError('legacy_opp_preview_failed');}
    finally{setBusy(false);}
  });
- body.append(h('p',{class:'sheet-note'},t('legacy_opp_note')),form,errorHost,previewButton,previewHost,receiptHost,
-   h('div',{class:'sheet-actions'},[legacyLink]));
+ body.append(h('p',{class:'sheet-note'},t('legacy_opp_note')),form,errorHost,previewButton,previewHost,receiptHost);
  const sheet=openSheet({title:t(mode==='edit'?'opp_edit_title':'opp_btn_advance_close'),
    sub:`${person?.display_name||opportunity.person?.display_name||''} · #${opportunityId}`,body});
  document.body.appendChild(sheet.overlay);return sheet;

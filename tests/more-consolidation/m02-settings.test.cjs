@@ -11,7 +11,7 @@ test('M02 refresh confirms before navigation and preserves settings, route and s
     await b.openConsole('#/settings','authCase=1');
     await b.wait("document.querySelector('.settings-advanced')");
     assert.equal(await b.evaluate("document.querySelector('.settings-advanced').open"),false);
-    assert.deepEqual(await b.evaluate("[...document.querySelectorAll('.settings-advanced a')].map(x=>x.getAttribute('href'))"),['/crm/admin.html#/account','/crm/admin.html#/test-scenario']);
+    assert.deepEqual(await b.evaluate("[...document.querySelectorAll('.settings-advanced a')].map(x=>x.getAttribute('href'))"),['/crm/admin.html#/test-scenario']);
     await b.evaluate(`(()=>{
       localStorage.setItem('m02-preserve','local-fixture');
       sessionStorage.setItem('m02-session-preserve','session-fixture');
@@ -30,7 +30,7 @@ test('M02 refresh confirms before navigation and preserves settings, route and s
       assert.equal(await b.evaluate('document.documentElement.scrollWidth<=innerWidth+1'),true);
     }
     await b.evaluate("[...document.querySelectorAll('#console-main button')].find(x=>x.textContent.includes('English')).click()");
-    await b.wait("document.querySelector('.settings-advanced summary')?.textContent.includes('Legacy Maintenance')");
+    await b.wait("document.querySelector('.settings-advanced summary')?.textContent.includes('Development Tools')");
     await b.evaluate(`(()=>{
       window.confirm=message=>{window.m02ConfirmEnglish=message;return false};
       [...document.querySelectorAll('#console-main button')].find(x=>x.textContent.includes('Force Reload Latest')).click();
