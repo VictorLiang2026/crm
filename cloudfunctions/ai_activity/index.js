@@ -142,6 +142,7 @@ exports.main = async (event, context) => {
     if (action === 'recommendTopics') return await recommendTopics(event);
     if (action === 'postReview') return await postReview(event);
     if (action === 'postReviewV2') return await require('./activity-review-v2').run(event, { app });
+    if (action === 'prepareV2') return await require('./activity-prepare-v2').run(event, { app });
     if (action === 'participantReview') return await participantReview(event);
     if (action === 'learning') return await learning(event);
     if (action !== 'analyze') return { error: 'unknown action: ' + action };

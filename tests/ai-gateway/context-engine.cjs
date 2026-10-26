@@ -53,7 +53,7 @@ const sample = {
   recruit_followups: [{ id: 15, candidate_id: 14, followup_notes: 'hello', deleted_at: null }],
 };
 
-test('six legacy recipes remain sourced and bounded; current Skill contracts validate compatible recipes', async () => {
+test('legacy and preparation recipes remain sourced and bounded; Skill contracts validate compatible recipes', async () => {
   const { engine, calls } = fixture(sample);
   const requests = [
     ['person_basic', 'customer', 7, 'person_summary'],
@@ -61,6 +61,7 @@ test('six legacy recipes remain sourced and bounded; current Skill contracts val
     ['quick_capture', 'none', null, 'quick_capture'],
     ['today_coach', 'day', '2026-09-25', 'today_coach'],
     ['activity_review', 'activity', 11, 'activity_review'],
+    ['activity_prepare', 'activity', 11, 'activity_prepare'],
     ['recruit_coach', 'candidate', 14, 'recruit_coach'],
   ];
   for (const [recipe, subjectType, subjectId, skill] of requests) {

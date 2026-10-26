@@ -8,6 +8,7 @@ import {
 } from '../activities-write.js';
 import { renderActivityParticipants, renderActivityResources } from '../activity-people.js';
 import { renderActivityReview } from '../activity-review.js';
+import { renderActivityPreparation } from '../activity-preparation.js';
 import { t, translateEnum } from '../i18n.js';
 import {
   wpTag, pageHead, emptyNote, loadInto, bdg, kvGrid, sectionTitle,
@@ -112,6 +113,7 @@ function flowNode(ctx, id) {
         class: 'btn btn-primary btn-sm', type: 'button',
         onclick: () => openActivityTaskEditor(ctx, { activityId: id, onDone: () => renderActivity(ctx, id) }),
       }, [ic('plus'), t('act_task_add')])),
+      renderActivityPreparation(ctx, id, a.status),
       tasks.length ? h('div', {}, tasks.map((task) => h('div', { class: 'list-row act-task-row' }, [
         h('div', { style: 'flex:1;min-width:0' }, [
           h('div', { class: 'row-title' }, [

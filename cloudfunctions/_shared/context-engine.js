@@ -16,7 +16,7 @@ const FIELDS = Object.freeze({
   policy_review_reports: ['id', 'customer_id', 'report_date', 'report_type', 'edited_summary', 'summary', 'next_action'],
   activities: ['id', 'name', 'activity_date', 'activity_type', 'status', 'review_summary', 'review_notes', 'review_score'],
   activity_participants: ['id', 'activity_id', 'canonical_person_id', 'person_type', 'person_id', 'status', 'participant_role', 'followup_status'],
-  activity_speakers: ['id', 'person_id'],
+  activity_speakers: ['id', 'person_id', 'position', 'expertise', 'topic_summary'],
   activity_tasks: ['id', 'activity_id', 'task_title', 'status', 'priority', 'due_date', 'completed_at'],
   interactions: ['id', 'person_id', 'activity_id', 'interaction_type', 'interaction_at', 'channel', 'summary', 'importance', 'source_type', 'source_id'],
   actions: ['id', 'person_id', 'activity_id', 'opportunity_id', 'interaction_id', 'action_type', 'title', 'due_at', 'priority', 'status', 'source'],
@@ -189,6 +189,23 @@ function createContextEngine({ rdb, now = () => new Date() } = {}) {
           returned: { interactions: followups.length, opportunities: opportunities.length, customers: customers.length },
           limits: { interactions: interactionLimit, opportunities: LIMITS.opportunities, customers: LIMITS.actions } },
           recent_interactions: followups, open_opportunities: opportunities, current_actions: customers };
+        break;
+      }
+      case 'activity_prepare': {
+        if (subjectType !== 'activity') throw new ContextError('INVALID_SUBJECT', 'Expected activity subject');
+        subject = idOf(subjectId);
+        const activity = await read('activities', { id: subject, deleted_at: null }, { one: true });
+        if (!activity) throw new ContextError('NOT_FOUND', 'Activity not found');
+        const [participants, tasks] = await Promise.all([
+          read('activity_participants', { activity_id: subject, deleted_at: null }, { order: 'id', limit: LIMITS.participants }),
+          read('activity_tasks', { activity_id: subject }, { order: 'id', limit: LIMITS.tasks }),
+        ]);
+        const speakerIds = [...new Set(participants.filter(row => row.data.person_type === 'speaker')
+          .map(row => Number(row.data.person_id)).filter(id => Number.isSafeInteger(id) && id > 0))]
+          .slice(0, LIMITS.activityPersons);
+        const speakers = speakerIds.length ? await read('activity_speakers',
+          { id: speakerIds, deleted_at: null }, { limit: LIMITS.activityPersons }) : [];
+        context = { activity, participants, speakers, tasks };
         break;
       }
       case 'activity_review': {
