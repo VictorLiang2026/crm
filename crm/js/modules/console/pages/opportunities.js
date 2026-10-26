@@ -42,7 +42,7 @@ function selectControl(options, value, label) {
   ]);
 }
 
-export function openIdentityExceptions(ctx) {
+export function openIdentityExceptions(ctx,onDone) {
   const body=h('div',{class:'opp-detail-body'});
   const sheet=openSheet({title:t('opp_identity_title'),sub:t('opp_identity_note'),body});
   let page=1;
@@ -57,9 +57,9 @@ export function openIdentityExceptions(ctx) {
           h('p',{},t(`opp_identity_${row.reason}`)),
           h('p',{},`${t('opp_identity_customer_person')}: ${row.customerPersonName||t('label_none')} #${row.customerPersonId||'—'}`),
           h('p',{},`${t('opp_identity_opportunity_person')}: ${row.opportunityPersonName||t('label_none')} #${row.opportunityPersonId||'—'}`),
-          row.customerPersonId?h('a',{href:`#/person/${row.customerPersonId}`},t('opp_open_person')):null,
+          row.customerPersonId?h('a',{href:`#/person/${row.customerPersonId}`,onclick:()=>sheet.overlay.remove()},t('opp_open_person')):null,
           h('button',{class:'btn btn-ghost btn-sm',type:'button',onclick:()=>{
-            sheet.overlay.remove();openOpportunityDetails(ctx,{id:row.opportunityId,customer_id:row.customerId},load);
+            sheet.overlay.remove();openOpportunityDetails(ctx,{id:row.opportunityId,customer_id:row.customerId},onDone);
           }},t('opp_details')),
         ])),
         !rows.length?emptyNote(t('opp_identity_empty'),t('opp_identity_empty_note')):null,
@@ -298,7 +298,7 @@ export function renderOpportunities(ctx) {
     pendingEl,analysisEl,
     h('div',{class:'opp-directory-head'},[
       h('div',{},[h('h2',{},t('opp_directory_title')),h('p',{},t('opp_directory_note'))]),
-      h('button',{class:'btn btn-ghost',type:'button',onclick:()=>openIdentityExceptions(ctx)},
+      h('button',{class:'btn btn-ghost',type:'button',onclick:()=>openIdentityExceptions(ctx,loadDirectory)},
         [ic('users'),t('opp_identity_title')]),
       h('button',{class:'btn btn-ghost',type:'button',onclick:()=>{
         state.status=state.status==='terminal'?'active':'terminal';state.page=1;
