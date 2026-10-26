@@ -83,6 +83,18 @@ const SKILLS = [
     confirmationLevel: 'confirm_before_write', timeoutClass: 'long',
   },
   {
+    name: 'activity_speaker_recommend', version: '1.0.0', capability: 'planning',
+    contextRecipe: recipe(['activity', 'speaker_candidates'], ['participants', 'tasks'],
+      { speaker_candidates: 20, participants: 20, tasks: 20 }),
+    inputSchema: object({ activityId: text(80), objective: text(500) }, ['activityId']),
+    outputSchema: object({ recommendations: { type: 'array', maxItems: 5, items: object({
+      speakerId: { type: 'integer', minimum: 1 }, score: { type: 'integer', minimum: 0, maximum: 100 },
+      reason: text(500), suggestedTopic: text(300), contactSuggestion: text(300),
+    }, ['speakerId', 'score', 'reason', 'suggestedTopic', 'contactSuggestion']) },
+    note: { type: 'string', maxLength: 500 } }, ['recommendations', 'note']),
+    confirmationLevel: 'confirm_before_write', timeoutClass: 'long',
+  },
+  {
     name: 'activity_review', version: '2.1.0', capability: 'analysis',
     contextRecipe: recipe(['activity', 'participants', 'tasks', 'persons', 'activity_interactions',
       'recent_interactions', 'current_actions', 'open_opportunities', 'relationships'], [],

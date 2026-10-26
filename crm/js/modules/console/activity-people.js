@@ -2,6 +2,7 @@ import { h } from './dom.js';
 import { data } from './data.js';
 import { openSheet } from './write.js';
 import { t, translateEnum } from './i18n.js';
+import { renderSpeakerRecommendations } from './activity-speaker-recommend.js';
 import { bdg, emptyNote, sectionTitle, pageHead } from './ui.js';
 
 const PARTICIPANT_TYPES = ['customer', 'recruit', 'speaker'];
@@ -36,9 +37,9 @@ function errorText(error) { return error?.message || t('save_failed'); }
 function setBusy(button, busy, label) { button.disabled = busy; if (label) button.textContent = label; }
 function typeLabel(type) { return type === 'person' ? t('participant') : t(`act_participant_type_${type}`) || translateEnum('participant_type', type) || type; }
 
-function openParticipantAdd(ctx, activity, onDone) {
-  const name = input('search', '', { maxlength: '160', placeholder: t('act_person_search_placeholder') });
-  const type = select(PARTICIPANT_TYPES.map(value => [value, typeLabel(value)]), 'customer');
+function openParticipantAdd(ctx, activity, onDone, initial = {}) {
+  const name = input('search', initial.name || '', { maxlength: '160', placeholder: t('act_person_search_placeholder') });
+  const type = select(PARTICIPANT_TYPES.map(value => [value, typeLabel(value)]), initial.type || 'customer');
   const status = select(PARTICIPANT_STATUSES.map(value => [value, t(`part_${value}`)]), 'invited');
   const note = textarea('', { maxlength: '4000', rows: '3' });
   const results = h('div', { class: 'act-person-results' });
@@ -514,6 +515,11 @@ export async function renderActivityResources(ctx, activityId, onDone, directory
     const refresh = () => renderActivityResources(ctx, activityId, onDone, directory).then(node => root.replaceWith(node)).catch(() => {});
     const speakers = speakerResult.rows || [], topics = topicResult.rows || [];
     if (showSpeakers) {
+    if (!directory) {
+      const recommendations = renderSpeakerRecommendations(ctx, detail.activity,
+        name => openParticipantAdd(ctx, detail.activity, refresh, { name, type: 'speaker' }));
+      if (recommendations) root.append(recommendations);
+    }
     root.append(sectionTitle(t('act_speakers_title'), h('button', { class: 'btn btn-primary btn-sm', type: 'button', onclick: () => openSpeakerEditor(ctx, null, refresh) }, t('act_speaker_add'))));
     root.append(speakers.length ? h('div', {}, speakers.map(speaker => h('article', { class: 'list-row act-resource-row' }, [
       h('div', { class: 'act-resource-main' }, [h('div', { class: 'row-title' }, [speaker.linked_person

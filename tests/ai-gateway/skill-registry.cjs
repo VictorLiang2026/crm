@@ -7,7 +7,7 @@ const { createSkillRegistry, defaultRegistry, SkillValidationError, TIMEOUT_CLAS
 const { defaultRegistry: assistantRegistry } = require('../../cloudfunctions/assistant/skill-registry');
 
 const names = ['quick_capture', 'person_summary', 'meeting_prep', 'today_coach',
-  'opportunity_analysis', 'opportunity_candidate', 'activity_prepare', 'activity_review', 'recruit_coach',
+  'opportunity_analysis', 'opportunity_candidate', 'activity_prepare', 'activity_speaker_recommend', 'activity_review', 'recruit_coach',
   'conversation_playbook', 'knowledge_extract', 'dual_followup', 'ai_search', 'crm_search_parse'];
 names.push('assistant_read_intent_v1', 'assistant_action_update_v1', 'assistant_opportunity_update_v1', 'crm_search_query_v2');
 
@@ -82,6 +82,8 @@ test('every initial skill accepts a representative input, context and output', (
       sourceRefs: [] }],
     activity_prepare: [{ activityId: '1' }, { activity: {} },
       { brief: 'Prepare activity', checklist: [], outreach: [], risks: [] }],
+    activity_speaker_recommend: [{ activityId: '1' }, { activity: {}, speaker_candidates: [] },
+      { recommendations: [], note: 'No eligible speaker' }],
     activity_review: [{ activityId: '1' }, { activity: {}, participants: [], tasks: [],
       persons: [], activity_interactions: [], recent_interactions: [], current_actions: [],
       open_opportunities: [], relationships: [] },
