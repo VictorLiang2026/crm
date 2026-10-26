@@ -358,7 +358,7 @@ const DICT = {
   'ai_history_read_only': { 'zh-CN': '只读来源', 'en': 'Read-only Source' },
   'ai_history_legacy_status': { 'zh-CN': '旧建议执行标记', 'en': 'Legacy Advice Status' },
   'ai_history_status_unrecorded': { 'zh-CN': '未记录', 'en': 'Not Recorded' },
-  'ai_history_readonly_note': { 'zh-CN': '此处仅查看旧建议。不会将旧建议编号用于新结果反馈、实际结果关联或学习审核；旧建议编辑仍在兼容入口。', 'en': 'Legacy advice is read-only here. Its IDs are not used for result feedback, outcome links or learning reviews. Legacy editing remains available separately.' },
+  'ai_history_readonly_note': { 'zh-CN': '旧建议在此只读，原编号不用于新结果反馈、实际结果关联或学习审核。今后请在 Console 人物页生成新建议并人工确认。', 'en': 'Legacy advice is read-only here. Its IDs are not used for new feedback, outcomes, or learning reviews. Generate and confirm new advice in Console People.' },
   'ai_history_snapshot_name': { 'zh-CN': '历史姓名快照', 'en': 'Historical Name Snapshot' },
   'ai_history_recommended_on': { 'zh-CN': '建议日期', 'en': 'Recommendation Date' },
   'ai_history_followup_on': { 'zh-CN': '建议跟进日期', 'en': 'Suggested Follow-up Date' },

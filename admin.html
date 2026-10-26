@@ -2215,13 +2215,12 @@ function renderCommandCenter(r, cid){
     el('a', {style:'font-size:12px;font-weight:500;color:#4338ca;cursor:pointer;', onclick:goTab('ai')}, '全部建议 →'),
   ]));
   if(nba){
-    aiCard.appendChild(renderNbaCard(nba, latestRec.suggested_followup_date, latestRec.id));
+    aiCard.appendChild(renderNbaCard(nba, latestRec.suggested_followup_date, latestRec.id, true));
   } else if(latestRec && (latestRec.suggested_message || latestRec.suggested_strategy)){
     if(latestRec.suggested_message) aiCard.appendChild(el('div', {style:'font-size:13px;color:#1e293b;line-height:1.7;background:#fff;border-left:3px solid var(--pri);padding:10px 12px;border-radius:0 8px 8px 0;'}, latestRec.suggested_message));
     if(latestRec.suggested_followup_goal) aiCard.appendChild(el('div', {style:'margin-top:8px;font-size:13px;'}, el('span', {class:'badge'}, '目标：'+latestRec.suggested_followup_goal)));
   } else {
-    aiCard.appendChild(el('div', {style:'font-size:13px;color:#6b7280;line-height:1.6;margin-bottom:10px;'}, '还没有 AI 建议。生成一次，AI 会基于历史跟进给出当前判断、经营目标和下一步最佳行动。'));
-    aiCard.appendChild(el('button', {class:'btn btn-ai', onclick:goTab('ai')}, '✨ 生成 AI 建议'));
+    aiCard.appendChild(el('div', {style:'font-size:13px;color:#6b7280;line-height:1.6;margin-bottom:10px;'}, '旧版 AI 建议已归档。今后的建议请在 Console 人物页生成，并由人工确认后执行。'));
   }
   grid.appendChild(aiCard);
 
@@ -3642,7 +3641,7 @@ function nbaRow(label, value, hl){
     el('span', {class:'nba-val' + (insufficient ? ' na' : '')}, insufficient ? '信息不足' : v),
   ]);
 }
-function renderNbaCard(nba, fuDate, recId){
+function renderNbaCard(nba, fuDate, recId, readOnly){
   var card = el('div', {class:'nba-card'}, [
     el('div', {class:'nba-title'}, '下一步行动（Next Best Action）'),
     nbaRow('当前判断：', nba.assessment),
@@ -3662,7 +3661,7 @@ function renderNbaCard(nba, fuDate, recId){
       el('span', {style:'font-weight:600'}, icon + ' ' + label + '：' + (nba.result || '')),
       nba.executed_at ? el('span', {style:'color:var(--muted);margin-left:8px'}, String(nba.executed_at).replace('T',' ').slice(0,16)) : null,
     ]));
-  } else if(recId){
+  } else if(recId && !readOnly){
     // pending：显示操作按钮
     card.appendChild(el('div', {style:'margin-top:8px;padding-top:8px;border-top:1px dashed #6ee7b7;display:flex;gap:8px'}, [
       el('button', {class:'btn btn-sm btn-primary', onclick:function(){ openNbaStatusModal(recId, 'completed'); }}, '完成'),
@@ -3736,16 +3735,10 @@ function openNbaStatusModal(recId, mode){
 
 async function renderAi(cid, recommendations){
   var box = el('div', {});
-  box.appendChild(el('div', {style:'margin-bottom:12px'}, el('button', {class:'btn btn-primary btn-sm', onclick:async function(){
-    var btn=this; btn.disabled=true; btn.textContent='生成中（约 1-2 分钟）…';
-    try {
-      var r = await callFn('ai_recommend', {customer_id:cid, operator: CONFIG.operator || null});
-      if(r.error){ toast(r.error,'err'); return; }
-      toast('建议已生成');
-      showDetail(cid);
-    } catch(e){ toast(e.message,'err'); }
-    finally { btn.disabled=false; btn.textContent='生成 AI 跟进建议'; }
-  }}, '生成 AI 跟进建议')));
+  box.appendChild(el('div', {style:'margin-bottom:12px'}, [
+    el('span', {class:'badge'}, '旧建议只读归档'),
+    el('span', {style:'margin-left:8px;color:var(--muted);font-size:13px'}, '新建议请在 Console 人物页使用 AI Gateway 流程。'),
+  ]));
 
   // 历史建议（每条卡片支持人工编辑：message/strategy/日期/阶段/目标）
   if(recommendations && recommendations.length){
@@ -3760,7 +3753,7 @@ async function renderAi(cid, recommendations){
         rec.suggested_followup_date ? el('span', {class:'badge stage'}, '建议跟进：'+String(rec.suggested_followup_date).slice(0,10)) : null,
       ]);
       var rightActions = el('div', {style:'display:flex;gap:6px'}, [
-        el('button', {class:'btn btn-sm'}, '编辑'),
+        el('button', {class:'btn btn-sm', disabled:true, style:'display:none'}, '编辑'),
       ]);
       topBar.appendChild(leftBadges);
       topBar.appendChild(rightActions);
@@ -3787,7 +3780,7 @@ async function renderAi(cid, recommendations){
       var inpGoal  = el('input', {type:'text', placeholder:'目标：建立联系/约见面/获取家庭信息/推进签单…', style:'flex:1;min-width:200px;padding:6px 10px;margin-top:6px'}, rec.suggested_followup_goal || '');
       var inpEditBar = el('div', {style:'display:none;margin-top:10px;justify-content:flex-end;gap:6px;flex-wrap:wrap'}, [
         el('button', {class:'btn btn-sm'}, '取消'),
-        el('button', {class:'btn btn-primary btn-sm'}, '保存修改'),
+        el('button', {class:'btn btn-primary btn-sm', disabled:true}, '保存修改'),
       ]);
       card.appendChild(inpEditBar);
       var btnCancelAi = inpEditBar.querySelector('button:nth-child(1)');
@@ -3797,7 +3790,7 @@ async function renderAi(cid, recommendations){
         p_nbaWrap.innerHTML = '';
         p_msgWrap.innerHTML = ''; p_strWrap.innerHTML = ''; p_tagsWrap.innerHTML = '';
         if(rec.nba && typeof rec.nba === 'object'){
-          p_nbaWrap.appendChild(renderNbaCard(rec.nba, rec.suggested_followup_date, rec.id));
+          p_nbaWrap.appendChild(renderNbaCard(rec.nba, rec.suggested_followup_date, rec.id, true));
         }
         if(rec.suggested_message) p_msgWrap.appendChild(el('p', {}, rec.suggested_message));
         if(rec.suggested_strategy){
@@ -3813,7 +3806,7 @@ async function renderAi(cid, recommendations){
         inpMsg.style.display = editing ? '' : 'none';
         inpStr.style.display = editing ? '' : 'none';
         inpEditBar.style.display = editing ? 'flex' : 'none';
-        btnEdit.style.display = editing ? 'none' : '';
+        btnEdit.style.display = 'none';
         if(editing){
           var aiFields = el('div', {style:'margin-top:4px'}, [inpMsg, inpStr]);
           p_msgWrap.appendChild(aiFields);
@@ -3835,10 +3828,11 @@ async function renderAi(cid, recommendations){
         }
         renderView();
       }
-      btnEdit.onclick = function(){ setEditAi(true); };
+      btnEdit.onclick = function(){ return; };
       btnCancelAi.onclick = function(){ setEditAi(false); };
 
       btnSaveAi.onclick = async function(){
+        if(!editing) return;
         btnSaveAi.disabled = true; btnSaveAi.textContent = '保存中…';
         try {
           var payload = {
@@ -3866,7 +3860,7 @@ async function renderAi(cid, recommendations){
       box.appendChild(card);
     });
   } else {
-    box.appendChild(el('div', {class:'empty'}, '暂无 AI 建议，点击上方按钮生成'));
+    box.appendChild(el('div', {class:'empty'}, '暂无旧版 AI 建议。今后请在 Console 人物页生成新建议。'));
   }
   return box;
 }
