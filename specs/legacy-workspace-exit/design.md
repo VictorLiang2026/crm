@@ -34,3 +34,7 @@
 ## 发布
 
 仅部署crm/js/modules/console/pages/misc.js及crm/js/modules/console/i18n.js。复用现有托管域名和配置，核对响应头、内容哈希；不新建域名、云函数或改变运行时。源码与测试检查后执行WP01和release.ps1完整核验；实际证据见[evidence/L00.md](evidence/L00.md)。
+
+## L06 个人招募目标工具（2026-10-26）
+
+复用新版阶段目标编辑器和原月目标事务保存；高级区延迟加载个人假设，上月和倒推结果只填入草稿，保留撤销及显式保存。新建纯计算模块recruit-goal-draft.js，不引入模型或运行时依赖。recruit_goals.saveBenchmarks通过atomic=true选择public.crm_recruit_benchmarks_save_v1，固定阶段对、数值范围、来源长度和版本校验，按稳定顺序锁定且整笔回滚。默认接口及基础表RLS保持；无列/视图变更。迁移及停用回退成对提供。指标明确为阶段记录而非同批转化率。最后More卡片移除后不渲染空兼容容器，保留17旧URL和现有手机捷径；双语验收仅针对iPad。

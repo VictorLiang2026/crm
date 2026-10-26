@@ -256,5 +256,7 @@ export const data = {
   saveRecruitGoals: (ctx, goalMonth, goals) => call(ctx, 'recruit_goals', {
     action: 'saveGoals', goalMonth, goals, operator: ctx.operator?.name || '',
   }),
+  recruitBenchmarks: ctx => call(ctx, 'recruit_goals', { action: 'listBenchmarks' }),
+  saveRecruitBenchmarks: (ctx, benchmarks) => call(ctx, 'recruit_goals', { action: 'saveBenchmarks', atomic: true, benchmarks }),
   activityReport: (ctx, action, params = {}) => call(ctx, 'activity_reports', { action, ...params }),
 };

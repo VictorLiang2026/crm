@@ -3733,6 +3733,16 @@
         "security_definer": false,
         "authenticated_execute": false
       }
+    },
+    {
+      "kind": "routine",
+      "name": "crm_recruit_benchmarks_save_v1(p_rows jsonb)",
+      "detail": {
+        "anon_execute": true,
+        "service_execute": true,
+        "security_definer": false,
+        "authenticated_execute": false
+      }
     }
   ]
 }

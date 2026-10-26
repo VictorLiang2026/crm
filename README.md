@@ -1,6 +1,8 @@
 # 个人 CRM（CloudBase 个人版 · 事件云函数）
 
-> **2026-10-25 L05（验收中）**：活动资源目录增加嘉宾合作阶段与联系到期的服务端组合筛选，显示最近/下次联系及手动合作次数；姓名和联系方式仍来自Person。嘉宾重复菜单及页内旧链接退出，旧URL保留，不增加提醒或数据库对象。验证与发布见[L05证据](specs/legacy-workspace-exit/evidence/L05.md)。
+> **2026-10-26 L06（验收中）**：新版招募目标增加上月草稿、按签约目标倒推及个人假设编辑，均须显式保存；假设版本校验与原子更新使用新增public.crm_recruit_benchmarks_save_v1，旧接口默认行为和历史实际数不变。More最后一张旧目标卡片及空兼容区退出，全部旧URL保留。迁移、回退和验证见[L06证据](specs/legacy-workspace-exit/evidence/L06.md)。
+
+> **2026-10-25 L05（已发布）**：活动资源目录增加嘉宾合作阶段与联系到期的服务端组合筛选，显示最近/下次联系及手动合作次数；姓名和联系方式仍来自Person。嘉宾重复菜单及页内旧链接退出，旧URL保留，不增加提醒或数据库对象。验证与发布见[L05证据](specs/legacy-workspace-exit/evidence/L05.md)。
 
 > **2026-10-25 L04b 增量（已发布）**：人物目录#/people/import可先保存原件、解析，再人工确认已有/新建Person及选中字段；人物OCR页显示关联原件和最近50条应用/撤销记录。person_360新增savePersonFileOriginal/listPersonFiles/getPersonFile/parsePersonFileDraft/previewPersonFile/previewPersonFileUndo/executePersonFile，既有客户导入action保持。public.crm_file_import_jobs新增独立原件模式，新增crm_person_file_commands与服务端专用crm_person_file_v1。权限、回退、测试和发布见[本包证据](specs/legacy-workspace-exit/evidence/L04b.md)。下文为早期架构记录，当前AI模型由Gateway/CloudBase配置选择，以AGENTS.md与最新架构增量为准。
 

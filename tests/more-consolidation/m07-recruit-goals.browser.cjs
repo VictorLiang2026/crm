@@ -20,7 +20,7 @@ test('M07 goal gaps distinguish shortfall and overage and refresh after atomic s
   assert.deepEqual(await b.evaluate("[...document.querySelectorAll('.goal-gap')].map(n=>n.textContent)"),['2','-2']);
   assert.match(await b.evaluate("document.querySelector('.goal-gap').title"),/负数表示超额/);
   assert.equal(await b.evaluate("document.querySelector('.recruit-goals-advanced').open"),false);
-  assert.equal(await b.evaluate("document.querySelector('.recruit-goals-advanced a').getAttribute('href')"),'/crm/admin.html#/recruit/goals');
+  assert.equal(await b.evaluate("document.querySelector('.recruit-goals-advanced a')"),null);
   await b.evaluate("document.querySelector('input[type=number]').value='8';[...document.querySelectorAll('#console-main button')].find(b=>b.textContent==='保存本月目标').click()");
   await b.wait("document.querySelector('.goal-gap')?.textContent==='5' && window.m07.reads===2");
   const save=await b.evaluate('window.m07.saves[0]');assert.equal(Object.keys(save.goals).length,7);assert.equal(save.goals['新增人才'],8);

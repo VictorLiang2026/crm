@@ -270,9 +270,7 @@ export function renderAI(ctx) {
 
 // More shows only unresolved legacy capabilities; all legacy URLs remain available.
 const LEGACY_ADMIN = '/crm/admin.html';
-const LEGACY_ENTRIES = [
-  ['recruit', 'legacy_recruit_goals', '#/recruit/goals', 'm17_reason_goals'],
-].map(([icon, key, hash, reasonKey]) => ({ kind: 'legacy', icon, key, hash, reasonKey }));
+const LEGACY_ENTRIES = [];
 
 function moreEntry({ kind, icon, key, hash, descKey, reasonKey }) {
   if (kind !== 'native' && kind !== 'legacy') throw new Error('Invalid More route kind');
@@ -305,18 +303,18 @@ export function renderMore(ctx) {
       ]),
     ]),
   ]);
-  const legacy = h('details', { class: 'more-section more-compat' }, [
+  const legacy = LEGACY_ENTRIES.length ? h('details', { class: 'more-section more-compat' }, [
     h('summary', { class: 'section-title', style: 'cursor:pointer;display:list-item;list-style-position:inside;min-height:44px;padding:10px 0' }, t('more_legacy_title')),
     h('p', { class: 'foot-note' }, t('m17_compat_note')),
     h('div', { class: 'tile-grid' }, LEGACY_ENTRIES.map(moreEntry)),
-  ]);
+  ]) : null;
   ctx.main.replaceChildren(
     pageHead({ kicker: t('kicker_more'), title: t('title_more'), sub: t('sub_more') }),
     h('section', { class: 'more-section more-primary' }, [
       sectionTitle(t('m17_tools')),
       h('div', { class: 'tile-grid' }, primary.map(moreEntry)),
     ]),
-    shortcuts, legacy,
+    shortcuts, ...(legacy ? [legacy] : []),
     h('div', { class: 'more-actions' }, h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => ctx.signOut() }, [ic('logout'), t('setting_signout')])),
   );
 }

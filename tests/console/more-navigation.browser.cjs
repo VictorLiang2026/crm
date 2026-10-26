@@ -25,7 +25,7 @@ const LEGACY_ROUTES = [
   ['#/recruit/trash', '[CRM_TEST_ONLY]已删除候选人'],
 ];
 
-const REMAINING_MORE_ROUTES = ['#/recruit/goals'];
+const REMAINING_MORE_ROUTES = [];
 
 test('Console More keeps only uncovered gaps bilingual and preserves all 17 old URLs', async () => {
   const browser = new Browser(path.resolve(__dirname, '../..'));
@@ -35,7 +35,7 @@ test('Console More keeps only uncovered gaps bilingual and preserves all 17 old 
     await browser.evaluate("localStorage.setItem('crm_lang', 'en')");
     await browser.openConsole('#/more', 'authCase=1');
     await browser.wait("document.querySelector('#console-main .more-section')");
-    await browser.evaluate("document.querySelector('.more-workspaces').open=true;document.querySelector('.more-compat').open=true");
+    await browser.evaluate("document.querySelector('.more-workspaces').open=true");
 
     const english = await browser.evaluate(`({
       headings: [...document.querySelectorAll('#console-main .more-section > .section-title')].map(x => x.innerText.trim()),
@@ -47,10 +47,10 @@ test('Console More keeps only uncovered gaps bilingual and preserves all 17 old 
       signOut: document.querySelector('#console-main .more-actions button')?.innerText,
       nav: [...document.querySelectorAll('.console-nav .nav-item')].map(x => x.getAttribute('href')),
     })`);
-    assert.deepEqual(english.headings, ['Tools', 'Workspaces & Quick Record', 'Legacy Compatibility']);
+    assert.deepEqual(english.headings, ['Tools', 'Workspaces & Quick Record']);
     assert.deepEqual(english.legacyHrefs, REMAINING_MORE_ROUTES.map(hash => '/crm/admin.html' + hash).sort());
     assert.equal(english.legacyStatusCount, REMAINING_MORE_ROUTES.length);
-    assert.equal(english.subtitle, 'Workspaces, system tools, and compatibility links.');
+    assert.equal(english.subtitle, 'Workspaces and system tools.');
     assert.match(english.currentRecycle || '', /Recycle Bin/);
     assert.match(english.quickRecord || '', /confirm the Person/);
     assert.match(english.signOut || '', /Sign Out/);
@@ -58,10 +58,11 @@ test('Console More keeps only uncovered gaps bilingual and preserves all 17 old 
 
     await browser.evaluate("localStorage.setItem('crm_lang', 'zh-CN')");
     await browser.openConsole('#/more', 'authCase=1');
-    await browser.wait("document.querySelector('#console-main')?.innerText.includes('旧版兼容') === true");
-    await browser.evaluate("document.querySelector('.more-workspaces').open=true;document.querySelector('.more-compat').open=true");
+    await browser.wait("document.querySelector('#console-main .more-primary')");
+    assert.equal(await browser.evaluate("document.querySelector('.more-compat')"),null);
+    await browser.evaluate("document.querySelector('.more-workspaces').open=true");
     const chinese = await browser.evaluate("document.querySelector('#console-main').innerText");
-    for (const label of ['工作区域、系统工具与兼容入口。', '常用工具', '知识与话术', '经营分析', '回收站', '旧版兼容', '工作区捷径与快速记录', '保留原因', '旧版']) {
+    for (const label of ['工作区域与系统工具。', '常用工具', '知识与话术', '经营分析', '回收站', '工作区捷径与快速记录']) {
       assert.ok(chinese.includes(label), `Missing Chinese label: ${label}`);
     }
     assert.equal(/WP[0-9]/.test(chinese), false);

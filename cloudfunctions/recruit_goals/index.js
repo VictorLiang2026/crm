@@ -230,8 +230,41 @@ async function listBenchmarks(event) {
   return { rows: r.data || [] };
 }
 
-// 修改行业基准
+function validatedAssumptions(input) {
+  if (!Array.isArray(input) || input.length < 1 || input.length > 7) throw Error('Invalid personal assumptions');
+  const allowed = new Set(STAGES.slice(0, -1).map((stage, i) => stage + '→' + STAGES[i + 1]));
+  allowed.add(STAGES[0] + '→' + STAGES[6]);
+  const seen = new Set(), keys = new Set(['stage_from', 'stage_to', 'conversion_min', 'conversion_avg', 'conversion_good', 'source', 'updated_at']);
+  return input.map(row => {
+    if (!row || typeof row !== 'object' || Array.isArray(row) || Object.keys(row).some(key => !keys.has(key))) {
+      throw Error('Invalid assumption fields');
+    }
+    const pair = row.stage_from + '→' + row.stage_to;
+    const values = [row.conversion_min, row.conversion_avg, row.conversion_good];
+    if (typeof row.stage_from !== 'string' || typeof row.stage_to !== 'string' || !allowed.has(pair) || seen.has(pair) ||
+        values.some(value => typeof value !== 'number' || !Number.isFinite(value)) ||
+        values[0] <= 0 || values[1] < values[0] || values[2] < values[1] || values[2] > 100 ||
+        typeof row.updated_at !== 'string' || !Number.isFinite(Date.parse(row.updated_at)) ||
+        (Object.hasOwn(row, 'source') && (typeof row.source !== 'string' || row.source.length > 500))) {
+      throw Error('Invalid personal assumptions');
+    }
+    seen.add(pair);
+    return { stage_from: row.stage_from, stage_to: row.stage_to, conversion_min: values[0],
+      conversion_avg: values[1], conversion_good: values[2], updated_at: row.updated_at,
+      ...(Object.hasOwn(row, 'source') ? { source: row.source } : {}) };
+  });
+}
+
+// Existing callers retain the original behavior; native assumptions opt into one transaction.
 async function saveBenchmarks(event) {
+  if (event.atomic !== undefined && typeof event.atomic !== 'boolean') throw Error('Invalid atomic mode');
+  if (event.atomic === true) {
+    const rows = validatedAssumptions(event.benchmarks);
+    const response = assertOk(await rdb.rpc('crm_recruit_benchmarks_save_v1', { p_rows: rows }));
+    const result = Array.isArray(response.data) && response.data.length === 1 ? response.data[0] : response.data;
+    if (!result || result.ok !== true) throw Error('Personal assumptions were not saved');
+    return result;
+  }
   const benchmarks = event.benchmarks || [];
   const ts = nowIso();
   var updated = 0;
