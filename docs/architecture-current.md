@@ -1,6 +1,8 @@
 # CRM 架构单页图（v2.0 现状）
 
-> **2026-10-26 L06（验收中）**：新版招募目标增加上月草稿、按签约目标倒推及个人假设编辑，均须显式保存；假设版本校验与原子更新使用新增public.crm_recruit_benchmarks_save_v1，旧接口默认行为和历史实际数不变。More最后一张旧目标卡片及空兼容区退出，全部旧URL保留。迁移、回退和验证见[L06证据](../specs/legacy-workspace-exit/evidence/L06.md)。
+> **2026-10-26 L07（验收中）**：统一回收站支持当前页最多20条原生批量恢复，服务端15分钟范围预览、人工确认、逐条事务回执和仅失败项重试。新增public.crm_recycle_commands及crm_recycle_batch_v1，仅服务端访问；旧单项接口和所有旧URL保持。退出回收站两条重复旧批量入口。详见[L07证据](../specs/legacy-workspace-exit/evidence/L07.md)。
+
+> **2026-10-26 L06（已发布）**：新版招募目标增加上月草稿、按签约目标倒推及个人假设编辑，均须显式保存；假设版本校验与原子更新使用新增public.crm_recruit_benchmarks_save_v1，旧接口默认行为和历史实际数不变。More最后一张旧目标卡片及空兼容区退出，全部旧URL保留。迁移、回退和验证见[L06证据](../specs/legacy-workspace-exit/evidence/L06.md)。
 
 > 2026-10-25 L05（已发布）：嘉宾目录按阶段/状态/关键词/联系到期组合查询，日期按北京时间，过滤在服务端分页前完成。显示现有联系摘要和手动合作次数，不复制Person基础资料、不生成新提醒。More兼容卡片2→1，旧嘉宾URL保留；无数据库或共享模块变更。见[L05](../specs/legacy-workspace-exit/evidence/L05.md)。
 

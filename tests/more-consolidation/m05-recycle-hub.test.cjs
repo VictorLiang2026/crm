@@ -8,7 +8,7 @@ test('M05 hub navigates to existing recycle pages without restoring records',asy
   await b.wait("document.querySelector('#console-main a[href=\"#/recycle\"]')");
   await b.evaluate("document.querySelector('#console-main a[href=\"#/recycle\"]').click()");
   await b.wait("document.querySelector('.recycle-hub')");
-  assert.equal(await b.evaluate("document.querySelector('.recycle-legacy').open"),false);
+  assert.equal(await b.evaluate("document.querySelector('.recycle-legacy')===null"),true);
   for(const route of ['#/people-trash','#/recycle/customers','#/recycle/recruit']){
    await b.evaluate(`document.querySelector('.recycle-hub a[href="${route}"]').click()`);
    await b.wait("document.querySelector('#console-main a[href=\"#/recycle\"]')");
@@ -16,8 +16,7 @@ test('M05 hub navigates to existing recycle pages without restoring records',asy
    await b.evaluate("document.querySelector('#console-main a[href=\"#/recycle\"]').click()");
    await b.wait("document.querySelector('.recycle-hub')");
   }
-  await b.evaluate("document.querySelector('.recycle-legacy summary').click()");
-  assert.deepEqual(await b.evaluate("[...document.querySelectorAll('.recycle-legacy a')].map(x=>x.getAttribute('href'))"),['/crm/admin.html#/customers/trash','/crm/admin.html#/recruit/trash']);
+  assert.deepEqual(await b.evaluate("[...document.querySelectorAll('.recycle-legacy a')].map(x=>x.getAttribute('href'))"),[]);
   await b.evaluate("localStorage.setItem('crm_lang','en')");
   await b.openConsole('#/recycle','authCase=1&mode=pc35');
   await b.wait("document.querySelector('.recycle-hub')");

@@ -5,6 +5,7 @@ import { data } from '../data.js';
 import { openSheet } from '../write.js';
 import { pageHead, emptyNote, loadInto } from '../ui.js';
 import { t } from '../i18n.js';
+import { createRecycleBatch } from '../recycle-batch.js';
 
 const PAGE_SIZE = 20;
 export function renderRecycleHub(ctx) {
@@ -18,14 +19,7 @@ export function renderRecycleHub(ctx) {
       actions: [h('a', { class: 'btn btn-ghost', href: '#/more' }, t('title_more'))] }),
     h('div', { class: 'tile-grid recycle-hub' }, entries.map(([href, key]) =>
       h('a', { class: 'tile', href }, [ic('refresh'), h('b', {}, t(key)), h('span', {}, t(key + '_desc'))]))),
-    h('details', { class: 'card card-body recycle-legacy' }, [
-      h('summary', {}, t('trash_legacy_batch')),
-      h('p', { class: 'foot-note' }, t('trash_legacy_batch_note')),
-      h('div', { class: 'more-actions' }, [
-        h('a', { class: 'btn btn-ghost', href: '/crm/admin.html#/customers/trash' }, t('legacy_customers_trash')),
-        h('a', { class: 'btn btn-ghost', href: '/crm/admin.html#/recruit/trash' }, t('legacy_recruit_trash')),
-      ]),
-    ]),
+
   );
 }
 
@@ -87,6 +81,8 @@ function renderTrash(ctx, kind) {
   const recruit = kind === 'recruit';
   const state = { page: 1, keyword: '', sortDir: 'desc' };
   const list = h('div', {});
+  const batch = createRecycleBatch(ctx, kind, () => runQuery());
+  let queryEpoch = 0, cancelQuery;
   const input = h('input', { class: 'sheet-input', type: 'search',
     placeholder: t('trash_search_placeholder'), 'aria-label': t('trash_search_placeholder') });
   const prev = h('button', { class: 'btn btn-ghost btn-sm', type: 'button' }, t('btn_prev'));
@@ -94,10 +90,10 @@ function renderTrash(ctx, kind) {
   const pageInfo = h('span', { class: 'pager-info' }, '');
   const totalInfo = h('span', { class: 'foot-note' }, '');
 
-  async function fetchRows() {
-    if (recruit) return fetchRecruit(ctx, state);
-    const result = await data.customerTrash(ctx, { page: state.page, pageSize: PAGE_SIZE,
-      keyword: state.keyword, sortDir: state.sortDir });
+  async function fetchRows(query) {
+    if (recruit) return fetchRecruit(ctx, query);
+    const result = await data.customerTrash(ctx, { page: query.page, pageSize: PAGE_SIZE,
+      keyword: query.keyword, sortDir: query.sortDir });
     if (!Array.isArray(result.rows) || !Number.isSafeInteger(Number(result.total))) {
       throw new Error(t('trash_invalid_result'));
     }
@@ -146,9 +142,14 @@ function renderTrash(ctx, kind) {
   }
 
   function runQuery() {
-    loadInto(list, async () => {
-      const result = await fetchRows();
+    const epoch = ++queryEpoch, query = { ...state };
+    cancelQuery?.();
+    batch.reset();
+    cancelQuery = loadInto(list, async () => {
+      const result = await fetchRows(query);
+      if (epoch !== queryEpoch) return h('div');
       const rows = result.rows;
+      batch.reset(rows);
       const total = Number(result.total) || 0;
       prev.disabled = state.page <= 1;
       next.disabled = state.page * PAGE_SIZE >= total;
@@ -160,11 +161,12 @@ function renderTrash(ctx, kind) {
       const headers = recruit
         ? ['col_name', 'trash_col_source', 'trash_col_deleted_at', 'trash_col_scope', 'trash_col_linked', 'trash_col_action']
         : ['col_name', 'trash_col_deleted_at', 'trash_col_scope', 'trash_col_linked', 'trash_col_action'];
-      const head = h('thead', {}, h('tr', {}, headers.map(key => h('th', {}, t(key)))));
+      const head = h('thead', {}, h('tr', {}, ['l07_select', ...headers].map(key => h('th', {}, t(key)))));
       const body = h('tbody', {}, rows.map(row => {
         const id = recruit ? row.candidate_id : row.Id;
         const counts = recruit ? result.counts?.[id] : result.recoverable_counts?.[id];
-        const cells = [h('td', { 'data-label': t('col_name') }, row.customer_name || `#${id}`)];
+        const cells = [h('td', { 'data-label': t('l07_select') }, batch.checkbox(row)),
+          h('td', { 'data-label': t('col_name') }, row.customer_name || `#${id}`)];
         if (recruit) cells.push(h('td', { 'data-label': t('trash_col_source') },
           t(row.customer_id == null ? 'trash_person_only' : 'trash_customer_linked')));
         cells.push(
@@ -198,10 +200,11 @@ function renderTrash(ctx, kind) {
       actions: [h('a', { class: 'btn btn-ghost', href: '#/recycle' }, [ic('refresh'), t('trash_hub_back')]),
         h('a', { class: 'btn btn-ghost', href: '#/more' }, [ic('grid'), t('title_more')])] }),
     h('section', { class: 'card' }, [
-      h('div', { class: 'card-body' }, [form, sort]), list,
+      h('div', { class: 'card-body' }, [form, sort]), batch.toolbar, list,
       h('div', { class: 'card-foot' }, [totalInfo,
         h('div', { class: 'pager', style: 'margin-left:auto' }, [prev, pageInfo, next])]),
     ]),
+    batch.receipt,
   );
   runQuery();
 }

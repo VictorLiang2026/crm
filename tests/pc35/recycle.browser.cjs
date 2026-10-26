@@ -27,7 +27,7 @@ test('nonempty Person trash renders roles and historical restore scope', async (
   } finally { await browser.close(); }
 });
 
-test('More opens the unified hub with three native recycle bins and preserves old links in both languages', async () => {
+test('More opens the unified hub with three native recycle bins without duplicate legacy links in both languages', async () => {
   const browser = new Browser(ROOT);
   try {
     await browser.start();
@@ -44,11 +44,11 @@ test('More opens the unified hub with three native recycle bins and preserves ol
       await browser.evaluate("document.querySelector('.more-primary a[href=\"#/recycle\"]').click()");
       await browser.wait("location.hash==='#/recycle' && document.querySelector('.recycle-hub')");
       const links = await browser.evaluate("[...document.querySelectorAll('#console-main a')].map(a=>a.getAttribute('href'))");
-      for (const href of ['#/people-trash','#/recycle/customers','#/recycle/recruit',...legacy]) assert.ok(links.includes(href), href);
-      await browser.evaluate("document.querySelector('.recycle-legacy summary').click()");
+      for (const href of ['#/people-trash','#/recycle/customers','#/recycle/recruit']) assert.ok(links.includes(href), href);
+      assert.ok(legacy.every(href=>!links.includes(href)));
       const labels = lang==='en'
-        ? ['Person Recycle Bin','Customer Recycle Bin','Recruit Recycle Bin','Legacy Batch Restore']
-        : ['Person 回收站','客户回收站','增员回收站','旧版批量恢复'];
+        ? ['Person Recycle Bin','Customer Recycle Bin','Recruit Recycle Bin']
+        : ['Person 回收站','客户回收站','增员回收站'];
       const content = await browser.evaluate("document.querySelector('#console-main').innerText");
       for (const word of labels) assert.ok(content.includes(word), word);
       for (const route of ['#/people-trash','#/recycle/customers','#/recycle/recruit']) {

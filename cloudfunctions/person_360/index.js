@@ -151,7 +151,7 @@ async function pgRpc(name, body) {
     'crm_ocr_parse_preview_v1','crm_ocr_parse_undo_preview_v1','crm_ocr_parse_execute_v1',
     'crm_recruit_candidate_create_v1','crm_recruit_candidate_transition_v1','crm_recruit_coach_outcome_v1',
     'crm_knowledge_review_v1','crm_proactive_coach_decision_v1','crm_file_import_v1',
-    'crm_legacy_opportunity_v1']).has(name)) throw new Error('Invalid RPC');
+    'crm_legacy_opportunity_v1','crm_recycle_batch_v1']).has(name)) throw new Error('Invalid RPC');
   const env = process.env.TCB_ENV;
   const key = process.env.CRM_PERSON360_DB_API_KEY;
   if (!/^crm-[a-z0-9]+$/.test(env || '') || !key) throw new Error('Person 360 is not configured');
@@ -1020,6 +1020,12 @@ exports.main = async event => {
       case 'listPersonOnlyRecruitTrash': return await service.listPersonOnlyRecruitTrash();
       case 'removePersonOnlyRecruit': return await service.changePersonOnlyRecruit('remove', [event.id], uid);
       case 'restorePersonOnlyRecruit': return await service.changePersonOnlyRecruit('restore', event.ids, uid);
+      case 'previewRecycleBatch': return await new (require('./recycle-batch-service').RecycleBatchService)({rpc:pgRpc})
+        .preview(event.data, uid);
+      case 'getRecycleBatch': return await new (require('./recycle-batch-service').RecycleBatchService)({rpc:pgRpc})
+        .receipt('get', event.previewId, uid);
+      case 'executeRecycleBatch': return await new (require('./recycle-batch-service').RecycleBatchService)({rpc:pgRpc})
+        .receipt('execute', event.previewId, uid);
       case 'resolveRecruitCandidateName': return await service.resolveRecruitCandidateName(event.name);
       case 'createRecruitCandidate': return await service.createRecruitCandidate(event.data, uid);
       case 'getRecruitCandidate': return await service.getRecruitCandidate(event.candidateId, event.personId);

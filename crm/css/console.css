@@ -959,3 +959,13 @@ body:has(.login), body.is-login { padding-top: env(safe-area-inset-top); }
 .l06-assumptions th, .l06-assumptions td { white-space: normal; overflow-wrap: anywhere; }
 .l06-assumptions .sheet-input { width: 100%; min-width: 0; min-height: 44px; padding-inline: 6px; }
 .l06-tools .btn { min-height: 44px; white-space: normal; }
+
+/* L07: bounded selection and actor-owned restore receipts. */
+.recycle-batch-toolbar { display:flex; flex-wrap:wrap; gap:12px; align-items:center; border-top:1px solid var(--line); }
+.recycle-batch-toolbar p { flex-basis:100%; margin:0; }
+.recycle-check { display:inline-flex; align-items:center; gap:8px; min-height:44px; cursor:pointer; }
+.recycle-check input { width:20px; height:20px; margin:0; }
+.recycle-results { list-style:none; padding:0; margin:12px 0; }
+.recycle-result-row { display:flex; flex-direction:column; gap:6px; padding:12px 0; border-bottom:1px solid var(--line); overflow-wrap:anywhere; }
+.recycle-result-row small { color:var(--ink-3); }
+.recycle-batch-receipt:not(:empty) { margin-top:16px; }
