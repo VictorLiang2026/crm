@@ -93,6 +93,9 @@ test('permission and stale preview database failures are explicit',async()=>{
 });
 test('ordinary AI Search links its actual task to returned test evidence',async()=>{
  const {runSearch}=require('../../cloudfunctions/assistant/search-service');const links=[];
+ const previousFetch=global.fetch;
+ global.fetch=async()=>({ok:true,json:async()=>[]});
+ try{
  const data={search:async()=>({rows:[{person_id:91,activity_id:92,participant_id:93}],total:1,coverage:{rows:1}}),
   testDataReader:async()=>({status:'verified',containsTestData:true,recordCount:1,sources:[]}),linkTestAudit:async(...args)=>links.push(args)};
  const result=await runSearch({query:'最近三个月参加过活动但没有继续跟进的人'},{app:{},data,
@@ -100,4 +103,5 @@ test('ordinary AI Search links its actual task to returned test evidence',async(
  assert.equal(result.total,1);assert.equal(links[0][0],94);assert.ok(links[0][1].some(r=>r.table==='persons'&&r.id==='91'));
  delete data.linkTestAudit;
  await assert.rejects(runSearch({query:'虚构查询'},{app:{},data,gateway:{runAITask:async()=>({taskId:94,result:{template:'activity_no_followup',months:3}})}}),/tracking is unavailable/);
+ }finally{global.fetch=previousFetch;}
 });
