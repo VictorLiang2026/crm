@@ -22,9 +22,11 @@
 - 已运行并通过：`npm run build:shared`、`npm run check:shared`、`npm run test:knowledge-library`、`npm run test:ai-skills`、`npm run test:ai-gateway`、`npm run test:pc22`、`npm run test:pc23`、`npm run test:pc03`、`npm run test:modular`、`tests/more-consolidation/m14-knowledge.browser.cjs`；完整 WP01 复归跑通过 108 项、0 失败、5 项预设跳过，PC34 双语/iPad 回归通过，匿名探针 77/77 通过。WP01 的状态为 `PASS_WITH_LIMITATIONS`：真实登录摘要、service runtime、生产写入和手机行为仍标为未验证。
 - 未验证：真实登录账号上的在线上传、实际 AI 模型配置下的模型输出质量、线上部署后的真实浏览器行为。本进度不把 Mock/离线回归表述为线上端到端成功。
 
-## 尚需完成
+## 发布结果与后续验证
 
-1. 完成 WP01 报告后，仍须按 `tests/wp01/README.md` 在独立窗口执行 `npm run test:wp01:login`，为发布门槛提供一小时内真实测试账号登录证据；当前证据过期，因此不可部署或发布。
-2. 门槛刷新通过后，只部署 `assistant`、`person_360` 和本轮触及的 Console 静态文件；验证云端函数与页面哈希。
-3. 提交、推送、发布标签和三端核验；独立招聘目录本地改动不纳入提交。
-4. 取得用户实际提供并授权的资料后，再做资料导入与内容质量评估。当前没有导入任何公司、产品、沙龙、绩优分享或法务税务材料。
+- 已部署 `assistant`、`ai_activity`、`person_360`，并上传本轮改动的 9 个 Console JS 文件与 `crm/css/console.css`；`admin.html` 未变。
+- 已提交并推送至 GitHub master：`40f868878fa864ff423ca13372fe3eaeb630e754`；标签：`release-20261027-011555`。发布脚本确认本地、GitHub、云端源码一致。
+- 发布后核验通过：87 个可达页面/模块/样式资源、29 个云函数共 217 个源码/配置文件。目标静态文件 ETag 与本地 MD5 逐项匹配。
+- WP01 为 `PASS_WITH_LIMITATIONS`，无发布阻断项；当前缺少一小时内真实账号登录摘要，因此还未完成登录后的真实页面上传/审核验收。按 `tests/wp01/README.md` 在独立窗口运行 `npm run test:wp01:login` 后可补验。service runtime、生产写入/恢复、真实 AI 输出质量与手机行为仍未验证。
+- 尚未导入实际公司、产品、沙龙、绩优分享或法务税务材料；收到用户提供并授权的资料后再做导入与内容质量评估。
+- 独立招聘目录的三处并行工作已恢复在本地工作区，未纳入本次提交或部署。
