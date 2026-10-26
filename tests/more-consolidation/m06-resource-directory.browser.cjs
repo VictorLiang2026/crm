@@ -8,6 +8,7 @@ test('M06 standalone resources page searches and pages without an activity, reus
   await b.wait("document.querySelector('.more-section')");
   await b.evaluate(`(async()=>{
    const {data}=await import('/crm/js/modules/console/data.js');window.m06={calls:[],fail:false};
+   data.resolveActivityPerson=async()=>({candidates:[]});
    data.resourceDirectory=async(ctx,kind,args)=>{
     window.m06.calls.push({kind,...args});if(window.m06.fail)throw Error('RESOURCE_SEARCH_LIMIT');
     return{rows:kind==='speaker'?[{id:args.page,name:'[CRM_TEST_ONLY] Speaker '+args.page,person_id:22,linked_person:{id:22,name:'[CRM_TEST_ONLY] Person'},status:'active',relationship_stage:'new'}]:[{id:33,topic_name:'[CRM_TEST_ONLY] Topic',status:'active',keywords:[]}],hasMore:kind==='speaker'&&args.page===1,page:args.page,pageSize:20,total:null};
@@ -17,11 +18,27 @@ test('M06 standalone resources page searches and pages without an activity, reus
   await b.wait("document.querySelector('.resource-directory-results .pager')");
   assert.equal(await b.evaluate('window.m06.calls[0].kind'),'speaker');
   assert.match(await b.evaluate("document.querySelector('.resource-directory-results .row-title').innerText"),/新建/);
+  assert.equal(await b.evaluate("document.querySelector('.act-resource-actions a')?.getAttribute('href')"),'#/person/22');
+  assert.equal(await b.evaluate("document.querySelector('.act-resource-actions a')?.textContent"),'人物主资料');
+  await b.evaluate("[...document.querySelectorAll('#console-main button')].find(x=>x.textContent==='新增嘉宾档案').click()");
+  await b.wait("document.querySelector('.sheet-overlay input[type=text]')");
+  assert.equal(await b.evaluate("[...document.querySelectorAll('.sheet-overlay button')].some(x=>x.textContent.includes('暂存未识别嘉宾'))"),false);
+  await b.evaluate("document.querySelector('.sheet-overlay input[type=text]').value='[CRM_TEST_ONLY] New Person';[...document.querySelectorAll('.sheet-overlay button')].find(x=>x.textContent==='解析 Person 候选').click()");
+  await b.wait("document.querySelector('.sheet-overlay a')?.getAttribute('href')==='#/people'");
+  assert.match(await b.evaluate("document.querySelector('.sheet-overlay').textContent"),/请先在人物页新建或核实身份/);
+  await b.evaluate("document.querySelector('.sheet-overlay').remove()");
+  await b.evaluate("document.querySelector('.act-resource-actions button').click()");
+  await b.wait("document.querySelector('.sheet-overlay input[type=text]')");
+  assert.equal(await b.evaluate("document.querySelector('.sheet-overlay input[type=text]').readOnly"),true);
+  await b.evaluate("document.querySelector('.sheet-overlay').remove()");
   await b.evaluate("document.querySelector('.resource-directory-results .pager button:last-child').click()");
   await b.wait("document.querySelector('.resource-directory-results .pager-info')?.innerText.includes('2')");
   assert.equal(await b.evaluate('window.m06.calls.at(-1).page'),2);
   assert.equal(await b.evaluate("document.querySelector('.resource-directory-results .pager button:last-child').disabled"),true);
-  await b.evaluate(`(()=>{const form=document.querySelector('#console-main form');form.querySelector('select').value='topic';form.querySelector('input').value='[CRM_TEST_ONLY]';form.querySelectorAll('select')[1].value='active';form.requestSubmit()})()`);
+  await b.evaluate("document.querySelector('.resource-directory-tab:nth-child(2)').click()");
+  await b.wait("document.querySelector('.act-topic-catalog .act-resource-row')");
+  assert.equal(await b.evaluate("document.querySelector('.resource-directory-tab:nth-child(2)').getAttribute('aria-selected')"),'true');
+  await b.evaluate(`(()=>{const form=document.querySelector('#console-main form');form.querySelector('input').value='[CRM_TEST_ONLY]';form.querySelectorAll('select')[1].value='active';form.requestSubmit()})()`);
   await b.wait("document.querySelector('.act-topic-catalog .act-resource-row')");
   assert.deepEqual(await b.evaluate('window.m06.calls.at(-1)'),{kind:'topic',keyword:'[CRM_TEST_ONLY]',status:'active',page:1,pageSize:20});
   assert.equal(await b.evaluate("document.querySelector('.act-topic-assignment')"),null);

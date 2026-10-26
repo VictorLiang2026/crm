@@ -220,8 +220,7 @@ export function renderActivityParticipants(ctx, activity, participants, onDone) 
 }
 
 function openSpeakerEditor(ctx, speaker, onDone) {
-  const temporary = !!speaker?._temporary;
-  const editing = !!speaker && !temporary;
+  const editing = !!speaker;
   const linked = !!speaker?.person_id;
   const name = input('text', speaker?.name, { maxlength: '160', required: true, ...(linked ? { readonly: true } : {}) });
   const position = input('text', speaker?.position, { maxlength: '240' });
@@ -239,16 +238,11 @@ function openSpeakerEditor(ctx, speaker, onDone) {
   const selected = h('p', { class: 'sheet-note' }, t('act_person_not_selected'));
   const resolve = h('button', { class: 'btn btn-ghost', type: 'button' }, t('act_person_resolve'));
   let chosen = null;
-  const identityControls = !editing && !temporary ? [
+  const identityControls = !editing ? [
     h('div', { class: 'sheet-actions' }, [resolve]), results, selected,
-    h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => {
-      const legacyName = name.value.trim();
-      if (!legacyName) { sheet.showErr(t('act_speaker_name_required')); return; }
-      sheet.overlay.remove(); openSpeakerEditor(ctx, { name: legacyName, _temporary: true }, onDone);
-    } }, t('act_temp_speaker_add')),
-  ] : temporary ? [h('div', { class: 'act-warning' }, t('act_temp_speaker_warning'))]
-    : !linked ? [h('div', { class: 'sheet-note' }, t('act_speaker_unlinked_note'))]
-      : [h('div', { class: 'sheet-note' }, `${t('act_speaker_person_linked')} · Person #${speaker.person_id}`)];
+  ] : !linked ? [h('div', { class: 'sheet-note' }, t('act_speaker_unlinked_note'))]
+      : [h('div', { class: 'sheet-note' }, `${t('act_speaker_person_linked')} · Person #${speaker.person_id}`),
+        h('a', { class: 'btn btn-ghost btn-sm', href: `#/person/${speaker.person_id}`, onclick: () => sheet.overlay.remove() }, t('act_speaker_person_master'))];
   const sheet = openSheet({ title: t(editing ? 'act_speaker_edit_title' : 'act_speaker_create_title'), sub: t('act_speaker_identity_note'), body: h('div', { class: 'sheet-stack' }, [
     field(t('act_speaker_name'), name), ...identityControls,
     field(t('act_speaker_position'), position), field(t('act_speaker_expertise'), expertise),
@@ -260,7 +254,7 @@ function openSpeakerEditor(ctx, speaker, onDone) {
   ]) });
   document.body.appendChild(sheet.overlay);
   const save = sheet.overlay.querySelector('.act-speaker-save');
-  if (!editing && !temporary) name.oninput = () => {
+  if (!editing) name.oninput = () => {
     chosen = null; save.disabled = true; selected.textContent = t('act_person_not_selected'); results.replaceChildren();
   };
   if (!editing) resolve.onclick = async () => {
@@ -270,7 +264,10 @@ function openSpeakerEditor(ctx, speaker, onDone) {
     try {
       const result = await data.resolveActivityPerson(ctx, name.value.trim());
       const candidates = result.candidates || [];
-      if (!candidates.length) { results.replaceChildren(h('p', { class: 'sheet-note' }, t('act_person_no_match'))); return; }
+      if (!candidates.length) { results.replaceChildren(
+        h('p', { class: 'sheet-note' }, t('act_speaker_no_match_person_first')),
+        h('a', { class: 'btn btn-ghost btn-sm', href: '#/people', onclick: () => sheet.overlay.remove() }, t('act_speaker_open_people')),
+      ); return; }
       results.replaceChildren(...candidates.map(candidate => h('button', { class: 'btn btn-ghost act-person-candidate', type: 'button', onclick: event => {
         chosen = candidate; save.disabled = false; name.value = candidate.displayName;
         selected.textContent = `${t('act_person_selected')}: ${candidate.displayName} · #${candidate.id}`;
@@ -293,10 +290,7 @@ function openSpeakerEditor(ctx, speaker, onDone) {
     setBusy(save, true, t('saving'));
     try {
       let result;
-      if (temporary) {
-        result = await ctx.api.call('activity_speakers', { action: 'create', data: { name: name.value.trim(), ...profile } });
-        if (!result?.id) throw new Error(result?.error || t('save_failed'));
-      } else if (editing) {
+      if (editing) {
         result = await data.updateActivitySpeaker(ctx, speaker.id, profile);
         if (result.ok !== true) throw new Error(result.error || t('save_failed'));
       } else {
@@ -308,7 +302,7 @@ function openSpeakerEditor(ctx, speaker, onDone) {
       sheet.overlay.remove(); ctx.toast(t(editing ? 'act_speaker_saved' : 'act_speaker_created'), 'ok'); onDone?.();
     } catch (error) { setBusy(save, false, t(editing ? 'btn_save' : 'act_speaker_confirm_create')); sheet.showErr(errorText(error)); }
   };
-  if (!editing && !temporary) save.disabled = true;
+  if (!editing) save.disabled = true;
 }
 
 function openSpeakerLink(ctx, speaker, onDone) {
@@ -454,6 +448,10 @@ export function renderResourceDirectory(ctx) {
   const host = h('div', { class: 'resource-directory-results' });
   const kind = select([['speaker', t('act_speakers_title')], ['topic', t('act_topics_title')]], state.kind);
   kind.setAttribute('aria-label', t('resource_directory_kind'));
+  kind.hidden = true;
+  const speakerTab = h('button', { class: 'resource-directory-tab', type: 'button', role: 'tab', onclick: () => selectKind('speaker') }, t('resource_directory_speakers_tab'));
+  const topicTab = h('button', { class: 'resource-directory-tab', type: 'button', role: 'tab', onclick: () => selectKind('topic') }, t('resource_directory_topics_tab'));
+  const tabs = h('div', { class: 'resource-directory-tabs', role: 'tablist', 'aria-label': t('resource_directory_kind') }, [speakerTab, topicTab]);
   const keyword = input('search', '', { placeholder: t('resource_directory_search'), 'aria-label': t('resource_directory_search'), maxlength: '120' });
   const status = select([['', t('resource_directory_all')], ['active', t('act_resource_active')], ['inactive', t('act_resource_inactive')]], '');
   status.setAttribute('aria-label', t('resource_directory_status'));
@@ -463,7 +461,13 @@ export function renderResourceDirectory(ctx) {
   const due = select(['', 'overdue', 'today', 'next7', 'unscheduled'].map(value => [value, t('l05_due_' + (value || 'all'))]), '');
   due.setAttribute('aria-label', t('l05_due_label'));
   const contactNote = h('p', { class: 'foot-note' }, t('l05_time_note'));
-  const syncType = () => { stage.hidden = due.hidden = contactNote.hidden = kind.value !== 'speaker'; };
+  const syncType = () => {
+    stage.hidden = due.hidden = contactNote.hidden = kind.value !== 'speaker';
+    for (const [button, selected] of [[speakerTab, kind.value === 'speaker'], [topicTab, kind.value === 'topic']]) {
+      button.classList.toggle('selected', selected);
+      button.setAttribute('aria-selected', String(selected));
+    }
+  };
   kind.addEventListener('change', syncType);
   let request = 0;
   async function load() {
@@ -471,6 +475,13 @@ export function renderResourceDirectory(ctx) {
     host.replaceChildren(h('p', { class: 'muted' }, t('loading')));
     const node = await renderActivityResources(ctx, null, load, { ...state });
     if (version === request && host.isConnected) host.replaceChildren(node);
+  }
+  function selectKind(value) {
+    if (kind.value === value) return;
+    kind.value = value; state.kind = value; state.page = 1;
+    delete state.stage; delete state.due;
+    if (value === 'speaker') { state.stage = stage.value; state.due = due.value; }
+    syncType(); load();
   }
   const form = h('form', { class: 'more-actions resource-directory-filters', onsubmit: event => {
     event.preventDefault(); state.kind = kind.value; state.keyword = keyword.value.trim();
@@ -482,10 +493,10 @@ export function renderResourceDirectory(ctx) {
   ctx.main.replaceChildren(
     pageHead({ title: t('resource_directory_title'), sub: t('resource_directory_note'),
       actions: [h('a', { class: 'btn btn-ghost', href: '#/activities' }, t('title_activities'))] }),
-    form, contactNote, host,
+    tabs, form, contactNote, host,
 
   );
-  load();
+  syncType(); load();
 }
 
 export async function renderActivityResources(ctx, activityId, onDone, directory = null) {
@@ -520,7 +531,8 @@ export async function renderActivityResources(ctx, activityId, onDone, directory
           `${t('act_speaker_last_note')}: ${String(speaker.last_contact_note).slice(0, 240)}${String(speaker.last_contact_note).length > 240 ? '…' : ''}`) : null,
         !speaker.person_id ? h('div', { class: 'row-sub' }, t('act_speaker_unlinked_note')) : null]),
       h('div', { class: 'act-resource-actions' }, [
-        h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => openSpeakerEditor(ctx, speaker, refresh) }, t('btn_edit')),
+        speaker.person_id ? h('a', { class: 'btn btn-ghost btn-sm', href: `#/person/${speaker.person_id}` }, t('act_speaker_person_master')) : null,
+        h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => openSpeakerEditor(ctx, speaker, refresh) }, t('act_speaker_activity_profile')),
         !speaker.person_id ? h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => openSpeakerLink(ctx, speaker, refresh) }, t('act_speaker_link')) : null,
         h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: async () => {
           try { const result = await data.updateActivitySpeaker(ctx, speaker.id, { status: speaker.status === 'active' ? 'inactive' : 'active' });
