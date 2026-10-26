@@ -3,6 +3,7 @@ import { data } from './data.js';
 import { openSheet } from './write.js';
 import { t, translateEnum } from './i18n.js';
 import { renderSpeakerRecommendations } from './activity-speaker-recommend.js';
+import { renderTopicRecommendations } from './activity-topic-recommend.js';
 import { bdg, emptyNote, sectionTitle, pageHead } from './ui.js';
 
 const PARTICIPANT_TYPES = ['customer', 'recruit', 'speaker'];
@@ -415,16 +416,25 @@ function renderTopicAssignment(ctx, activity, topics, onDone) {
   const topicMap = new Map(topics.map(topic => [String(topic.id), topic]));
   const missing = original.filter(id => !topicMap.has(id));
   const chosen = new Set(original.filter(id => topicMap.has(id)));
+  const checkboxes = new Map();
   const list = h('div', { class: 'act-topic-picks' }, topics.map(topic => {
     const id = String(topic.id), currentlySelected = chosen.has(id);
     const checkbox = h('input', { type: 'checkbox', checked: currentlySelected, disabled: topic.status !== 'active' && !currentlySelected,
       onchange: () => { if (checkbox.checked) chosen.add(id); else chosen.delete(id); } });
+    checkboxes.set(id, checkbox);
     return h('label', { class: 'act-topic-pick' }, [checkbox, h('span', {}, [h('b', {}, topic.topic_name),
       h('small', {}, `${topic.category || t('act_topic_uncategorized')} · ${t('act_topic_usage_count')} ${topic.use_count || 0}`)]),
       topic.status === 'inactive' ? bdg(t('act_resource_inactive'), 'gray') : null]);
   }));
   const acknowledge = h('input', { type: 'checkbox' });
   const save = h('button', { class: 'btn btn-primary btn-sm', type: 'button' }, t('act_topics_save'));
+  const recommendations = renderTopicRecommendations(ctx, activity, topicId => {
+    const checkbox = checkboxes.get(String(topicId));
+    if (!checkbox || checkbox.disabled) { ctx.toast(t('act_ai_topic_unavailable'), 'err'); return; }
+    checkbox.checked = true;
+    chosen.add(String(topicId));
+    ctx.toast(t('act_ai_topic_selected'), 'ok');
+  });
   save.onclick = async () => {
     if (missing.length && !acknowledge.checked) return;
     setBusy(save, true, t('saving'));
@@ -437,6 +447,7 @@ function renderTopicAssignment(ctx, activity, topics, onDone) {
   return h('div', { class: 'act-topic-assignment' }, [
     h('div', { class: 'act-note-row' }, [h('p', { class: 'sheet-note' }, t('act_topic_assignment_note')),
       h('button', { class: 'btn btn-primary btn-sm', type: 'button', onclick: () => openTopicEditor(ctx, null, onDone) }, t('act_topic_add'))]),
+    recommendations,
     missing.length ? h('div', { class: 'act-warning' }, [h('p', {}, `${t('act_topics_missing')}: ${missing.join(', ')}`),
       h('label', { class: 'act-missing-confirm' }, [acknowledge, t('act_topics_remove_missing_confirm')])]) : null,
     topics.length ? list : emptyNote(t('act_topics_empty'), t('act_topics_empty_note')),

@@ -228,6 +228,8 @@ export const data = {
     call(ctx, 'ai_activity', { action: 'prepareV2', activity_id: Number(activityId), mode, language }),
   activityRecommendSpeakersV2: (ctx, activityId, language) =>
     call(ctx, 'ai_activity', { action: 'recommendSpeakersV2', activity_id: Number(activityId), language }),
+  activityRecommendTopicsV2: (ctx, activityId, language) =>
+    call(ctx, 'ai_activity', { action: 'recommendTopicsV2', activity_id: Number(activityId), language }),
   activityReviewHistory: (ctx, activityId) =>
     p360(ctx, 'listActivityReviewHistory', { activityId: Number(activityId) }),
   previewActivityReview: (ctx, payload) =>
