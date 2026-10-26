@@ -9,6 +9,7 @@ import {
 import { wpTag, pageHead, card, emptyNote, loadInto, bdg, fmtDate, textOf } from '../ui.js';
 import { t, tFull, translateEnum } from '../i18n.js';
 import { openLegacyOpportunity, legacyOpportunityTypeLabel } from '../legacy-opportunity.js';
+import { openLegacyOpportunityMaintenance } from '../legacy-opportunity-maintenance.js';
 
 const PAGE_SIZE = 20;
 const FILTER_TYPES = [
@@ -108,6 +109,14 @@ function openOpportunityDetails(ctx, row, onDone) {
         ? h('button', { class:'btn btn-primary legacy-opp-advance', type:'button', onclick:()=>{
           sheet.overlay.remove();openLegacyOpportunity(ctx,{opportunity,person,actions:linkedActions,mode:'advance',onDone});
         } }, [ic('check'),t('opp_btn_advance_close')]) : null,
+      !personOnly && legacyCustomerHref && ['成交','关闭'].includes(opportunity.status)
+        ? h('button', { class:'btn btn-ghost', type:'button', onclick:()=>{
+          sheet.overlay.remove();openLegacyOpportunityMaintenance(ctx,{opportunity,mode:'terminal_edit',onDone});
+        } }, [ic('edit'),t('opp_maintenance_terminal_edit')]) : null,
+      !personOnly && legacyCustomerHref
+        ? h('button', { class:'btn btn-ghost', type:'button', onclick:()=>{
+          sheet.overlay.remove();openLegacyOpportunityMaintenance(ctx,{opportunity,mode:'remove',onDone});
+        } }, [ic('trash'),t('opp_maintenance_remove')]) : null,
       !personOnly && legacyCustomerHref ? h('details', { class: 'opp-maintenance', style:'flex-basis:100%' }, [
         h('summary', {style:'min-height:44px;cursor:pointer'}, t('l08_opportunity_maintenance')),
         h('p', { class:'foot-note' }, t(person ? 'l08_opportunity_maintenance_note' : 'l08_opportunity_unlinked_note')),

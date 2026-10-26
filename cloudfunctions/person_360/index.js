@@ -24,7 +24,7 @@ const { RelationshipNetworkService } = require('./relationship-network-service')
 const { OcrReviewService } = require('./ocr-review-service');
 const { FileImportService } = require('./file-import-service');
 const { PersonFileService } = require('./person-file-service');
-const { LegacyOpportunityService } = require('./legacy-opportunity-service');
+const { LegacyOpportunityService, LegacyOpportunityMaintenanceService } = require('./legacy-opportunity-service');
 const { RecruitDirectoryService } = require('./recruit-directory-service');
 const { RecruitCandidateService } = require('./recruit-candidate-service');
 const aiStandards = require('./ai');
@@ -1092,6 +1092,10 @@ exports.main = async event => {
         return await new LegacyOpportunityService({rpc:pgRpc}).preview(event.data,uid);
       case 'executeLegacyOpportunity':
         return await new LegacyOpportunityService({rpc:pgRpc}).execute(event.previewId,uid);
+      case 'previewLegacyOpportunityMaintenance':
+        return await new LegacyOpportunityMaintenanceService({rpc:pgRpc}).preview(event.data,uid);
+      case 'executeLegacyOpportunityMaintenance':
+        return await new LegacyOpportunityMaintenanceService({rpc:pgRpc}).execute(event.previewId,uid);
       case 'savePersonFileOriginal': return await new PersonFileService({rpc:pgRpc}).save(event.data,uid);
       case 'listPersonFiles': return await new PersonFileService({rpc:pgRpc}).list(event.personId,event.page,uid);
       case 'getPersonFile': return await new PersonFileService({rpc:pgRpc,request:pgRequest}).get(event.jobId,uid,{history:true});

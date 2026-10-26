@@ -42,4 +42,32 @@ class LegacyOpportunityService {
  preview(input,actor){return this.call(actor,'preview',normalize(input));}
  execute(previewId,actor){return this.call(actor,'execute',{previewId:uuid(previewId)});}
 }
-module.exports={LegacyOpportunityService,normalize};
+function normalizeMaintenance(input){
+ exact(input,'idempotencyKey,operation,customerId,opportunityId,draft');
+ const result={idempotencyKey:uuid(input.idempotencyKey),operation:input.operation,
+   customerId:id(input.customerId),opportunityId:id(input.opportunityId)};
+ if(Number(result.customerId)>2147483647)throw Error('Invalid legacy Opportunity customer');
+ if(input.operation==='terminal_edit'){
+   exact(input.draft,'type,status,progress,nextAction,nextActionDate,discoveredAt,referredName,referredRelation');
+   const d=input.draft;
+   if(!TYPES.has(d.type)||!['成交','关闭'].includes(d.status))throw Error('Invalid terminal correction');
+   result.draft={type:d.type,status:d.status,progress:text(d.progress,4000),
+     nextAction:text(d.nextAction,1000),nextActionDate:date(d.nextActionDate),
+     discoveredAt:date(d.discoveredAt),referredName:text(d.referredName,160),
+     referredRelation:text(d.referredRelation,200)};
+ }else if(input.operation==='remove'){
+   exact(input.draft,'');result.draft={};
+ }else throw Error('Invalid maintenance operation');
+ return result;
+}
+class LegacyOpportunityMaintenanceService {
+ constructor({rpc}){this.rpc=rpc;}
+ call(actor,phase,data){
+   if(typeof actor!=='string'||!actor.trim()||actor.length>128)throw Error('UNAUTHORIZED');
+   return this.rpc('crm_legacy_opportunity_maintenance_v1',{
+     p_actor_uid:actor,p_phase:phase,p_data:data});
+ }
+ preview(input,actor){return this.call(actor,'preview',normalizeMaintenance(input));}
+ execute(previewId,actor){return this.call(actor,'execute',{previewId:uuid(previewId)});}
+}
+module.exports={LegacyOpportunityService,LegacyOpportunityMaintenanceService,normalize,normalizeMaintenance};
