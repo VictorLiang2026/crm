@@ -7755,7 +7755,6 @@ async function showCandidateDetail(id, tab){
       el('button', {class:'btn', onclick:function(){ location.hash='#/recruit'; }}, '← 增员工作台'),
       el('button', {class:'btn', onclick:function(){ openCandidateForm(id); }}, '编辑'),
       el('button', {class:'btn btn-ai', onclick:function(){ openQuickCapture({rcId:id, cid:c.customer_id, name:c.customer_name}); }}, '✍️ 快速记录'),
-      el('button', {class:'btn', onclick:function(){ genRecruitScore(id); }}, 'AI 高潜评分'),
       el('button', {class:'btn btn-danger', style:'margin-left:auto', onclick:async function(){
         if(!confirm('确认删除该候选人？' + (c.customer_id == null ? '人物主档' : '客户记录') + '保留，其增员跟进记录将一并移入回收站，可随时恢复。')) return;
         try {
@@ -7804,8 +7803,7 @@ async function showCandidateDetail(id, tab){
       case 'followups': content.appendChild(renderRecruitFollowups(id, followups, c.customer_name)); break;
       case 'ai':
         var aiArea = el('div', {id:'rc-ai-area'});
-        aiArea.appendChild(el('div', {style:'margin-bottom:12px'}, el('button', {class:'btn btn-primary btn-sm', onclick:function(){ genRecruitRecommend(id); }}, '生成 AI 增员话术')));
-        aiArea.appendChild(el('div', {class:'empty'}, '点击上方按钮生成话术'));
+        aiArea.appendChild(el('div', {class:'empty'}, '旧版增员话术入口已归档。今后请在 Console 招募教练中生成、核实并人工确认。'));
         content.appendChild(aiArea);
         break;
       case 'milestones': content.appendChild(renderCandidateMilestones(milestones)); break;
@@ -7878,7 +7876,6 @@ function renderRcProfile(c, followupCount){
   box.appendChild(el('div', {style:'display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap'}, [
     el('div', {class:'section-title', style:'margin:0'}, '候选人画像'),
     el('div', {style:'display:flex;gap:8px'}, [
-      el('button', {class:'btn btn-ai', onclick:function(){ openAiRcProfileAnalyze(c.candidate_id, c.customer_name); }}, '✨ AI 补全画像'),
       el('button', {class:'btn', onclick:function(){ openRcProfileEditor(c.candidate_id); }}, '手动编辑'),
     ]),
   ]));
@@ -7886,7 +7883,7 @@ function renderRcProfile(c, followupCount){
   var hasAny = RC_PROFILE_TEXT_KEYS.some(function(k){ return p[k]; }) || (Array.isArray(p.events) && p.events.length > 0);
   if(!hasAny){
     box.appendChild(el('p', {style:'font-size:13px;color:var(--muted);margin:10px 0 0'},
-      '画像还为空。点「✨ AI 补全画像」可从' + (followupCount ? followupCount + ' 条增员跟进' : '增员跟进') + '中自动提取，确认后才写入；也可「手动编辑」。'));
+      '画像还为空。可手动编辑；新的 AI 建议请在 Console 招募教练中生成并人工确认。'));
   }
   function na(text){ return el('span', {style:'color:#b8bfc9'}, text || '待补充'); }
   function dimRow(label, node){
@@ -7923,7 +7920,7 @@ function renderRcProfile(c, followupCount){
     box.appendChild(el('div', {class:'empty'}, '暂无事件记录'));
   }
   box.appendChild(el('p', {style:'font-size:12px;color:var(--muted);margin-top:14px'},
-    '画像由 AI 基于增员跟进记录提取，你确认后才写入；也可随时手动编辑或用「AI 补全画像」重新生成。'));
+    '历史画像保留展示。今后可手动编辑，AI 建议请使用 Console 招募教练并人工确认。'));
   return box;
 }
 
