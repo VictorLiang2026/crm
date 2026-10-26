@@ -57,6 +57,7 @@ test('M13 filters and pages on server, waits for Person choice, keeps failed vie
   assert.equal(await b.evaluate("document.querySelectorAll('.crm-ai-exp-detail form,.crm-ai-exp-result input[type=checkbox],.crm-ai-exp-lower form').length"),0);
   assert.equal(await b.evaluate("getComputedStyle(document.querySelector('.crm-ai-exp-lower')).display"),'none');
   assert.match(await b.evaluate("document.querySelector('.crm-ai-exp-detail').innerText"),/public.ai_recommendations #71/);
+  assert.match(await b.evaluate("document.querySelector('.crm-ai-exp-detail').innerText"),/旧建议执行标记: 已完成/);
   assert.equal(await b.evaluate("document.querySelector('.crm-ai-exp-raw').open"),false);
   assert.equal(await b.evaluate("m13.calls.some(x=>['decide','outcome','learning','confirmLearning'].includes(x.p.operation))"),false);
   assert.equal(await b.evaluate("document.querySelector('.crm-ai-exp-detail a[href*=\"admin.html#/ai-suggestions\"]')"),null);

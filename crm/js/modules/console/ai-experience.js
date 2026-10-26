@@ -26,6 +26,11 @@ function uuid() {
 function safeJson(value) {
   try { return JSON.stringify(value ?? {}, null, 2); } catch (_) { return '{}'; }
 }
+function legacyExecutionStatus(row) {
+  const status = row?.nba?.status;
+  return status === 'completed' ? t('status_completed') :
+    status === 'skipped' ? t('status_skipped') : t('ai_history_status_unrecorded');
+}
 function resultPayload(value) {
   if (value && typeof value === 'object' && !Array.isArray(value)) return value;
   if (typeof value === 'string') {
@@ -185,6 +190,7 @@ export function renderAiExperience({ root, callFn }) {
       const pick=el('button','crm-ai-exp-result-pick',`${t('ai_history_source_legacy')} #${row.id}`);pick.type='button';
       pick.addEventListener('click',()=>{selectedResultId=String(row.id);legacyRows();detailView();});
       article.append(pick,el('span','crm-ai-exp-state',t('ai_history_read_only')),
+        el('span','crm-ai-exp-muted',`${t('ai_history_legacy_status')}: ${legacyExecutionStatus(row)}`),
         el('span','crm-ai-exp-muted',row.customer_name || t('ai_experience_empty')));
       for(const [key,value]of [['ai_history_recommended_on',row.recommendation_date],['ai_history_followup_on',row.suggested_followup_date],
         ['ai_history_message',row.suggested_message],['ai_history_strategy',row.suggested_strategy],['l03_goal',row.suggested_followup_goal]]){
@@ -199,6 +205,7 @@ export function renderAiExperience({ root, callFn }) {
     const row=model.legacy.find(item=>String(item.id)===selectedResultId);
     if(!row){detail.append(el('p','crm-ai-exp-muted',t('ai_experience_no_selection')));return;}
     detail.append(el('h3','',`${t('ai_history_source_legacy')} #${row.id}`),el('p','crm-ai-exp-current',t('ai_history_readonly_note')),
+      el('p','crm-ai-exp-muted',`${t('ai_history_legacy_status')}: ${legacyExecutionStatus(row)}`),
       el('p','crm-ai-exp-muted',`${t('ai_history_snapshot_name')}: ${row.customer_name || t('ai_experience_empty')}`));
     for(const [key,value]of [['ai_history_recommended_on',row.recommendation_date],['ai_history_followup_on',row.suggested_followup_date],
       ['ai_history_message',row.suggested_message],['ai_history_strategy',row.suggested_strategy],['l03_goal',row.suggested_followup_goal]]){
