@@ -25,7 +25,7 @@ export async function fileImportNode(ctx,personId,customerId,{onReview,onSaved,o
   const api=standalone?{save:data.savePersonFileOriginal,list:data.personFiles,parse:data.parsePersonFileDraft}:
     {save:data.saveFileOriginal,list:data.fileImports,parse:data.parseFileDraft};
   const root=h('section',{class:'care-materials-section file-import'});
-  const input=h('input',{type:'file',multiple:true,'aria-label':t('file_import_choose')});
+  const input=h('input',{class:'file-import-picker',type:'file',multiple:true,'aria-label':t('file_import_choose')});
   const queueHost=h('div',{class:'care-materials-list file-import-queue'});
   const message=h('p',{class:'care-status',role:'status'});
   const history=h('div',{class:'care-materials-list file-import-history'});

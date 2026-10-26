@@ -129,7 +129,7 @@ export async function renderPersonFileImport(ctx){
    onReview:(job,host,refresh)=>reviewPersonFile(ctx,job,host,refresh),
    onOriginal:async(job)=>download((await data.personFile(ctx,job.id)).source)});
   ctx.main.replaceChildren(pageHead({title:t('l04_import_title'),sub:t('l04_import_note')}),
-   h('a',{class:'btn btn-ghost',href:'#/people'},t('nav_people')),panel);
+   h('a',{class:'btn btn-soft people-toolbar-link',href:'#/people'},t('people_all_view')),panel);
  }catch{ctx.main.append(h('p',{role:'alert'},t('file_import_load_failed')));}
 }
 export async function personFileHistory(ctx,personId){

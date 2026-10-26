@@ -152,6 +152,22 @@ h1, h2, h3, p, ul { margin: 0; }
 .people-table tbody tr { cursor: pointer; }
 .people-table tbody tr:last-child td { border-bottom: 0; }
 .people-table a { color: var(--ink); text-decoration: none; font-weight: 650; }
+.people-directory-table tbody td,
+.people-directory-table tbody td a,
+.people-directory-table tbody td .bdg,
+.people-directory-table tbody td.people-col-name a { font-weight: 400; }
+.people-toolbar-link { text-decoration: none; }
+.file-import-picker { font-family: inherit; font-size: 12.5px; }
+.file-import-picker::file-selector-button,
+.file-import-picker::-webkit-file-upload-button { font: inherit; }
+@media (min-width: 821px) {
+  .people-directory-table th.people-col-customer_priority,
+  .people-directory-table td.people-col-customer_priority,
+  .people-directory-table th.people-col-recruit_priority,
+  .people-directory-table td.people-col-recruit_priority,
+  .people-directory-table th.people-col-referral_priority,
+  .people-directory-table td.people-col-referral_priority { padding-left: 6px; padding-right: 6px; }
+}
 @media (hover: hover) and (pointer: fine) {
   .people-table .sortable-th:hover { color: var(--ink); }
   .people-table tbody tr:hover { background: #f8fbff; }
@@ -631,6 +647,7 @@ body:has(.login), body.is-login { padding-top: env(safe-area-inset-top); }
   .list-row { padding: 10px 12px; }
   .stat { padding: 10px 12px; }
   .btn { padding: 7px 12px; font-size: 13px; }
+  .file-import-picker { font-size: 13px; }
 }
 
 @media (max-width: 480px) {
@@ -691,6 +708,7 @@ body:has(.login), body.is-login { padding-top: env(safe-area-inset-top); }
   .people-directory-table .people-col-latest_followup,
   .people-directory-table .people-col-next_followup { width: 40px; min-width: 0; }
   .people-directory-table .people-col-id { width: 38px; min-width: 0; }
+  .file-import-picker { font-size: 12px; }
   .btn { padding: 6px 10px; font-size: 13px; }
   .btn-sm { padding: 4px 10px; font-size: 12px; }
   .bdg { height: 20px; padding: 0 7px; font-size: 11px; }

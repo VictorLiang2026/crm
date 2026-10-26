@@ -3,7 +3,7 @@ import { h } from '../dom.js';
 import { ic } from '../icons.js';
 import { data } from '../data.js';
 import { openPersonNew, openPersonRoleConversion } from '../write.js';
-import { wpTag, pageHead, emptyNote, loadInto, bdg, textOf } from '../ui.js';
+import { wpTag, pageHead, emptyNote, loadInto, bdg, textOf, dueLabel } from '../ui.js';
 import { t, translateEnum } from '../i18n.js';
 
 const DESKTOP_PAGE_SIZE = 20;
@@ -43,7 +43,6 @@ const SORT_COLUMNS = (customerView = false, showConversions = true) => ([
   ...(customerView ? [
     { key: 'customer_stage', field: 'customer_stage', label: t('customer_view_stage'), sortable: false },
     { key: 'wb_status', field: 'wb_status', label: t('l01_status') },
-    { key: 'recruit_status', field: 'recruit_status', label: t('l01_recruit'), sortable: false },
   ] : []),
   { key: 'customer_priority', field: 'sales_priority', label: t('col_customer_priority'), mobileLabel: compactColumnLabel(t('col_customer_priority'), 'customer_priority') },
   { key: 'recruit_priority', field: 'recruitment_priority', label: t('col_recruit_priority'), mobileLabel: compactColumnLabel(t('col_recruit_priority'), 'recruit_priority') },
@@ -187,12 +186,10 @@ export function renderPeople(ctx) {
           cell('name', h('a', { href: `#/person/${p.id}` }, [p.display_name, h('span', { class: 'badge-stack' }, badges)])),
           ...(customerView ? [
             cell('customer_stage', p.customer_stage ? translateEnum('customer_stage', p.customer_stage) : '-'),
-            cell('wb_status', bdg(t('l01_' + (['overdue', 'today', 'month', 'stale', 'normal', 'unlinked'].includes(p.wb_status) ? p.wb_status : 'unknown')),
+            cell('wb_status', bdg(p.wb_status === 'overdue' && p.next_followup_date
+              ? dueLabel(p.next_followup_date)
+              : t('l01_' + (['overdue', 'today', 'month', 'stale', 'normal', 'unlinked'].includes(p.wb_status) ? p.wb_status : 'unknown')),
               p.wb_status === 'overdue' ? 'red' : p.wb_status === 'today' ? 'gold' : 'gray')),
-            cell('recruit_status', p.recruit_status === 'active'
-              ? h('a', { href: `#/person/${p.id}/recruit`, onclick: ev => ev.stopPropagation() },
-                [t('l01_recruit_active'), p.recruit_stage ? ` · ${translateEnum('recruit_stage', p.recruit_stage)}` : ''])
-              : t('l01_recruit_' + (p.recruit_status === 'historical' ? 'historical' : p.recruit_status === 'none' ? 'none' : 'unknown'))),
           ] : []),
           cell('customer_priority', p.sales_priority ? translateEnum('sales_priority', p.sales_priority) : '-'),
           cell('recruit_priority', p.recruitment_priority ? translateEnum('sales_priority', p.recruitment_priority) : '-'),
@@ -333,9 +330,9 @@ export function renderPeople(ctx) {
       ]),
       h('div', { class: 'people-filter-anchor' }, [filterButton, filterPanel]),
       customerViewButton,
-      h('a',{class:'btn btn-ghost',href:'#/people/import'},t('l04_import_title')),
+      h('a',{class:'btn btn-soft people-toolbar-link',href:'#/people/import'},t('l04_import_title')),
       h('a', {
-        class: 'btn btn-ghost', href: '#/people-trash',
+        class: 'btn btn-soft people-toolbar-link', href: '#/people-trash',
       }, [ic('trash'), t('btn_trash')]),
       h('button', {
         class: 'btn btn-primary', type: 'button',
