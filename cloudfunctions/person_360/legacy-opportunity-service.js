@@ -69,5 +69,11 @@ class LegacyOpportunityMaintenanceService {
  }
  preview(input,actor){return this.call(actor,'preview',normalizeMaintenance(input));}
  execute(previewId,actor){return this.call(actor,'execute',{previewId:uuid(previewId)});}
+ listExceptions(page,actor){
+   if(typeof actor!=='string'||!actor.trim()||actor.length>128||
+      !Number.isInteger(Number(page))||Number(page)<1||Number(page)>1000)throw Error('Invalid identity exception request');
+   return this.rpc('crm_legacy_opportunity_identity_exceptions_v1',{
+     p_actor_uid:actor,p_page:Number(page),p_page_size:20});
+ }
 }
 module.exports={LegacyOpportunityService,LegacyOpportunityMaintenanceService,normalize,normalizeMaintenance};

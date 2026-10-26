@@ -150,5 +150,43 @@ BEGIN
 END $fn$;
 REVOKE ALL ON FUNCTION public.crm_legacy_opportunity_maintenance_v1(text,text,jsonb) FROM PUBLIC,anon,authenticated,service_role;
 GRANT EXECUTE ON FUNCTION public.crm_legacy_opportunity_maintenance_v1(text,text,jsonb) TO service_role;
+
+CREATE FUNCTION public.crm_legacy_opportunity_identity_exceptions_v1(p_actor_uid text,p_page integer,p_page_size integer)
+RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path=pg_catalog AS $fn$
+DECLARE result jsonb; test_actor boolean;
+BEGIN
+ IF current_user<>'service_role' OR p_actor_uid IS NULL OR length(btrim(p_actor_uid)) NOT BETWEEN 1 AND 128 OR
+    p_page IS NULL OR p_page NOT BETWEEN 1 AND 1000 OR p_page_size IS NULL OR p_page_size NOT BETWEEN 1 AND 50 THEN
+   RAISE EXCEPTION 'Invalid identity exception request'; END IF;
+ SELECT EXISTS(SELECT 1 FROM public.crm_test_batches WHERE created_by_uid=p_actor_uid) INTO test_actor;
+ WITH exceptions AS MATERIALIZED (
+   SELECT o.id AS "opportunityId",o.customer_id AS "customerId",o.person_id AS "opportunityPersonId",
+     c.person_id AS "customerPersonId",cp.display_name AS "customerPersonName",
+     op.display_name AS "opportunityPersonName",o.status,
+     CASE WHEN c."Id" IS NULL OR c.deleted_at IS NOT NULL THEN 'customer_unavailable'
+       WHEN c.person_id IS NULL THEN 'customer_person_missing'
+       WHEN cp.id IS NULL THEN 'customer_person_unavailable'
+       WHEN o.person_id IS NULL THEN 'opportunity_person_missing'
+       WHEN op.id IS NULL THEN 'opportunity_person_unavailable'
+       WHEN o.person_id<>c.person_id THEN 'person_conflict' END AS reason
+   FROM public.opportunities o
+   LEFT JOIN public.customers c ON c."Id"=o.customer_id
+   LEFT JOIN public.persons cp ON cp.id=c.person_id AND cp.deleted_at IS NULL
+   LEFT JOIN public.persons op ON op.id=o.person_id AND op.deleted_at IS NULL
+   WHERE o.customer_id IS NOT NULL AND o.deleted_at IS NULL
+     AND (c."Id" IS NULL OR c.deleted_at IS NOT NULL OR c.person_id IS NULL OR cp.id IS NULL OR
+       o.person_id IS NULL OR op.id IS NULL OR o.person_id<>c.person_id)
+     AND (NOT test_actor OR EXISTS(SELECT 1 FROM public.crm_test_records r
+       JOIN public.crm_test_batches b ON b.batch_key=r.batch_key
+       WHERE b.created_by_uid=p_actor_uid AND r.record_table='opportunities' AND r.record_id=o.id::text))
+ )
+ SELECT jsonb_build_object('total',(SELECT count(*) FROM exceptions),
+   'rows',coalesce((SELECT jsonb_agg(to_jsonb(page_rows)) FROM (
+     SELECT * FROM exceptions ORDER BY "opportunityId" DESC
+       LIMIT p_page_size OFFSET (p_page-1)*p_page_size) page_rows),'[]'::jsonb)) INTO result;
+ RETURN result;
+END $fn$;
+REVOKE ALL ON FUNCTION public.crm_legacy_opportunity_identity_exceptions_v1(text,integer,integer) FROM PUBLIC,anon,authenticated,service_role;
+GRANT EXECUTE ON FUNCTION public.crm_legacy_opportunity_identity_exceptions_v1(text,integer,integer) TO service_role;
 NOTIFY pgrst,'reload schema';
 COMMIT;

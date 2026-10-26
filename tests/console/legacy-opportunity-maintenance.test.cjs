@@ -27,3 +27,12 @@ test('service sends preview and execute through the scoped RPC',async()=>{
   assert.deepEqual(calls.map(x=>x.args.p_phase),['preview','execute']);
   assert.throws(()=>service.execute(randomUUID(),''),/UNAUTHORIZED/);
 });
+test('identity exception list stays read-only and paginated',async()=>{
+  const calls=[];
+  const service=new LegacyOpportunityMaintenanceService({rpc:async(name,args)=>{
+    calls.push({name,args});return {rows:[],total:0};}});
+  assert.deepEqual(await service.listExceptions(2,'actor-1'),{rows:[],total:0});
+  assert.deepEqual(calls,[{name:'crm_legacy_opportunity_identity_exceptions_v1',args:{
+    p_actor_uid:'actor-1',p_page:2,p_page_size:20}}]);
+  assert.throws(()=>service.listExceptions(1001,'actor-1'),/Invalid identity exception/);
+});

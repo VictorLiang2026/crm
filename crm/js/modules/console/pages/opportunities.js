@@ -42,6 +42,37 @@ function selectControl(options, value, label) {
   ]);
 }
 
+export function openIdentityExceptions(ctx) {
+  const body=h('div',{class:'opp-detail-body'});
+  const sheet=openSheet({title:t('opp_identity_title'),sub:t('opp_identity_note'),body});
+  let page=1;
+  function load(){
+    loadInto(body,async()=>{
+      const result=await data.legacyOpportunityIdentityExceptions(ctx,page);
+      const rows=result.rows||[];
+      return h('div',{},[
+        h('p',{class:'sheet-note'},`${t('opp_total_count')} ${result.total||0} · ${t('opp_page')} ${page}`),
+        ...rows.map(row=>h('div',{class:'opp-history-row'},[
+          h('b',{},`${t('legacy_opp_record')} #${row.opportunityId} · ${t('opp_maintenance_customer')} #${row.customerId}`),
+          h('p',{},t(`opp_identity_${row.reason}`)),
+          h('p',{},`${t('opp_identity_customer_person')}: ${row.customerPersonName||t('label_none')} #${row.customerPersonId||'—'}`),
+          h('p',{},`${t('opp_identity_opportunity_person')}: ${row.opportunityPersonName||t('label_none')} #${row.opportunityPersonId||'—'}`),
+          row.customerPersonId?h('a',{href:`#/person/${row.customerPersonId}`},t('opp_open_person')):null,
+          h('button',{class:'btn btn-ghost btn-sm',type:'button',onclick:()=>{
+            sheet.overlay.remove();openOpportunityDetails(ctx,{id:row.opportunityId,customer_id:row.customerId},load);
+          }},t('opp_details')),
+        ])),
+        !rows.length?emptyNote(t('opp_identity_empty'),t('opp_identity_empty_note')):null,
+        h('div',{class:'opp-pagination'},[
+          h('button',{class:'btn btn-ghost btn-sm',type:'button',disabled:page<=1,onclick:()=>{page--;load();}},t('btn_prev')),
+          h('button',{class:'btn btn-ghost btn-sm',type:'button',disabled:page*20>=Number(result.total||0),onclick:()=>{page++;load();}},t('btn_next')),
+        ]),
+      ]);
+    });
+  }
+  document.body.appendChild(sheet.overlay);load();
+}
+
 function openOpportunityDetails(ctx, row, onDone) {
   const body = h('div', { class: 'opp-detail-body' }, h('p', { class: 'sheet-note' }, t('opp_detail_loading')));
   const personName = row.person?.display_name || t('opp_no_link_person');
@@ -267,6 +298,8 @@ export function renderOpportunities(ctx) {
     pendingEl,analysisEl,
     h('div',{class:'opp-directory-head'},[
       h('div',{},[h('h2',{},t('opp_directory_title')),h('p',{},t('opp_directory_note'))]),
+      h('button',{class:'btn btn-ghost',type:'button',onclick:()=>openIdentityExceptions(ctx)},
+        [ic('users'),t('opp_identity_title')]),
       h('button',{class:'btn btn-ghost',type:'button',onclick:()=>{
         state.status=state.status==='terminal'?'active':'terminal';state.page=1;
         statusControl.querySelector('select').value=state.status;loadDirectory();

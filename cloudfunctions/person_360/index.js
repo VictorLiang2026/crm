@@ -1096,6 +1096,8 @@ exports.main = async event => {
         return await new LegacyOpportunityMaintenanceService({rpc:pgRpc}).preview(event.data,uid);
       case 'executeLegacyOpportunityMaintenance':
         return await new LegacyOpportunityMaintenanceService({rpc:pgRpc}).execute(event.previewId,uid);
+      case 'listLegacyOpportunityIdentityExceptions':
+        return await new LegacyOpportunityMaintenanceService({rpc:pgRpc}).listExceptions(event.page || 1,uid);
       case 'savePersonFileOriginal': return await new PersonFileService({rpc:pgRpc}).save(event.data,uid);
       case 'listPersonFiles': return await new PersonFileService({rpc:pgRpc}).list(event.personId,event.page,uid);
       case 'getPersonFile': return await new PersonFileService({rpc:pgRpc,request:pgRequest}).get(event.jobId,uid,{history:true});

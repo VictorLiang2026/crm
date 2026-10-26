@@ -29,6 +29,7 @@ export const data = {
   executeLegacyOpportunity: (ctx, previewId) => p360(ctx, 'executeLegacyOpportunity', { previewId }),
   previewLegacyOpportunityMaintenance: (ctx, payload) => p360(ctx, 'previewLegacyOpportunityMaintenance', { data: payload }),
   executeLegacyOpportunityMaintenance: (ctx, previewId) => p360(ctx, 'executeLegacyOpportunityMaintenance', { previewId }),
+  legacyOpportunityIdentityExceptions: (ctx, page = 1) => p360(ctx, 'listLegacyOpportunityIdentityExceptions', { page }),
   searchPeopleForOpportunities: (ctx, name) => p360(ctx, 'search', { name }),
   legacyOpportunityFunnel: (ctx) => call(ctx, 'funnel_insight', { action: 'stats' }),
   funnelStats: (ctx) => call(ctx, 'funnel_insight', { action: 'stats', presentation: 'stage_facts' }),
