@@ -33,6 +33,7 @@ function fixture(count = 75) {
   const request = async (table, method, filters) => {
     calls.push({ table, method, filters });
     let rows = ordered(sourceRows[table]);
+    if (filters.customer_id === 'not.is.null') rows = rows.filter(row => row.customer_id != null);
     if (filters.or) {
       const match = /next_action_date\.lt\.(\d{4}-\d{2}-\d{2}),and\(next_action_date\.eq\.\d{4}-\d{2}-\d{2},candidate_id\.lt\.(\d+)\),next_action_date\.is\.null/.exec(filters.or);
       assert.ok(match, `unexpected keyset filter: ${filters.or}`);
@@ -82,6 +83,28 @@ test('PC31 merged recruit pages have a shared stable order and no gaps or duplic
   assert.ok(f.calls.every(call => call.filters.limit === 51));
   assert.ok(f.calls.slice(2).every(call => call.filters.or || call.filters.next_action_date === 'is.null'));
   assert.ok(pages.every(row => !('_source' in row)));
+});
+
+test('PC31 excludes Person-only candidates from the legacy source in cursor and filtered lists', async () => {
+  const f = fixture(1);
+  const personOnly = f.sourceRows.v_recruit_candidates_person_only[0];
+  f.sourceRows.v_recruit_candidates.push({ ...personOnly });
+
+  const page = await f.service.list({ page: 1, pageSize: 50 });
+  const matchingPageRows = page.rows.filter(row => String(row.person_id) === String(personOnly.person_id));
+  assert.deepEqual(matchingPageRows.map(row => `${row.source}:${row.candidate_id}`),
+    [`person:${personOnly.candidate_id}`]);
+  assert.equal(f.calls.find(call => call.table === 'v_recruit_candidates').filters.customer_id, 'not.is.null');
+  assert.equal(f.calls.find(call => call.table === 'v_recruit_candidates_person_only').filters.customer_id, undefined);
+
+  const filtered = await f.service.list({ action: 'listRecruitDirectory', page: 1, pageSize: 30,
+    search: personOnly.customer_name, sortField: 'name', sortDir: 'asc' });
+  assert.deepEqual(filtered.rows.map(row => `${row.source}:${row.candidate_id}`),
+    [`person:${personOnly.candidate_id}`]);
+  const legacyCall = f.calls.filter(call => call.table === 'v_recruit_candidates').at(-1);
+  const personCall = f.calls.filter(call => call.table === 'v_recruit_candidates_person_only').at(-1);
+  assert.equal(legacyCall.filters.customer_id, 'not.is.null');
+  assert.equal(personCall.filters.customer_id, undefined);
 });
 
 test('PC31 marks the bounded directory as truncated at 1,000 rows', async () => {

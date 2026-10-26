@@ -140,7 +140,9 @@ class RecruitDirectoryService {
     const select = 'candidate_id,customer_name,stage,occupation,potential_score,next_action,next_action_date,idle_days,person_id,customer_id';
     const order = 'next_action_date.desc.nullslast,candidate_id.desc';
     const [legacy, personOnly] = await Promise.all([
-      this.request('v_recruit_candidates', 'GET', { select, order, limit, ...after(boundaries.legacy) }),
+      this.request('v_recruit_candidates', 'GET', {
+        select, order, limit, ...after(boundaries.legacy), customer_id: 'not.is.null',
+      }),
       this.request('v_recruit_candidates_person_only', 'GET', { select, order, limit, ...after(boundaries.person) }),
     ]);
     const compare = (a, b) => {
@@ -175,7 +177,7 @@ class RecruitDirectoryService {
     const criteria = criteriaOf(event);
     const filters = postgrestFilters(criteria, criteria.sortField, criteria.sortDir);
     const [legacy, personOnly] = await Promise.all([
-      this.request('v_recruit_candidates', 'GET', filters),
+      this.request('v_recruit_candidates', 'GET', { ...filters, customer_id: 'not.is.null' }),
       this.request('v_recruit_candidates_person_only', 'GET', filters),
     ]);
     const merged = [
