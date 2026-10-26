@@ -24,7 +24,7 @@
     "test:person-service": "node --test tests/persons/person-service.cjs",
     "test:households": "node --test tests/households/person360-service.cjs",
     "test:pc08": "node --test tests/households/person360-service.cjs tests/households/lifecycle.test.cjs tests/pc08/meeting-prep-context.test.cjs tests/pc08/family-ui.browser.cjs tests/pc08/migration-contract.test.cjs",
-    "test:pc19": "node --test tests/pc19/recruit-candidate-service.test.cjs tests/pc19/recruit-write.browser.cjs",
+    "test:pc19": "node --test tests/pc19/recruit-candidate-service.test.cjs tests/pc19/recruit-write.browser.cjs tests/pc19/recruit-remove-routing.browser.cjs",
     "test:pc20": "node --test tests/pc20/*.test.cjs tests/pc20/*.browser.cjs",
     "test:pc21": "node --test tests/recruit-goals/transactional-save.cjs tests/wp02/run.test.cjs tests/pc16/activity-management.test.cjs tests/pc16/activity-management.browser.cjs tests/pc21/*.browser.cjs",
     "test:pc22": "node --test tests/pc22/*.test.cjs tests/pc22/*.browser.cjs tests/ai-gateway/meeting-prep.cjs tests/ai-gateway/conversation-playbook.cjs",

@@ -1472,7 +1472,7 @@ export function openRecruitCandidateRemove(ctx, { candidate, onDone } = {}) {
           const button = event.currentTarget;
           busy(button, true, t('writing'));
           try {
-            const result = await data.removeRecruitRole(ctx, id);
+            const result = await data.removeRecruitRole(ctx, candidate);
             if (!result || result.ok === false || result.error) throw new Error(result?.error || t('write_failed'));
             sheet.overlay.remove();
             ctx.toast(t('recruit_role_remove_done'), 'ok');

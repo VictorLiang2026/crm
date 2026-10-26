@@ -58,7 +58,9 @@ export const data = {
   getRecycleBatch: (ctx, previewId) => p360(ctx, 'getRecycleBatch', { previewId }),
   executeRecycleBatch: (ctx, previewId) => p360(ctx, 'executeRecycleBatch', { previewId }),
   recruitTrash: (ctx, params) => call(ctx, 'recruit_candidates', { action: 'trashList', ...(params || {}) }),
-  removeRecruitRole: (ctx, id) => call(ctx, 'recruit_candidates', { action: 'remove', id: Number(id) }),
+  removeRecruitRole: (ctx, candidate) => candidate?.customer_id === null
+    ? p360(ctx, 'removePersonOnlyRecruit', { id: String(candidate.id) })
+    : call(ctx, 'recruit_candidates', { action: 'remove', id: Number(candidate?.id ?? candidate) }),
   personRoleRecovery: (ctx, personId, kind) => p360(ctx, 'getPersonRoleRecovery', { personId: String(personId), kind }),
   personOnlyRecruitTrash: (ctx) => p360(ctx, 'listPersonOnlyRecruitTrash'),
   restoreRecruit: (ctx, id, personOnly) => personOnly
