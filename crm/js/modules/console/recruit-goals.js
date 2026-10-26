@@ -55,7 +55,7 @@ function targetEditor(ctx, month, rows, afterSaved) {
 function goalTools(ctx, month, readSign, applyDraft) {
   const content = h('div', { class: 'tab-stack l06-tools' });
   const panel = h('details', { class: 'card card-body recruit-goals-advanced' }, [
-    h('summary', {}, t('goal_advanced')), content,
+    h('summary', {}, t('recruit_analysis_reference')), content,
   ]);
   let started = false;
   panel.addEventListener('toggle', () => {
@@ -196,7 +196,62 @@ function goalTools(ctx, month, readSign, applyDraft) {
   return panel;
 }
 
-function progressPanel(progress) {
+function analysisMetric(label, actual, target) {
+  return h('div', { class: 'recruit-analysis-metric' }, [
+    h('span', { class: 'recruit-analysis-metric-label' }, label),
+    h('strong', {}, String(actual ?? 0)),
+    h('span', { class: 'recruit-analysis-metric-detail' }, t('recruit_analysis_actual_target')
+      .replace('{actual}', String(actual ?? 0)).replace('{target}', String(target ?? 0))),
+  ]);
+}
+
+function stageComparison(rows) {
+  const max = Math.max(1, ...(rows || []).flatMap(row => [Number(row.target) || 0, Number(row.actual) || 0]));
+  return h('section', { class: 'card card-body recruit-analysis-panel' }, [
+    h('h3', { class: 'section-title' }, t('recruit_analysis_stage_title')),
+    h('p', { class: 'row-sub' }, t('recruit_analysis_stage_note')),
+    h('div', { class: 'recruit-analysis-stage-list' }, (rows || []).map(row => {
+      const actual = Math.max(0, Number(row.actual) || 0);
+      const target = Math.max(0, Number(row.target) || 0);
+      return h('div', { class: 'recruit-analysis-stage' }, [
+        h('span', { class: 'recruit-analysis-stage-label', title: translateEnum('recruit_stage', row.stage) }, translateEnum('recruit_stage', row.stage)),
+        h('div', { class: 'recruit-analysis-bars' }, [
+          h('span', { class: 'recruit-analysis-bar target', style: `width:${Math.min(100, target / max * 100)}%` }),
+          h('span', { class: 'recruit-analysis-bar actual', style: `width:${Math.min(100, actual / max * 100)}%` }),
+        ]),
+        h('span', { class: 'recruit-analysis-stage-count' }, `${actual} / ${target}`),
+      ]);
+    })),
+  ]);
+}
+
+function currentFunnelPanel(funnel) {
+  if (funnel?._error || funnel?.error) return h('section', { class: 'card card-body recruit-analysis-panel' }, [
+    h('h3', { class: 'section-title' }, t('recruit_analysis_current_title')),
+    emptyNote(t('data_load_failed'), String(funnel?._error?.message || funnel?.error || '')),
+  ]);
+  const counts = funnel?.funnel || {};
+  const stages = [...STAGES, '流失'];
+  const max = Math.max(1, ...stages.map(stage => Number(counts[stage]) || 0));
+  const total = funnel?.total ?? stages.reduce((sum, stage) => sum + (Number(counts[stage]) || 0), 0);
+  return h('section', { class: 'card card-body recruit-analysis-panel' }, [
+    h('h3', { class: 'section-title' }, t('recruit_analysis_current_title')),
+    h('p', { class: 'row-sub' }, t('recruit_analysis_current_note')),
+    h('div', { class: 'recruit-analysis-current-list' }, stages.map(stage => {
+      const count = Number(counts[stage]) || 0;
+      return h('div', { class: 'recruit-analysis-current-row' }, [
+        h('span', { title: translateEnum('recruit_stage', stage) }, translateEnum('recruit_stage', stage)),
+        h('span', { class: 'recruit-analysis-current-track' }, h('span', { class: stage === '流失' ? 'lost' : '', style: `width:${Math.min(100, count / max * 100)}%` })),
+        h('strong', {}, String(count)),
+      ]);
+    })),
+    h('p', { class: 'foot-note' }, t('recruit_analysis_current_total').replace('{count}', String(total))),
+    funnel?.testData?.status === 'unverified' ? h('p', { class: 'status-error' }, t('pc21_test_unverified'))
+      : funnel?.testData?.containsTestData ? h('p', { class: 'status-error' }, t('pc21_test_notice').replace('{count}', String(funnel.testData.recordCount))) : null,
+  ]);
+}
+
+function progressPanel(progress, funnel) {
   if (!progress || progress.error) return emptyNote(t('data_load_failed'), progress?.error || t('pc21_no_progress'));
   const heads = [t('pc21_stage'), t('pc21_target'), t('pc21_actual'), t('goal_gap'), t('pc21_achievement'), t('l06_ratio'), t('l06_benchmark')];
   const rows = (progress.rows || []).map(row => h('tr', {}, [
@@ -216,6 +271,17 @@ function progressPanel(progress) {
     h('tbody', {}, body.length ? body : [h('tr', {}, h('td', { colspan: String(labels.length) }, t('pc21_no_history')))]),
   ]));
   return h('div', { class: 'tab-stack' }, [
+    h('div', { class: 'recruit-analysis-metrics' }, [
+      analysisMetric(t('recruit_analysis_new'), progress.rows?.[0]?.actual, progress.rows?.[0]?.target),
+      analysisMetric(t('recruit_analysis_signed'), progress.rows?.find(row => row.stage === STAGES[STAGES.length - 1])?.actual,
+        progress.rows?.find(row => row.stage === STAGES[STAGES.length - 1])?.target),
+      h('div', { class: 'recruit-analysis-metric' }, [
+        h('span', { class: 'recruit-analysis-metric-label' }, t('recruit_analysis_rate')),
+        h('strong', {}, Number(progress.overall?.new_count) > 0 ? `${progress.overall?.rate ?? 0}%` : '—'),
+        h('span', { class: 'recruit-analysis-metric-detail' }, t('l06_metric_note')),
+      ]),
+    ]),
+    h('div', { class: 'recruit-analysis-grid' }, [stageComparison(progress.rows), currentFunnelPanel(funnel)]),
     h('p', { class: 'row-sub' }, `${t('l06_overall')}: ${progress.overall?.new_count ?? 0} → ${progress.overall?.sign_count ?? 0} · ${Number(progress.overall?.new_count) > 0 ? `${progress.overall?.rate ?? 0}%` : '—'}`),
     progress.testData?.status === 'unverified' ? h('p', { class: 'status-error' }, t('pc21_test_unverified'))
       : progress.testData?.containsTestData ? h('p', { class: 'status-error' }, t('pc21_test_notice').replace('{count}', String(progress.testData.recordCount))) : null,
@@ -237,6 +303,7 @@ export function renderRecruitGoals(ctx) {
   const targetHost = h('div', { class: 'tab-stack' }, h('p', { class: 'row-sub' }, t('loading')));
   const historyHost = h('div', { class: 'tab-stack' }, h('p', { class: 'row-sub' }, t('loading')));
   let targetRequest = 0;
+  let historyRequest = 0;
   async function loadTarget() {
     const request = ++targetRequest, month = targetMonth.value || current;
     targetHost.replaceChildren(h('p', { class: 'row-sub' }, t('loading')));
@@ -247,28 +314,35 @@ export function renderRecruitGoals(ctx) {
     } catch (error) { if (request === targetRequest) targetHost.replaceChildren(errorBox(error, loadTarget)); }
   }
   async function loadHistory() {
-    const from = start.value || current, to = end.value || from;
+    const request = ++historyRequest, from = start.value || current, to = end.value || from;
     historyHost.replaceChildren(h('p', { class: 'row-sub' }, t('loading')));
     if (to < from) { historyHost.replaceChildren(errorBox(new Error(t('pc21_invalid_range')), loadHistory)); return; }
-    try { historyHost.replaceChildren(progressPanel(await data.recruitProgress(ctx, from, to))); }
-    catch (error) { historyHost.replaceChildren(errorBox(error, loadHistory)); }
+    try {
+      const [progress, funnel] = await Promise.all([
+        data.recruitProgress(ctx, from, to), data.recruitFunnel(ctx).catch(error => ({ _error: error })),
+      ]);
+      if (request === historyRequest) historyHost.replaceChildren(progressPanel(progress, funnel));
+    } catch (error) { if (request === historyRequest) historyHost.replaceChildren(errorBox(error, loadHistory)); }
   }
   const query = h('button', { class: 'btn btn-primary', type: 'button', onclick: loadHistory }, t('pc21_query'));
   targetMonth.addEventListener('change', loadTarget);
   loadTarget(); loadHistory();
   ctx.main.replaceChildren(
-    pageHead({ kicker: t('pc21_kicker'), title: t('pc21_goals_title'), tag: wpTag(t('fact')),
+    pageHead({ kicker: t('pc21_kicker'), title: t('recruit_analysis_entry'), tag: wpTag(t('fact')),
+      sub: t('recruit_analysis_sub'),
       actions: [h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => { location.hash = '#/recruit'; } }, t('pc21_back_recruit'))] }),
     h('div', { class: 'tab-stack' }, [
-      h('section', { class: 'card card-body tab-stack' }, [
-        h('b', {}, t('pc21_history_filter')),
+      h('section', { class: 'card card-body tab-stack recruit-analysis-filter' }, [
+        h('b', {}, t('recruit_analysis_period')),
         h('div', { class: 'form-row', style: 'display:flex;gap:12px;align-items:end;flex-wrap:wrap' }, [
           h('label', { class: 'sheet-field' }, [h('span', {}, t('pc21_start_month')), start]),
           h('label', { class: 'sheet-field' }, [h('span', {}, t('pc21_end_month')), end]), query,
         ]),
       ]),
       historyHost,
-      h('section', { class: 'card card-body' }, [
+      h('section', { class: 'card card-body recruit-analysis-targets' }, [
+        h('h2', { class: 'section-title' }, t('recruit_analysis_target_section')),
+        h('p', { class: 'row-sub' }, t('recruit_analysis_target_note')),
         h('div', { class: 'form-row', style: 'display:flex;gap:12px;align-items:end;flex-wrap:wrap' }, [
           h('label', { class: 'sheet-field' }, [h('span', {}, t('pc21_goal_month')), targetMonth]),
         ]), targetHost,

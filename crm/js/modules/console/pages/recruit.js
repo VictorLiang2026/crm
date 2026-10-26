@@ -256,9 +256,9 @@ export function renderRecruit(ctx) {
       kicker: t('kicker_recruit'), title: t('title_recruit'), tag: wpTag(t('wp1_readonly')),
       sub: t('sub_recruit'),
       actions: [
+        h('button', { class: 'btn btn-ghost', type: 'button', title: t('recruit_analysis_entry'), onclick: () => { location.hash = '#/recruit/goals'; } }, [ic('calendar'), t('recruit_analysis_entry')]),
         h('button', { class: 'btn btn-ghost', type: 'button', title: t('pc28_title'),
           onclick: () => openRecruitDeleteCommand(ctx) }, [ic('trash'), t('pc28_short')]),
-        h('button', { class: 'btn btn-ghost', type: 'button', title: t('goals_title'), onclick: () => { location.hash = '#/recruit/goals'; } }, [ic('calendar'), t('goals_short')]),
         h('button', { class: 'btn btn-primary', type: 'button', title: t('new_recruit'), onclick: () => openRecruitCandidateCreate(ctx, {
           onDone: personId => { location.hash = `#/person/${personId}`; },
         }) }, [ic('plus'), t('new_recruit_short')]),

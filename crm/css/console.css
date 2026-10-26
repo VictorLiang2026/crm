@@ -583,6 +583,36 @@ body:has(.login), body.is-login { padding-top: env(safe-area-inset-top); }
 .recruit-block:last-child { border-bottom: none; }
 
 .goal-row { display: grid; grid-template-columns: 72px 1fr 52px; align-items: center; gap: 10px; padding: 6px 0; font-size: 12.5px; color: var(--ink-2); }
+
+/* Recruit goals and analysis: period milestones and current stock stay visually distinct. */
+.recruit-analysis-filter { border-top: 4px solid var(--red); }
+.recruit-analysis-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.recruit-analysis-metric { min-width: 0; padding: 20px 22px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); box-shadow: var(--shadow); display: grid; gap: 4px; }
+.recruit-analysis-metric-label { color: var(--ink-2); font-size: 13px; font-weight: 700; }
+.recruit-analysis-metric strong { color: var(--ink); font-size: 30px; line-height: 1.2; font-weight: 800; font-variant-numeric: tabular-nums; }
+.recruit-analysis-metric-detail { color: var(--muted); font-size: 12px; }
+.recruit-analysis-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr); gap: 14px; align-items: start; }
+.recruit-analysis-panel { min-width: 0; display: grid; gap: 12px; }
+.recruit-analysis-stage-list, .recruit-analysis-current-list { display: grid; gap: 11px; }
+.recruit-analysis-stage { display: grid; grid-template-columns: minmax(80px, 105px) minmax(0, 1fr) 70px; align-items: center; gap: 10px; font-size: 13px; }
+.recruit-analysis-stage-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.recruit-analysis-bars { display: grid; gap: 3px; }
+.recruit-analysis-bar { display: block; height: 7px; min-width: 0; border-radius: 99px; }
+.recruit-analysis-bar.target { background: var(--gold); }
+.recruit-analysis-bar.actual { background: var(--jade); }
+.recruit-analysis-stage-count { text-align: right; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.recruit-analysis-current-row { display: grid; grid-template-columns: minmax(80px, 105px) minmax(0, 1fr) 30px; align-items: center; gap: 10px; font-size: 13px; }
+.recruit-analysis-current-row > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.recruit-analysis-current-track { height: 8px; border-radius: 99px; background: var(--bg); overflow: hidden; }
+.recruit-analysis-current-track > span { display: block; height: 100%; border-radius: inherit; background: var(--ink-2); }
+.recruit-analysis-current-track > span.lost { background: var(--muted); }
+.recruit-analysis-current-row strong { text-align: right; font-variant-numeric: tabular-nums; }
+.recruit-analysis-targets { border-top: 4px solid var(--gold); display: grid; gap: 12px; }
+@media (max-width: 980px) {
+  .recruit-analysis-grid { grid-template-columns: 1fr; }
+  .recruit-analysis-metric { padding: 16px; }
+  .recruit-analysis-metric strong { font-size: 25px; }
+}
 .goal-bar-track { background: #eef0f4; border-radius: 7px; height: 12px; overflow: hidden; display: block; }
 .goal-bar { display: block; height: 100%; border-radius: 7px; background: linear-gradient(90deg, var(--gold), #d6a14a); }
 .goal-n { text-align: right; color: var(--muted); font-size: 12px; }
