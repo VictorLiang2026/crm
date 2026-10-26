@@ -1453,7 +1453,7 @@ const DICT = {
   'opp_maintenance_customer': { 'zh-CN': '客户', 'en': 'Customer' },
   'opp_maintenance_actions': { 'zh-CN': '关联 Action', 'en': 'Linked Actions' },
   'opp_maintenance_outcomes': { 'zh-CN': '历史 Outcome', 'en': 'Historical Outcomes' },
-  'opp_maintenance_edit_note': { 'zh-CN': '修订原机会的终态字段。关联的 Action 与 Outcome 历史保留原 ID，不会随状态修订而改写。请核对预览后确认。', 'en': 'Correct fields on the original closed opportunity. Linked Actions and Outcomes keep their IDs and are not rewritten. Review the preview before confirming.' },
+  'opp_maintenance_edit_note': { 'zh-CN': '修订原机会的终态字段，也可重新打开。关联的 Action 与 Outcome 历史保留原 ID，不会随状态修订而改写；重新打开后历史成交/关闭结果仍可见。请核对预览后确认。', 'en': 'Correct fields on the original closed opportunity, including reopening it. Linked Actions and Outcomes keep their IDs and are not rewritten; historical close or win results remain visible after reopening. Review the preview before confirming.' },
   'opp_maintenance_remove_note': { 'zh-CN': '仅软删除原机会。关联 Action 与 Outcome 历史不会删除；此操作没有机会单项自助恢复入口，请核对预览后确认。', 'en': 'Soft-delete the original opportunity only. Linked Actions and Outcomes remain. There is no self-service restore for an individual opportunity. Review the preview before confirming.' },
   'opp_maintenance_edit_effect': { 'zh-CN': '只修改原机会字段；历史结果与行动不变。', 'en': 'Only the original opportunity fields change; historical Outcomes and Actions remain.' },
   'opp_maintenance_remove_effect': { 'zh-CN': '原机会将从目录隐藏；关联结果与行动继续保留。', 'en': 'The original opportunity will be hidden from the directory; linked Outcomes and Actions remain.' },

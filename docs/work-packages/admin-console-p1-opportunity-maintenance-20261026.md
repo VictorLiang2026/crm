@@ -4,7 +4,7 @@
 
 ## 范围与兼容
 
-- Console 机会详情新增原 ID 的终态字段修订与软删除；两者均经 `person_360`、`public.crm_legacy_opportunity_maintenance_v1` 服务端预览、人工勾选、执行和回执。15 分钟预览有效期、同操作者幂等键与数据库行版本校验防止旧预览执行。
+- Console 机会详情新增原 ID 的终态字段修订（含重新打开）与软删除；两者均经 `person_360`、`public.crm_legacy_opportunity_maintenance_v1` 服务端预览、人工勾选、执行和回执。15 分钟预览有效期、同操作者幂等键与数据库行版本校验防止旧预览执行。重新打开不改写既有 Outcome，界面提示历史结果仍在。
 - 服务端预览列出机会/客户 ID、前后字段、关联 Action 与 Outcome 数量。软删除仅设置机会 `deleted_at`，关联记录保留，与旧 `opportunities.remove` 的数据语义一致。机会没有单项自助恢复入口，界面明确提示。
 - Console 新增只读身份异常清单，按原 ID 显示客户/机会的 Person 关联与异常原因；不自动选定、关联或修改 Person。旧客户深链及 `admin.html` 保留，供异常记录兼容维护。
 - 不修改既有表、视图、函数或路由；只新增 `public` 命令表与两个数据库函数。无 AI 模型、权限范围或其它 schema 变更。

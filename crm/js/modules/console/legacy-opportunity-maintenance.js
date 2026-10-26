@@ -10,6 +10,9 @@ const FIELDS={type:'legacy_opp_type',status:'legacy_opp_stage',progress:'opp_det
   nextAction:'opp_detail_next_action',nextActionDate:'opp_detail_next_date',
   discoveredAt:'opp_detail_discovered',referredName:'opp_referred_name',referredRelation:'opp_referred_relation'};
 const terminal=value=>['成交','关闭'].includes(value);
+const stages=type=>['转介绍','referral'].includes(type)?
+  ['潜在线索','已介绍','已联系','已建立关系','成交','关闭']:
+  ['发现','沟通','方案','成交','关闭'];
 const validId=value=>/^[1-9][0-9]*$/.test(String(value))&&Number.isSafeInteger(Number(value));
 function control(name,value,{options,textarea=false,type='text',max=4000}={}){
   const node=options?h('select',{class:'sheet-select',name},options.map(([v,label])=>h('option',{value:v},label))):
@@ -35,7 +38,7 @@ export function openLegacyOpportunityMaintenance(ctx,{opportunity,mode,onDone}={
   if(mode==='terminal_edit'){
     const items=[
       ['type',opportunity.opportunity_type,{options:TYPES.map(x=>[x,legacyOpportunityTypeLabel(x)||x])}],
-      ['status',opportunity.status,{options:['成交','关闭'].map(x=>[x,translateEnum('opportunity_stage',x)])}],
+      ['status',opportunity.status,{options:stages(opportunity.opportunity_type).map(x=>[x,translateEnum('opportunity_stage',x)])}],
       ['progress',opportunity.last_progress||'',{textarea:true}],
       ['nextAction',opportunity.next_action||'',{textarea:true,max:1000}],
       ['nextActionDate',opportunity.next_action_date?.slice(0,10)||'',{type:'date'}],
@@ -47,6 +50,12 @@ export function openLegacyOpportunityMaintenance(ctx,{opportunity,mode,onDone}={
       controls[key]=control(key,value,opts);
       form.append(h('label',{class:'sheet-field'},[h('span',{},t(FIELDS[key])),controls[key]]));
     }
+    controls.type.addEventListener('change',()=>{
+      const prior=controls.status.value,allowed=stages(controls.type.value);
+      controls.status.replaceChildren(...allowed.map(x=>h('option',{value:x},translateEnum('opportunity_stage',x))));
+      controls.status.value=allowed.includes(prior)?prior:allowed[0];
+      controls.status.dispatchEvent(new Event('change'));
+    });
   }
   const note=h('p',{class:'sheet-note'},t(mode==='remove'?'opp_maintenance_remove_note':'opp_maintenance_edit_note'));
   const errorHost=h('p',{class:'sheet-err',role:'alert',style:'display:none'});

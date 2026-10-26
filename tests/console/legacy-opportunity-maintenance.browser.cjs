@@ -46,6 +46,7 @@ test('customer Opportunity maintenance requires server preview and human confirm
     })()`);
     await browser.wait("document.querySelector('.legacy-opportunity-form')");
     assert.match(await browser.evaluate("document.querySelector('.legacy-opportunity-form').innerText"),/Correct fields/);
+    assert.equal(await browser.evaluate("[...document.querySelectorAll('.legacy-opportunity-form select[name=status] option')].some(x=>x.value==='发现')"),true);
     await browser.healthy();
   }finally{await browser.close();}
 });

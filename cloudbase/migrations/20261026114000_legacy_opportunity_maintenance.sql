@@ -91,10 +91,15 @@ BEGIN
       (SELECT count(*) FROM jsonb_object_keys(draft))<>8 OR EXISTS(
        SELECT 1 FROM jsonb_object_keys(draft) x WHERE x NOT IN
          ('type','status','progress','nextAction','nextActionDate','discoveredAt','referredName','referredRelation')) OR
-      coalesce(draft->>'status','') NOT IN ('成交','关闭') OR
+      coalesce(draft->>'status','') NOT IN ('发现','沟通','方案','潜在线索','已介绍','已联系','已建立关系','成交','关闭') OR
       coalesce(draft->>'type','') NOT IN ('医疗保障','重疾保障','养老规划','教育规划','财富规划','家庭保障','转介绍',
         'insurance','recruit','referral','activity','speaker','partnership','service','relationship') THEN
      RAISE EXCEPTION 'Invalid terminal correction'; END IF;
+   IF (draft->>'type' IN ('转介绍','referral') AND draft->>'status' NOT IN
+         ('潜在线索','已介绍','已联系','已建立关系','成交','关闭')) OR
+      (draft->>'type' NOT IN ('转介绍','referral') AND draft->>'status' NOT IN
+         ('发现','沟通','方案','成交','关闭')) THEN
+     RAISE EXCEPTION 'Invalid correction type and stage'; END IF;
    FOREACH k IN ARRAY ARRAY['type','status','progress','nextAction','referredName','referredRelation'] LOOP
      IF jsonb_typeof(draft->k) IS DISTINCT FROM 'string' THEN RAISE EXCEPTION 'Invalid correction text'; END IF;
    END LOOP;

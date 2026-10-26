@@ -4,12 +4,13 @@ const {randomUUID}=require('node:crypto');
 const {LegacyOpportunityMaintenanceService,normalizeMaintenance}=
   require('../../cloudfunctions/person_360/legacy-opportunity-service');
 
-test('terminal correction rejects active status and unsafe fields',()=>{
+test('terminal correction permits reopening with valid type and rejects unsafe fields',()=>{
   const base={idempotencyKey:randomUUID(),operation:'terminal_edit',customerId:'12',opportunityId:'34',
     draft:{type:'医疗保障',status:'成交',progress:'修订',nextAction:'联系',nextActionDate:null,
       discoveredAt:null,referredName:'',referredRelation:''}};
   assert.equal(normalizeMaintenance(base).draft.status,'成交');
-  assert.throws(()=>normalizeMaintenance({...base,draft:{...base.draft,status:'发现'}}),/terminal correction/);
+  assert.equal(normalizeMaintenance({...base,draft:{...base.draft,status:'发现'}}).draft.status,'发现');
+  assert.throws(()=>normalizeMaintenance({...base,draft:{...base.draft,type:'转介绍',status:'发现'}}),/terminal correction/);
   assert.throws(()=>normalizeMaintenance({...base,draft:{...base.draft,customerId:'99'}}),/fields/);
 });
 test('remove accepts only exact empty draft and safe original identifiers',()=>{

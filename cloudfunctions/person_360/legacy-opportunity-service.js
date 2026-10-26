@@ -50,7 +50,10 @@ function normalizeMaintenance(input){
  if(input.operation==='terminal_edit'){
    exact(input.draft,'type,status,progress,nextAction,nextActionDate,discoveredAt,referredName,referredRelation');
    const d=input.draft;
-   if(!TYPES.has(d.type)||!['成交','关闭'].includes(d.status))throw Error('Invalid terminal correction');
+   const allowed=['转介绍','referral'].includes(d.type)?
+     ['潜在线索','已介绍','已联系','已建立关系','成交','关闭']:
+     ['发现','沟通','方案','成交','关闭'];
+   if(!TYPES.has(d.type)||!allowed.includes(d.status))throw Error('Invalid terminal correction');
    result.draft={type:d.type,status:d.status,progress:text(d.progress,4000),
      nextAction:text(d.nextAction,1000),nextActionDate:date(d.nextActionDate),
      discoveredAt:date(d.discoveredAt),referredName:text(d.referredName,160),
