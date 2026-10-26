@@ -54,7 +54,7 @@ test('Console More keeps only uncovered gaps bilingual and preserves all 17 old 
     assert.match(english.currentRecycle || '', /Recycle Bin/);
     assert.match(english.quickRecord || '', /confirm the Person/);
     assert.match(english.signOut || '', /Sign Out/);
-    assert.deepEqual(english.nav, ['#/today', '#/people', '#/opportunities', '#/activities', '#/recruit', '#/ai', '#/more']);
+    assert.deepEqual(english.nav, ['#/today', '#/people', '#/opportunities', '#/activities', '#/recruit', '#/ai', '#/knowledge-library', '#/more']);
 
     await browser.evaluate("localStorage.setItem('crm_lang', 'zh-CN')");
     await browser.openConsole('#/more', 'authCase=1');

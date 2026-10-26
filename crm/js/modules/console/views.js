@@ -17,3 +17,4 @@ export { renderAiExperience } from './ai-experience.js';
 export { renderSettings } from './pages/settings.js';
 export { renderTestScenario, renderTestAction } from './test-tools.js';
 export { renderKnowledgeGovernance } from './knowledge-governance.js';
+export { renderDualFollowup } from './dual-followup.js';

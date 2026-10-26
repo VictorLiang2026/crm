@@ -8,7 +8,7 @@ const { defaultRegistry: assistantRegistry } = require('../../cloudfunctions/ass
 
 const names = ['quick_capture', 'person_summary', 'meeting_prep', 'today_coach',
   'opportunity_analysis', 'opportunity_candidate', 'activity_prepare', 'activity_review', 'recruit_coach',
-  'conversation_playbook', 'ai_search', 'crm_search_parse'];
+  'conversation_playbook', 'knowledge_extract', 'dual_followup', 'ai_search', 'crm_search_parse'];
 names.push('assistant_read_intent_v1', 'assistant_action_update_v1', 'assistant_opportunity_update_v1', 'crm_search_query_v2');
 
 test('all versioned contracts are model-independent and immutable', () => {
@@ -100,6 +100,15 @@ test('every initial skill accepts a representative input, context and output', (
       { possibleUnderlyingReasons: ['可能担心理赔条件'], clarifyingQuestions: ['哪些范围最担心？'],
         responseLogic: '先确认具体担忧，再核对条款。', evidenceRefs: [],
         nextObjective: '明确待核实的保障范围', doNotSay: [] }],
+    knowledge_extract: [{ domain: 'product', title: '产品说明' }, { document: '条款与产品介绍' },
+      { summary: '产品定位摘要', keyPoints: [], applicationNotes: [], boundaries: [] }],
+    dual_followup: [{ personId: '1', question: '如何跟进？', market: '中国' },
+      { customer_snapshot: {}, recruit_context: {}, question: {}, market: {}, strategy_sources: [],
+        library_sources: [], strategy_guidance: {}, library_guidance: {}, guardrails: {} },
+      { candidates: ['strategy_based', 'library_based'].map(candidateType => ({ candidateType,
+        summary: '下一步建议', reasoning: '依据客户情况和资料来源', clarifyingQuestions: [],
+        nextAction: '先确认需求', messageDraft: '方便进一步了解吗？', boundaryNotes: [],
+        sourceRefs: [], matchStatus: 'no_matching_sources' })) }],
     ai_search: [{ query: 'Find a fact' }, { search_results: [] },
       { answer: 'A sourced answer', citations: [{ sourceType: 'record', sourceId: '1', excerpt: 'Fact' }], confidence: 'low' }],
     crm_search_parse: [{ query: '最近三个月参加过活动但没有继续跟进的人' },

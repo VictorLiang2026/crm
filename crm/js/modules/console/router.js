@@ -5,6 +5,7 @@ import {
   renderSettings, renderRecruitGoals, renderActivityReport, renderAiExperience, renderRecycleHub,
   renderKnowledgeGovernance, renderResourceDirectory, renderAnalytics, renderPersonFileImport,
   renderTestScenario, renderTestAction,
+  renderDualFollowup,
 } from './views.js';
 
 const EXACT = new Map([
@@ -28,6 +29,7 @@ const EXACT = new Map([
   ['#/test-scenario', renderTestScenario],
   ['#/test-scenario/action', renderTestAction],
   ['#/knowledge-governance', renderKnowledgeGovernance],
+  ['#/knowledge-library', renderKnowledgeGovernance],
 ]);
 
 const PATTERNS = [
@@ -36,6 +38,7 @@ const PATTERNS = [
     return renderActivityReport(ctx, 'customer', { startDate: params.get('startDate'), endDate: params.get('endDate') });
   } },
   { re: /^#\/person\/(\d+)(?:\/(timeline|insurance|opportunities|relationships|recruit|care|ocr))?$/, nav: '#/people', render: (ctx, id, section) => renderPerson(ctx, id, section) },
+  { re: /^#\/ai\/followup\/(\d+)$/, nav: '#/people', render: (ctx, id) => renderDualFollowup(ctx, id) },
   { re: /^#\/activity\/(\d+)$/, nav: '#/activities', render: renderActivity },
   { re: /^#\/activity-report\/(customer|recruit)(?:\?(.*))?$/, nav: '#/today', render: (ctx, type, query) => {
     const params = new URLSearchParams(query || '');
@@ -69,6 +72,7 @@ const NAV_OF = {
   '#/test-scenario': '#/more',
   '#/test-scenario/action': '#/more',
   '#/knowledge-governance': '#/more',
+  '#/knowledge-library': '#/knowledge-library',
   '#/activity-report/customer': '#/today',
   '#/activity-report/recruit': '#/today',
 };

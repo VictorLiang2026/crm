@@ -323,6 +323,18 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
         return { ok:false,error:{code,message:'AI Experience request could not be completed'} };
       }
     }
+    if (event?.action === 'knowledgeLibrary') {
+      try { return await require('./knowledge-library-service').handleKnowledgeLibrary(event, identity.uid); }
+      catch (error) {
+        const code = ['INVALID_INPUT','INVALID_FILE','INVALID_CONTENT','UNSUPPORTED_TYPE','UNSUPPORTED_CONTENT',
+          'FILE_TOO_LARGE','PERSONAL_DATA_DETECTED','SHARING_AUTHORIZATION_REQUIRED','SOURCE_METADATA_REQUIRED',
+          'SOURCE_UNAVAILABLE','DRAFT_ALREADY_EXISTS','STALE_SOURCE','NOT_FOUND','INVALID_OPERATION','PERSISTENCE_ERROR',
+          'PERMISSION_DENIED','DUPLICATE_SOURCE','AI_IN_PROGRESS','AI_RETRY_LATER','AI_AUDIT_UNKNOWN',
+          'INVALID_RESULT','INVALID_CONFIG','TIMEOUT','UPSTREAM_UNAVAILABLE','AI_REQUEST_FAILED'].includes(error?.code)
+          ? error.code : 'KNOWLEDGE_LIBRARY_FAILED';
+        return {ok:false,error:{code,message:'Knowledge library operation could not be completed'}};
+      }
+    }
     // CloudBase may add transport metadata to the event. Only route the declared request fields.
     try { return routeIntent({ intent: event?.intent, subject: event?.subject, input: event?.input }); }
     catch (error) {

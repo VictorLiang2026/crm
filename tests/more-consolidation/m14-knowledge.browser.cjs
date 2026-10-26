@@ -15,7 +15,7 @@ test('M14 knowledge keeps review states separate from validity, source types and
      lifecycle_status:'verified',source:'[CRM_TEST_ONLY] Fictional review',possible_underlying_reasons:['[CRM_TEST_ONLY] Might need clarification'],
      evidence_refs:[1],case_refs:[2],story_refs:[3]}]}};
    window.m14Render=async lang=>{const {setLang}=await import('/crm/js/modules/console/i18n.js');setLang(lang);
-    renderKnowledgeGovernance({main:document.querySelector('.console-main'),api:{call:async(n,p)=>{m14.calls.push({n,p});if(p.action==='listKnowledgeGovernance')return m14.records;throw Error('unexpected write');}}});};
+    renderKnowledgeGovernance({main:document.querySelector('.console-main'),api:{call:async(n,p)=>{m14.calls.push({n,p});if(p.action==='listKnowledgeGovernance')return m14.records;if(p.action==='knowledgeLibrary'&&p.operation==='list')return {ok:true,sources:[],knowledge:[],playbooks:[]};throw Error('unexpected write');}}});};
    await m14Render('zh-CN');
    const now=new Date('2026-10-23T16:30:00Z');
    return [knowledgeValidity({valid_to:'2026-10-23'},now),knowledgeValidity({valid_from:'2026-10-24',valid_to:'2026-10-24'},now),
@@ -31,7 +31,7 @@ test('M14 knowledge keeps review states separate from validity, source types and
   await b.evaluate("document.querySelector('[data-kg-id=\"4\"] details').open=true");
   assert.match(await b.evaluate("document.querySelector('[data-kg-id=\"4\"]').innerText"),/可能的解释|可能的异议原因/);
   assert.match(await b.evaluate("document.querySelector('[data-kg-id=\"4\"]').innerText"),/Might need clarification/);
-  assert.equal(await b.evaluate("m14.calls.every(x=>x.p.action==='listKnowledgeGovernance')"),true);
+  assert.equal(await b.evaluate("m14.calls.every(x=>x.p.action==='listKnowledgeGovernance'||(x.p.action==='knowledgeLibrary'&&x.p.operation==='list'))"),true);
   assert.equal(await b.evaluate("m14.records.knowledge[0].lifecycle_status"),'verified');
   for(const lang of ['en','zh-CN']){
    await b.evaluate('m14Render('+JSON.stringify(lang)+')');await b.wait("document.querySelectorAll('.kg-row').length===4");

@@ -17,13 +17,14 @@ test('PC22 governance page is bilingual, iPad-safe, and uses the authenticated s
       const ctx={main:document.querySelector('.console-main'),api:{call:async(name,payload)=>{
         calls.push({name,payload});
         if(payload.action==='listKnowledgeGovernance')return {knowledge:[{id:1,item_type:'evidence',source:'Policy',content:'Reviewed clause',confidence:.9,verified:false,lifecycle_status:'draft',version_no:1,updated_at:'2026-10-16T00:00:00Z'}],playbooks:[]};
+        if(payload.action==='knowledgeLibrary'&&payload.operation==='list')return {ok:true,sources:[],knowledge:[],playbooks:[]};
         return {ok:true};
       }}};
       window.kgCalls=calls;window.kgRender=()=>renderKnowledgeGovernance(ctx);window.kgI18n=i18n;window.confirm=()=>true;
       window.kgRender(); await new Promise(r=>setTimeout(r,30));
     })()`);
     await browser.wait("document.querySelector('.kg-layout .kg-row')");
-    const first = await browser.evaluate(`({text:document.querySelector('#console-main').innerText, writes:window.kgCalls.filter(x=>!['listKnowledgeGovernance'].includes(x.payload.action)).length})`);
+    const first = await browser.evaluate(`({text:document.querySelector('#console-main').innerText, writes:window.kgCalls.filter(x=>!(x.payload.action==='listKnowledgeGovernance'||(x.payload.action==='knowledgeLibrary'&&x.payload.operation==='list'))).length})`);
     assert.equal(first.writes, 0, 'opening the page does not write business data');
     assert.match(first.text, /Reviewed clause/);
     await browser.evaluate("window.kgI18n.setLang('en');window.kgRender()");

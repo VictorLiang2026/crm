@@ -753,6 +753,9 @@ export function renderPerson(ctx, id, initialSection) {
           class: 'btn btn-soft', type: 'button', onclick: openPlaybook,
         }, [ic('chat'), t('btn_playbook')]),
         h('button', {
+          class: 'btn btn-primary', type: 'button', onclick: () => { location.hash = `#/ai/followup/${id}`; },
+        }, [ic('sparkle'), t('btn_dual_followup')]),
+        h('button', {
           class: 'btn btn-soft', type: 'button',
           onclick: () => openPersonEdit(wctx, { personId: String(id), onDone: wctx.onWriteDone }),
         }, [ic('gear'), t('btn_edit_profile')]),

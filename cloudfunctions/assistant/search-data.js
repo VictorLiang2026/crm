@@ -77,7 +77,8 @@ function createSearchData({ env, key, fetchImpl = fetch } = {}) {
       },
     };
   }, async rpc(name, args) {
-    if (!['crm_ai_claim_v2', 'crm_ai_finish_v1'].includes(name)) throw new Error('Invalid AI audit RPC');
+    if (!['crm_ai_claim_v2', 'crm_ai_finish_v1', 'crm_ai_finish_dual_v1',
+      'crm_ai_select_dual_v1', 'crm_knowledge_source_review_v1'].includes(name)) throw new Error('Invalid AI audit RPC');
     const data = await request(`rpc/${name}`, 'POST', {}, args);
     if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('Invalid AI audit RPC response');
     return { data };

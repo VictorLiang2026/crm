@@ -27,14 +27,14 @@ function renderRow(ctx, table, row, reload, onRevision, resolveRef, focusItemId)
   const content = table === 'playbooks' ? `${row.scenario} · ${row.objection}\n${row.response_logic}` : row.content;
   const validity = knowledgeValidity(row);
   const controls = [];
-  if (row.lifecycle_status === 'draft' || (!row.lifecycle_status && !row.verified)) {
+  if (!row.source_id && (row.lifecycle_status === 'draft' || (!row.lifecycle_status && !row.verified))) {
     controls.push(h('button', { class: 'btn btn-primary', type: 'button', onclick: async () => {
       if (!window.confirm(text('confirm_verify'))) return;
       await data.reviewKnowledgeGovernance(ctx, { table, id: row.id, action: 'verify', expectedUpdatedAt: row.updated_at });
       await reload();
     } }, text('verify')));
   }
-  if (row.lifecycle_status === 'verified') {
+  if (!row.source_id && row.lifecycle_status === 'verified') {
     if (table === 'knowledge_items') controls.push(h('button', { class: 'btn btn-ghost', type: 'button',
       onclick: () => onRevision(row) }, text('revise')));
     controls.push(h('button', { class: 'btn btn-ghost', type: 'button', onclick: async () => {
@@ -67,10 +67,58 @@ function renderRow(ctx, table, row, reload, onRevision, resolveRef, focusItemId)
 
 export function renderKnowledgeGovernance(ctx, { focusItemId = null } = {}) {
   const main = ctx.main;
-  let records = { knowledge: [], playbooks: [] };
+  let records = { knowledge: [], playbooks: [], sources: [], libraryKnowledge: [] };
   let typeFilter = 'all'; let statusFilter = 'all';
-  const refresh = async () => { records = await data.knowledgeGovernance(ctx); draw();
+  const refresh = async () => {
+    const [governance, library] = await Promise.all([data.knowledgeGovernance(ctx), data.knowledgeLibrary(ctx, 'list')]);
+    records = { ...governance, sources: library.sources || [], libraryKnowledge: library.knowledge || [] };
+    const byId = new Map((records.knowledge || []).map(row => [String(row.id), row]));
+    records.libraryKnowledge.forEach(row => byId.set(String(row.id), row));
+    records.knowledge = [...byId.values()];
+    draw();
     if (focusItemId) requestAnimationFrame(() => document.getElementById('kg-focused-item')?.scrollIntoView({ behavior: 'smooth', block: 'center' })); };
+  const sourceStatus = h('p', { class: 'foot-note', role: 'status' });
+  const sourceForm = h('form', { class: 'kg-form', onsubmit: async event => {
+    event.preventDefault();
+    const form = event.currentTarget, fd = new FormData(form), file = fd.get('file');
+    if (!(file instanceof File) || !file.size) { sourceStatus.textContent = text('source_file_required'); return; }
+    if (file.size > 3 * 1024 * 1024) { sourceStatus.textContent = text('source_file_too_large'); return; }
+    const reader = new FileReader();
+    reader.onerror = () => { sourceStatus.textContent = text('source_upload_failed'); };
+    reader.onload = async () => {
+      sourceStatus.textContent = text('source_extracting');
+      const values = Object.fromEntries([...fd.entries()].filter(([key]) => key !== 'file'));
+      try {
+        const response = await data.knowledgeLibrary(ctx, 'upload', { data: { ...values, fileName: file.name,
+          contentType: file.type || 'application/octet-stream', fileBase64: String(reader.result).split(',')[1],
+          sharingAuthorized: fd.get('sharingAuthorized') === 'on', anonymized: fd.get('anonymized') === 'on' } });
+        sourceStatus.textContent = response.ok ? (response.duplicate ? text('source_duplicate') : text('source_draft_created'))
+          : text('source_upload_failed');
+        if (response.ok) { form.reset(); await refresh(); }
+      } catch (_) { sourceStatus.textContent = text('source_upload_failed'); }
+    };
+    reader.readAsDataURL(file);
+  } }, [
+    h('h2', {}, text('source_upload_title')),
+    label('source_domain', h('select', { name: 'domain', required: true }, [
+      ...['product','company','service','recruitment','industry','campaign','health_wealth_seminar','top_performer_sharing','legal_tax','case','playbook']
+        .map(value => h('option', { value }, text(`domain_${value}`))),
+    ])),
+    label('source_title', h('input', { name: 'title', maxlength: 500, required: true })),
+    label('source_publisher', h('input', { name: 'publisher', maxlength: 500 })),
+    label('source_jurisdiction', h('input', { name: 'jurisdiction', maxlength: 160, placeholder: text('source_jurisdiction_hint') })),
+    label('source_uri', h('input', { name: 'sourceUri', type: 'url', maxlength: 2000, placeholder: text('source_uri_hint') })),
+    label('source_published_at', h('input', { name: 'publishedAt', type: 'date' })),
+    label('source_valid_from', h('input', { name: 'validFrom', type: 'date' })),
+    label('source_valid_to', h('input', { name: 'validTo', type: 'date' })),
+    label('source_review_at', h('input', { name: 'reviewAt', type: 'date' })),
+    label('source_file', h('input', { name: 'file', type: 'file', required: true, accept: '.pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain' })),
+    label('source_sharing_authorized', h('input', { name: 'sharingAuthorized', type: 'checkbox' })),
+    label('source_anonymized', h('input', { name: 'anonymized', type: 'checkbox' })),
+    h('p', { class: 'foot-note' }, text('source_upload_help')),
+    h('button', { class: 'btn btn-primary', type: 'submit' }, text('source_upload')),
+    sourceStatus,
+  ]);
   const form = h('form', { class: 'kg-form', onsubmit: async event => {
     event.preventDefault();
     const fd = new FormData(event.currentTarget);
@@ -131,7 +179,7 @@ export function renderKnowledgeGovernance(ctx, { focusItemId = null } = {}) {
     main.replaceChildren(pageHead({ kicker: text('kicker'), title: text('title'), sub: text('description') }),
       h('p', {class:'foot-note'}, text('validity_scope')),
       h('div', { class: 'kg-layout' }, [
-        card({ body: [form, playbookForm] }),
+        card({ body: [sourceForm, h('hr'), form, playbookForm] }),
         h('section', { class: 'kg-list' }, [
           h('p', {class:'foot-note'}, text('loaded_scope')),
           h('div', { class: 'kg-toolbar' }, [h('h2', {}, text('items')),
@@ -158,6 +206,30 @@ export function renderKnowledgeGovernance(ctx, { focusItemId = null } = {}) {
             form.elements.content.value = row.content || '';
             form.scrollIntoView({ behavior: 'smooth', block: 'start' });
           }, (_type, id) => String(id), focusItemId)),
+          ...(records.sources || []).map(source => {
+            const item = records.libraryKnowledge.find(row => String(row.source_id) === String(source.id));
+            return h('article', { class: 'kg-row' }, [
+              h('div', { class: 'kg-row-head' }, [h('b', {}, `${text(`domain_${source.domain}`)} · ${source.title}`),
+                h('span', { class: `kg-status kg-${source.lifecycleStatus}` }, text(`status_${source.lifecycleStatus}`))]),
+              h('small', {}, `${text('source_file')}: ${source.fileName || '—'} · ${text('source_extraction')}: ${text(`extraction_${source.extractionStatus}`)}`),
+              source.jurisdiction ? h('small', {}, `${text('source_jurisdiction')}: ${source.jurisdiction}`) : null,
+              item ? h('p', { class: 'kg-copy' }, item.content || '') : null,
+              h('div', { class: 'kg-actions' }, [
+                source.extractionStatus === 'failed' ? h('button', { class: 'btn btn-ghost', type: 'button', onclick: async () => {
+                  await data.knowledgeLibrary(ctx, 'retry', { sourceId: source.id }); await refresh();
+                } }, text('source_retry')) : null,
+                source.lifecycleStatus === 'draft' && item ? h('button', { class: 'btn btn-primary', type: 'button', onclick: async () => {
+                  if (!window.confirm(text('source_confirm_verify'))) return;
+                  await data.knowledgeLibrary(ctx, 'review', { data: { sourceId: source.id, itemId: item.id,
+                    decision: 'verify', expectedUpdatedAt: source.updatedAt } }); await refresh();
+                } }, text('verify')) : null,
+                source.lifecycleStatus === 'verified' && item ? h('button', { class: 'btn btn-ghost', type: 'button', onclick: async () => {
+                  if (!window.confirm(text('confirm_invalidate'))) return;
+                  await data.knowledgeLibrary(ctx, 'review', { data: { sourceId: source.id, itemId: item.id, decision: 'invalidate' } }); await refresh();
+                } }, text('invalidate')) : null,
+              ]),
+            ]);
+          }),
           ...visiblePlaybooks.map(row => renderRow(ctx, 'playbooks', row, refresh, null, (type, id) => {
             const item = records.knowledge.find(entry => String(entry.id) === String(id));
             return item ? `#${id} · ${item.source || item.content?.slice(0, 80) || ''}` : `#${id} · ${text(`${type}_missing`)}`;

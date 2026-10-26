@@ -987,6 +987,7 @@ exports.main = async event => {
     const service = createService();
     switch (event?.action) {
       case 'get': return await service.get(event.personId);
+      case 'extractKnowledgePdfText': return await require('./knowledge-pdf-service').extract(event);
       case 'resolveHouseholdMember':
         return await new HouseholdService({request: pgRequest, rpc: pgRpc}).resolveMemberName(event.name);
       case 'previewHousehold':

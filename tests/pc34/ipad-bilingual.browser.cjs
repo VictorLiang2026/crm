@@ -30,7 +30,7 @@ test('PC34 Console modules render in both languages across iPad orientations', a
           assert.equal(state.width, viewport.width);
           assert.ok(state.scrollWidth <= state.width + 1, `${lang} ${route} ${viewport.width}: document overflow ${state.scrollWidth}`);
           assert.ok(state.left >= -1 && state.right <= state.width + 1, `${lang} ${route}: main outside viewport`);
-          assert.equal(state.navCount, 7, `${lang} ${route}: navigation incomplete`);
+          assert.equal(state.navCount, 8, `${lang} ${route}: navigation incomplete`);
           assert.ok(!/加载失败|Failed to load|Error loading/.test(state.text), `${lang} ${route}: ${state.text}`);
         }
       }

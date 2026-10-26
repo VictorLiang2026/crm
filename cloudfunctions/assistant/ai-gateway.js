@@ -164,6 +164,11 @@ function createRdbAuditStore(rdb) {
       p_error: row.error, p_usage: row.usage, p_result: row.result,
       p_final: row.final,
     });
+    store.finishDualAttempt = row => rpc('crm_ai_finish_dual_v1', {
+      p_task_id: row.taskId, p_run_id: row.runId, p_success: row.success,
+      p_error: row.error, p_usage: row.usage, p_candidates: row.candidates,
+      p_final: row.final,
+    });
   }
   return store;
 }
@@ -264,8 +269,13 @@ function createAIGateway(options) {
       throw new AIGatewayError('INVALID_CONFIG', 'Unsupported CloudBase model group');
     }
     const disclosure = await (options.testDataReader || testData.disclose)(testData.collectRefs(context));
+    const skillInstruction = skill === 'dual_followup'
+      ? 'Produce exactly two candidates: one strategy_based and one library_based. strategy_based should give general international insurance practice, agent communication experience and customer progression logic; use only strategySources as citations. If recruitContext contains a recruit candidate, adapt the strategy to that candidate’s stated career stage and concerns; otherwise do not assume recruitment intent. library_based must rely on librarySources for company-specific products, services, campaigns, seminars, recruitment, legal or tax facts; use only librarySources as citations. sourceRefs must contain only exact supplied knowledge item IDs. Do not present general model knowledge as a company fact, local law, product term, return or guarantee. If no suitable source exists, say so and ask what must be verified. Tailor both to the supplied customer snapshot without inventing facts. Keep the two perspectives distinct.'
+      : skill === 'knowledge_extract'
+        ? 'Summarize the supplied source faithfully. Separate source facts from suggested marketing or agent applications. Preserve limitations, dates and jurisdiction. Do not add product, legal, tax, performance or return claims that are not present in the document.'
+        : '';
     const messages = testData.withMessages([
-      { role: 'system', content: 'Return only JSON matching the supplied output schema. Do not change business records.' },
+      { role: 'system', content: `Return only JSON matching the supplied output schema. Do not change business records.${skillInstruction ? ` ${skillInstruction}` : ''}` },
       { role: 'user', content: JSON.stringify({ taskType, skill, capability, context, input, outputSchema: schema }) },
     ], disclosure);
     const taskRow = {
@@ -317,8 +327,12 @@ function createAIGateway(options) {
       try { runId = await store.createRun({ task_id: taskId, success: null }); }
       catch (error) {
         if (atomicAudit) {
-          try { await store.finishAttempt({ taskId, runId: null, success: false,
-            error: 'PERSISTENCE_ERROR', usage: {}, result: null, final: true }); }
+          try {
+            if (skill === 'dual_followup') await store.finishDualAttempt({ taskId, runId:null, success:false,
+              error:'PERSISTENCE_ERROR',usage:{},candidates:null,final:true });
+            else await store.finishAttempt({ taskId, runId: null, success: false,
+              error: 'PERSISTENCE_ERROR', usage: {}, result: null, final: true });
+          }
           catch (auditFailure) { const failure = auditError(auditFailure); failure.taskId = taskId; throw failure; }
         } else await markFailed(taskId);
         const failure = auditError(error); failure.taskId = taskId; throw failure;
@@ -338,11 +352,17 @@ function createAIGateway(options) {
           invalid.details = error.details;
           throw invalid;
         }
+          if (skill === 'dual_followup') {
+            result.candidates = [...result.candidates].sort((a,b) =>
+              (a.candidateType === 'strategy_based' ? 0 : 1) - (b.candidateType === 'strategy_based' ? 0 : 1));
+          }
       } catch (error) {
         const normalized = normalizeError(error);
         const canRetry = normalized.retryable && attempt < maxAttempts;
         try {
-          if (atomicAudit) await store.finishAttempt({ taskId, runId, success: false,
+          if (atomicAudit && skill === 'dual_followup') await store.finishDualAttempt({ taskId, runId, success:false,
+            error:normalized.code,usage:{...usageOf(response),latency_ms:elapsedMs(started)},candidates:null,final:!canRetry });
+          else if (atomicAudit) await store.finishAttempt({ taskId, runId, success: false,
             error: normalized.code, usage: { ...usageOf(response), latency_ms: elapsedMs(started) },
             result: null, final: !canRetry });
           else await store.updateRun(runId, {
@@ -367,15 +387,27 @@ function createAIGateway(options) {
 
       const usage = usageOf(response);
       let resultId;
+      let resultIds = null;
       try {
         if (atomicAudit) {
-          const finished = await store.finishAttempt({ taskId, runId, success: true,
-            error: null, usage: { ...usage, latency_ms: elapsedMs(started) },
-            result, final: true });
-          if (finished.status !== 'completed' || !finished.resultId) {
-            throw new AIGatewayError('PERSISTENCE_ERROR', 'AI audit completion did not return a result');
+          const usageWithLatency = { ...usage, latency_ms: elapsedMs(started) };
+          if (skill === 'dual_followup') {
+            if (typeof store.finishDualAttempt !== 'function') throw new AIGatewayError('PERSISTENCE_ERROR', 'Dual AI audit is unavailable');
+            const finished = await store.finishDualAttempt({ taskId, runId, success:true,
+              error:null, usage:usageWithLatency, candidates:result.candidates, final:true });
+            if (finished.status !== 'completed' || !Array.isArray(finished.resultIds) || finished.resultIds.length !== 2) {
+              throw new AIGatewayError('PERSISTENCE_ERROR', 'Dual AI audit completion did not return two results');
+            }
+            resultIds = finished.resultIds.map(String);
+            resultId = resultIds[0];
+          } else {
+            const finished = await store.finishAttempt({ taskId, runId, success: true,
+              error: null, usage: usageWithLatency, result, final: true });
+            if (finished.status !== 'completed' || !finished.resultId) {
+              throw new AIGatewayError('PERSISTENCE_ERROR', 'AI audit completion did not return a result');
+            }
+            resultId = finished.resultId;
           }
-          resultId = finished.resultId;
         } else {
           await store.updateRun(runId, { ...usage, latency_ms: elapsedMs(started), success: true, error: null });
           resultId = await store.createResult({
@@ -388,7 +420,7 @@ function createAIGateway(options) {
         if (!atomicAudit) await markFailed(taskId);
         const failure = auditError(error); failure.taskId = taskId; throw failure;
       }
-      return { taskId, runId, resultId, result, usage, testData: disclosure, skillVersion: definition.version,
+      return { taskId, runId, resultId, ...(resultIds ? { resultIds } : {}), result, usage, testData: disclosure, skillVersion: definition.version,
         confirmationLevel: definition.confirmationLevel, requiresConfirmation: true };
     }
     throw new AIGatewayError('AI_REQUEST_FAILED', 'AI request failed');

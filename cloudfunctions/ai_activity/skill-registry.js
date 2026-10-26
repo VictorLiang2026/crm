@@ -144,6 +144,31 @@ const SKILLS = [
     confirmationLevel: 'review', timeoutClass: 'standard',
   },
   {
+    name: 'knowledge_extract', version: '1.0.0', capability: 'summarization',
+    contextRecipe: recipe(['document']),
+    inputSchema: object({domain:{type:'string',enum:['product','company','service','recruitment','industry','campaign',
+      'health_wealth_seminar','top_performer_sharing','legal_tax','case','playbook']},title:text(500)},['domain','title']),
+    outputSchema: object({summary:text(1800),keyPoints:strings(16,500),applicationNotes:strings(10,500),boundaries:strings(10,500)},
+      ['summary','keyPoints','applicationNotes','boundaries']),
+    confirmationLevel:'review',timeoutClass:'standard',
+  },
+  {
+    name:'dual_followup',version:'1.0.0',capability:'coaching',
+    contextRecipe:recipe(['customer_snapshot','recruit_context','question','market','strategy_sources','library_sources',
+      'strategy_guidance','library_guidance','guardrails'],[],{strategy_sources:8,library_sources:10}),
+    inputSchema:object({personId:{type:'string',pattern:'^[1-9][0-9]*$',maxLength:16},question:{type:'string',maxLength:1000},market:{type:'string',maxLength:160}},
+      ['personId','question','market']),
+    outputSchema:(()=>{
+      const candidate=object({candidateType:{type:'string',enum:['strategy_based','library_based']},summary:text(1200),
+        reasoning:text(1600),clarifyingQuestions:strings(6,400),nextAction:text(800),messageDraft:text(1200),
+        boundaryNotes:strings(6,400),sourceRefs:{type:'array',maxItems:10,uniqueItems:true,
+          items:{type:'string',pattern:'^[1-9][0-9]*$'}},matchStatus:{type:'string',enum:['matched','no_matching_sources']}},
+      ['candidateType','summary','reasoning','clarifyingQuestions','nextAction','messageDraft','boundaryNotes','sourceRefs','matchStatus']);
+      return object({candidates:{type:'array',minItems:2,maxItems:2,items:candidate}},['candidates']);
+    })(),
+    confirmationLevel:'review',timeoutClass:'standard',
+  },
+  {
     name: 'ai_search', version: '1.0.0', capability: 'retrieval',
     contextRecipe: recipe(['search_results'], [], { search_results: 30 }),
     inputSchema: object({ query: text(1000), scope: strings(10, 80) }, ['query']),
