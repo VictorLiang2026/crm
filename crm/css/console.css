@@ -391,6 +391,8 @@ h1, h2, h3, p, ul { margin: 0; }
 .more-business-group { margin-top: 16px; }
 .more-business-title { margin: 0 0 10px; color: var(--ink-2); font-size: 13px; font-weight: 700; }
 .more-actions { display: flex; justify-content: flex-end; margin-top: 12px; }
+.test-tools-actions { flex-wrap: wrap; align-items: center; gap: 8px; }
+.test-tools-actions .input { min-width: 0; flex: 1 1 240px; }
 .tile .ic { color: var(--red); }
 .tile b { font-size: 14px; }
 .tile > span:not(.bdg) { font-size: 12px; color: var(--muted); }
