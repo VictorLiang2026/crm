@@ -1,6 +1,6 @@
 import { h } from './dom.js';
 import { ic } from './icons.js';
-import { openSheet, openWorkItemEditor } from './write.js';
+import { openSheet, openWorkItemEditor, openRecruitCandidateRemove } from './write.js';
 import { data } from './data.js';
 import { t, getLang, translateEnum } from './i18n.js';
 import { emptyNote, fmtDate, sectionTitle } from './ui.js';
@@ -482,6 +482,8 @@ export async function renderRecruitSection(ctx, personId, onDone) {
         h('div', { class: 'recruit-candidate-actions' }, [
           h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => openProfileEditor(ctx, candidate, reload) }, t('recruit_profile_edit')),
           h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => openFollowupEditor(ctx, candidate, null, reload) }, t('recruit_followup_new')),
+          h('button', { class: 'btn btn-ghost btn-sm', type: 'button', style: 'margin-left:auto;color:var(--red)',
+            onclick: () => openRecruitCandidateRemove(ctx, { candidate, onDone: reload }) }, t('recruit_role_remove')),
         ]),
         h('section', { class: 'recruit-detail-section' }, [sectionTitle(t('recruit_files')), renderAttachments(ctx, candidate, reload)]),
         h('section', { class: 'recruit-detail-section' }, [sectionTitle(t('recruit_milestones')), (detail.milestones || []).length

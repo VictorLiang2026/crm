@@ -16,7 +16,7 @@ import { renderOcrReview } from '../ocr-review.js';
 import { renderInsuranceEditor } from '../insurance-editor.js';
 import { renderInsuranceReports } from '../insurance-reports.js';
 import { openWorkItemEditor, openWorkItemTransition, openOpportunityAdvance, openQuickCapture, openPersonEdit, openPersonDelete,
-  openPersonInteraction, openPersonFollowup } from '../write.js';
+  openPersonInteraction, openPersonFollowup, openPersonCustomerRemove } from '../write.js';
 import {
   wpTag, pageHead, emptyNote, loadInto, bdg, kvGrid, sectionTitle,
   fmtDate, weekdayCN, dueLabel, toneByDue, textOf,
@@ -156,6 +156,8 @@ function overviewNode(ctx, id, setName) {
           sectionTitle(t('sec_customer_specific_info')),
           h('button', { class: 'btn btn-soft btn-sm', type: 'button',
             onclick: () => openPersonEdit(ctx, { personId: String(id), onDone: ctx.onWriteDone }) }, t('btn_edit_customer_profile')),
+          h('button', { class: 'btn btn-ghost btn-sm', type: 'button', style: 'color:var(--red)',
+            onclick: () => openPersonCustomerRemove(ctx, { customerId: profile.customerId, onDone: ctx.onWriteDone }) }, t('customer_role_remove')),
         ]),
         kvGrid(customerInfoPairs),
       ]) : profile.status === 'customer_unavailable'

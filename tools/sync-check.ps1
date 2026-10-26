@@ -10,7 +10,7 @@ function GitRead([string[]]$Arguments) {
 }
 function SourceFilesMatch([string]$Left, [string]$Right) {
   if ((Get-FileHash -LiteralPath $Left -Algorithm SHA256).Hash -eq (Get-FileHash -LiteralPath $Right -Algorithm SHA256).Hash) { return $true }
-  $textExtensions = @('.js', '.cjs', '.mjs', '.ts', '.json', '.sql', '.md', '.txt', '.yml', '.yaml')
+  $textExtensions = @('.js', '.cjs', '.mjs', '.ts', '.json', '.sql', '.md', '.txt', '.yml', '.yaml', '.npmrc')
   if ([IO.Path]::GetExtension($Left).ToLowerInvariant() -notin $textExtensions) { return $false }
   $utf8 = [Text.UTF8Encoding]::new($false, $true)
   try {

@@ -1276,6 +1276,114 @@ export function openPersonNew(ctx, { onDone } = {}) {
 }
 
 // Person → role conversion is a reviewed server command: preview first, then explicit human confirmation.
+async function restorePreviousRoleIfPresent(ctx, { person, kind, sheet, onDone, restoredState, nextStep = 0 }) {
+  const restored = restoredState || new Set();
+  const roleLabel = kind === 'customer' ? t('customer') : t('recruit');
+  const itemCounts = row => Object.entries(row.counts || {})
+    .filter(([, count]) => Number(count) > 0)
+    .map(([name, count]) => `${t(({ followups: 'trash_count_followups', gifts: 'trash_count_gifts', photos: 'trash_count_photos',
+      policy_review_reports: 'trash_count_reports', ocr_records: 'trash_count_ocr', products: 'trash_count_products',
+      recruit_candidates: 'trash_count_recruits', recruit_followups: 'l07_recruit_followups' })[name] || name)} ${count}`)
+    .join(' · ');
+  const recoveryRoot = state => {
+    if (kind === 'customer' && state.customer?.deleted) {
+      return { kind: 'customer', id: Number(state.customer.id), name: state.displayName, parent: false };
+    }
+    if (kind === 'recruit' && state.recruit?.deleted) {
+      if (state.parentCustomer?.deleted) {
+        return { kind: 'customer', id: Number(state.parentCustomer.id), name: state.displayName, parent: true };
+      }
+      return { kind: state.recruit.personOnly ? 'person_recruit' : 'recruit',
+        id: Number(state.recruit.id), name: state.displayName, parent: false };
+    }
+    return null;
+  };
+
+  for (let step = nextStep; step < 3; step += 1) {
+    const state = await data.personRoleRecovery(ctx, person.id, kind);
+    if (!state || state.error) throw new Error(state?.message || state?.error || t('write_failed'));
+    const root = recoveryRoot(state);
+    if (!root) {
+      if (!restored.size) return false;
+      sheet.overlay.remove();
+      const message = restored.has('recruit')
+        ? (restored.has('customer') ? t('role_recovery_done_both') : t('role_recovery_done_recruit'))
+        : t('role_recovery_done_customer');
+      ctx.toast(message.replace('{role}', roleLabel), 'ok');
+      onDone?.();
+      return true;
+    }
+    if (!Number.isSafeInteger(root.id) || root.id < 1) throw new Error(t('trash_invalid_result'));
+
+    const preview = await data.previewRecycleBatch(ctx, {
+      requestKey: uuid(), items: [{ kind: root.kind, id: root.id }],
+    });
+    if (!preview || !preview.previewId || !Array.isArray(preview.items) || preview.items.length !== 1) {
+      throw new Error(t('trash_invalid_result'));
+    }
+    const row = preview.items[0];
+    if (row.id !== root.id || row.kind !== root.kind) throw new Error(t('trash_invalid_result'));
+    const canRestore = row.code === 'READY';
+    const noteKey = root.parent ? 'role_recovery_parent_customer_note'
+      : root.kind === 'customer' ? 'role_recovery_customer_note' : 'role_recovery_recruit_note';
+    const actions = h('div', { class: 'sheet-actions' }, [
+      h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => sheet.overlay.remove() }, t('cancel')),
+      h('button', { class: 'btn btn-primary', type: 'button', disabled: !canRestore },
+        canRestore ? t('role_recovery_confirm') : t(`l07_code_${row.code}`)),
+    ]);
+    const confirm = actions.querySelector('.btn-primary');
+    sheet.swap(h('div', {}, [
+      h('p', { class: 'sheet-note' }, t(noteKey).replace('{role}', roleLabel)),
+      h('div', { class: 'card card-body' }, [
+        h('b', {}, `${root.name || person.display_name} #${root.id}`),
+        h('div', {}, t(`l07_code_${row.code}`)),
+        row.batchId ? h('small', { class: 'foot-note' }, `${t('l07_batch')} ${row.batchId}${itemCounts(row) ? ` · ${itemCounts(row)}` : ''}`) : null,
+      ]),
+      h('p', { class: 'foot-note' }, `${t('l07_expires')} ${new Date(preview.expiresAt).toLocaleString()}`),
+      actions,
+    ]));
+    confirm.onclick = async () => {
+      if (!canRestore || confirm.disabled) return;
+      confirm.disabled = true;
+      let result;
+      try {
+        result = await data.executeRecycleBatch(ctx, preview.previewId);
+      } catch (executeError) {
+        try { result = await data.getRecycleBatch(ctx, preview.previewId); }
+        catch { sheet.showErr(t('role_recovery_uncertain')); confirm.disabled = false; return; }
+        if (result?.status !== 'executed') {
+          sheet.showErr(t('role_recovery_uncertain'));
+          confirm.disabled = false;
+          return;
+        }
+      }
+      const restoredRow = result?.results?.[0];
+      if (result?.status !== 'executed' || !restoredRow || !['RESTORED', 'ALREADY_RESTORED'].includes(restoredRow.code)) {
+        sheet.showErr(restoredRow?.code ? t(`l07_code_${restoredRow.code}`) : t('trash_invalid_result'));
+        confirm.disabled = false;
+        return;
+      }
+      restored.add(root.kind === 'customer' ? 'customer' : 'recruit');
+      if (kind === 'recruit' && root.kind === 'customer' && Number(restoredRow.counts?.recruit_candidates) > 0) {
+        restored.add('recruit');
+      }
+      // A deleted linked candidate can outlive the customer's deletion batch. Re-read
+      // and restore that candidate separately after its parent has become active.
+      await restorePreviousRoleIfPresent(ctx, { person, kind, sheet, onDone, restoredState: restored, nextStep: step + 1 });
+    };
+    return true;
+  }
+  if (restored.size) {
+    sheet.overlay.remove();
+    ctx.toast(restored.has('recruit') && restored.has('customer')
+      ? t('role_recovery_done_both') : restored.has('recruit')
+        ? t('role_recovery_done_recruit') : t('role_recovery_done_customer'), 'ok');
+    onDone?.();
+    return true;
+  }
+  return false;
+}
+
 export function openPersonRoleConversion(ctx, { person, kind, onDone } = {}) {
   if (!person?.id || !['customer', 'recruit'].includes(kind)) return;
   const label = kind === 'customer' ? t('customer') : t('recruit');
@@ -1287,6 +1395,7 @@ export function openPersonRoleConversion(ctx, { person, kind, onDone } = {}) {
   document.body.appendChild(sheet.overlay);
   (async () => {
     try {
+      if (await restorePreviousRoleIfPresent(ctx, { person, kind, sheet, onDone })) return;
       const pv = await p360(ctx, 'previewIdentity', { data: {
         kind, personId: String(person.id), displayName: person.display_name,
         idempotencyKey: uuid(),
@@ -1320,6 +1429,60 @@ export function openPersonRoleConversion(ctx, { person, kind, onDone } = {}) {
       onDone?.();
     } catch (err) { busy(btn, false, t('btn_confirm')); sheet.showErr(err.message); }
   }
+}
+
+export function openPersonCustomerRemove(ctx, { customerId, onDone } = {}) {
+  const id = Number(customerId);
+  if (!Number.isSafeInteger(id) || id < 1) return;
+  const sheet = openSheet({
+    title: t('customer_role_remove_title'),
+    sub: t('customer_role_remove_note'),
+    body: h('div', {}, [
+      h('p', { class: 'sheet-note' }, t('customer_role_remove_cascade')),
+      h('div', { class: 'sheet-actions' }, [
+        h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => sheet.overlay.remove() }, t('cancel')),
+        h('button', { class: 'btn btn-primary', type: 'button', onclick: async event => {
+          const button = event.currentTarget;
+          busy(button, true, t('writing'));
+          try {
+            const result = await data.removeCustomerRole(ctx, id);
+            if (!result || result.ok === false || result.error) throw new Error(result?.error || t('write_failed'));
+            sheet.overlay.remove();
+            ctx.toast(t('customer_role_remove_done'), 'ok');
+            onDone?.();
+          } catch (error) { busy(button, false, t('customer_role_remove')); sheet.showErr(error.message || t('write_failed')); }
+        } }, t('customer_role_remove')),
+      ]),
+    ]),
+  });
+  document.body.appendChild(sheet.overlay);
+}
+
+export function openRecruitCandidateRemove(ctx, { candidate, onDone } = {}) {
+  const id = Number(candidate?.id);
+  if (!Number.isSafeInteger(id) || id < 1) return;
+  const sheet = openSheet({
+    title: t('recruit_role_remove_title'),
+    sub: `${candidate.name || candidate.display_name || ''} #${id}`,
+    body: h('div', {}, [
+      h('p', { class: 'sheet-note' }, t('recruit_role_remove_note')),
+      h('div', { class: 'sheet-actions' }, [
+        h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => sheet.overlay.remove() }, t('cancel')),
+        h('button', { class: 'btn btn-primary', type: 'button', onclick: async event => {
+          const button = event.currentTarget;
+          busy(button, true, t('writing'));
+          try {
+            const result = await data.removeRecruitRole(ctx, id);
+            if (!result || result.ok === false || result.error) throw new Error(result?.error || t('write_failed'));
+            sheet.overlay.remove();
+            ctx.toast(t('recruit_role_remove_done'), 'ok');
+            onDone?.();
+          } catch (error) { busy(button, false, t('recruit_role_remove')); sheet.showErr(error.message || t('write_failed')); }
+        } }, t('recruit_role_remove')),
+      ]),
+    ]),
+  });
+  document.body.appendChild(sheet.overlay);
 }
 
 // ---------- 人物：编辑基础资料（updatePerson，乐观锁；客户档案字段不在本表单范围） ----------

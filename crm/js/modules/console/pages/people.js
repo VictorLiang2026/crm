@@ -38,7 +38,7 @@ function compactColumnLabel(label, key) {
   return word;
 }
 
-const SORT_COLUMNS = (customerView = false) => ([
+const SORT_COLUMNS = (customerView = false, showConversions = true) => ([
   { key: 'name', field: 'display_name', label: t('col_name') },
   ...(customerView ? [
     { key: 'customer_stage', field: 'customer_stage', label: t('customer_view_stage'), sortable: false },
@@ -51,9 +51,13 @@ const SORT_COLUMNS = (customerView = false) => ([
   { key: 'latest_followup', field: 'latest_followup_date', label: t('col_latest_followup'), mobileLabel: compactColumnLabel(t('col_latest_followup'), 'latest_followup'), full: t('col_latest_followup_full') },
   { key: 'next_followup', field: 'next_followup_date', label: t('col_next_followup'), mobileLabel: compactColumnLabel(t('col_next_followup'), 'next_followup'), full: t('col_next_followup_full') },
   { key: 'updated_at', field: 'updated_at', label: t('col_recent_update'), mobileLabel: t('col_recent_update_mobile') },
-  { key: 'convert_customer', field: 'convert_customer', label: t('col_convert_customer'), sortable: false },
-  { key: 'convert_recruit', field: 'convert_recruit', label: t('col_convert_recruit'), sortable: false },
-  { key: 'id', field: 'id', label: t('col_id') },
+  ...(showConversions ? [
+    { key: 'convert_customer', field: 'convert_customer', label: t('col_convert_customer'), sortable: false },
+    { key: 'convert_recruit', field: 'convert_recruit', label: t('col_convert_recruit'), sortable: false },
+  ] : []),
+  customerView
+    ? { key: 'customer_id', field: 'customer_id', label: t('col_customer_id') }
+    : { key: 'id', field: 'id', label: t('col_id') },
 ]);
 
 function fmtDate(v) {
@@ -102,11 +106,13 @@ export function renderPeople(ctx) {
     const version = ++queryVersion;
     cancelQuery = loadInto(listEl, async () => {
       const customerView = state.filters.roles.length === 1 && state.filters.roles[0] === 'customer';
+      const recruitView = state.filters.roles.length === 1 && state.filters.roles[0] === 'recruit';
+      const showConversions = !customerView && !recruitView;
       worklistTools.hidden = !customerView;
       worklistTools.style.display = customerView ? '' : 'none';
       if (!customerView) {
         state.worklistStatus = 'all'; worklistFilter.value = 'all';
-        if (state.sortField === 'wb_status') { state.sortField = 'id'; state.sortDir = 'desc'; }
+        if (state.sortField === 'wb_status' || state.sortField === 'customer_id') { state.sortField = 'id'; state.sortDir = 'desc'; }
       }
       const res = await data.listPeople(ctx, {
         page: state.page, pageSize: peoplePageSize(), keyword: state.keyword,
@@ -125,7 +131,7 @@ export function renderPeople(ctx) {
       if (!rows.length) {
         return h('div', { class: 'card-body' }, [emptyNote(t('empty_no_people'), state.keyword ? t('empty_people_hint') : t('empty_people_note'))]);
       }
-      const columns = SORT_COLUMNS(customerView);
+      const columns = SORT_COLUMNS(customerView, showConversions);
       const thead = h('thead', {}, h('tr', {}, columns.map((col) => {
         const th = h('th', {
           class: `people-col-${col.key}${col.sortable === false ? '' : ' sortable-th'}`,
@@ -194,9 +200,12 @@ export function renderPeople(ctx) {
           dateCell('latest_followup', p.latest_followup_date),
           dateCell('next_followup', p.next_followup_date),
           dateCell('updated_at', p.updated_at),
-          h('td', { class: 'people-col-convert_customer' }, convertCell('customer', hasCustomer)),
-          h('td', { class: 'people-col-convert_recruit' }, convertCell('recruit', hasRecruit)),
-          cell('id', String(p.id)),
+          ...(showConversions ? [
+            h('td', { class: 'people-col-convert_customer' }, convertCell('customer', hasCustomer)),
+            h('td', { class: 'people-col-convert_recruit' }, convertCell('recruit', hasRecruit)),
+          ] : []),
+          customerView ? cell('customer_id', p.customer_id == null ? '-' : String(p.customer_id))
+            : cell('id', String(p.id)),
         ];
         // Keep existing responsive labels aligned with the localized table headers.
         cells.forEach((td, i) => { if (i > 0) td.setAttribute('data-label', cols[i].label); });

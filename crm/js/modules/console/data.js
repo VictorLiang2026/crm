@@ -53,10 +53,13 @@ export const data = {
   restorePerson: (ctx, personId) => p360(ctx, 'restorePerson', { data: { personId: String(personId) } }),
   customerTrash: (ctx, params) => call(ctx, 'customers', { action: 'trashList', ...(params || {}) }),
   restoreCustomer: (ctx, id) => call(ctx, 'customers', { action: 'restore', ids: [Number(id)] }),
+  removeCustomerRole: (ctx, id) => call(ctx, 'customers', { action: 'remove', id: Number(id) }),
   previewRecycleBatch: (ctx, draft) => p360(ctx, 'previewRecycleBatch', { data: draft }),
   getRecycleBatch: (ctx, previewId) => p360(ctx, 'getRecycleBatch', { previewId }),
   executeRecycleBatch: (ctx, previewId) => p360(ctx, 'executeRecycleBatch', { previewId }),
   recruitTrash: (ctx, params) => call(ctx, 'recruit_candidates', { action: 'trashList', ...(params || {}) }),
+  removeRecruitRole: (ctx, id) => call(ctx, 'recruit_candidates', { action: 'remove', id: Number(id) }),
+  personRoleRecovery: (ctx, personId, kind) => p360(ctx, 'getPersonRoleRecovery', { personId: String(personId), kind }),
   personOnlyRecruitTrash: (ctx) => p360(ctx, 'listPersonOnlyRecruitTrash'),
   restoreRecruit: (ctx, id, personOnly) => personOnly
     ? p360(ctx, 'restorePersonOnlyRecruit', { ids: [Number(id)] })

@@ -151,7 +151,7 @@ async function pgRpc(name, body) {
     'crm_ocr_parse_preview_v1','crm_ocr_parse_undo_preview_v1','crm_ocr_parse_execute_v1',
     'crm_recruit_candidate_create_v1','crm_recruit_candidate_transition_v1','crm_recruit_coach_outcome_v1',
     'crm_knowledge_review_v1','crm_proactive_coach_decision_v1','crm_file_import_v1',
-    'crm_legacy_opportunity_v1','crm_recycle_batch_v1']).has(name)) throw new Error('Invalid RPC');
+    'crm_legacy_opportunity_v1','crm_recycle_batch_v1','person_role_recovery_v1']).has(name)) throw new Error('Invalid RPC');
   const env = process.env.TCB_ENV;
   const key = process.env.CRM_PERSON360_DB_API_KEY;
   if (!/^crm-[a-z0-9]+$/.test(env || '') || !key) throw new Error('Person 360 is not configured');
@@ -307,7 +307,7 @@ function createService({ request = pgRequest, rpc = pgRpc, disclosure = disclose
     const sortDir = String(event.sortDir || 'desc');
     const customerWorklist = event.customerWorklist === true;
     if (!['id', 'display_name', 'updated_at', 'sales_priority', 'recruitment_priority',
-      'referral_priority', 'latest_followup_date', 'next_followup_date', ...(customerWorklist ? ['wb_status'] : [])].includes(sortField) || !['asc', 'desc'].includes(sortDir)) {
+      'referral_priority', 'latest_followup_date', 'next_followup_date', ...(customerWorklist ? ['wb_status', 'customer_id'] : [])].includes(sortField) || !['asc', 'desc'].includes(sortDir)) {
       throw new Error('Invalid directory sort');
     }
     const rolesAllowed = new Set(['customer', 'recruit', 'referrer', 'speaker', 'participant', 'partner', 'alumni', 'other']);
@@ -403,6 +403,16 @@ function createService({ request = pgRequest, rpc = pgRpc, disclosure = disclose
       deleted_at: 'not.is.null', limit: 1,
     });
     return { ...resolved, deletedIdentity: deleted.length > 0 };
+  }
+
+  async function getPersonRoleRecovery(personId, kind, uid) {
+    const id = idOf(personId);
+    if (!uid || !id || !['customer', 'recruit'].includes(String(kind))) {
+      throw new Error('Invalid role recovery request');
+    }
+    return rpc('person_role_recovery_v1', {
+      p_actor_uid: uid, p_person_id: Number(id), p_kind: String(kind),
+    });
   }
 
   async function previewIdentity(data, uid) {
@@ -953,7 +963,7 @@ function createService({ request = pgRequest, rpc = pgRpc, disclosure = disclose
   }
 
   return { get, lookupCustomer, search, saveFacts, addMember, removeMember,
-    listPeople, listOpportunityDirectory, resolveIdentity, previewIdentity, executeIdentity,
+    listPeople, listOpportunityDirectory, resolveIdentity, getPersonRoleRecovery, previewIdentity, executeIdentity,
     updatePerson, previewPersonDelete, executePersonDelete, restorePerson, listPersonTrash,
     listPersonOnlyRecruits,
     listRecruitDirectory: event => new RecruitDirectoryService({ request }).list(event),
@@ -1031,6 +1041,7 @@ exports.main = async event => {
       case 'getRecruitCandidate': return await service.getRecruitCandidate(event.candidateId, event.personId);
       case 'transitionRecruitStage': return await service.transitionRecruitStage(event.data, uid);
       case 'resolveIdentity': return await service.resolveIdentity(event.name);
+      case 'getPersonRoleRecovery': return await service.getPersonRoleRecovery(event.personId, event.kind, uid);
       case 'previewIdentity': return await service.previewIdentity(event.data, uid);
       case 'executeIdentity': return await service.executeIdentity(event.data, uid);
       case 'updatePerson': return await service.updatePerson(event.data, uid);
