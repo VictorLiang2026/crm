@@ -15,17 +15,6 @@ function peoplePageSize() {
     : window.innerWidth <= 1180;
   return compactViewport ? COMPACT_PAGE_SIZE : DESKTOP_PAGE_SIZE;
 }
-const ROLE_BADGE = () => ({
-  customer: [t('customer'), 'ink'],
-  recruit: [t('recruit'), 'gold'],
-  speaker: [t('speaker'), 'jade'],
-  participant: [t('participant'), 'blue'],
-  partner: [t('role_partner'), 'purple'],
-  referrer: [t('role_referrer'), 'teal'],
-  alumni: [t('role_alumni'), 'gray'],
-  other: [t('role_other'), 'gray'],
-});
-
 function compactColumnLabel(label, key) {
   if (/[\u3400-\u9fff]/.test(label)) {
     if (key.endsWith('_priority')) return label.replace(/优先级$/, '').slice(-1);
@@ -152,13 +141,6 @@ export function renderPeople(ctx) {
         return th;
       })));
       const tbody = h('tbody', {}, rows.map((p) => {
-        const badges = (p.roles || []).map((role) => {
-          const [label, tone] = role === 'recruit'
-            ? [t('people_badge_recruit'), 'gold']
-            : (ROLE_BADGE()[role] || [role, 'gray']);
-          return bdg(label, tone);
-        });
-        if (p.recruit_id && !(p.roles || []).includes('recruit')) badges.push(bdg(t('people_badge_recruit'), 'gold'));
         const cols = columns;
         const hasCustomer = (p.roles || []).includes('customer');
         const hasRecruit = (p.roles || []).includes('recruit') || !!p.recruit_id;
@@ -183,7 +165,7 @@ export function renderPeople(ctx) {
             : labels);
         };
         const cells = [
-          cell('name', h('a', { href: `#/person/${p.id}` }, [p.display_name, h('span', { class: 'badge-stack' }, badges)])),
+          cell('name', h('a', { href: `#/person/${p.id}` }, p.display_name)),
           ...(customerView ? [
             cell('customer_stage', p.customer_stage ? translateEnum('customer_stage', p.customer_stage) : '-'),
             cell('wb_status', bdg(p.wb_status === 'overdue' && p.next_followup_date

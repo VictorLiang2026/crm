@@ -99,7 +99,7 @@ test('People directory reveals role priorities and applies multi-select only on 
   } finally { await b.close(); }
 });
 
-test('People directory shows one 招募 badge for converted recruits without changing global labels', async () => {
+test('People directory name cells show only names while role filters and global labels remain available', async () => {
   const b = new Browser(path.resolve(__dirname, '../..'));
   try {
     await b.start();
@@ -107,14 +107,15 @@ test('People directory shows one 招募 badge for converted recruits without cha
     await b.evaluate(`(async()=>{
       const {renderPeople}=await import('/crm/js/modules/console/pages/people.js');
       const ctx={main:(()=>{const e=document.createElement('main');document.body.append(e);return e})(),toast(){},api:{call:async()=>({rows:[
-        {id:7,display_name:'已转招募',roles:['recruit'],recruit_id:73},
+        {id:7,display_name:'已转招募',roles:['customer','recruit','participant'],recruit_id:73},
         {id:8,display_name:'招募关联人物',roles:[],recruit_id:74},
       ],page:1,pageSize:30,total:2,totalPages:1,hasMore:false})}};
       renderPeople(ctx);
     })()`);
-    await b.wait("document.querySelectorAll('.people-table .badge-stack').length===2");
-    const badges = await b.evaluate("[...document.querySelectorAll('.people-table .badge-stack')].map(x=>[...x.children].map(b=>b.textContent.trim()))");
-    assert.deepEqual(badges, [['招募'], ['招募']]);
+    await b.wait("document.querySelectorAll('.people-directory-table tbody tr').length===2");
+    const names = await b.evaluate("[...document.querySelectorAll('.people-directory-table td.people-col-name')].map(x=>x.textContent.trim())");
+    assert.deepEqual(names, ['已转招募', '招募关联人物']);
+    assert.equal(await b.evaluate("document.querySelectorAll('.people-directory-table td.people-col-name .badge-stack').length"), 0);
     const sharedLabels = await b.evaluate(`(async()=>{
       const {t}=await import('/crm/js/modules/console/i18n.js');
       return [t('recruit'),t('badge_recruiting')];
