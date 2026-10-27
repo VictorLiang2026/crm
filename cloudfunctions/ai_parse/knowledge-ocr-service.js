@@ -24,7 +24,7 @@ function textOf(result){
   if(!text||text.length>100000||text.includes('\0'))fail('OCR_FAILED');
   return text;
 }
-function createKnowledgeOcr({rdb,generateText,assertOk,visionModel=process.env.VISION_MODEL}={}){
+function createKnowledgeOcr({rdb,generateText,assertOk,app,visionModel=process.env.VISION_MODEL}={}){
   if(!rdb||typeof generateText!=='function'||typeof assertOk!=='function')throw new Error('Invalid OCR configuration');
   async function imageText(fileName,contentType,base64){
     if(typeof visionModel!=='string'||!visionModel.trim())fail('VISION_MODEL_NOT_CONFIGURED');
@@ -36,15 +36,34 @@ function createKnowledgeOcr({rdb,generateText,assertOk,visionModel=process.env.V
     ]}],{timeout:60000,model:visionModel.trim()});
     return textOf(output);
   }
+  async function imageTextUrl(fileName,contentType,url){
+    if(typeof visionModel!=='string'||!visionModel.trim())fail('VISION_MODEL_NOT_CONFIGURED');
+    if(!imageMime(fileName)||imageMime(fileName)!==contentType||typeof url!=='string'||!/^https:\/\//i.test(url))fail('INVALID_IMAGE');
+    const prompt='请逐字识别图片中可见的文字，按原有顺序和段落输出。保留标题、列表、表格行列关系、日期、金额、数字和标点；无法辨认处标记为[无法辨认]。不要总结、推测或补写图片中没有的内容。';
+    const output=await generateText([{role:'user',content:[
+      {type:'image_url',image_url:{url,detail:'high'}},{type:'text',text:prompt},
+    ]}],{timeout:60000,model:visionModel.trim()});
+    return textOf(output);
+  }
   async function fromSource(sourceIdValue,uploadIdValue){
     const sourceId=String(sourceIdValue||''),uploadId=String(uploadIdValue||'');
     const numericSourceId=Number(sourceId);
     if(!/^[1-9][0-9]*$/.test(sourceId)||!Number.isSafeInteger(numericSourceId)||!UUID.test(uploadId))fail('INVALID_SOURCE');
+    const stored=await rdb.rpc('crm_knowledge_storage_ocr_input_v1',{
+      p_source_id:numericSourceId,p_upload_id:uploadId,
+    });
+    const storedSource=stored?.data;
+    if(storedSource?.storage_key){
+      if(!app?.storage?.from)fail('SOURCE_UNAVAILABLE');
+      const signed=await app.storage.from('knowledge').createSignedUrl(storedSource.storage_key,600);
+      if(signed?.error)fail('SOURCE_UNAVAILABLE');
+      const url=signed?.data?.fullSignedURL||signed?.data?.signedUrl;
+      return {sourceId,ocrText:await imageTextUrl(storedSource.file_name,storedSource.content_type,url)};
+    }
     const response=assertOk(await rdb.rpc('crm_knowledge_ocr_input_v1',{
       p_source_id:numericSourceId,p_upload_id:uploadId,
     }));
-    const data=response?.data;
-    const source=Array.isArray(data)?data[0]:data;
+    const data=response?.data,source=Array.isArray(data)?data[0]:data;
     if(!source?.file_name||!source?.content_type||!source?.original_base64)fail('SOURCE_UNAVAILABLE');
     return {sourceId,ocrText:await imageText(source.file_name,source.content_type,source.original_base64)};
   }
@@ -53,7 +72,7 @@ function createKnowledgeOcr({rdb,generateText,assertOk,visionModel=process.env.V
     const fileName=String(event?.fileName||''),contentType=String(event?.contentType||'');
     return {ocrText:await imageText(fileName,contentType,event?.base64)};
   }
-  return {run,imageText,fromSource};
+  return {run,imageText,imageTextUrl,fromSource};
 }
 
 module.exports={createKnowledgeOcr,decodeImage,MAX_BYTES};

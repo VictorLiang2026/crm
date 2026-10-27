@@ -4,7 +4,7 @@ import { t } from './i18n.js';
 import { data } from './data.js';
 
 const text=key=>t(`kg_${key}`);
-const UPLOAD_CHUNK_BYTES=768*1024;
+const MAX_SOURCE_FILE_BYTES=100_000_000;
 const CATEGORIES=['on_sale_product','existing_service','recruitment_policy','industry_development',
   'marketing_activity','legal_tax','health_wealth_sharing','top_performer_sharing','customer_case','recruitment_case',
   'conversation_strategy','objection_handling','company_information','other'];
@@ -17,10 +17,6 @@ const categoriesOf=row=>Array.isArray(row?.metadata?.categories)&&row.metadata.c
     :[LEGACY[row?.metadata?.domain]||(row?.table==='playbooks'?'conversation_strategy':'other')];
 const field=(key,control)=>h('label',{class:'kg-field'},[h('span',{},text(key)),control]);
 const todayLocal=()=>{const date=new Date();return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;};
-function bytesToBase64(bytes){let binary='';for(let offset=0;offset<bytes.length;offset+=0x8000)
-  binary+=String.fromCharCode(...bytes.subarray(offset,Math.min(offset+0x8000,bytes.length)));
-  return btoa(binary);}
-async function readFileChunk(file,start,end){return bytesToBase64(new Uint8Array(await file.slice(start,end).arrayBuffer()));}
 const textInput=(name,{value='',required=false,type='text',max=500,min=null,step=null,placeholder=''}={})=>h('input',
   {name,type,value,required,...(type==='number'?{max:String(max),...(min==null?{}:{min:String(min)}),...(step==null?{}:{step:String(step)})}:{maxlength:String(max)}),
     ...(placeholder?{placeholder:text(placeholder)}:{})});
@@ -58,23 +54,17 @@ export function renderKnowledgeEditor(ctx,{mode='new',table='knowledge_items',id
         const file=current.elements.file.files?.[0];
         if(!file)throw new Error(text('source_file_required'));
         if(!file.size)throw new Error(text('source_file_required'));
-        if(file.size>6*1024*1024)throw new Error(text('source_file_too_large'));
-        const initialized=await data.knowledgeLibrary(ctx,'uploadStart',{data:{...values,fileName:file.name,fileSizeBytes:file.size}});
+        if(file.size>MAX_SOURCE_FILE_BYTES)throw new Error(text('source_file_too_large'));
+        if(!ctx.knowledgeFiles)throw new Error(text('source_upload_failed'));
+        const initialized=await data.knowledgeLibrary(ctx,'uploadPrepare',{data:{...values,fileName:file.name,fileSizeBytes:file.size}});
         if(!initialized?.ok)throw new Error(initialized?.error?.code||text('source_upload_failed'));
         const session={sourceId:initialized.sourceId,uploadId:initialized.uploadId};let finalizing=false;
         try{
-          for(let index=0;index<initialized.chunkCount;index++){
-            const start=index*UPLOAD_CHUNK_BYTES,end=Math.min(file.size,start+UPLOAD_CHUNK_BYTES);
-            const chunkBase64=await readFileChunk(file,start,end);
-            let result,error;
-            for(let attempt=0;attempt<2;attempt++){
-              try{result=await data.knowledgeLibrary(ctx,'uploadChunk',{data:{...session,index,chunkBase64}});error=null;break;}
-              catch(caught){error=caught;}
-            }
-            if(error)throw error;
-            if(!result?.ok)throw new Error(result?.error?.code||text('source_upload_failed'));
-            formStatus.textContent=text('source_upload_progress').replace('{current}',String(index+1)).replace('{total}',String(initialized.chunkCount));
-          }
+          formStatus.textContent=text('source_upload_progress');
+          const stored=await ctx.knowledgeFiles.upload(initialized.storageKey,file,{
+            contentType:file.type||initialized.contentType||'application/octet-stream',upsert:false,
+          });
+          if(stored?.error)throw new Error(stored.error.message||text('source_upload_failed'));
           finalizing=true;
           const result=await data.knowledgeLibrary(ctx,'uploadFinalize',{data:session});
           if(!result?.ok){const code=result?.errorCode||result?.error?.code;

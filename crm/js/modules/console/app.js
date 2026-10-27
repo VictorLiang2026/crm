@@ -116,6 +116,9 @@ function route() {
       createSignedUrl: (path, expiresIn) => app.storage.from('recruit').createSignedUrl(path, expiresIn),
       remove: paths => app.storage.from('recruit').remove(paths),
     },
+    knowledgeFiles: {
+      upload: (path, file, options) => app.storage.from('knowledge').upload(path, file, options),
+    },
     operator: CONFIG.operator || {},
     toast,
     signOut: signOutCurrentAccount,

@@ -21,4 +21,6 @@ Gateway 使用 Registry 的 JSON Schema 在落库前校验输入和上下文，�
 
 审计写入失败时不调用模型或不重试已经完成的模型调用，也不返回成功。当前 CloudBase RDB 是多次独立请求，不能保证跨三表原子提交；网络故障可能留下 `running` 任务或尚未补全的 run。后续接入前需设计对账、幂等和授权调用入口。SDK 调用的本地超时不等于远端取消，实际计费以 CloudBase 返回为准。
 
-本阶段不向现有 26 个函数同步或部署 Gateway/Registry，不改现有 `db.js` / `ai.js` 与 `AI_MODEL` 行为。现有 shared 同步脚本仍只治理 `db.js`、`ai.js`。首个实际调用者出现时，应单独审查服务端 API Key 存放、RLS 身份、模型配额、函数超时、重试幂等、敏感快照、人工确认和业务回归，然后将 Gateway、Registry 和 `ajv` / `ajv-formats` 依赖加入明确受影响的函数并只部署该函数。当前环境的 Token Credits 只读预检返回空列表，本轮不进行真实模型调用。
+当前 `assistant` 与 `ai_activity` 函数目录各保留一份 Gateway 副本；`assistant` 用它处理人物摘要和知识库双建议，`ai_activity` 的既有调用仍保持原行为。共享副本 `_shared/ai-gateway.js` 与这两个副本必须保持一致。Gateway 的可选 `onStarted` 回调在任务和首个 run 审计创建后、模型请求前通知调用方任务 ID；未传回调时不改变同步调用行为。人物摘要和双建议通过 CloudBase 函数 callback 尽早返回任务 ID，再由已认证的 `assistant.aiTaskStatus` 读取 `public.ai_tasks` / `public.ai_results` 完成轮询。仅在这两个明确启用的异步请求上，使用非 async handler 并在 callback 前设 `context.callbackWaitsForEmptyEventLoop=false`，由 SCF 分离同步响应与后台异步工作；其他调用仍受支持并继续返回原 Promise。此流程复用现有表，不新增数据库对象，也不自动确认或执行建议。模型仍由 AI Gateway / CloudBase 配置决定，建议选择仍由用户完成。
+
+本接入的回归重点是 Gateway 副本一致、早返回与后台审计完成、状态查询按任务类型和 Person 限定、旧同步接口兼容，以及人物详情双建议交互。线上 AI 生成验证使用登记的虚构 Person 783；未执行真实客户写入。

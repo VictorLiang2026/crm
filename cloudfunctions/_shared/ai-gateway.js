@@ -337,6 +337,10 @@ function createAIGateway(options) {
         } else await markFailed(taskId);
         const failure = auditError(error); failure.taskId = taskId; throw failure;
       }
+      if (attempt === 1 && typeof request.onStarted === 'function') {
+        try { await request.onStarted({ taskId, runId }); }
+        catch (_) { console.error('AI_EARLY_RESPONSE_CALLBACK_FAILED'); }
+      }
       const started = process.hrtime.bigint();
       let response;
       let result;

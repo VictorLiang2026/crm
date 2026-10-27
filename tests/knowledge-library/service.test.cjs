@@ -7,7 +7,7 @@ test('knowledge source accepts only canonical base64 within the private file lim
   const bytes = Buffer.from('trusted source text', 'utf8');
   assert.deepEqual(decodeBase64(bytes.toString('base64')), bytes);
   assert.throws(() => decodeBase64('***'), error => error.code === 'INVALID_FILE');
-  assert.equal(MAX_FILE_BYTES, 6 * 1024 * 1024);
+  assert.equal(MAX_FILE_BYTES, 100_000_000);
   assert.throws(() => decodeBase64(Buffer.alloc(MAX_FILE_BYTES + 1).toString('base64')),
     error => ['INVALID_FILE','FILE_TOO_LARGE'].includes(error.code));
 });

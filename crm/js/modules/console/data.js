@@ -1,5 +1,7 @@
 // Console 数据层（WP1）：调用经 ctx.api（core/createApi：校验函数名、拒绝 pr_*）。
 // 仅封装当前页面所需的 CRM 云函数 action；业务写入仍由服务端作用域与预览执行边界控制。
+import { resolveAITask } from './ai-task-polling.mjs';
+
 async function call(ctx, name, params) {
   const res = await ctx.api.call(name, params || {});
   if (res == null || typeof res !== 'object') throw new Error('服务无响应');
@@ -13,6 +15,11 @@ async function call(ctx, name, params) {
 }
 
 const p360 = (ctx, action, extra) => call(ctx, 'person_360', { action, ...(extra || {}) });
+const aiTask = (ctx, startPayload, taskType, personId) => resolveAITask(
+  () => call(ctx, 'assistant', startPayload),
+  ({ taskId, personId: targetId, taskType: targetType }) => call(ctx, 'assistant', {
+    action: 'aiTaskStatus', taskId, personId: targetId, taskType: targetType,
+  }), taskType, personId);
 
 export const data = {
   // ---------- 今日 ----------
@@ -39,14 +46,15 @@ export const data = {
   aiSearch: (ctx, query) => call(ctx, 'assistant', { action: 'search', query }),
   aiSearchV2: (ctx, payload) => call(ctx, 'assistant', { action: 'searchV2', ...payload }),
   assistantReadTask: (ctx, payload) => call(ctx, 'assistant', { action: 'assistantReadTask', ...payload }),
-  summarizePerson: (ctx, personId) => call(ctx, 'assistant', { action: 'summarize', personId }),
+  summarizePerson: (ctx, personId) => aiTask(ctx, { action: 'summarize', personId, asyncWait: true }, 'person_summary', personId),
   meetingPrep: (ctx, personId) => call(ctx, 'assistant', { action: 'meetingPrep', personId }),
   conversationPlaybook: (ctx, personId, objection) => call(ctx, 'assistant', { action: 'conversationPlaybook', personId, objection }),
   conversationPlaybookHistory: (ctx, personId) => call(ctx, 'assistant', { action: 'conversationPlaybookHistory', personId }),
   personAIHistory: (ctx, personId) => call(ctx, 'assistant', { action: 'personAIHistory', personId }),
   knowledgeGovernance: (ctx) => p360(ctx, 'listKnowledgeGovernance'),
   knowledgeLibrary: (ctx, operation = 'list', payload = {}) => call(ctx, 'assistant', { action: 'knowledgeLibrary', operation, ...payload }),
-  dualFollowup: (ctx, payload) => call(ctx, 'assistant', { action: 'knowledgeLibrary', operation: 'dualGenerate', data: payload }),
+  dualFollowup: (ctx, payload) => aiTask(ctx, { action: 'knowledgeLibrary', operation: 'dualGenerate',
+    data: { ...payload, asyncWait: true } }, 'customer_followup_dual', payload?.personId),
   selectDualFollowup: (ctx, payload) => call(ctx, 'assistant', { action: 'knowledgeLibrary', operation: 'dualSelect', data: payload }),
   dualFollowupHistory: (ctx, personId) => call(ctx, 'assistant', { action: 'knowledgeLibrary', operation: 'dualHistory', personId }),
   saveKnowledgeGovernance: (ctx, payload) => p360(ctx, 'saveKnowledgeGovernance', { data: payload }),

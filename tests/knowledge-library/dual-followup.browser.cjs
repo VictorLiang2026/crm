@@ -13,7 +13,8 @@ test('dual follow-up auto-generates both recommendations from client context and
    const result={ok:true,taskId:'12',candidates:[{...common,id:'56',candidateType:'strategy_based'},
     {...common,id:'57',candidateType:'library_based',sourceRefs:[{id:'10',title:'Approved source',sourceDate:'2026-01-01',excerpt:'Verified company guidance'}],matchStatus:'matched'}]};
    const calls=[];const ctx={main:document.querySelector('.console-main'),api:{call:async(name,payload)=>{
-    calls.push({name,payload});if(payload.operation==='dualGenerate')return result;
+    calls.push({name,payload});if(payload.operation==='dualGenerate')return {ok:true,status:'pending',taskId:'12',personId:'42'};
+    if(payload.action==='aiTaskStatus')return {...result,status:'completed'};
     if(payload.operation==='dualHistory')return {ok:true,rows:[]};
     if(payload.operation==='dualSelect')return {ok:true,status:'selected'};
     throw Error('unexpected call');}}};
@@ -28,7 +29,7 @@ test('dual follow-up auto-generates both recommendations from client context and
   assert.match(pair.source,/Approved source/);
   assert.equal(pair.inputs,0);
   assert.deepEqual(pair.backgrounds,[pair.backgrounds[0],pair.backgrounds[0]]);
-  assert.deepEqual(pair.request,{personId:'42'});
+  assert.deepEqual(pair.request,{personId:'42',asyncWait:true});
   await b.evaluate("document.querySelectorAll('.df-candidate button')[1].click()");
   await b.wait("window.dfCalls.some(x=>x.payload.operation==='dualSelect')");
   const selected=await b.evaluate("window.dfCalls.filter(x=>x.payload.operation==='dualSelect').map(x=>x.payload.data.resultId)");

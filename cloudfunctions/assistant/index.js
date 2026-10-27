@@ -45,6 +45,24 @@ function aiExperienceInput(event) {
   return Object.fromEntries(allowed.filter(key=>Object.hasOwn(event,key)).map(key=>[key,event[key]]));
 }
 
+function createEarlyResponse(callback, context, continueInBackground) {
+  let sent = false;
+  return {
+    get sent() { return sent; },
+    send(value) {
+      if (sent || typeof callback !== 'function') return false;
+      if (continueInBackground && context && typeof context === 'object') {
+        context.callbackWaitsForEmptyEventLoop = false;
+      }
+      if (continueInBackground) console.log('AI_EARLY_CALLBACK_BEFORE_SEND',context?.callbackWaitsForEmptyEventLoop===false);
+      callback(null, value);
+      sent = true;
+      if (continueInBackground) console.log('AI_EARLY_CALLBACK_SENT');
+      return true;
+    },
+  };
+}
+
 function createMain(getIdentity, searchRunner = event => require('./search-service').runSearch(event),
   actionRunner = (event, uid) => require('./action-command-service').runActionCommand(event, uid),
   candidateRunner = (event, uid) => require('./opportunity-candidate-service').runOpportunityCandidate(event, uid),
@@ -56,8 +74,16 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
   opportunityCommandRunner = (event, uid) => require('./opportunity-command-service').runOpportunityCommand(event,uid),
   recruitDeleteIntentRunner = event => require('./recruit-delete-intent-service').interpretRecruitDelete(event),
   recruitDeleteTargetsRunner = (event,uid) => require('./recruit-delete-intent-service').listRecruitDeleteTargets(event,uid),
-  recruitDeleteCommandRunner = (event,uid) => require('./recruit-delete-command-service').runRecruitDeleteCommand(event,uid)) {
-  return async event => {
+  recruitDeleteCommandRunner = (event,uid) => require('./recruit-delete-command-service').runRecruitDeleteCommand(event,uid),
+  summaryRunner = (event, options) => require('./summarize-service').runSummarize(event, options),
+  knowledgeLibraryRunner = (event, uid, options) => require('./knowledge-library-service').handleKnowledgeLibrary(event, uid, options),
+  aiTaskStatusRunner = (event, uid) => {
+    if (event.taskType === 'person_summary') return require('./summarize-service').getSummaryTaskStatus(event);
+    if (event.taskType === 'customer_followup_dual') return require('./knowledge-library-service').handleKnowledgeLibrary(
+      { action: 'knowledgeLibrary', operation: 'dualStatus', data: event }, uid);
+    const error = new Error('Unsupported AI task type'); error.code = 'INVALID_INPUT'; throw error;
+  }) {
+  const run = async (event, context, callback, earlyResponse) => {
     let identity;
     try { identity = await getIdentity(); }
     catch (_) { return { ok: false, error: { code: 'UNAUTHORIZED', message: 'Login required' } }; }
@@ -263,9 +289,29 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
         return {ok:false,error:{code,message:'Assistant read task could not be completed'}};
       }
     }
+    if (event?.action === 'aiTaskStatus') {
+      try {
+        if (!['person_summary','customer_followup_dual'].includes(event.taskType)) {
+          return {ok:false,error:{code:'INVALID_INPUT',message:'AI task status request is invalid'}};
+        }
+        return await aiTaskStatusRunner({taskId:event.taskId,personId:event.personId,taskType:event.taskType},identity.uid);
+      } catch (error) {
+        const code=['INVALID_INPUT','NOT_FOUND','AI_AUDIT_UNKNOWN','PERSISTENCE_ERROR'].includes(error?.code)?error.code:'AI_TASK_STATUS_FAILED';
+        return {ok:false,error:{code,message:'AI task status could not be loaded'}};
+      }
+    }
     if (event?.action === 'summarize') {
-      try { return await require('./summarize-service').runSummarize(event); }
+      const asyncRequested=event.asyncWait===true&&typeof callback==='function';
+      try {
+        const result=await summaryRunner(event,{onStarted:asyncRequested?({taskId})=>{
+          console.log('AI_TASK_READY_TO_RETURN');
+          return earlyResponse.send({ok:true,status:'pending',taskId:String(taskId),personId:String(event.personId)});
+        }:undefined});
+        return earlyResponse.sent?undefined:result;
+      }
       catch (error) {
+        if(asyncRequested&&error?.code==='AI_IN_PROGRESS'&&error?.taskId){earlyResponse.send({ok:true,status:'pending',taskId:String(error.taskId),personId:String(event.personId)});return undefined;}
+        if(earlyResponse.sent){console.error('AI_BACKGROUND_FAILED',String(error?.code||'SUMMARY_FAILED'));return undefined;}
         const code = ['INVALID_INPUT', 'NOT_FOUND', 'INVALID_CONFIG', 'INVALID_RESULT',
           'RATE_LIMIT', 'TIMEOUT', 'UPSTREAM_UNAVAILABLE', 'PERSISTENCE_ERROR',
           'AI_IN_PROGRESS', 'AI_RETRY_LATER', 'AI_AUDIT_UNKNOWN',
@@ -324,14 +370,24 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
       }
     }
     if (event?.action === 'knowledgeLibrary') {
-      try { return await require('./knowledge-library-service').handleKnowledgeLibrary(event, identity.uid); }
+      const asyncRequested=event.operation==='dualGenerate'&&event.data?.asyncWait===true&&typeof callback==='function';
+      try {
+        const result=await knowledgeLibraryRunner(event,identity.uid,{onStarted:asyncRequested?({taskId})=>{
+          console.log('AI_TASK_READY_TO_RETURN');
+          return earlyResponse.send({ok:true,status:'pending',taskId:String(taskId),personId:String(event.data.personId)});
+        }:undefined});
+        return earlyResponse.sent?undefined:result;
+      }
       catch (error) {
+        if(asyncRequested&&error?.code==='AI_IN_PROGRESS'&&error?.taskId){earlyResponse.send({ok:true,status:'pending',taskId:String(error.taskId),personId:String(event.data.personId)});return undefined;}
+        if(earlyResponse.sent){console.error('AI_BACKGROUND_FAILED',String(error?.code||'KNOWLEDGE_LIBRARY_FAILED'));return undefined;}
         const code = ['INVALID_INPUT','INVALID_FILE','INVALID_CONTENT','UNSUPPORTED_TYPE','UNSUPPORTED_CONTENT',
             'FILE_TOO_LARGE','INVALID_FILE','INVALID_CONTENT','INVALID_IMAGE','INVALID_SOURCE',
             'UNSUPPORTED_TYPE','INVALID_INPUT','INVALID_CATEGORIES',
             'PERSONAL_DATA_DETECTED','SHARING_AUTHORIZATION_REQUIRED','SOURCE_METADATA_REQUIRED',
           'SOURCE_UNAVAILABLE','SOURCE_IN_USE','DRAFT_ALREADY_EXISTS','STALE_SOURCE','UPLOAD_INCOMPLETE',
           'UPLOAD_CHUNK_CONFLICT','UPLOAD_CHUNK_ORDER','OCR_FAILED','VISION_MODEL_NOT_CONFIGURED',
+          'STORAGE_FAILED','INVALID_ACTOR',
           'NOT_FOUND','INVALID_OPERATION','PERSISTENCE_ERROR',
           'PERMISSION_DENIED','DUPLICATE_SOURCE','AI_IN_PROGRESS','AI_RETRY_LATER','AI_AUDIT_UNKNOWN',
           'INVALID_RESULT','INVALID_CONFIG','TIMEOUT','UPSTREAM_UNAVAILABLE','AI_REQUEST_FAILED'].includes(error?.code)
@@ -347,6 +403,25 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
       }
       return { ok: false, error: { code: 'ROUTING_ERROR', message: 'Routing failed' } };
     }
+  };
+  return (event, context, callback) => {
+    const asyncRequested = typeof callback === 'function' &&
+      ((event?.action === 'summarize' && event.asyncWait === true) ||
+       (event?.action === 'knowledgeLibrary' && event.operation === 'dualGenerate' && event.data?.asyncWait === true));
+    const earlyResponse = createEarlyResponse(callback, context, asyncRequested);
+    if (asyncRequested) console.log('AI_ASYNC_CALLBACK_MODE');
+    const work = run(event, context, callback, earlyResponse);
+    if (!asyncRequested) return work;
+    // SCF callback responses must use a non-async handler. Disable event-loop
+    // waiting before the callback so SCF returns now and continues this async work.
+    work.then(result => {
+      if (!earlyResponse.sent) earlyResponse.send(result);
+    }, error => {
+      if (!earlyResponse.sent) earlyResponse.send({ok:false,error:{code:'AI_BACKGROUND_FAILED',
+        message:'AI request could not be completed'}});
+      else console.error('AI_BACKGROUND_FAILED',String(error?.code||'ASSISTANT_FAILED'));
+    });
+    return undefined;
   };
 }
 

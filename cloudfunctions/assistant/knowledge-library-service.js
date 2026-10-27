@@ -6,7 +6,9 @@ const { inflateRawSync } = require('node:zlib');
 const { createAIGateway } = require('./ai-gateway');
 const { createSearchData } = require('./search-data');
 
-const MAX_FILE_BYTES = 6 * 1024 * 1024;
+const MAX_FILE_BYTES = 100_000_000;
+const LEGACY_MAX_FILE_BYTES = 6 * 1024 * 1024;
+const KNOWLEDGE_BUCKET = 'knowledge';
 const UPLOAD_CHUNK_BYTES = 768 * 1024;
 const MAX_TEXT_CHARS = 100000;
 const CATEGORIES = Object.freeze(['on_sale_product','existing_service','recruitment_policy','industry_development',
@@ -227,6 +229,32 @@ function createKnowledgeLibrary(options={}) {
       const text=await response.text(); return text?JSON.parse(text):[];
     } finally { clearTimeout(timer); }
   }
+  async function storageRequest(objectKey,method='GET') {
+    const safeKey=String(objectKey||'').split('/').map(part=>encodeURIComponent(part)).join('/');
+    if(!safeKey||objectKey.split('/').some(part=>!part||part==='.'||part==='..'))fail('SOURCE_UNAVAILABLE');
+    const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),120000);
+    try {
+      const response=await fetchImpl(`https://${env}.api.tcloudbasegateway.com/v1/storages/object/${KNOWLEDGE_BUCKET}/${safeKey}`,{
+        method,headers:{Authorization:`Bearer ${key}`},signal:controller.signal});
+      if(method==='DELETE'&&(response.ok||response.status===404))return true;
+      if(!response.ok)fail(response.status===404?'SOURCE_UNAVAILABLE':'STORAGE_FAILED');
+      if(method==='HEAD')return {size:Number(response.headers.get('content-length')||0),contentType:response.headers.get('content-type')||null};
+      const declaredSize=Number(response.headers.get('content-length')||0);
+      if(declaredSize>MAX_FILE_BYTES)fail('FILE_TOO_LARGE');
+      const bytes=Buffer.from(await response.arrayBuffer());
+      if(!bytes.length||bytes.length>MAX_FILE_BYTES)fail('FILE_TOO_LARGE');
+      return bytes;
+    } catch(error) {
+      if(error?.code)throw error;
+      fail('STORAGE_FAILED');
+    } finally {clearTimeout(timer);}
+  }
+  async function sourceBytes(source) {
+    if(typeof source?.original_base64==='string'&&source.original_base64)return decodeBase64(source.original_base64);
+    const path=String(source?.storage_key||'');
+    if(!path||path.startsWith('pg-private://'))fail('SOURCE_UNAVAILABLE');
+    return storageRequest(path,'GET');
+  }
   async function sourceRows() {
     const rows=await request('knowledge_sources','GET',{select:'id,domain,title,publisher,source_uri,published_at,review_at,file_name,file_size_bytes,sha256,extraction_status,lifecycle_status,version_no,created_at,updated_at,deleted_at,metadata',deleted_at:'is.null',order:'updated_at.desc,id.desc',limit:200});
     return rows.filter(row=>row.metadata?.upload?.phase!=='receiving');
@@ -328,13 +356,12 @@ function createKnowledgeLibrary(options={}) {
     for (const key of ['publishedAt','reviewAt']) if (!validDate(input[key])) fail('INVALID_INPUT');
     if (sourceUri && !/^https:\/\//i.test(sourceUri)) fail('INVALID_INPUT');
     const publishedAt=input.publishedAt||todayShanghai();
-    if (categories.includes('legal_tax') && (!sourceUri || !publishedAt)) fail('SOURCE_METADATA_REQUIRED');
-    if (categories.includes('industry_development') && (!sourceUri || !publishedAt)) fail('SOURCE_METADATA_REQUIRED');
     return {domain,categories,title,publisher,sourceUri,publishedAt,
       reviewAt:input.reviewAt||null,fileName,contentType};
   }
   async function extractToDraft(source,base64,actor,preparedText=null) {
-    const bytes=decodeBase64(base64),text=preparedText||await extractText(source.file_name,source.content_type,bytes);
+    const text=preparedText||await extractText(source.file_name,source.content_type,await sourceBytes(source),
+      {app:client,sourceId:source.id,uploadId:source.metadata?.upload?.upload_id});
     if(Array.isArray(source.metadata?.categories)&&source.metadata.categories.includes('top_performer_sharing')&&likelySensitive(text)) fail('PERSONAL_DATA_DETECTED');
     const database=searchDataFactory({env,key,fetchImpl});
     const gateway=gatewayFactory({app:client,rdb:database.auditRdb,timeoutMs:60000,maxAttempts:1,
@@ -370,7 +397,7 @@ function createKnowledgeLibrary(options={}) {
   }
   async function uploadStart(input,actorValue) {
     const actor=actorUid(actorValue),meta=fields(input),fileSizeBytes=Number(input.fileSizeBytes);
-    if(!Number.isSafeInteger(fileSizeBytes)||fileSizeBytes<1||fileSizeBytes>MAX_FILE_BYTES)fail('FILE_TOO_LARGE');
+    if(!Number.isSafeInteger(fileSizeBytes)||fileSizeBytes<1||fileSizeBytes>LEGACY_MAX_FILE_BYTES)fail('FILE_TOO_LARGE');
     const uploadId=randomUUID(),placeholderDigest=createHash('sha256').update(`knowledge-upload:${uploadId}`).digest('hex');
     const upload={upload_id:uploadId,phase:'receiving',file_size_bytes:fileSizeBytes,
       chunk_count:Math.ceil(fileSizeBytes/UPLOAD_CHUNK_BYTES),next_chunk:0,chunk_hashes:[]};
@@ -383,6 +410,24 @@ function createKnowledgeLibrary(options={}) {
     const rows=await request('knowledge_sources','POST',{select:'id,updated_at'},[payload]);
     if(!rows?.[0]?.id)fail('PERSISTENCE_ERROR');
     return {ok:true,sourceId:String(rows[0].id),uploadId,chunkSize:UPLOAD_CHUNK_BYTES,chunkCount:upload.chunk_count};
+  }
+  async function uploadPrepare(input,actorValue) {
+    const actor=actorUid(actorValue),meta=fields(input),fileSizeBytes=Number(input.fileSizeBytes);
+    if(!/^[A-Za-z0-9_-]{1,128}$/.test(actor))fail('INVALID_ACTOR');
+    if(!Number.isSafeInteger(fileSizeBytes)||fileSizeBytes<1||fileSizeBytes>MAX_FILE_BYTES)fail('FILE_TOO_LARGE');
+    const uploadId=randomUUID(),placeholderDigest=createHash('sha256').update(`knowledge-upload:${uploadId}`).digest('hex');
+    const fileName=meta.fileName.replace(/[\\/\u0000-\u001f]/g,'_').replace(/^\.+/,'_');
+    const storageKey=`${actor}/${uploadId}/${fileName}`;
+    const upload={upload_id:uploadId,phase:'receiving',file_size_bytes:fileSizeBytes,storage_bucket:KNOWLEDGE_BUCKET};
+    const rows=await request('knowledge_sources','POST',{select:'id,updated_at'},[{
+      domain:meta.domain,title:meta.title,publisher:meta.publisher,source_uri:meta.sourceUri,
+      published_at:meta.publishedAt,valid_from:null,valid_to:null,review_at:meta.reviewAt,
+      storage_key:storageKey,file_name:meta.fileName,content_type:meta.contentType,file_size_bytes:fileSizeBytes,
+      sha256:placeholderDigest,extraction_status:'queued',lifecycle_status:'draft',version_no:1,
+      created_by:actor,updated_by:actor,metadata:{categories:meta.categories,upload},original_base64:null,
+    }]);
+    if(!rows?.[0]?.id)fail('PERSISTENCE_ERROR');
+    return {ok:true,sourceId:String(rows[0].id),uploadId,storageBucket:KNOWLEDGE_BUCKET,storageKey,contentType:meta.contentType};
   }
   async function uploadChunk(input,actorValue) {
     const actor=actorUid(actorValue),sourceId=String(input?.sourceId||''),uploadId=String(input?.uploadId||''),index=Number(input?.index);
@@ -412,6 +457,39 @@ function createKnowledgeLibrary(options={}) {
     const source=rows[0],state=source?.metadata?.upload;
     if(!source||state?.upload_id!==uploadId)fail('SOURCE_UNAVAILABLE');
     if(state.phase==='complete')return {ok:true,sourceId,extractionStatus:source.extraction_status};
+    if(state.storage_bucket===KNOWLEDGE_BUCKET&&state.phase==='receiving') {
+      const bytes=await storageRequest(source.storage_key,'GET');
+      if(bytes.length!==Number(state.file_size_bytes)||bytes.length!==Number(source.file_size_bytes))fail('INVALID_FILE');
+      const digest=createHash('sha256').update(bytes).digest('hex');
+      const existing=await request('knowledge_sources','GET',{select:'id,extraction_status',sha256:`eq.${digest}`,id:`neq.${sourceId}`,limit:1});
+      if(existing.length){
+        await storageRequest(source.storage_key,'DELETE').catch(()=>{});
+        await request('knowledge_sources','DELETE',{id:`eq.${sourceId}`,created_by:`eq.${actor}`,deleted_at:'is.null'});
+        return {ok:true,duplicate:true,sourceId:String(existing[0].id),extractionStatus:existing[0].extraction_status};
+      }
+      const upload={...state,phase:'complete'};
+      const prepared={...source,sha256:digest,metadata:{...source.metadata,upload}};
+      const marked=await request('knowledge_sources','PATCH',{select:'id,updated_at',id:`eq.${sourceId}`,
+        updated_at:`eq.${source.updated_at}`,created_by:`eq.${actor}`},
+        {sha256:digest,metadata:prepared.metadata,extraction_status:'extracting',updated_at:new Date().toISOString(),updated_by:actor},
+        {timeoutMs:30000});
+      if(marked.length!==1)fail('STALE_SOURCE');
+      prepared.updated_at=marked[0].updated_at;prepared.extraction_status='extracting';
+      try {
+        const extractedText=await extractText(source.file_name,source.content_type,bytes,{app:client,sourceId,uploadId});
+        if((source.metadata?.categories||[]).includes('top_performer_sharing')&&likelySensitive(extractedText))fail('PERSONAL_DATA_DETECTED');
+        return {ok:true,...await extractToDraft(prepared,null,actor,extractedText),extractionStatus:'verified'};
+      } catch(error) {
+        if(error.code==='PERSONAL_DATA_DETECTED') {
+          await storageRequest(source.storage_key,'DELETE').catch(()=>{});
+          await request('knowledge_sources','DELETE',{id:`eq.${sourceId}`,created_by:`eq.${actor}`,deleted_at:'is.null'}).catch(()=>{});
+          return {ok:false,sourceId,extractionStatus:'rejected',errorCode:error.code};
+        }
+        await request('knowledge_sources','PATCH',{id:`eq.${sourceId}`,created_by:`eq.${actor}`,deleted_at:'is.null'},
+          {extraction_status:'failed',updated_at:new Date().toISOString(),updated_by:actor},{timeoutMs:30000}).catch(()=>{});
+        return {ok:false,sourceId,extractionStatus:'failed',errorCode:error.code||'EXTRACTION_FAILED'};
+      }
+    }
     if(state.phase!=='receiving'||Number(state.next_chunk)!==Number(state.chunk_count))fail('UPLOAD_INCOMPLETE');
     const bytes=decodeBase64(source.original_base64);
     if(bytes.length!==Number(state.file_size_bytes)||bytes.length!==Number(source.file_size_bytes))fail('INVALID_FILE');
@@ -452,6 +530,8 @@ function createKnowledgeLibrary(options={}) {
     if(!source||source.created_by!==actor||source.metadata?.upload?.upload_id!==uploadId||source.metadata?.upload?.phase!=='receiving')return {ok:true};
     const linked=await request('knowledge_items','GET',{select:'id',source_id:`eq.${sourceId}`,limit:1});
     if(linked.length)fail('SOURCE_IN_USE');
+    if(source.metadata?.upload?.storage_bucket===KNOWLEDGE_BUCKET&&source.storage_key)
+      await storageRequest(source.storage_key,'DELETE').catch(()=>{});
     await request('knowledge_sources','DELETE',{id:`eq.${sourceId}`,created_by:`eq.${actor}`,deleted_at:'is.null'});
     return {ok:true};
   }
@@ -483,13 +563,13 @@ function createKnowledgeLibrary(options={}) {
     const actor=actorUid(actorValue),sourceId=String(sourceIdValue||'');
     if(!positiveId(sourceId))fail('INVALID_INPUT');
     const rows=await request('knowledge_sources','GET',{select:'*',id:`eq.${sourceId}`,deleted_at:'is.null',limit:1});
-    if(!rows.length||!rows[0].original_base64)fail('SOURCE_UNAVAILABLE');
+    if(!rows.length||(!rows[0].original_base64&&!rows[0].storage_key))fail('SOURCE_UNAVAILABLE');
     const items=await request('knowledge_items','GET',{select:'id',source_id:`eq.${sourceId}`,limit:1});
     if(items.length)fail('DRAFT_ALREADY_EXISTS');
     const source=rows[0];
     const extracting=(await request('knowledge_sources','PATCH',{select:'id,updated_at',id:`eq.${sourceId}`},
       {extraction_status:'extracting',updated_at:new Date().toISOString(),updated_by:actor}))[0];
-    try {const text=await extractText(source.file_name,source.content_type,decodeBase64(source.original_base64),{app:client,sourceId});
+    try {const bytes=await sourceBytes(source);const text=await extractText(source.file_name,source.content_type,bytes,{app:client,sourceId,uploadId:source.metadata?.upload?.upload_id});
       return {ok:true,...await extractToDraft({...source,extraction_status:'extracting',updated_at:extracting?.updated_at},source.original_base64,actor,text),extractionStatus:'verified'};}
     catch(error){await request('knowledge_sources','PATCH',{id:`eq.${sourceId}`},{extraction_status:'failed',updated_at:new Date().toISOString(),updated_by:actor}).catch(()=>{});throw error;}
   }
@@ -499,7 +579,6 @@ function createKnowledgeLibrary(options={}) {
     if(action==='verify') {
       const rows=await request('knowledge_sources','GET',{select:'id,domain,source_uri,published_at,metadata,updated_at,extraction_status,lifecycle_status',id:`eq.${sourceId}`,limit:1});
       const source=rows[0]; if(!source||source.extraction_status!=='draft'||source.lifecycle_status!=='draft'||source.updated_at!==input.expectedUpdatedAt)fail('STALE_SOURCE');
-      if(['industry','legal_tax'].includes(source.domain)&&(!source.source_uri||!source.published_at))fail('SOURCE_METADATA_REQUIRED');
     }
     const data=searchDataFactory({env,key,fetchImpl});
     const result=await data.auditRdb.rpc('crm_knowledge_source_review_v1',{p_actor_uid:actor,p_source_id:Number(sourceId),
@@ -595,7 +674,7 @@ function createKnowledgeLibrary(options={}) {
     }
     return {refs,allowed};
   }
-  async function runDual(input,actorValue) {
+  async function runDual(input,actorValue,options={}) {
     const actor=actorUid(actorValue),personId=String(input?.personId||'').trim();
     if(!positiveId(personId))fail('INVALID_INPUT');
     const personResponse=await callFunction({name:'person_360',data:{action:'getMeetingPrepContext',personId}});
@@ -622,7 +701,8 @@ function createKnowledgeLibrary(options={}) {
       actorResolver:async()=>({uid:actor,isAnonymous:false})});
     const task=await gateway.runAITask({taskType:'customer_followup_dual',skill:'dual_followup',capability:'coaching',
       subjectType:'person',subjectId:personId,input:{personId},context,
-      contextSnapshot:{...context,_context:{recipe:'dual_followup',version:'1.1.0',source:'assistant.knowledge-library-service'}}});
+      contextSnapshot:{...context,_context:{recipe:'dual_followup',version:'1.1.0',source:'assistant.knowledge-library-service'}},
+      ...(typeof options.onStarted==='function'?{onStarted:options.onStarted}:{})});
     let candidates=task.result?.candidates;
     let results=[];
     if(task.reused){
@@ -651,6 +731,38 @@ function createKnowledgeLibrary(options={}) {
       selectionNotice:'选择仅表示采用此建议作为工作参考，不表示已经联系客户或执行任何业务动作。',
       execution:{modelCalled:!task.reused,businessDataRead:true,businessDataWritten:false}};
   }
+  async function dualStatus(input) {
+    const taskId=String(input?.taskId||'').trim(),personId=String(input?.personId||'').trim();
+    if(!positiveId(taskId)||!positiveId(personId))fail('INVALID_INPUT');
+    const tasks=await request('ai_tasks','GET',{select:'id,task_type,status,subject_type,subject_id,context_snapshot',
+      id:`eq.${taskId}`,task_type:'eq.customer_followup_dual',subject_type:'eq.person',subject_id:`eq.${personId}`,limit:1});
+    const task=tasks[0];if(!task)fail('NOT_FOUND');
+    if(task.status==='failed')return {ok:false,status:'failed',taskId,error:{code:'AI_REQUEST_FAILED'}};
+    if(task.status!=='completed')return {ok:true,status:'pending',taskId};
+    const rows=await request('ai_results','GET',{select:'id,task_id,run_id,result_json,rank,user_selected,user_edited,final_result_json',
+      task_id:`eq.${taskId}`,order:'rank.asc,id.asc',limit:2});
+    if(rows.length!==2)fail('AI_AUDIT_UNKNOWN');
+    const snapshot=task.context_snapshot||{},byKind=new Map();
+    for(const row of rows){
+      const value=row.user_selected&&row.final_result_json?row.final_result_json:row.result_json;
+      const kind=value?.candidateType,sourceKey=kind==='strategy_based'?'strategy_sources':kind==='library_based'?'library_sources':null;
+      if(!sourceKey||byKind.has(kind))fail('INVALID_RESULT');
+      const allowed=new Map((Array.isArray(snapshot[sourceKey])?snapshot[sourceKey]:[])
+        .filter(ref=>ref&&positiveId(ref.id)).map(ref=>[String(ref.id),ref]));
+      const refs=Array.isArray(value.sourceRefs)?value.sourceRefs.map(ref=>String(typeof ref==='object'?ref?.id:ref))
+        .filter(id=>allowed.has(id)).map(id=>allowed.get(id)):[];
+      const clean={...value,sourceRefs:refs,matchStatus:refs.length?'matched':'no_matching_sources'};
+      if(!refs.length)clean.boundaryNotes=[...(Array.isArray(clean.boundaryNotes)?clean.boundaryNotes:[]),
+        '当前没有可用的匹配引用；请先核实信息，不要把推断当成公司资料或行业事实。'];
+      byKind.set(kind,{...clean,id:String(row.id),rank:row.rank||1,userSelected:row.user_selected===true,
+        userEdited:row.user_edited===true,finalResult:row.final_result_json||null});
+    }
+    if(byKind.size!==2||!byKind.has('strategy_based')||!byKind.has('library_based'))fail('INVALID_RESULT');
+    return {ok:true,status:'completed',personId,taskId,runId:String(rows[0].run_id||''),reused:false,
+      candidates:['strategy_based','library_based'].map(kind=>byKind.get(kind)),
+      selectionNotice:'选择仅表示采用此建议作为工作参考，不表示已经联系客户或执行任何业务动作。',
+      execution:{modelCalled:true,businessDataRead:true,businessDataWritten:false}};
+  }
   async function selectDual(input,actorValue) {
     const actor=actorUid(actorValue),taskId=String(input?.taskId||''),resultId=String(input?.resultId||'');
     if(!positiveId(taskId)||!positiveId(resultId))fail('INVALID_INPUT');
@@ -675,13 +787,14 @@ function createKnowledgeLibrary(options={}) {
         candidate:row.user_selected&&row.final_result_json?row.final_result_json:row.result_json,
         userSelected:row.user_selected,userEdited:row.user_edited}))})).filter(row=>row.candidates.length===2)};
   }
-  async function run(event,actor) {
+  async function run(event,actor,options={}) {
     switch(event?.operation){
       case 'list':return list();
       case 'trashList':return trashList();
       case 'save':return saveKnowledge(event.data,actor);
       case 'upload':return upload(event.data,actor);
       case 'uploadStart':return uploadStart(event.data,actor);
+      case 'uploadPrepare':return uploadPrepare(event.data,actor);
       case 'uploadChunk':return uploadChunk(event.data,actor);
       case 'uploadFinalize':return uploadFinalize(event.data,actor);
       case 'uploadCancel':return uploadCancel(event.data,actor);
@@ -690,14 +803,17 @@ function createKnowledgeLibrary(options={}) {
       case 'setValidity':return setValidity(event.data,actor);
       case 'delete':return softDelete(event.data,actor);
       case 'restore':return restore(event.data,actor);
-      case 'dualGenerate':return runDual(event.data,actor);
+      case 'dualGenerate':return runDual(event.data,actor,options);
+      case 'dualStatus':return dualStatus(event.data);
       case 'dualSelect':return selectDual(event.data,actor);
       case 'dualHistory':return history(event.personId);
       default:fail('INVALID_OPERATION');
     }
   }
-  return {run,upload,uploadStart,uploadChunk,uploadFinalize,uploadCancel,extractText,list,runDual,selectDual,history};
+  return {run,upload,uploadStart,uploadPrepare,uploadChunk,uploadFinalize,uploadCancel,extractText,list,runDual,dualStatus,selectDual,history};
 }
 
-async function handleKnowledgeLibrary(event,actor) { return createKnowledgeLibrary().run(event,actor); }
+async function handleKnowledgeLibrary(event,actor,options={}) {
+  return createKnowledgeLibrary().run(event,actor,options);
+}
 module.exports={createKnowledgeLibrary,handleKnowledgeLibrary,extractDocx,extractPptx,extractXlsx,extractText,decodeBase64,likelySensitive,MAX_FILE_BYTES,UPLOAD_CHUNK_BYTES};

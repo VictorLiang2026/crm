@@ -21,6 +21,23 @@ test('existing ai_parse OCR route reads a staged source with its capability and 
   assert.match(generation.messages[0].content[1].text,/逐字识别/);
 });
 
+test('storage-backed OCR signs the private object server-side without sending file bytes through callFunction',async()=>{
+  const calls=[],generation=[];
+  const service=createKnowledgeOcr({app:{storage:{from:bucket=>({createSignedUrl:async(key,expires)=>{
+    calls.push({bucket,key,expires});return {data:{fullSignedURL:'https://storage.example/signed/object'},error:null};
+  }})}},rdb:{rpc:async(name,args)=>{calls.push({name,args});return {data:{file_name:'source.png',content_type:'image/png',
+    storage_key:'operator-1/01234567-89ab-4cde-8fab-0123456789ab/source.png',file_size_bytes:68},error:null};}},
+    assertOk:r=>r,visionModel:'configured-vision-model',generateText:async(messages,options)=>{
+      generation.push({messages,options});return {text:'识别结果'};
+    }});
+  const result=await service.run({action:'ocr_knowledge_source',sourceId:'17',uploadId:'01234567-89ab-4cde-8fab-0123456789ab'});
+  assert.deepEqual(result,{sourceId:'17',ocrText:'识别结果'});
+  assert.equal(calls[0].name,'crm_knowledge_storage_ocr_input_v1');
+  assert.deepEqual(calls[1],{bucket:'knowledge',key:'operator-1/01234567-89ab-4cde-8fab-0123456789ab/source.png',expires:600});
+  assert.equal(generation[0].messages[0].content[0].image_url.url,'https://storage.example/signed/object');
+  assert.equal(generation[0].options.model,'configured-vision-model');
+});
+
 test('invalid source capabilities are rejected before database or model access',async()=>{
   let reads=0,calls=0;
   const service=createKnowledgeOcr({rdb:{rpc:async()=>{reads++;return {data:[],error:null};}},
@@ -45,14 +62,18 @@ test('OCR removes only the model answer wrapper while preserving recognized text
     {ocrText:'OCR SYNTHETIC 123'});
 });
 
-test('migration exposes only an upload-token-gated image read to the function anon role',()=>{
-  const file=path.join(__dirname,'../../cloudbase/migrations/20261027181000_knowledge_ocr_input.sql');
+test('storage OCR lookup is private and upload-token gated',()=>{
+  const file=path.join(__dirname,'../../cloudbase/migrations/20261028150000_knowledge_private_storage.sql');
   const sql=fs.readFileSync(file,'utf8');
   assert.match(sql,/public\.knowledge_sources/);
-  assert.match(sql,/SECURITY DEFINER\s+SET search_path = pg_catalog/i);
-  assert.match(sql,/metadata->'upload'->>'upload_id' = p_upload_id::text/);
-  assert.match(sql,/s\.extraction_status = 'extracting'/);
+  assert.match(sql,/storage\.buckets/);
+  assert.match(sql,/file_size_limit,allowed_mime_types/);
+  assert.match(sql,/CREATE POLICY knowledge_objects_select_own/);
+  assert.match(sql,/storage\.foldername\(name\)\)\[1\]=auth\.uid\(\)/);
+  assert.match(sql,/SECURITY DEFINER\s+SET search_path\s*=\s*pg_catalog/i);
+  assert.match(sql,/metadata->'upload'->>'upload_id'=p_upload_id::text/);
+  assert.match(sql,/s\.extraction_status='extracting'/);
   assert.match(sql,/s\.content_type IN \('image\/png','image\/jpeg','image\/webp'\)/);
-  assert.match(sql,/REVOKE ALL ON FUNCTION public\.crm_knowledge_ocr_input_v1\(bigint,uuid\)\s+FROM PUBLIC, anon, authenticated, service_role/);
-  assert.match(sql,/GRANT EXECUTE ON FUNCTION public\.crm_knowledge_ocr_input_v1\(bigint,uuid\) TO anon/);
+  assert.match(sql,/REVOKE ALL ON FUNCTION public\.crm_knowledge_storage_ocr_input_v1\(bigint,uuid\)\s+FROM PUBLIC,anon,authenticated/);
+  assert.match(sql,/GRANT EXECUTE ON FUNCTION public\.crm_knowledge_storage_ocr_input_v1\(bigint,uuid\) TO service_role/);
 });

@@ -16,9 +16,9 @@ const envId = 'crm-d1gkae8ddc930d151';
 const nonce = crypto.randomBytes(24).toString('hex');
 const dual = process.argv.includes('--dual');
 const playbook = process.argv.includes('--playbook');
-const payload = dual ? { action: 'knowledgeLibrary', operation: 'dualGenerate', data: { personId: '783' } } : playbook ? { action: 'conversationPlaybook', personId: '783',
+const payload = dual ? { action: 'knowledgeLibrary', operation: 'dualGenerate', data: { personId: '783', asyncWait: true } } : playbook ? { action: 'conversationPlaybook', personId: '783',
   objection: '【系统测试·勿联系】我想先理解保障内容，再决定是否继续。' } :
-  { action: 'summarize', personId: '783' };
+  { action: 'summarize', personId: '783', asyncWait: true };
 const reportFile = path.join(root, dual ? 'tests/security/.results/pc33-live-dual.json' : playbook ?
   'tests/security/.results/pc33-live-playbook.json' : 'tests/security/.results/pc33-live-model.json');
 async function probe(nonce, payload, runRepeat) {
@@ -31,8 +31,18 @@ async function probe(nonce, payload, runRepeat) {
     if (session?.error || !session?.data?.session) throw Error('NO_SESSION');
     report.login = 'PASS';
     document.getElementById('view').textContent = '正在对“【系统测试·勿联系】虚构体验甲”调用已配置的 AI 模型，仅生成建议，不写业务数据。';
-    const first = await Promise.race([callFn('assistant', payload),
-      new Promise((_, reject) => setTimeout(() => reject(Error('LOCAL_TIMEOUT')), 95000))]);
+    async function resolveTask(started) {
+      if(started?.status!=='pending')return started;
+      const taskType=dual?'customer_followup_dual':'person_summary',deadline=Date.now()+100000;
+      while(Date.now()<deadline){
+        await new Promise(resolve=>setTimeout(resolve,2000));
+        const status=await callFn('assistant',{action:'aiTaskStatus',taskId:started.taskId,personId:'783',taskType});
+        if(status?.status==='completed'||status?.status==='failed')return status;
+        if(status?.status!=='pending')return status;
+      }
+      throw Error('LOCAL_TIMEOUT');
+    }
+    const first = await resolveTask(await callFn('assistant', payload));
     const validDual = dual && first?.ok === true && Number.isSafeInteger(Number(first.taskId)) &&
       Array.isArray(first.candidates) && first.candidates.length === 2 &&
       first.candidates.map(item => item?.candidateType).sort().join(',') === 'library_based,strategy_based' &&
@@ -45,8 +55,7 @@ async function probe(nonce, payload, runRepeat) {
       report.taskId = Number(first.taskId);
       report.resultId = Number(dual ? first.candidates[0].id : first.resultId);
       if (runRepeat) {
-        const repeat = await Promise.race([callFn('assistant', payload),
-          new Promise((_, reject) => setTimeout(() => reject(Error('LOCAL_TIMEOUT')), 95000))]);
+        const repeat = await resolveTask(await callFn('assistant', payload));
         report.sameTask = Number(repeat?.taskId) === report.taskId;
         report.sameResult = Number(repeat?.resultId) === report.resultId;
         report.repeat = repeat?.ok === true && report.sameTask && report.sameResult ? 'PASS' :

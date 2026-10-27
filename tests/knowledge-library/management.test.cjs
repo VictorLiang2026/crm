@@ -157,3 +157,56 @@ test('staged upload rejects files larger than 6 MiB before creating a source rec
   await assert.rejects(service.uploadStart({categories:['on_sale_product'],title:'Too big',fileName:'source.png',
     fileSizeBytes:6*1024*1024+1},'operator-1'),error=>error.code==='FILE_TOO_LARGE');
 });
+
+test('private storage upload accepts an attached industry source without a public URL and extracts it',async()=>{
+  const rows={knowledge_sources:[],knowledge_items:[]};let nextId=1,storageUrl=null;
+  const bytes=Buffer.from('行业经验资料：客户需求先于产品介绍。','utf8');
+  const fetchImpl=async(url,options={})=>{
+    const parsed=new URL(url),path=parsed.pathname,table=path.split('/').pop(),method=options.method||'GET',params=parsed.searchParams;
+    if(path.includes('/v1/storages/object/knowledge/')){
+      storageUrl=path;
+      return {ok:true,status:200,headers:{get:name=>name.toLowerCase()==='content-length'?String(bytes.length):'text/markdown'},
+        arrayBuffer:async()=>bytes};
+    }
+    if(method==='GET'){
+      let found=[...(rows[table]||[])];
+      for(const [key,value] of params){
+        if(key==='select'||key==='limit')continue;
+        if(value==='is.null')found=found.filter(row=>row[key]==null);
+        else if(value.startsWith('eq.'))found=found.filter(row=>String(row[key])===value.slice(3));
+        else if(value.startsWith('neq.'))found=found.filter(row=>String(row[key])!==value.slice(4));
+      }
+      return response(found.slice(0,Number(params.get('limit')||found.length)));
+    }
+    if(method==='POST'){
+      const payload=JSON.parse(options.body),created=(Array.isArray(payload)?payload:[payload]).map(row=>({...row,id:nextId++,updated_at:new Date().toISOString()}));
+      rows[table].push(...created);return response(created);
+    }
+    if(method==='PATCH'){
+      const found=(rows[table]||[]).filter(row=>!params.has('id')||String(row.id)===params.get('id').slice(3));
+      const payload=JSON.parse(options.body);for(const row of found)Object.assign(row,payload);
+      return response(found);
+    }
+    throw new Error(`Unexpected method ${method}`);
+  };
+  const service=createKnowledgeLibrary({env:'crm-test123',key:'test-key',fetchImpl,
+    client:{callFunction:async()=>({result:{}})},
+    gatewayFactory:()=>({runAITask:async()=>({result:{summary:'行业摘要',keyPoints:['先识别需求'],applicationNotes:['先提问再介绍'],boundaries:['不替代法务意见']},taskId:1,resultId:2})}),
+    searchDataFactory:()=>({auditRdb:{rpc:async()=>({data:{ok:true}})}})});
+  const initialized=await service.uploadPrepare({categories:['industry_development'],title:'行业经验',fileName:'notes.md',
+    fileSizeBytes:bytes.length,publishedAt:'2026-10-28'},'operator-1');
+  assert.equal(initialized.ok,true);assert.equal(initialized.storageBucket,'knowledge');
+  assert.match(initialized.storageKey,/^operator-1\/[0-9a-f-]{36}\/notes\.md$/);
+  const source=rows.knowledge_sources[0];assert.equal(source.source_uri,null);assert.equal(source.original_base64,null);
+  const finalized=await service.uploadFinalize({sourceId:initialized.sourceId,uploadId:initialized.uploadId},'operator-1');
+  assert.equal(finalized.ok,true);assert.equal(finalized.extractionStatus,'verified');
+  assert.match(storageUrl,/\/knowledge\/operator-1\//);
+  assert.equal(rows.knowledge_items[0].metadata.summary,'行业摘要');
+});
+
+test('private storage upload rejects files above the CloudBase PG limit before creating a source row',async()=>{
+  const {service,writes}=setup();
+  await assert.rejects(service.uploadPrepare({categories:['other'],title:'Too big',fileName:'large.pdf',
+    fileSizeBytes:100_000_001},'operator-1'),error=>error.code==='FILE_TOO_LARGE');
+  assert.equal(writes.length,0);
+});

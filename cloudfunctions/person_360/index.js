@@ -991,8 +991,12 @@ exports.main = async event => {
     switch (event?.action) {
       case 'get': return await service.get(event.personId);
       case 'extractKnowledgePdfText': return await require('./knowledge-pdf-service').extract(event,async sourceId=>one(await pgRequest(
-        'knowledge_sources','GET',{select:'id,original_base64,file_name,content_type,extraction_status,deleted_at',
-          id:`eq.${sourceId}`,deleted_at:'is.null',limit:1},undefined,{timeoutMs:30000})));
+        'knowledge_sources','GET',{select:'id,original_base64,storage_key,file_size_bytes,file_name,content_type,extraction_status,deleted_at',
+          id:`eq.${sourceId}`,deleted_at:'is.null',limit:1},undefined,{timeoutMs:30000})),async storageKey=>{
+            const downloaded=await app.storage.from('knowledge').download(storageKey);
+            if(downloaded?.error||!downloaded?.data)throw new Error('SOURCE_UNAVAILABLE');
+            return Buffer.from(await downloaded.data.arrayBuffer());
+          });
       case 'resolveHouseholdMember':
         return await new HouseholdService({request: pgRequest, rpc: pgRpc}).resolveMemberName(event.name);
       case 'previewHousehold':

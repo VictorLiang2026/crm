@@ -30,7 +30,7 @@ async function restGet(table, filters) {
   } finally { clearTimeout(timer); }
 }
 
-async function runSummarize(event) {
+async function runSummarize(event, options = {}) {
   const personId = String(event?.personId || '').trim();
   if (!positiveId(personId)) {
     const e = new Error('personId must be a positive integer');
@@ -101,6 +101,7 @@ async function runSummarize(event) {
       _context: { recipe: 'person_summary', version: '1.0.0',
         source: 'public.persons + public.interactions + public.opportunities', sources },
     },
+    ...(typeof options.onStarted === 'function' ? { onStarted: options.onStarted } : {}),
   });
 
   return {
@@ -119,4 +120,31 @@ async function runSummarize(event) {
   };
 }
 
-module.exports = { runSummarize };
+async function getSummaryTaskStatus(event) {
+  const taskId = String(event?.taskId || '').trim();
+  const personId = String(event?.personId || '').trim();
+  if (!positiveId(taskId) || !positiveId(personId)) {
+    const error = new Error('taskId and personId are required'); error.code = 'INVALID_INPUT'; throw error;
+  }
+  const tasks = await restGet('ai_tasks', { select: 'id,task_type,status,subject_type,subject_id,context_snapshot',
+    id: `eq.${taskId}`, task_type: 'eq.person_summary', subject_type: 'eq.person',
+    subject_id: `eq.${personId}`, limit: 1 });
+  const task = Array.isArray(tasks) ? tasks[0] : null;
+  if (!task) { const error = new Error('AI task not found'); error.code = 'NOT_FOUND'; throw error; }
+  if (task.status === 'failed') return { ok: false, status: 'failed', taskId, error: { code: 'AI_REQUEST_FAILED' } };
+  if (task.status !== 'completed') return { ok: true, status: 'pending', taskId };
+  const results = await restGet('ai_results', { select: 'id,task_id,result_json,rank', task_id: `eq.${taskId}`,
+    order: 'rank.asc,id.asc', limit: 1 });
+  const row = Array.isArray(results) ? results[0] : null;
+  if (!row?.result_json || typeof row.result_json !== 'object') {
+    const error = new Error('AI result unavailable'); error.code = 'AI_AUDIT_UNKNOWN'; throw error;
+  }
+  const sources = task.context_snapshot?._context?.sources;
+  return { ok: true, status: 'completed', personId, taskId, resultId: String(row.id),
+    summary: row.result_json.summary, signals: row.result_json.signals, gaps: row.result_json.gaps,
+    nextActions: row.result_json.nextActions, evidence: row.result_json.evidence,
+    sources: Array.isArray(sources) ? sources : [], skillVersion: task.context_snapshot?._skill?.version || '1.0.0',
+    execution: { modelCalled: true, businessDataRead: true, businessDataWritten: false } };
+}
+
+module.exports = { runSummarize, getSummaryTaskStatus };
