@@ -163,7 +163,7 @@ async function init() {
     ]));
     return;
   }
-  app = cloudbase.init({ env: CONFIG.envId });
+  app = cloudbase.init({ env: CONFIG.envId, timeout: 120000 });
   authInst = app.auth({ persistence: 'local' });
   api = createApi(callFn);
   // 跨刷新 / 后台回收的超时检查（与 admin.html 相同语义）

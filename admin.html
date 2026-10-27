@@ -620,7 +620,7 @@ async function initSdk(){
     return false;
   }
   document.getElementById('env-label').textContent = 'PersonalAIOperatingSystemforRelationship,Sales&Growth';
-  app = cloudbase.init({ env: CONFIG.envId });
+  app = cloudbase.init({ env: CONFIG.envId, timeout: 120000 });
   authInst = app.auth({persistence:'local'});
   // 跨刷新/后台回收的超时检查：距上次活动超过 5 分钟则清除登录态，要求重新登录（iOS Safari 回收页面场景）
   try {

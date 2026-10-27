@@ -19,12 +19,12 @@ const playbook = process.argv.includes('--playbook');
 const payload = dual ? { action: 'knowledgeLibrary', operation: 'dualGenerate', data: { personId: '783' } } : playbook ? { action: 'conversationPlaybook', personId: '783',
   objection: '【系统测试·勿联系】我想先理解保障内容，再决定是否继续。' } :
   { action: 'summarize', personId: '783' };
-const reportFile = path.join(root, playbook ?
-  'tests/security/.results/pc33-live-playbook.json' : dual ?
-  'tests/security/.results/pc33-live-dual.json' : 'tests/security/.results/pc33-live-model.json');
+const reportFile = path.join(root, dual ? 'tests/security/.results/pc33-live-dual.json' : playbook ?
+  'tests/security/.results/pc33-live-playbook.json' : 'tests/security/.results/pc33-live-model.json');
 async function probe(nonce, payload, runRepeat) {
   const report = { login: 'FAIL', first: 'NOT_RUN', repeat: 'NOT_RUN',
-    sameTask: false, sameResult: false, taskId: null, resultId: null };
+    sameTask: false, sameResult: false, taskId: null, resultId: null,
+    errorType: null, errorStatus: null, errorCode: null, errorKeys: [] };
   try {
     await initSdk();
     const session = await authInst.getSession();
@@ -53,7 +53,27 @@ async function probe(nonce, payload, runRepeat) {
           (repeat?.error?.code || 'NEW_RESULT');
       }
     }
-  } catch (error) { if (report.login === 'PASS') report.first = error?.message === 'LOCAL_TIMEOUT' ? 'LOCAL_TIMEOUT' : 'REQUEST_FAILED'; }
+  } catch (error) {
+    if (report.login === 'PASS') {
+      const code=String(error?.code||'').toUpperCase();
+      const name=String(error?.name||error?.constructor?.name||'');
+      report.errorType=['Error','TypeError','AbortError','TimeoutError'].includes(name)?name:'OTHER';
+      report.errorKeys=Object.keys(error||{}).filter(key=>/^[A-Za-z][A-Za-z0-9_]{0,31}$/.test(key)).sort().slice(0,12);
+      const status=Number(error?.status||error?.statusCode||error?.response?.status||0);
+      report.errorStatus=Number.isInteger(status)&&status>=100&&status<=599?status:null;
+      report.errorCode=/^[A-Z0-9_:-]{1,48}$/.test(code)&&['UNAUTHORIZED','INVALID_INPUT','NOT_FOUND','INVALID_CONFIG',
+        'INVALID_RESULT','RATE_LIMIT','TIMEOUT','FUNCTIONS_TIME_LIMIT_EXCEEDED','UPSTREAM_UNAVAILABLE',
+        'PERSISTENCE_ERROR','AI_IN_PROGRESS','AI_RETRY_LATER','AI_AUDIT_UNKNOWN','AI_REQUEST_FAILED',
+        'NETWORK_ERROR','REQUEST_TIMEOUT','ERR_ABORTED','ABORT_ERR'].includes(code)?code:null;
+      const safeCodes=new Set(['UNAUTHORIZED','INVALID_INPUT','NOT_FOUND','INVALID_CONFIG','INVALID_RESULT',
+        'RATE_LIMIT','TIMEOUT','FUNCTIONS_TIME_LIMIT_EXCEEDED','UPSTREAM_UNAVAILABLE','PERSISTENCE_ERROR',
+        'AI_IN_PROGRESS','AI_RETRY_LATER','AI_AUDIT_UNKNOWN','AI_REQUEST_FAILED','NETWORK_ERROR',
+        'REQUEST_TIMEOUT','ERR_ABORTED','ABORT_ERR']);
+      const failure=error?.message==='LOCAL_TIMEOUT'?'LOCAL_TIMEOUT':safeCodes.has(code)?code:'REQUEST_FAILED';
+      if(report.first==='PASS'&&runRepeat)report.repeat=failure;
+      else report.first=failure;
+    }
+  }
   finally {
     try {
       const response = await fetch('/result', { method: 'POST',
@@ -72,7 +92,7 @@ const html = '<!doctype html><meta charset="utf-8"><title>PC33 AI 测试账号�
   '<div id="env-label"></div><div id="view"></div><div id="modal-root"></div><div id="toast-root"></div>' +
   '<script src="' + sdk + '"></script><script>var CONFIG={envId:' + JSON.stringify(envId) + '};var app=null;function route(){}' +
   source.slice(start, end) + '\n(' + probe.toString() + ')(' + JSON.stringify(nonce) + ',' +
-  JSON.stringify(payload) + ',' + JSON.stringify(!playbook) + ');</script>';
+  JSON.stringify(payload) + ',' + JSON.stringify(!playbook && !dual) + ');</script>';
 let origin;
 const server = http.createServer((req, res) => {
   res.setHeader('Cache-Control', 'no-store');
@@ -87,15 +107,24 @@ const server = http.createServer((req, res) => {
       const input = JSON.parse(body);
       const codes = new Set(['PASS','FAIL','NOT_RUN','NO_SESSION','INVALID_RESPONSE','LOCAL_TIMEOUT','REQUEST_FAILED',
         'NEW_RESULT','UNAUTHORIZED','INVALID_INPUT','NOT_FOUND','INVALID_CONFIG','INVALID_RESULT','RATE_LIMIT',
-        'TIMEOUT','UPSTREAM_UNAVAILABLE','PERSISTENCE_ERROR','AI_IN_PROGRESS','AI_RETRY_LATER',
+        'TIMEOUT','FUNCTIONS_TIME_LIMIT_EXCEEDED','UPSTREAM_UNAVAILABLE','PERSISTENCE_ERROR','AI_IN_PROGRESS','AI_RETRY_LATER',
+        'NETWORK_ERROR','REQUEST_TIMEOUT','ERR_ABORTED','ABORT_ERR',
         'AI_AUDIT_UNKNOWN','AI_REQUEST_FAILED','SUMMARY_FAILED']);
       if (!codes.has(input.login) || !codes.has(input.first) || !codes.has(input.repeat) ||
+          ![null,'Error','TypeError','AbortError','TimeoutError','OTHER'].includes(input.errorType) ||
+          !(input.errorStatus===null || (Number.isInteger(input.errorStatus)&&input.errorStatus>=100&&input.errorStatus<=599)) ||
+          !Array.isArray(input.errorKeys)||input.errorKeys.length>12||input.errorKeys.some(key=>typeof key!=='string'||!/^[A-Za-z][A-Za-z0-9_]{0,31}$/.test(key)) ||
+          !(input.errorCode===null || ['UNAUTHORIZED','INVALID_INPUT','NOT_FOUND','INVALID_CONFIG','INVALID_RESULT',
+            'RATE_LIMIT','TIMEOUT','FUNCTIONS_TIME_LIMIT_EXCEEDED','UPSTREAM_UNAVAILABLE','PERSISTENCE_ERROR',
+            'AI_IN_PROGRESS','AI_RETRY_LATER','AI_AUDIT_UNKNOWN','AI_REQUEST_FAILED','NETWORK_ERROR',
+            'REQUEST_TIMEOUT','ERR_ABORTED','ABORT_ERR'].includes(input.errorCode)) ||
           typeof input.sameTask !== 'boolean' || typeof input.sameResult !== 'boolean' ||
           (input.taskId != null && !(Number.isSafeInteger(input.taskId) && input.taskId > 0)) ||
           (input.resultId != null && !(Number.isSafeInteger(input.resultId) && input.resultId > 0))) throw Error('Invalid summary');
       const report = { environment: envId, observedAt: new Date().toISOString(),
         login: input.login, first: input.first, repeat: input.repeat,
         sameTask: input.sameTask, sameResult: input.sameResult,
+        errorType:input.errorType,errorStatus:input.errorStatus,errorCode:input.errorCode,errorKeys:input.errorKeys,
         taskId: input.taskId, resultId: input.resultId };
       fs.writeFileSync(reportFile, JSON.stringify(report, null, 2) + '\n');
       res.end('ok'); console.log(JSON.stringify(report));

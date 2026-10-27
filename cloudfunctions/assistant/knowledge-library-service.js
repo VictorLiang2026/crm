@@ -618,7 +618,7 @@ function createKnowledgeLibrary(options={}) {
       strategy_guidance:'根据客户近期互动、目标与进展推断合适的销售和沟通策略；以行业实践、可信经验、沟通逻辑为主，并将推断明确标为推断。不得把来源市场规则直接当成本地规定。',
       library_guidance:'根据客户近期互动和已知需求，使用知识库中当前有效资料提出更贴近公司的建议。产品、法律和税务事实只能依据匹配且仍在有效期内的来源；法律税务资料需先核实客户适用的司法辖区，不得推定适用地区。',
       guardrails:'不编造客户事实、产品条款、回报、税务法律结论；没有证据就写明无匹配资料并提出待确认问题。绩优个案只作启发，不保证复现结果。'};
-    const database=createSearchData({env,key}),gateway=createAIGateway({app:client,rdb:database.auditRdb,timeoutMs:70000,maxAttempts:1,
+    const database=createSearchData({env,key}),gateway=createAIGateway({app:client,rdb:database.auditRdb,timeoutMs:80000,maxAttempts:1,
       actorResolver:async()=>({uid:actor,isAnonymous:false})});
     const task=await gateway.runAITask({taskType:'customer_followup_dual',skill:'dual_followup',capability:'coaching',
       subjectType:'person',subjectId:personId,input:{personId},context,
