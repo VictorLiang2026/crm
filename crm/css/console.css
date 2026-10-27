@@ -1027,24 +1027,28 @@ body:has(.login), body.is-login { padding-top: env(safe-area-inset-top); }
 .recycle-result-row small { color:var(--ink-3); }
 .recycle-batch-receipt:not(:empty) { margin-top:16px; }
 .kg-home-card .card-body{display:grid;gap:14px}.kg-home-card .kg-filters{align-items:center}
-.kg-search input[type=search]{width:340px;min-width:320px;max-width:100%;box-sizing:border-box}
+.kg-search input[type=search]{width:380px;min-width:360px;max-width:100%;box-sizing:border-box}
 .kg-category-filter{box-sizing:border-box;display:flex;align-items:center;min-height:42px;min-width:142px}
 .kg-category-filter>summary{list-style:none}
 .kg-status-filter{box-sizing:border-box;min-height:42px;min-width:142px;padding:8px 10px;border:1px solid var(--line,#e3e5e9);border-radius:8px;background:#fff;color:var(--ink,#2e333b);font:inherit}
 .kg-home-card .kg-table{width:100%;min-width:100%;table-layout:fixed}
-.kg-home-card .kg-table th:nth-child(1),.kg-home-card .kg-table td:nth-child(1){width:8%}.kg-home-card .kg-table td:nth-child(1){min-width:0;max-width:none}
-.kg-home-card .kg-table th:nth-child(2),.kg-home-card .kg-table td:nth-child(2){width:14%}
-.kg-home-card .kg-table th:nth-child(3),.kg-home-card .kg-table td:nth-child(3){width:14%}
-.kg-home-card .kg-table th:nth-child(4),.kg-home-card .kg-table td:nth-child(4){width:29%}
-.kg-home-card .kg-table th:nth-child(5),.kg-home-card .kg-table td:nth-child(5){width:9%}
-.kg-home-card .kg-table th:nth-child(6),.kg-home-card .kg-table td:nth-child(6){width:12%}
-.kg-home-card .kg-table th:nth-child(7),.kg-home-card .kg-table td:nth-child(7){width:14%}
+.kg-home-card .kg-table th:nth-child(1),.kg-home-card .kg-table td:nth-child(1){width:7%}.kg-home-card .kg-table td:nth-child(1){min-width:0;max-width:none}
+.kg-home-card .kg-table th:nth-child(2),.kg-home-card .kg-table td:nth-child(2){width:20%}
+.kg-home-card .kg-table th:nth-child(3),.kg-home-card .kg-table td:nth-child(3){width:9%}
+.kg-home-card .kg-table th:nth-child(4),.kg-home-card .kg-table td:nth-child(4){width:37%}
+.kg-home-card .kg-table th:nth-child(5),.kg-home-card .kg-table td:nth-child(5){width:8%}
+.kg-home-card .kg-table th:nth-child(6),.kg-home-card .kg-table td:nth-child(6){width:10%}
+.kg-home-card .kg-table th:nth-child(7),.kg-home-card .kg-table td:nth-child(7){width:9%}
 .kg-home-card .kg-table td:nth-child(2){min-width:0;max-width:none;overflow-wrap:anywhere}
 .kg-home-card .kg-table .kg-number-cell{font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--ink-600,#565e6b)}
 .kg-home-card .kg-table .kg-category-tags{min-width:0}
 .kg-home-card .kg-table .kg-category-chip{display:block;width:max-content;max-width:100%;box-sizing:border-box;margin:0 0 5px;padding:3px 7px;border:1px solid var(--line,#e3e5e9);border-radius:999px;background:#f7f8fa;color:var(--ink-600,#565e6b);font-size:11px;white-space:normal;overflow-wrap:anywhere}
 .kg-home-card .kg-table-actions{white-space:normal}
-.kg-home-card .kg-table-actions .btn{display:flex;box-sizing:border-box;width:100%;height:auto;min-height:36px;margin:0 0 4px;padding:4px;justify-content:center;white-space:normal}
+.kg-home-card .kg-table-actions .btn{display:flex;box-sizing:border-box;width:max-content;max-width:100%;height:auto;min-height:0;margin:0 0 4px;padding:3px 7px;justify-content:center;border-width:1px;border-radius:999px;font-size:11px;line-height:1.2;text-align:center;white-space:normal}
+.kg-home-card .kg-table-actions .kg-action-edit,.kg-home-card .kg-table-actions .kg-action-retry{background:#edf3ff;border-color:#cfddf4;color:#315a91}
+.kg-home-card .kg-table-actions .kg-action-activate{background:#eaf6ee;border-color:#cbe7d3;color:#286b41}
+.kg-home-card .kg-table-actions .kg-action-invalidate{background:#fff4e5;border-color:#f0d8ae;color:#805414}
+.kg-home-card .kg-table-actions .kg-action-delete{background:#fff0f0;border-color:#efcece;color:#963f45}
 @media(max-width:1100px){.kg-home-card .kg-table th,.kg-home-card .kg-table td{padding:8px 7px;font-size:12px}}
 .kg-category-tags{min-width:210px}.kg-category-chip{display:inline-block;margin:0 5px 5px 0;padding:3px 7px;border:1px solid var(--line,#e3e5e9);border-radius:999px;background:#f7f8fa;color:var(--ink-600,#565e6b);font-size:11px;white-space:nowrap}
 .kg-categories-field{min-width:0;margin:0;padding:12px;border:1px solid var(--line,#e3e5e9);border-radius:10px}

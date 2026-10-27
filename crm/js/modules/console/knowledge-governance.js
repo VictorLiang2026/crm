@@ -80,11 +80,11 @@ export function renderKnowledgeGovernance(ctx) {
         const editHref=isSource?'':`#/knowledge/edit/${row.table}/${row.id}`;
         const summary=summaryOf(row);
         const actions=[
-          !isSource&&!superseded?h('a',{class:'btn btn-ghost btn-sm',href:editHref},text('edit')):null,
-          isSource&&row.extractionStatus==='failed'?h('button',{class:'btn btn-ghost btn-sm',type:'button',
+          !isSource&&!superseded?h('a',{class:'btn btn-ghost btn-sm kg-action-edit',href:editHref},text('edit')):null,
+          isSource&&row.extractionStatus==='failed'?h('button',{class:'btn btn-ghost btn-sm kg-action-retry',type:'button',
             onclick:()=>retry(row).catch(error=>ctx.toast(error.message,'error'))},text('retry')):null,
-          !isSource&&!superseded?h('button',{class:'btn btn-ghost btn-sm',type:'button',onclick:()=>setStatus(row).catch(error=>ctx.toast(error.message,'error'))},text(live?'mark_invalid':'mark_valid')):null,
-          h('button',{class:'btn btn-ghost btn-sm',type:'button',onclick:()=>remove(row).catch(error=>ctx.toast(error.message,'error'))},text('delete')),
+          !isSource&&!superseded?h('button',{class:`btn btn-ghost btn-sm kg-action-status ${live?'kg-action-invalidate':'kg-action-activate'}`,type:'button',onclick:()=>setStatus(row).catch(error=>ctx.toast(error.message,'error'))},text(live?'mark_invalid':'mark_valid')):null,
+          h('button',{class:'btn btn-ghost btn-sm kg-action-delete',type:'button',onclick:()=>remove(row).catch(error=>ctx.toast(error.message,'error'))},text('delete')),
         ].filter(Boolean);
         return h('tr',{'data-kg-id':String(row.id)},[
           h('td',{class:'kg-number-cell'},`${row.table==='knowledge_items'?'K':isPlaybook?'P':'S'}-${row.id}`),

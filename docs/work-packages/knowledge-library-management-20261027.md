@@ -44,3 +44,10 @@
 - The three standard row actions remain Edit, Mark Active/Inactive, and Delete. They stay vertically stacked; source rows still show Retry only when extraction failed.
 - Browser regression verified no horizontal table scrolling and no action-button overflow at 820×1180 and 1180×820. `npm run test:pc22`: 13 passed. WP01: PASS_WITH_LIMITATIONS; the existing verification items remain unchanged.
 - Deployed only `crm/css/console.css` to `/crm/css/console.css`; CloudBase reported one file uploaded successfully. Full cloud/GitHub verification follows the repository release script.
+
+## 2026-10-27 iPad action styling and column balance
+
+- Reduced the three standard operation buttons to the same 11px text and compact padding as category chips. Edit is blue, mark active is green, mark inactive is amber, and delete is red; action order and behavior are unchanged. Failed source extraction retains its separate retry action.
+- Redistributed the table to 37% summary, 20% title, and narrower widths for the remaining columns. The title search field is 380px wide (360px minimum).
+- Updated button color/style classes in `knowledge-governance.js`, scoped table rules in `console.css`, and browser assertions for color distinction, sizing, relative column widths, and iPad fit. `npm run test:pc22`: 13 passed.
+- Uploaded successfully: `crm/js/modules/console/knowledge-governance.js` and `crm/css/console.css`. The release script will verify cloud/GitHub consistency before and after publishing the release tag.

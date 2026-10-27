@@ -37,6 +37,10 @@ test('Knowledge Library supports categories, bilingual search, sorting, status, 
       return {headers:headers.map(node=>node.innerText.trim().replace(/[ ↑↓]/g,'')),
         summaryWidth:headers[3].getBoundingClientRect().width,titleWidth:headers[1].getBoundingClientRect().width,
         date:cells[5].innerText,categoryTops:chips,buttonTops:buttons,
+        actionColors:[...document.querySelectorAll('.kg-table tbody tr[data-kg-id="1"] .kg-table-actions .btn')].map(node=>getComputedStyle(node).backgroundColor),
+        actionFontSizes:[...document.querySelectorAll('.kg-table tbody tr[data-kg-id="1"] .kg-table-actions .btn')].map(node=>getComputedStyle(node).fontSize),
+        categoryFontSize:getComputedStyle(document.querySelector('.kg-table tbody tr[data-kg-id="1"] .kg-category-chip')).fontSize,
+        columnWidths:headers.map(node=>node.getBoundingClientRect().width),
         searchWidth:document.querySelector('.kg-search input[type="search"]').getBoundingClientRect().width,
         categoryTop:document.querySelector('.kg-category-filter').getBoundingClientRect().top,
         statusTop:document.querySelector('.kg-status-filter').getBoundingClientRect().top,
@@ -44,10 +48,13 @@ test('Knowledge Library supports categories, bilingual search, sorting, status, 
     })()`);
     assert.deepEqual(layout.headers,['编号','标题','知识类别','摘要','状态','更新时间','操作']);
     assert.ok(layout.summaryWidth>layout.titleWidth,'summary column gets more width than title');
+    assert.ok(layout.titleWidth>Math.max(...layout.columnWidths.filter((_,index)=>![1,3].includes(index))),'title is the next widest column');
     assert.equal(layout.date,'2026-10-17','updated time only shows the date');
     assert.ok(layout.categoryTops[1]>layout.categoryTops[0],'category chips stack vertically');
     assert.ok(layout.buttonTops[1]>layout.buttonTops[0]&&layout.buttonTops[2]>layout.buttonTops[1],'row actions stack vertically');
-    assert.ok(layout.searchWidth>260,'search input is wider than before');
+    assert.equal(new Set(layout.actionColors).size,3,'edit, status, and delete actions have distinct background colors');
+    assert.ok(layout.actionFontSizes.every(size=>size===layout.categoryFontSize),'action text matches category chip size');
+    assert.ok(layout.searchWidth>=380,'search input is slightly wider');
     assert.equal(layout.categoryTop,layout.statusTop,'category and status filters align');
     assert.equal(layout.statusDefault,'状态筛选','status label is inside the select');
     await browser.evaluate(`(()=>[...document.querySelectorAll('.kg-table th.kg-sortable')]
@@ -94,8 +101,13 @@ test('Knowledge Library supports categories, bilingual search, sorting, status, 
       const tableFit=await browser.evaluate(`(()=>{const wrap=document.querySelector('.kg-table-wrap');const table=wrap.querySelector('.kg-table');
         const actionCell=table.querySelector('tbody tr[data-kg-id="1"] .kg-table-actions');
         return {wrap:wrap.clientWidth,table:table.getBoundingClientRect().width,scroll:table.scrollWidth,
+          columns:[...table.querySelectorAll('thead th')].map(cell=>cell.getBoundingClientRect().width),
+          searchWidth:document.querySelector('.kg-search input[type="search"]').getBoundingClientRect().width,
           actionButtons:[...actionCell.querySelectorAll('.btn')].map(button=>({top:button.getBoundingClientRect().top,right:button.getBoundingClientRect().right,cellRight:actionCell.getBoundingClientRect().right}))};})()`);
       assert.ok(tableFit.table<=tableFit.wrap+1&&tableFit.scroll<=tableFit.wrap+1,`${width}x${height} knowledge columns fit without horizontal scrolling: ${JSON.stringify(tableFit)}`);
+      assert.ok(tableFit.columns[3]>tableFit.columns[1]&&tableFit.columns[1]>Math.max(...tableFit.columns.filter((_,index)=>![1,3].includes(index))),
+        `${width}x${height} summary is widest and title is second widest: ${JSON.stringify(tableFit.columns)}`);
+      assert.ok(tableFit.searchWidth>=360,`${width}x${height} title search remains slightly wider`);
       assert.ok(tableFit.actionButtons[1].top>tableFit.actionButtons[0].top&&tableFit.actionButtons[2].top>tableFit.actionButtons[1].top,
         `${width}x${height} row actions remain vertically stacked`);
       assert.ok(tableFit.actionButtons.every(button=>button.right<=button.cellRight+1),`${width}x${height} action buttons stay inside the column: ${JSON.stringify(tableFit)}`);
