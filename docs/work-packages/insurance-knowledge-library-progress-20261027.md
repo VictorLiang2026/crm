@@ -47,4 +47,4 @@
 - 静态托管已按 3 个明确文件上传：知识治理模块、Console i18n、Console CSS；`assistant` 按最终代码再次成功部署。`sync-check.ps1 -CloudOnly` 已核实 `admin.html` 相同、89 个可达页面/模块/样式资源一致，以及 29 个 CRM 函数的 219 个源码/配置文件一致。
 - CloudBase MCP 的 `invokeFunction` 返回平台 `Cam authentication failed`，CLI 只读调用也返回非零退出；线上知识列表函数调用因此未验证。离线服务单测和浏览器回归通过，不将其写成线上运行通过。
 - 最终 WP01：`PASS_WITH_LIMITATIONS`，catalog 1149 项无漂移，匿名探针 77/77，隔离回归 108 PASS、0 FAIL、5 SKIP。开放项仍为真实登录、service runtime 写操作、线上业务写入和手机真机行为。
-- GitHub master 提交和 release 标签：随本轮 `tools/release.ps1` 发布后补记；本地/线上 CloudBase 源码一致性已通过，GitHub 同步以发布脚本和最终完整 `sync-check.ps1` 为准。
+- 本轮功能提交为 `22bd2dd706258e8305b85c264dd3dfbd9681f97`，标签 `release-20261027-083600`；GitHub master、标签与线上 CloudBase 源码同步检查均已通过。后续仅本进度文件中的发布编号修正由下一条发布记录提交。
