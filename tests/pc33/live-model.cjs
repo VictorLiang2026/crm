@@ -14,12 +14,14 @@ const sdk = source.match(/https:\/\/static\.cloudbase\.net\/cloudbase-js-sdk\/\d
 if (start < 0 || end <= start || !sdk) throw Error('Production login anchors changed');
 const envId = 'crm-d1gkae8ddc930d151';
 const nonce = crypto.randomBytes(24).toString('hex');
+const dual = process.argv.includes('--dual');
 const playbook = process.argv.includes('--playbook');
-const payload = playbook ? { action: 'conversationPlaybook', personId: '783',
+const payload = dual ? { action: 'knowledgeLibrary', operation: 'dualGenerate', data: { personId: '783' } } : playbook ? { action: 'conversationPlaybook', personId: '783',
   objection: '【系统测试·勿联系】我想先理解保障内容，再决定是否继续。' } :
   { action: 'summarize', personId: '783' };
 const reportFile = path.join(root, playbook ?
-  'tests/security/.results/pc33-live-playbook.json' : 'tests/security/.results/pc33-live-model.json');
+  'tests/security/.results/pc33-live-playbook.json' : dual ?
+  'tests/security/.results/pc33-live-dual.json' : 'tests/security/.results/pc33-live-model.json');
 async function probe(nonce, payload, runRepeat) {
   const report = { login: 'FAIL', first: 'NOT_RUN', repeat: 'NOT_RUN',
     sameTask: false, sameResult: false, taskId: null, resultId: null };
@@ -31,13 +33,17 @@ async function probe(nonce, payload, runRepeat) {
     document.getElementById('view').textContent = '正在对“【系统测试·勿联系】虚构体验甲”调用已配置的 AI 模型，仅生成建议，不写业务数据。';
     const first = await Promise.race([callFn('assistant', payload),
       new Promise((_, reject) => setTimeout(() => reject(Error('LOCAL_TIMEOUT')), 95000))]);
-    if (first?.ok !== true || !Number.isSafeInteger(Number(first.taskId)) ||
+    const validDual = dual && first?.ok === true && Number.isSafeInteger(Number(first.taskId)) &&
+      Array.isArray(first.candidates) && first.candidates.length === 2 &&
+      first.candidates.map(item => item?.candidateType).sort().join(',') === 'library_based,strategy_based' &&
+      first.candidates.every(item => Number.isSafeInteger(Number(item.id)));
+    if (dual ? !validDual : first?.ok !== true || !Number.isSafeInteger(Number(first.taskId)) ||
         !Number.isSafeInteger(Number(first.resultId))) {
       report.first = first?.error?.code || 'INVALID_RESPONSE';
     } else {
       report.first = 'PASS';
       report.taskId = Number(first.taskId);
-      report.resultId = Number(first.resultId);
+      report.resultId = Number(dual ? first.candidates[0].id : first.resultId);
       if (runRepeat) {
         const repeat = await Promise.race([callFn('assistant', payload),
           new Promise((_, reject) => setTimeout(() => reject(Error('LOCAL_TIMEOUT')), 95000))]);
@@ -62,7 +68,7 @@ async function probe(nonce, payload, runRepeat) {
 const html = '<!doctype html><meta charset="utf-8"><title>PC33 AI 测试账号登录</title>' +
   '<style>body{font:16px sans-serif;max-width:620px;margin:48px auto}input,button{padding:12px;margin:8px}label{display:block}</style>' +
   '<h1>PC33 虚构人物 AI 验证</h1><p>请使用测试账号。仅为已登记的虚构 Person 783 生成一次' +
-  (playbook ? '对话建议' : '摘要并核对同请求重用') + '；不写业务数据，不保存账号、令牌或生成内容。</p>' +
+  (dual ? '双视角跟进建议' : playbook ? '对话建议' : '摘要并核对同请求重用') + '；不写业务数据，不保存账号、令牌或生成内容。</p>' +
   '<div id="env-label"></div><div id="view"></div><div id="modal-root"></div><div id="toast-root"></div>' +
   '<script src="' + sdk + '"></script><script>var CONFIG={envId:' + JSON.stringify(envId) + '};var app=null;function route(){}' +
   source.slice(start, end) + '\n(' + probe.toString() + ')(' + JSON.stringify(nonce) + ',' +

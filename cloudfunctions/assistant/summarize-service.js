@@ -85,7 +85,9 @@ async function runSummarize(event) {
 
   const database = createSearchData({ env: process.env.TCB_ENV,
     key: process.env.CRM_ASSISTANT_DB_API_KEY });
-  const aiGateway = createAIGateway({ app, rdb: database.auditRdb, timeoutMs: 30000, maxAttempts: 1 });
+  // The Assistant function has a 90s runtime ceiling. Allow slower model responses
+  // room to complete while keeping time for reads and audit persistence.
+  const aiGateway = createAIGateway({ app, rdb: database.auditRdb, timeoutMs: 50000, maxAttempts: 1 });
   const task = await aiGateway.runAITask({
     taskType: 'person_summary',
     skill: 'person_summary',

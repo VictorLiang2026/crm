@@ -24,14 +24,14 @@ test('dual follow-up writes exactly two ranked candidates and preserves strategy
   const app = { ai:() => ({createModel:() => ({generateText:async () => ({
     text:JSON.stringify({candidates:[library,strategy]}),usage:{input_tokens:10,output_tokens:20},
   })})}) };
-  const context = {customer_snapshot:{person:{display_name:'Example'}},recruit_context:null,question:'How to follow up?',market:'CN',
+  const context = {customer_snapshot:{person:{display_name:'Example'}},recruit_context:null,
     strategy_sources:[],library_sources:[],strategy_guidance:'General practice',library_guidance:'Verified company sources',
     guardrails:'Do not invent.'};
   const gateway = createAIGateway({app,store,timeoutMs:60000,maxAttempts:1,modelResolver:()=> 'configured',
     actorResolver:async()=>({uid:'operator-1',isAnonymous:false})});
   const result = await gateway.runAITask({taskType:'customer_followup_dual',skill:'dual_followup',capability:'coaching',
-    subjectType:'person',subjectId:'99',input:{personId:'99',question:'How to follow up?',market:'CN'},context,
-    contextSnapshot:{...context,_context:{recipe:'dual_followup',version:'1.0.0'}}});
+    subjectType:'person',subjectId:'99',input:{personId:'99'},context,
+    contextSnapshot:{...context,_context:{recipe:'dual_followup',version:'1.1.0'}}});
   assert.deepEqual(result.result.candidates.map(row=>row.candidateType),['strategy_based','library_based']);
   assert.deepEqual(result.resultIds,['56','57']);
   assert.deepEqual(audit.candidates.map(row=>row.candidateType),['strategy_based','library_based']);

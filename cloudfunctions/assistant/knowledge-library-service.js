@@ -560,7 +560,7 @@ function createKnowledgeLibrary(options={}) {
   }
   async function sourceList() { return {ok:true,sources:(await sourceRows()).map(metadataForSource)}; }
 
-  async function activeItems(domains,market) {
+  async function activeItems(domains) {
     const items=await request('knowledge_items','GET',{select:'id,source_id,item_type,source,source_date,verified,lifecycle_status,version_no,content,metadata,deleted_at',verified:'eq.true',lifecycle_status:'eq.verified',deleted_at:'is.null',order:'updated_at.desc.nullslast,id.desc',limit:300});
     const ids=[...new Set(items.map(row=>row.source_id).filter(positiveId).map(String))];
     const sources=ids.length?await request('knowledge_sources','GET',{select:'id,domain,title,publisher,source_uri,published_at,review_at,lifecycle_status,version_no,deleted_at',id:`in.(${ids.join(',')})`,deleted_at:'is.null',limit:300}):[];
@@ -571,7 +571,6 @@ function createKnowledgeLibrary(options={}) {
       if(![...categoryDomain].some(value=>domains.has(value)))return false;
       const source=row.source_id?sourceMap.get(String(row.source_id)):null;
       if(row.source_id&&(!source||source.deleted_at||source.lifecycle_status!=='verified'||source.review_at&&source.review_at<today))return false;
-      if(categoryDomain.has('legal_tax')&&!market)return false;
       if(categoryDomain.has('top_performer_sharing')&&likelySensitive(row.content||''))return false;
       return true;
     }).map(row=>({row,source:row.source_id?sourceMap.get(String(row.source_id))||null:null}));
@@ -597,7 +596,7 @@ function createKnowledgeLibrary(options={}) {
     return {refs,allowed};
   }
   async function runDual(input,actorValue) {
-    const actor=actorUid(actorValue),personId=String(input?.personId||'').trim(),question=cleanText(input?.question||'',1000,'question'),market=cleanText(input?.market||'',160,'market');
+    const actor=actorUid(actorValue),personId=String(input?.personId||'').trim();
     if(!positiveId(personId))fail('INVALID_INPUT');
     const personResponse=await callFunction({name:'person_360',data:{action:'getMeetingPrepContext',personId}});
     const person=personResponse?.result;if(!person||person.error||!object(person)||!person.person)fail('NOT_FOUND');
@@ -610,20 +609,20 @@ function createKnowledgeLibrary(options={}) {
       const recruitResponse=await callFunction({name:'person_360',data:{action:'listRecruitContext',personId}});
       if(!recruitResponse?.result?.error)recruitContext=(recruitResponse?.result?.rows||[]).slice(0,5);
     } catch (_) { /* A Person without recruit history still receives customer advice. */ }
-    const query=`${question||''} ${person.person.display_name||''} ${person.person.occupation||''} ${JSON.stringify(contextSummary)}`;
-    const all=await activeItems(new Set(['industry','top_performer_sharing','playbook','case','story','evidence']),market);
-    const library=await activeItems(new Set(['product','company','service','recruitment','campaign','health_wealth_seminar','legal_tax','case','playbook','regulation','evidence','story','other']),market);
+    const query=`${person.person.display_name||''} ${person.person.occupation||''} ${JSON.stringify(contextSummary)}`;
+    const all=await activeItems(new Set(['industry','top_performer_sharing','playbook','case','story','evidence']));
+    const library=await activeItems(new Set(['product','company','service','recruitment','campaign','health_wealth_seminar','legal_tax','case','playbook','regulation','evidence','story','other']));
     const a=sourceContext(rankEvidence(all,query,8)),b=sourceContext(rankEvidence(library,query,10));
-    const context={customer_snapshot:contextSummary,recruit_context:recruitContext,question:question||'提出下一步跟进建议',market:market||null,
+    const context={customer_snapshot:contextSummary,recruit_context:recruitContext,
       strategy_sources:a.refs,library_sources:b.refs,
-      strategy_guidance:'以行业实践、可信经验、沟通逻辑为主；将推断明确标为推断。不得把来源市场规则直接当成本地规定。',
-      library_guidance:'以知识库中当前有效资料为依据。产品、法律和税务事实只能依据匹配且仍在有效期内的来源。',
+      strategy_guidance:'根据客户近期互动、目标与进展推断合适的销售和沟通策略；以行业实践、可信经验、沟通逻辑为主，并将推断明确标为推断。不得把来源市场规则直接当成本地规定。',
+      library_guidance:'根据客户近期互动和已知需求，使用知识库中当前有效资料提出更贴近公司的建议。产品、法律和税务事实只能依据匹配且仍在有效期内的来源；法律税务资料需先核实客户适用的司法辖区，不得推定适用地区。',
       guardrails:'不编造客户事实、产品条款、回报、税务法律结论；没有证据就写明无匹配资料并提出待确认问题。绩优个案只作启发，不保证复现结果。'};
-    const database=createSearchData({env,key}),gateway=createAIGateway({app:client,rdb:database.auditRdb,timeoutMs:60000,maxAttempts:1,
+    const database=createSearchData({env,key}),gateway=createAIGateway({app:client,rdb:database.auditRdb,timeoutMs:70000,maxAttempts:1,
       actorResolver:async()=>({uid:actor,isAnonymous:false})});
     const task=await gateway.runAITask({taskType:'customer_followup_dual',skill:'dual_followup',capability:'coaching',
-      subjectType:'person',subjectId:personId,input:{personId,question:question||'',market:market||''},context,
-      contextSnapshot:{...context,_context:{recipe:'dual_followup',version:'1.0.0',source:'assistant.knowledge-library-service'}}});
+      subjectType:'person',subjectId:personId,input:{personId},context,
+      contextSnapshot:{...context,_context:{recipe:'dual_followup',version:'1.1.0',source:'assistant.knowledge-library-service'}}});
     let candidates=task.result?.candidates;
     let results=[];
     if(task.reused){

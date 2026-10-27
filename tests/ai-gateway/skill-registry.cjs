@@ -106,8 +106,8 @@ test('every initial skill accepts a representative input, context and output', (
         nextObjective: '明确待核实的保障范围', doNotSay: [] }],
     knowledge_extract: [{ domain: 'product', title: '产品说明' }, { document: '条款与产品介绍' },
       { summary: '产品定位摘要', keyPoints: [], applicationNotes: [], boundaries: [] }],
-    dual_followup: [{ personId: '1', question: '如何跟进？', market: '中国' },
-      { customer_snapshot: {}, recruit_context: {}, question: {}, market: {}, strategy_sources: [],
+    dual_followup: [{ personId: '1' },
+      { customer_snapshot: {}, recruit_context: null, strategy_sources: [],
         library_sources: [], strategy_guidance: {}, library_guidance: {}, guardrails: {} },
       { candidates: ['strategy_based', 'library_based'].map(candidateType => ({ candidateType,
         summary: '下一步建议', reasoning: '依据客户情况和资料来源', clarifyingQuestions: [],
@@ -135,9 +135,10 @@ test('every initial skill accepts a representative input, context and output', (
   };
   for (const name of names) {
     const [input, context, output] = examples[name];
-    assert.equal(defaultRegistry.validateInput(name, input), true, name);
-    assert.equal(defaultRegistry.validateContext(name, context), true, name);
-    assert.equal(defaultRegistry.validateOutput(name, output), true, name);
+    const registry = name === 'dual_followup' ? assistantRegistry : defaultRegistry;
+    assert.equal(registry.validateInput(name, input), true, name);
+    assert.equal(registry.validateContext(name, context), true, name);
+    assert.equal(registry.validateOutput(name, output), true, name);
   }
 });
 

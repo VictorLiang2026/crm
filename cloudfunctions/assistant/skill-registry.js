@@ -210,11 +210,10 @@ const SKILLS = [
     confirmationLevel:'review',timeoutClass:'standard',
   },
   {
-    name:'dual_followup',version:'1.0.0',capability:'coaching',
-    contextRecipe:recipe(['customer_snapshot','recruit_context','question','market','strategy_sources','library_sources',
+    name:'dual_followup',version:'1.1.0',capability:'coaching',
+    contextRecipe:recipe(['customer_snapshot','recruit_context','strategy_sources','library_sources',
       'strategy_guidance','library_guidance','guardrails'],[],{strategy_sources:8,library_sources:10}),
-    inputSchema:object({personId:{type:'string',pattern:'^[1-9][0-9]*$',maxLength:16},question:{type:'string',maxLength:1000},market:{type:'string',maxLength:160}},
-      ['personId','question','market']),
+    inputSchema:object({personId:{type:'string',pattern:'^[1-9][0-9]*$',maxLength:16}},['personId']),
     outputSchema:(()=>{
       const candidate=object({candidateType:{type:'string',enum:['strategy_based','library_based']},summary:text(1200),
         reasoning:text(1600),clarifyingQuestions:strings(6,400),nextAction:text(800),messageDraft:text(1200),
