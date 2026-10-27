@@ -142,10 +142,68 @@ function createKnowledgeLibrary(options={}) {
   }
   async function list() {
     const [sources,items,playbooks]=await Promise.all([
-      sourceRows(),request('knowledge_items','GET',{select:'id,source_id,item_type,source,source_date,valid_from,valid_to,verified,lifecycle_status,version_no,content,metadata,updated_at',order:'updated_at.desc,id.desc',limit:200}),
+      sourceRows(),request('knowledge_items','GET',{select:'id,source_id,item_type,source,source_date,valid_from,valid_to,verified,lifecycle_status,version_no,supersedes_id,confidence,content,metadata,updated_at',order:'updated_at.desc,id.desc',limit:200}),
       request('playbooks','GET',{select:'id,scenario,objection,lifecycle_status,updated_at',order:'updated_at.desc,id.desc',limit:100}),
     ]);
     return {ok:true,sources:sources.map(metadataForSource),knowledge:items,playbooks};
+  }
+  async function generateSummary({domain,title,content},actor) {
+    const database=createSearchData({env,key});
+    const gateway=gatewayFactory({app:client,rdb:database.auditRdb,timeoutMs:60000,maxAttempts:1,
+      actorResolver:async()=>({uid:actor,isAnonymous:false})});
+    const task=await gateway.runAITask({taskType:'knowledge_summary',skill:'knowledge_extract',capability:'summarization',
+      input:{domain,title},context:{document:{title,domain,text:content}},
+      contextSnapshot:{document:{title,domain,text:content},_context:{recipe:'knowledge_summary',version:'1.0.0'}}});
+    const summary=cleanText(task.result?.summary,1200,'summary',true);
+    return {summary,taskId:String(task.taskId),resultId:String(task.resultId)};
+  }
+  async function saveKnowledge(input,actorValue) {
+    const actor=actorUid(actorValue);
+    if(!object(input)||!DOMAIN.has(input.domain))fail('INVALID_INPUT');
+    const id=input.id==null||input.id===''?null:String(input.id);
+    if(id&&!positiveId(id))fail('INVALID_INPUT');
+    const title=cleanText(input.title,500,'title',true),content=cleanText(input.content,8000,'content',true),
+      sourceDate=input.sourceDate||null,validFrom=input.validFrom||null,validTo=input.validTo||null,
+      jurisdiction=cleanText(input.jurisdiction,160,'jurisdiction'),sourceUri=cleanText(input.sourceUri,2000,'sourceUri'),
+      confidence=input.confidence==null?0.8:Number(input.confidence);
+    if(!validDate(sourceDate)||!validDate(validFrom)||!validDate(validTo)||
+      (validFrom&&validTo&&validFrom>validTo)||!Number.isFinite(confidence)||confidence<0||confidence>1)fail('INVALID_INPUT');
+    if(sourceUri&&!/^https:\/\//i.test(sourceUri))fail('INVALID_INPUT');
+    if(['industry','legal_tax'].includes(input.domain)&&(!jurisdiction||!sourceUri||!sourceDate))fail('SOURCE_METADATA_REQUIRED');
+    if(input.domain==='top_performer_sharing'&&(input.sharingAuthorized!==true||input.anonymized!==true))fail('SHARING_AUTHORIZATION_REQUIRED');
+    if(input.domain==='top_performer_sharing'&&likelySensitive(content))fail('PERSONAL_DATA_DETECTED');
+    let current=null;
+    if(id){
+      const rows=await request('knowledge_items','GET',{select:'*',id:`eq.${id}`,limit:1});
+      current=rows[0];if(!current)fail('NOT_FOUND');
+      if(!input.expectedUpdatedAt||current.updated_at!==input.expectedUpdatedAt)fail('STALE_SOURCE');
+      const currentStatus=current.lifecycle_status||(current.verified?'verified':'draft');
+      if(!['draft','verified'].includes(currentStatus))fail('INVALID_INPUT');
+      if(current.source_id&&current.metadata?.domain&&current.metadata.domain!==input.domain)fail('INVALID_INPUT');
+      if(currentStatus==='verified'&&ITEM_TYPE[input.domain]!==current.item_type)fail('INVALID_INPUT');
+    }
+    const summary=input.summary?cleanText(input.summary,1200,'summary',true):null;
+    const generated=summary?null:await generateSummary({domain:input.domain,title,content},actor);
+    const metadata={...(current?.metadata||{}),domain:input.domain,
+      summary:summary||generated.summary,summary_source:summary?'manual':'ai',
+      jurisdiction,source_uri:sourceUri,
+      ...(input.domain==='top_performer_sharing'?{sharing_authorized:true,anonymized:true}:{}),
+      ...(generated?{summary_task_id:generated.taskId,summary_result_id:generated.resultId}:{})};
+    const parent=current&&(current.lifecycle_status||(current.verified?'verified':'draft'))==='verified'?current:null;
+    const payload={item_type:ITEM_TYPE[input.domain],source:title,source_date:sourceDate,
+      valid_from:validFrom,valid_to:validTo,verified:false,lifecycle_status:'draft',confidence,content,metadata,
+      source_id:current?.source_id||null,supersedes_id:parent?Number(parent.id):(current?.supersedes_id||null),
+      version_no:parent?Number(parent.version_no||1)+1:Number(current?.version_no||1),updated_by:actor};
+    let rows;
+    if(current&&!parent){
+      rows=await request('knowledge_items','PATCH',{id:`eq.${id}`,updated_at:`eq.${input.expectedUpdatedAt}`},
+        {...payload,created_by:undefined,created_at:undefined});
+      if(rows.length!==1)fail('STALE_SOURCE');
+    }else{
+      rows=await request('knowledge_items','POST',{},[{...payload,created_by:actor}]);
+    }
+    if(!rows?.[0]?.id)fail('PERSISTENCE_ERROR');
+    return {ok:true,row:rows[0],summaryGenerated:!!generated,revision:!!parent};
   }
   function fields(input) {
     if (!object(input) || !DOMAIN.has(input.domain)) fail('INVALID_INPUT');
@@ -179,7 +237,8 @@ function createKnowledgeLibrary(options={}) {
     const meta={domain:source.domain,jurisdiction:source.jurisdiction,review_at:source.review_at,
       source_uri:source.source_uri,sharing_authorized:source.domain==='top_performer_sharing'&&source.metadata?.sharing_authorized===true,
       anonymized:source.domain==='top_performer_sharing'&&source.metadata?.anonymized===true,
-      extraction_task_id:String(task.taskId),extraction_result_id:String(task.resultId),source_version:source.version_no};
+      summary:out.summary,summary_source:'ai',extraction_task_id:String(task.taskId),
+      extraction_result_id:String(task.resultId),source_version:source.version_no};
     const itemRows=await request('knowledge_items','POST',{},[{item_type:ITEM_TYPE[source.domain],source:source.title,
       source_date:source.published_at,valid_from:source.valid_from,valid_to:source.valid_to,verified:false,
       confidence:null,content,metadata:meta,lifecycle_status:'draft',created_by:actor,updated_by:actor,
@@ -362,6 +421,7 @@ function createKnowledgeLibrary(options={}) {
   async function run(event,actor) {
     switch(event?.operation){
       case 'list':return list();
+      case 'save':return saveKnowledge(event.data,actor);
       case 'upload':return upload(event.data,actor);
       case 'retry':return retryExtraction(event.sourceId,actor);
       case 'review':return reviewSource(event.data,actor);
