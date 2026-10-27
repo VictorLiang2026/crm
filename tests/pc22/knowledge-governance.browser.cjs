@@ -86,9 +86,19 @@ test('Knowledge Library supports categories, bilingual search, sorting, status, 
     await browser.evaluate("window.kgEditor('playbook','playbooks')");
     const playbookFields=await browser.evaluate("[...document.querySelectorAll('.kg-page-form [name]')].map(x=>x.name)");
     for(const removed of ['evidence_refs','case_refs','story_refs','source','valid_to'])assert.equal(playbookFields.includes(removed),false,`strategy excludes ${removed}`);
+    await browser.evaluate('window.kgRender()');
+    await browser.wait("document.querySelector('.kg-table tbody tr[data-kg-id=\"1\"]')");
     for (const [width,height] of [[820,1180],[1180,820]]) {
       await browser.send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:false});
       assert.equal(await browser.evaluate('document.documentElement.scrollWidth<=innerWidth+1'),true,`${width}x${height} overflow`);
+      const tableFit=await browser.evaluate(`(()=>{const wrap=document.querySelector('.kg-table-wrap');const table=wrap.querySelector('.kg-table');
+        const actionCell=table.querySelector('tbody tr[data-kg-id="1"] .kg-table-actions');
+        return {wrap:wrap.clientWidth,table:table.getBoundingClientRect().width,scroll:table.scrollWidth,
+          actionButtons:[...actionCell.querySelectorAll('.btn')].map(button=>({top:button.getBoundingClientRect().top,right:button.getBoundingClientRect().right,cellRight:actionCell.getBoundingClientRect().right}))};})()`);
+      assert.ok(tableFit.table<=tableFit.wrap+1&&tableFit.scroll<=tableFit.wrap+1,`${width}x${height} knowledge columns fit without horizontal scrolling: ${JSON.stringify(tableFit)}`);
+      assert.ok(tableFit.actionButtons[1].top>tableFit.actionButtons[0].top&&tableFit.actionButtons[2].top>tableFit.actionButtons[1].top,
+        `${width}x${height} row actions remain vertically stacked`);
+      assert.ok(tableFit.actionButtons.every(button=>button.right<=button.cellRight+1),`${width}x${height} action buttons stay inside the column: ${JSON.stringify(tableFit)}`);
     }
     await browser.send('Emulation.clearDeviceMetricsOverride');
   } finally { await browser.close(); }

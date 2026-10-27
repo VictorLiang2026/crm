@@ -37,3 +37,10 @@
 
 - Code recovery uses the pre-change release tag `release-20261027-090822`, with a new recovery commit and redeploy of the same three functions and seven frontend files; no force push.
 - Database recovery requires review of current knowledge records first. The paired rollback refuses to remove recoverable trash or `other`-domain source records.
+
+## 2026-10-27 iPad table layout
+
+- Reduced the Knowledge Library home table's minimum width from 1240px to the available width and redistributed the seven column widths. iPad-sized cells use tighter padding and smaller type; long action labels may wrap within their column.
+- The three standard row actions remain Edit, Mark Active/Inactive, and Delete. They stay vertically stacked; source rows still show Retry only when extraction failed.
+- Browser regression verified no horizontal table scrolling and no action-button overflow at 820×1180 and 1180×820. `npm run test:pc22`: 13 passed. WP01: PASS_WITH_LIMITATIONS; the existing verification items remain unchanged.
+- Deployed only `crm/css/console.css` to `/crm/css/console.css`; CloudBase reported one file uploaded successfully. Full cloud/GitHub verification follows the repository release script.
