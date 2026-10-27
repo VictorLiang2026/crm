@@ -7,13 +7,8 @@ const CATEGORIES = new Set(['on_sale_product','existing_service','recruitment_po
   'conversation_strategy','objection_handling','company_information','other']);
 const clip = (value, max) => typeof value === 'string' ? value.trim().slice(0, max) : '';
 const positive = value => /^[1-9]\d*$/.test(String(value || '')) && Number.isSafeInteger(Number(value));
-const refs = value => {
-  if (Array.isArray(value)) return value.map(Number).filter(Number.isSafeInteger);
-  if (typeof value !== 'string' || !value.trim()) return [];
-  const parts = value.split(',').map(v => v.trim());
-  if (parts.some(v => !positive(v))) throw new Error('Reference IDs must be positive integers');
-  return [...new Set(parts.map(Number))].slice(0, 20);
-};
+const publishedToday = now => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai',
+  year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
 
 class KnowledgeGovernanceService {
   constructor({ request, rpc, now = () => new Date() }) {
@@ -56,29 +51,31 @@ class KnowledgeGovernanceService {
       scenario: clip(data.scenario, 160), objection: clip(data.objection, 500),
       possible_underlying_reasons: Array.isArray(data.possible_underlying_reasons) ? data.possible_underlying_reasons.slice(0, 10) : [],
       clarifying_questions: Array.isArray(data.clarifying_questions) ? data.clarifying_questions.slice(0, 10) : [],
-      response_logic: clip(data.response_logic, 4000), evidence_refs: refs(data.evidence_refs),
-      case_refs: refs(data.case_refs), story_refs: refs(data.story_refs),
+      response_logic: clip(data.response_logic, 4000), evidence_refs: [], case_refs: [], story_refs: [],
       do_not_say: Array.isArray(data.do_not_say) ? data.do_not_say.slice(0, 10) : [],
-      next_objective: clip(data.next_objective, 500), source: clip(data.source, 500),
+      next_objective: clip(data.next_objective, 500), source: 'Knowledge Library',
       confidence: data.confidence == null ? null : Number(data.confidence),
-      valid_from: data.valid_from || null, valid_to: data.valid_to || null,
+      valid_from: null, valid_to: null,
       metadata: { ...(current?.metadata&&typeof current.metadata==='object'?current.metadata:{}),
         ...(data.metadata&&typeof data.metadata==='object'?data.metadata:{}),
+        published_at: data.publishedAt || current?.metadata?.published_at || publishedToday(this.now()),
         categories: data.categories||data.metadata?.categories||['conversation_strategy'], revisionNote: clip(data.revisionNote, 500) }, updated_by: uid,
     } : {
       item_type: TYPES.has(data.item_type) ? data.item_type : 'evidence',
-      source: clip(data.source, 500), source_date: data.source_date || null,
-      valid_from: data.valid_from || null, valid_to: data.valid_to || null,
+      source: clip(data.source, 500), source_date: null,
+      valid_from: null, valid_to: null,
       verified: false, confidence: data.confidence == null ? null : Number(data.confidence),
       content: clip(data.content, 8000), metadata: {
+        ...(current?.metadata&&typeof current.metadata==='object'?current.metadata:{}),
         categories: data.categories||data.metadata?.categories||['other'],
         person: { schema: 'public', table: 'persons', id: positive(data.personId) ? Number(data.personId) : null },
+        published_at: data.publishedAt || current?.metadata?.published_at || publishedToday(this.now()),
         revisionNote: clip(data.revisionNote, 500),
       }, updated_by: uid,
     };
     if (!Array.isArray(payload.metadata.categories) || !payload.metadata.categories.length ||
         payload.metadata.categories.some(category => !CATEGORIES.has(category))) throw new Error('Select at least one valid category');
-    const mainText = isPlaybook ? [payload.scenario, payload.objection, payload.response_logic] : [payload.source, payload.content];
+    const mainText = isPlaybook ? [payload.scenario, payload.response_logic] : [payload.source, payload.content];
     if (mainText.some(v => !v)) throw new Error('Source, title and content are required');
     if (!Number.isFinite(payload.confidence) || payload.confidence < 0 || payload.confidence > 1) throw new Error('Invalid confidence');
     if (id) {

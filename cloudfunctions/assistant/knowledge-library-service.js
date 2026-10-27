@@ -6,7 +6,8 @@ const { inflateRawSync } = require('node:zlib');
 const { createAIGateway } = require('./ai-gateway');
 const { createSearchData } = require('./search-data');
 
-const MAX_FILE_BYTES = 3 * 1024 * 1024;
+const MAX_FILE_BYTES = 6 * 1024 * 1024;
+const UPLOAD_CHUNK_BYTES = 768 * 1024;
 const MAX_TEXT_CHARS = 100000;
 const CATEGORIES = Object.freeze(['on_sale_product','existing_service','recruitment_policy','industry_development',
   'marketing_activity','legal_tax','health_wealth_sharing','top_performer_sharing','customer_case','recruitment_case',
@@ -22,7 +23,10 @@ const LEGACY_CATEGORY = Object.freeze({product:'on_sale_product',service:'existi
 const REST_TABLES = new Set(['knowledge_sources','knowledge_items','playbooks','ai_tasks','ai_results']);
 const EXTENSIONS = Object.freeze({
   '.pdf': 'application/pdf', '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  '.txt': 'text/plain',
+  '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  '.txt': 'text/plain', '.md': 'text/markdown', '.csv': 'text/csv',
+  '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp',
 });
 
 function fail(code, message = code) { const error = new Error(message); error.code = code; throw error; }
@@ -80,7 +84,7 @@ function decodeXml(value) {
     .replace(/&apos;/g,"'").replace(/&amp;/g,'&').replace(/&#(\d+);/g,(_,n)=>String.fromCodePoint(Number(n)))
     .replace(/&#x([0-9a-f]+);/gi,(_,n)=>String.fromCodePoint(parseInt(n,16)));
 }
-function extractDocx(bytes) {
+function zipTextEntries(bytes, accepted) {
   if (!bytes.subarray(0,4).equals(Buffer.from([0x50,0x4b,0x03,0x04]))) fail('INVALID_CONTENT');
   let eocd = -1;
   for (let i = bytes.length - 22; i >= Math.max(0, bytes.length - 65557); i--) {
@@ -89,47 +93,98 @@ function extractDocx(bytes) {
   if (eocd < 0) fail('INVALID_CONTENT');
   const entries = bytes.readUInt16LE(eocd + 10), directoryOffset = bytes.readUInt32LE(eocd + 16);
   if (entries > 5000 || directoryOffset >= bytes.length) fail('INVALID_CONTENT');
-  let cursor = directoryOffset, target = null;
+  let cursor = directoryOffset; const targets=[];
   for (let i = 0; i < entries; i++) {
+    if (cursor < 0 || cursor + 46 > bytes.length) fail('INVALID_CONTENT');
     if (bytes.readUInt32LE(cursor) !== 0x02014b50) fail('INVALID_CONTENT');
     const method=bytes.readUInt16LE(cursor+10), compressed=bytes.readUInt32LE(cursor+20), uncompressed=bytes.readUInt32LE(cursor+24);
     const nameLength=bytes.readUInt16LE(cursor+28), extraLength=bytes.readUInt16LE(cursor+30), commentLength=bytes.readUInt16LE(cursor+32);
     const localOffset=bytes.readUInt32LE(cursor+42), name=bytes.subarray(cursor+46,cursor+46+nameLength).toString('utf8');
-    if (name === 'word/document.xml') target={method,compressed,uncompressed,localOffset};
+    if (accepted(name)) targets.push({name,method,compressed,uncompressed,localOffset});
     cursor += 46 + nameLength + extraLength + commentLength;
     if (cursor > bytes.length) fail('INVALID_CONTENT');
   }
-  if (!target || target.uncompressed > 20 * 1024 * 1024 || ![0,8].includes(target.method)) fail('UNSUPPORTED_TYPE');
-  const offset=target.localOffset;
-  if (bytes.readUInt32LE(offset)!==0x04034b50) fail('INVALID_CONTENT');
-  const nameLength=bytes.readUInt16LE(offset+26), extraLength=bytes.readUInt16LE(offset+28);
-  const start=offset+30+nameLength+extraLength, end=start+target.compressed;
-  if (end>bytes.length) fail('INVALID_CONTENT');
-  let xml;
-  try { const compressed=bytes.subarray(start,end); xml=target.method===0?compressed:inflateRawSync(compressed,{maxOutputLength:20*1024*1024}); }
-  catch (_) { fail('INVALID_CONTENT'); }
-  if (xml.length!==target.uncompressed) fail('INVALID_CONTENT');
-  const text=decodeXml(xml.toString('utf8').replace(/<w:tab\b[^>]*\/>/g,'\t').replace(/<w:br\b[^>]*\/>/g,'\n')
-    .replace(/<\/w:p>/g,'\n').replace(/<[^>]+>/g,' ')).replace(/[ \t]+/g,' ').replace(/\n\s*/g,'\n').trim();
-  return boundedText(text);
+  if(!targets.length)fail('UNSUPPORTED_TYPE');
+  return targets.sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true})).map(target=>{
+    if(target.uncompressed>20*1024*1024||![0,8].includes(target.method))fail('UNSUPPORTED_TYPE');
+    const offset=target.localOffset;
+    if(offset+30>bytes.length||bytes.readUInt32LE(offset)!==0x04034b50)fail('INVALID_CONTENT');
+    const nameLength=bytes.readUInt16LE(offset+26),extraLength=bytes.readUInt16LE(offset+28);
+    const start=offset+30+nameLength+extraLength,end=start+target.compressed;
+    if(end>bytes.length)fail('INVALID_CONTENT');
+    try{const compressed=bytes.subarray(start,end);const xml=target.method===0?compressed:inflateRawSync(compressed,{maxOutputLength:20*1024*1024});
+      if(xml.length!==target.uncompressed)fail('INVALID_CONTENT');return {name:target.name,xml:xml.toString('utf8')};}
+    catch(error){if(error?.code==='INVALID_CONTENT'||error?.code==='UNSUPPORTED_TYPE')throw error;fail('INVALID_CONTENT');}
+  });
+}
+function xmlPlainText(value) {
+  return decodeXml(value.replace(/<w:tab\b[^>]*\/>/g,'\t').replace(/<w:br\b[^>]*\/>/g,'\n')
+    .replace(/<a:br\b[^>]*\/>/g,'\n').replace(/<\/w:p>/g,'\n').replace(/<\/a:p>/g,'\n')
+    .replace(/<[^>]+>/g,' ')).replace(/[ \t]+/g,' ').replace(/\n\s*/g,'\n').trim();
+}
+function extractDocx(bytes) {
+  const entries=zipTextEntries(bytes,name=>name==='word/document.xml');
+  return boundedText(xmlPlainText(entries[0].xml));
+}
+function extractPptx(bytes) {
+  const entries=zipTextEntries(bytes,name=>/^ppt\/slides\/slide\d+\.xml$/.test(name));
+  return boundedText(entries.map(entry=>xmlPlainText(entry.xml)).filter(Boolean).join('\n\n'));
+}
+function extractXlsx(bytes) {
+  const entries=zipTextEntries(bytes,name=>name==='xl/sharedStrings.xml'||/^xl\/worksheets\/sheet\d+\.xml$/.test(name));
+  const sharedEntry=entries.find(entry=>entry.name==='xl/sharedStrings.xml');
+  const shared=sharedEntry?[...sharedEntry.xml.matchAll(/<si\b[^>]*>([\s\S]*?)<\/si>/g)].map(([,cell])=>
+    [...cell.matchAll(/<t\b[^>]*>([\s\S]*?)<\/t>/g)].map(([,text])=>decodeXml(text)).join('')):[];
+  const rows=entries.filter(entry=>entry.name.startsWith('xl/worksheets/')).map(entry=>{
+    const cells=[...entry.xml.matchAll(/<c\b([^>]*)>([\s\S]*?)<\/c>/g)].map(([,attrs,cell])=>{
+      const value=cell.match(/<v\b[^>]*>([\s\S]*?)<\/v>/)?.[1]||cell.match(/<t\b[^>]*>([\s\S]*?)<\/t>/)?.[1]||'';
+      const decoded=decodeXml(value);const sharedIndex=attrs.match(/\bt="s"/) ? Number(decoded) : -1;
+      return sharedIndex>=0?(shared[sharedIndex]||''):decoded;
+    }).filter(Boolean);
+    return cells.join(' | ');
+  }).filter(Boolean);
+  return boundedText(rows.join('\n'));
 }
 function boundedText(value) {
   const text=String(value||'').replace(/\r/g,'').trim();
   if (!text || text.length>MAX_TEXT_CHARS || text.includes('\0')) fail('UNSUPPORTED_CONTENT');
   return text;
 }
-async function extractText(fileName, mime, bytes) {
+function extensionOf(fileName) { const lower=String(fileName||'').toLowerCase(); return lower.slice(lower.lastIndexOf('.')); }
+function fileTypeForName(fileName) { return EXTENSIONS[extensionOf(fileName)]||null; }
+function validateImageBytes(mime,bytes) {
+  const valid=mime==='image/png'?bytes.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10])):
+    mime==='image/jpeg'?bytes.length>3&&bytes[0]===0xff&&bytes[1]===0xd8&&bytes[2]===0xff:
+      mime==='image/webp'?bytes.length>12&&bytes.toString('ascii',0,4)==='RIFF'&&bytes.toString('ascii',8,12)==='WEBP':false;
+  if(!valid)fail('INVALID_CONTENT');
+}
+async function extractImageText(fileName,mime,bytes,{app:client,sourceId,uploadId}={}) {
+  validateImageBytes(mime,bytes);
+  let response;
+  const data=sourceId!=null?{action:'ocr_knowledge_source',sourceId:String(sourceId),uploadId:String(uploadId||'')}:
+    {action:'ocr_knowledge_source',fileName,contentType:mime,base64:bytes.toString('base64')};
+  try{response=await (client||require('./db').app).callFunction({name:'ai_parse',data});}catch(_){fail('OCR_FAILED');}
+  const result=response?.result;
+  if(!result||result.error||typeof result.ocrText!=='string')fail(result?.error||'OCR_FAILED');
+  return boundedText(result.ocrText);
+}
+async function extractText(fileName, mime, bytes, options={}) {
   const lower=fileName.toLowerCase();
   const ext=lower.slice(lower.lastIndexOf('.'));
   if (EXTENSIONS[ext]!==mime) fail('UNSUPPORTED_TYPE');
-  if (ext==='.txt') {
+  if (['.txt','.md','.csv'].includes(ext)) {
     let text; try { text=new TextDecoder('utf-8',{fatal:true}).decode(bytes); } catch (_) { fail('INVALID_CONTENT'); }
     return boundedText(text);
   }
   if (ext==='.docx') return extractDocx(bytes);
+  if (ext==='.pptx') return extractPptx(bytes);
+  if (ext==='.xlsx') return extractXlsx(bytes);
+  if (['.png','.jpg','.jpeg','.webp'].includes(ext)) return extractImageText(fileName,mime,bytes,options);
   if (ext==='.pdf') {
     if (!bytes.subarray(0,5).equals(Buffer.from('%PDF-'))) fail('INVALID_CONTENT');
-    const response=await app.callFunction({name:'person_360',data:{action:'extractKnowledgePdfText',base64:bytes.toString('base64')}});
+    const response=options.sourceId
+      ? await (options.app||require('./db').app).callFunction({name:'person_360',data:{action:'extractKnowledgePdfText',sourceId:String(options.sourceId)}})
+      : await (options.app||require('./db').app).callFunction({name:'person_360',data:{action:'extractKnowledgePdfText',base64:bytes.toString('base64')}});
     const result=response?.result;
     if (!result || result.error || typeof result.text!=='string') fail(result?.error || 'PDF_EXTRACTION_FAILED');
     return boundedText(result.text);
@@ -141,8 +196,8 @@ function likelySensitive(text) {
 }
 function metadataForSource(row) {
   return {id:String(row.id),domain:row.domain,title:row.title,publisher:row.publisher||null,
-    jurisdiction:row.jurisdiction||null,sourceUri:row.source_uri||null,publishedAt:row.published_at||null,
-    validFrom:row.valid_from||null,validTo:row.valid_to||null,reviewAt:row.review_at||null,
+    sourceUri:row.source_uri||null,publishedAt:row.published_at||null,
+    reviewAt:row.review_at||null,
     fileName:row.file_name||null,fileSizeBytes:row.file_size_bytes||null,sha256:row.sha256||null,
     extractionStatus:row.extraction_status,lifecycleStatus:row.lifecycle_status,lifecycle_status:row.lifecycle_status,
     versionNo:row.version_no,createdAt:row.created_at,updatedAt:row.updated_at,deletedAt:row.deleted_at||null,
@@ -157,13 +212,13 @@ function createKnowledgeLibrary(options={}) {
   const searchDataFactory=options.searchDataFactory||createSearchData;
   const callFunction=options.callFunction||client.callFunction.bind(client);
   if (!/^crm-[a-z0-9]+$/.test(env||'') || typeof key!=='string' || !key) fail('INVALID_CONFIG');
-  async function request(table,method='GET',filters={},body) {
+  async function request(table,method='GET',filters={},body,{timeoutMs=12000}={}) {
     if (!REST_TABLES.has(table)) fail('INVALID_INPUT');
     const url=new URL(`https://${env}.api.tcloudbasegateway.com/v1/rdb/rest/${table}`);
     for (const [name,value] of Object.entries(filters)) url.searchParams.set(name,String(value));
     const headers={Authorization:`Bearer ${key}`,'Accept-Profile':'public','Content-Profile':'public',Accept:'application/json',
       'Content-Type':'application/json',Prefer:'return=representation'};
-    const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),12000);
+    const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),timeoutMs);
     try {
       const response=await fetchImpl(url,{method,headers,body:body===undefined?undefined:JSON.stringify(body),signal:controller.signal});
       if (!response.ok) { const bodyText=await response.text(); const error=new Error(`Knowledge data request failed (${response.status})`);
@@ -173,7 +228,8 @@ function createKnowledgeLibrary(options={}) {
     } finally { clearTimeout(timer); }
   }
   async function sourceRows() {
-    return request('knowledge_sources','GET',{select:'id,domain,title,publisher,jurisdiction,source_uri,published_at,valid_from,valid_to,review_at,file_name,file_size_bytes,sha256,extraction_status,lifecycle_status,version_no,created_at,updated_at,deleted_at,metadata',deleted_at:'is.null',order:'updated_at.desc,id.desc',limit:200});
+    const rows=await request('knowledge_sources','GET',{select:'id,domain,title,publisher,source_uri,published_at,review_at,file_name,file_size_bytes,sha256,extraction_status,lifecycle_status,version_no,created_at,updated_at,deleted_at,metadata',deleted_at:'is.null',order:'updated_at.desc,id.desc',limit:200});
+    return rows.filter(row=>row.metadata?.upload?.phase!=='receiving');
   }
   async function list() {
     const [sources,items,playbooks]=await Promise.all([
@@ -217,14 +273,11 @@ function createKnowledgeLibrary(options={}) {
     const id=input.id==null||input.id===''?null:String(input.id);
     if(id&&!positiveId(id))fail('INVALID_INPUT');
     const title=cleanText(input.title,500,'title',true),content=cleanText(input.content,8000,'content',true),
-      sourceDate=input.sourceDate||null,validFrom=input.validFrom||null,validTo=input.validTo||null,
-      jurisdiction=cleanText(input.jurisdiction,160,'jurisdiction'),sourceUri=cleanText(input.sourceUri,2000,'sourceUri'),
+      publishedAt=input.publishedAt||todayShanghai(),sourceUri=cleanText(input.sourceUri,2000,'sourceUri'),
       confidence=input.confidence==null?0.8:Number(input.confidence);
-    if(!validDate(sourceDate)||!validDate(validFrom)||!validDate(validTo)||
-      (validFrom&&validTo&&validFrom>validTo)||!Number.isFinite(confidence)||confidence<0||confidence>1)fail('INVALID_INPUT');
+    if(!validDate(publishedAt)||!Number.isFinite(confidence)||confidence<0||confidence>1)fail('INVALID_INPUT');
     if(sourceUri&&!/^https:\/\//i.test(sourceUri))fail('INVALID_INPUT');
-    if(categories.some(category=>['industry_development','legal_tax'].includes(category))&&(!jurisdiction||!sourceUri||!sourceDate))fail('SOURCE_METADATA_REQUIRED');
-    if(categories.includes('top_performer_sharing')&&(input.sharingAuthorized!==true||input.anonymized!==true))fail('SHARING_AUTHORIZATION_REQUIRED');
+    if(categories.some(category=>['industry_development','legal_tax'].includes(category))&&(!sourceUri||!publishedAt))fail('SOURCE_METADATA_REQUIRED');
     if(categories.includes('top_performer_sharing')&&likelySensitive(content))fail('PERSONAL_DATA_DETECTED');
     let current=null,currentStatus=null;
     if(id){
@@ -238,12 +291,12 @@ function createKnowledgeLibrary(options={}) {
     const generated=summary?null:await generateSummary({domain,title,content},actor);
     const metadata={...(current?.metadata||{}),domain,categories,
       summary:summary||generated.summary,summary_source:summary?'manual':'ai',
-      jurisdiction,source_uri:sourceUri,
-      ...(categories.includes('top_performer_sharing')?{sharing_authorized:true,anonymized:true}:{}),
+      published_at:publishedAt,source_uri:sourceUri,
+      jurisdiction:undefined,sharing_authorized:undefined,anonymized:undefined,
       ...(generated?{summary_task_id:generated.taskId,summary_result_id:generated.resultId}:{})};
     const parent=current&&(current.lifecycle_status||(current.verified?'verified':'draft'))==='verified'?current:null;
-    const payload={item_type:itemTypeForCategories(categories,current?.item_type),source:title,source_date:sourceDate,
-      valid_from:validFrom,valid_to:validTo,verified:false,lifecycle_status:'draft',confidence,content,metadata,
+    const payload={item_type:itemTypeForCategories(categories,current?.item_type),source:title,source_date:null,
+      valid_from:null,valid_to:null,verified:false,lifecycle_status:'draft',confidence,content,metadata,
       source_id:current?.source_id||null,supersedes_id:parent?Number(parent.id):(current?.supersedes_id||null),
       version_no:parent?Number(parent.version_no||1)+1:Number(current?.version_no||1),updated_by:actor};
     let rows;
@@ -268,16 +321,17 @@ function createKnowledgeLibrary(options={}) {
     if (!object(input)) fail('INVALID_INPUT');
     const categories=normalizeCategories(input.categories,input.domain),domain=domainForCategories(categories);
     const title=cleanText(input.title,500,'title',true),publisher=cleanText(input.publisher,500,'publisher'),
-      jurisdiction=cleanText(input.jurisdiction,160,'jurisdiction'),sourceUri=cleanText(input.sourceUri,2000,'sourceUri'),
-      fileName=cleanText(input.fileName,255,'fileName',true),contentType=cleanText(input.contentType,120,'contentType',true);
-    for (const key of ['publishedAt','validFrom','validTo','reviewAt']) if (!validDate(input[key])) fail('INVALID_INPUT');
+      sourceUri=cleanText(input.sourceUri,2000,'sourceUri'),
+      fileName=cleanText(input.fileName,255,'fileName',true),contentType=fileTypeForName(fileName);
+    if(!contentType)fail('UNSUPPORTED_TYPE');
+    if(input.fileSizeBytes!=null&&(!Number.isSafeInteger(Number(input.fileSizeBytes))||Number(input.fileSizeBytes)<1||Number(input.fileSizeBytes)>MAX_FILE_BYTES))fail('FILE_TOO_LARGE');
+    for (const key of ['publishedAt','reviewAt']) if (!validDate(input[key])) fail('INVALID_INPUT');
     if (sourceUri && !/^https:\/\//i.test(sourceUri)) fail('INVALID_INPUT');
-    if (categories.includes('top_performer_sharing') && (input.sharingAuthorized!==true || input.anonymized!==true)) fail('SHARING_AUTHORIZATION_REQUIRED');
-    if (categories.includes('legal_tax') && (!jurisdiction || !input.publishedAt || !sourceUri)) fail('SOURCE_METADATA_REQUIRED');
-    if (categories.includes('industry_development') && (!jurisdiction || !input.publishedAt || !sourceUri)) fail('SOURCE_METADATA_REQUIRED');
-    return {domain,categories,title,publisher,jurisdiction,sourceUri,publishedAt:input.publishedAt||null,
-      validFrom:input.validFrom||null,validTo:input.validTo||null,reviewAt:input.reviewAt||null,fileName,contentType,
-      sharingAuthorized:input.sharingAuthorized===true,anonymized:input.anonymized===true};
+    const publishedAt=input.publishedAt||todayShanghai();
+    if (categories.includes('legal_tax') && (!sourceUri || !publishedAt)) fail('SOURCE_METADATA_REQUIRED');
+    if (categories.includes('industry_development') && (!sourceUri || !publishedAt)) fail('SOURCE_METADATA_REQUIRED');
+    return {domain,categories,title,publisher,sourceUri,publishedAt,
+      reviewAt:input.reviewAt||null,fileName,contentType};
   }
   async function extractToDraft(source,base64,actor,preparedText=null) {
     const bytes=decodeBase64(base64),text=preparedText||await extractText(source.file_name,source.content_type,bytes);
@@ -287,22 +341,21 @@ function createKnowledgeLibrary(options={}) {
       actorResolver:async()=>({uid:actor,isAnonymous:false})});
     const task=await gateway.runAITask({taskType:'knowledge_source_extract',skill:'knowledge_extract',capability:'summarization',
       input:{domain:source.domain,title:source.title},
-      context:{document:{title:source.title,domain:source.domain,categories:source.metadata?.categories||[],jurisdiction:source.jurisdiction||null,
+      context:{document:{title:source.title,domain:source.domain,categories:source.metadata?.categories||[],
         sourceDate:source.published_at||null,text}},
-      contextSnapshot:{document:{title:source.title,domain:source.domain,categories:source.metadata?.categories||[],jurisdiction:source.jurisdiction||null,
+      contextSnapshot:{document:{title:source.title,domain:source.domain,categories:source.metadata?.categories||[],
         sourceDate:source.published_at||null,text},_context:{recipe:'knowledge_source_extract',version:'1.0.0'}}});
     const out=task.result;
     const content=[out.summary,`知识点：\n${out.keyPoints.map(x=>`• ${x}`).join('\n')}`,
       `营销/服务应用：\n${out.applicationNotes.map(x=>`• ${x}`).join('\n')}`,
       `适用边界：\n${out.boundaries.map(x=>`• ${x}`).join('\n')}`].join('\n\n').slice(0,7900);
     const categories=normalizeCategories(source.metadata?.categories,source.domain);
-    const meta={domain:source.domain,categories,jurisdiction:source.jurisdiction,review_at:source.review_at,
-      source_uri:source.source_uri,sharing_authorized:source.domain==='top_performer_sharing'&&source.metadata?.sharing_authorized===true,
-      anonymized:source.domain==='top_performer_sharing'&&source.metadata?.anonymized===true,
+    const meta={domain:source.domain,categories,review_at:source.review_at,
+      source_uri:source.source_uri,published_at:source.published_at,
       summary:out.summary,summary_source:'ai',extraction_task_id:String(task.taskId),
       extraction_result_id:String(task.resultId),source_version:source.version_no};
     const itemRows=await request('knowledge_items','POST',{},[{item_type:itemTypeForCategories(categories),source:source.title,
-      source_date:source.published_at,valid_from:source.valid_from,valid_to:source.valid_to,verified:false,
+      source_date:null,valid_from:null,valid_to:null,verified:false,
       confidence:null,content,metadata:meta,lifecycle_status:'draft',created_by:actor,updated_by:actor,
       supersedes_id:null,version_no:source.version_no,source_id:source.id}]);
     if(!Array.isArray(itemRows)||!itemRows[0]?.id) fail('PERSISTENCE_ERROR');
@@ -315,19 +368,107 @@ function createKnowledgeLibrary(options={}) {
     return {itemId:String(itemRows[0].id),sourceId:String(source.id),draft:false,summary:out.summary,
       keyPoints:out.keyPoints,taskId:String(task.taskId),resultId:String(task.resultId)};
   }
+  async function uploadStart(input,actorValue) {
+    const actor=actorUid(actorValue),meta=fields(input),fileSizeBytes=Number(input.fileSizeBytes);
+    if(!Number.isSafeInteger(fileSizeBytes)||fileSizeBytes<1||fileSizeBytes>MAX_FILE_BYTES)fail('FILE_TOO_LARGE');
+    const uploadId=randomUUID(),placeholderDigest=createHash('sha256').update(`knowledge-upload:${uploadId}`).digest('hex');
+    const upload={upload_id:uploadId,phase:'receiving',file_size_bytes:fileSizeBytes,
+      chunk_count:Math.ceil(fileSizeBytes/UPLOAD_CHUNK_BYTES),next_chunk:0,chunk_hashes:[]};
+    const payload={domain:meta.domain,title:meta.title,publisher:meta.publisher,source_uri:meta.sourceUri,
+      published_at:meta.publishedAt,valid_from:null,valid_to:null,review_at:meta.reviewAt,
+      storage_key:`pg-private://knowledge-sources/uploads/${uploadId}`,file_name:meta.fileName,
+      content_type:meta.contentType,file_size_bytes:fileSizeBytes,sha256:placeholderDigest,
+      extraction_status:'queued',lifecycle_status:'draft',version_no:1,created_by:actor,updated_by:actor,
+      metadata:{categories:meta.categories,upload},original_base64:''};
+    const rows=await request('knowledge_sources','POST',{select:'id,updated_at'},[payload]);
+    if(!rows?.[0]?.id)fail('PERSISTENCE_ERROR');
+    return {ok:true,sourceId:String(rows[0].id),uploadId,chunkSize:UPLOAD_CHUNK_BYTES,chunkCount:upload.chunk_count};
+  }
+  async function uploadChunk(input,actorValue) {
+    const actor=actorUid(actorValue),sourceId=String(input?.sourceId||''),uploadId=String(input?.uploadId||''),index=Number(input?.index);
+    if(!positiveId(sourceId)||!/^[-0-9a-f]{36}$/i.test(uploadId)||!Number.isSafeInteger(index)||index<0)fail('INVALID_INPUT');
+    const bytes=decodeBase64(input.chunkBase64),digest=createHash('sha256').update(bytes).digest('hex');
+    const rows=await request('knowledge_sources','GET',{select:'id,created_by,metadata,original_base64,updated_at,deleted_at',id:`eq.${sourceId}`,limit:1});
+    const source=rows[0],state=source?.metadata?.upload;
+    if(!source||source.deleted_at||source.created_by!==actor||state?.phase!=='receiving'||state.upload_id!==uploadId)fail('SOURCE_UNAVAILABLE');
+    const expectedBytes=Math.min(UPLOAD_CHUNK_BYTES,state.file_size_bytes-index*UPLOAD_CHUNK_BYTES);
+    if(expectedBytes<1||bytes.length!==expectedBytes||index>=state.chunk_count)fail('INVALID_FILE');
+    const next=Number(state.next_chunk||0),hashes=Array.isArray(state.chunk_hashes)?state.chunk_hashes:[];
+    if(index<next){if(hashes[index]===digest)return {ok:true,duplicate:true,nextChunk:next};fail('UPLOAD_CHUNK_CONFLICT');}
+    if(index!==next)fail('UPLOAD_CHUNK_ORDER');
+    if(index<state.chunk_count-1&&bytes.length%3!==0)fail('INVALID_FILE');
+    const base64=String(input.chunkBase64),updatedUpload={...state,next_chunk:next+1,chunk_hashes:[...hashes,digest]};
+    const updated=await request('knowledge_sources','PATCH',{select:'id,updated_at',id:`eq.${sourceId}`,
+      updated_at:`eq.${source.updated_at}`,created_by:`eq.${actor}`,deleted_at:'is.null'},
+      {original_base64:String(source.original_base64||'')+base64,metadata:{...source.metadata,upload:updatedUpload},
+        updated_at:new Date().toISOString(),updated_by:actor},{timeoutMs:30000});
+    if(updated.length!==1)fail('STALE_SOURCE');
+    return {ok:true,nextChunk:next+1};
+  }
+  async function uploadFinalize(input,actorValue) {
+    const actor=actorUid(actorValue),sourceId=String(input?.sourceId||''),uploadId=String(input?.uploadId||'');
+    if(!positiveId(sourceId)||!/^[-0-9a-f]{36}$/i.test(uploadId))fail('INVALID_INPUT');
+    const rows=await request('knowledge_sources','GET',{select:'*',id:`eq.${sourceId}`,created_by:`eq.${actor}`,deleted_at:'is.null',limit:1});
+    const source=rows[0],state=source?.metadata?.upload;
+    if(!source||state?.upload_id!==uploadId)fail('SOURCE_UNAVAILABLE');
+    if(state.phase==='complete')return {ok:true,sourceId,extractionStatus:source.extraction_status};
+    if(state.phase!=='receiving'||Number(state.next_chunk)!==Number(state.chunk_count))fail('UPLOAD_INCOMPLETE');
+    const bytes=decodeBase64(source.original_base64);
+    if(bytes.length!==Number(state.file_size_bytes)||bytes.length!==Number(source.file_size_bytes))fail('INVALID_FILE');
+    const digest=createHash('sha256').update(bytes).digest('hex');
+    const existing=await request('knowledge_sources','GET',{select:'id,extraction_status',sha256:`eq.${digest}`,id:`neq.${sourceId}`,limit:1});
+    if(existing.length){
+      await request('knowledge_sources','DELETE',{id:`eq.${sourceId}`,created_by:`eq.${actor}`,deleted_at:'is.null'});
+      return {ok:true,duplicate:true,sourceId:String(existing[0].id),extractionStatus:existing[0].extraction_status};
+    }
+    const upload={...state,phase:'complete'};
+    const prepared={...source,sha256:digest,metadata:{...source.metadata,upload}};
+    const marked=await request('knowledge_sources','PATCH',{select:'id,updated_at',id:`eq.${sourceId}`,updated_at:`eq.${source.updated_at}`,created_by:`eq.${actor}`},
+      {sha256:digest,metadata:prepared.metadata,extraction_status:'extracting',updated_at:new Date().toISOString(),updated_by:actor},
+      {timeoutMs:30000});
+    if(marked.length!==1)fail('STALE_SOURCE');
+    prepared.updated_at=marked[0].updated_at;
+    prepared.extraction_status='extracting';
+    try{
+      const extractedText=await extractText(source.file_name,source.content_type,bytes,{app:client,sourceId,uploadId:state.upload_id});
+      if((source.metadata?.categories||[]).includes('top_performer_sharing')&&likelySensitive(extractedText))fail('PERSONAL_DATA_DETECTED');
+      const draft=await extractToDraft(prepared,source.original_base64,actor,extractedText);
+      return {ok:true,...draft,extractionStatus:'verified'};
+    }catch(error){
+      if(error.code==='PERSONAL_DATA_DETECTED'){
+        await request('knowledge_sources','DELETE',{id:`eq.${sourceId}`,created_by:`eq.${actor}`,deleted_at:'is.null'}).catch(()=>{});
+        return {ok:false,sourceId,extractionStatus:'rejected',errorCode:error.code};
+      }
+      await request('knowledge_sources','PATCH',{id:`eq.${sourceId}`,created_by:`eq.${actor}`,deleted_at:'is.null'},
+        {extraction_status:'failed',updated_at:new Date().toISOString(),updated_by:actor},{timeoutMs:30000}).catch(()=>{});
+      return {ok:false,sourceId,extractionStatus:'failed',errorCode:error.code||'EXTRACTION_FAILED'};
+    }
+  }
+  async function uploadCancel(input,actorValue) {
+    const actor=actorUid(actorValue),sourceId=String(input?.sourceId||''),uploadId=String(input?.uploadId||'');
+    if(!positiveId(sourceId)||!/^[-0-9a-f]{36}$/i.test(uploadId))fail('INVALID_INPUT');
+    const rows=await request('knowledge_sources','GET',{select:'id,created_by,metadata',id:`eq.${sourceId}`,deleted_at:'is.null',limit:1});
+    const source=rows[0];
+    if(!source||source.created_by!==actor||source.metadata?.upload?.upload_id!==uploadId||source.metadata?.upload?.phase!=='receiving')return {ok:true};
+    const linked=await request('knowledge_items','GET',{select:'id',source_id:`eq.${sourceId}`,limit:1});
+    if(linked.length)fail('SOURCE_IN_USE');
+    await request('knowledge_sources','DELETE',{id:`eq.${sourceId}`,created_by:`eq.${actor}`,deleted_at:'is.null'});
+    return {ok:true};
+  }
   async function upload(input,actorValue) {
-    const actor=actorUid(actorValue),meta=fields(input),bytes=decodeBase64(input.fileBase64);
-    const extractedText=await extractText(meta.fileName,meta.contentType,bytes);
+    const actor=actorUid(actorValue),bytes=decodeBase64(input?.fileBase64);
+    if(bytes.length>3*1024*1024)fail('FILE_TOO_LARGE');
+    const meta=fields({...input,fileSizeBytes:bytes.length}),extractedText=await extractText(meta.fileName,meta.contentType,bytes,{app:client});
     if(meta.categories.includes('top_performer_sharing')&&likelySensitive(extractedText))fail('PERSONAL_DATA_DETECTED');
     const digest=createHash('sha256').update(bytes).digest('hex');
     const existing=await request('knowledge_sources','GET',{select:'id,extraction_status',sha256:`eq.${digest}`,limit:1});
     if(existing.length)return {ok:true,duplicate:true,sourceId:String(existing[0].id),extractionStatus:existing[0].extraction_status};
     const id=randomUUID(),sourceKey=`pg-private://knowledge-sources/${id}`;
-    const payload={domain:meta.domain,title:meta.title,publisher:meta.publisher,jurisdiction:meta.jurisdiction,source_uri:meta.sourceUri,
-      published_at:meta.publishedAt,valid_from:meta.validFrom,valid_to:meta.validTo,review_at:meta.reviewAt,
+    const payload={domain:meta.domain,title:meta.title,publisher:meta.publisher,source_uri:meta.sourceUri,
+      published_at:meta.publishedAt,valid_from:null,valid_to:null,review_at:meta.reviewAt,
       storage_key:sourceKey,file_name:meta.fileName,content_type:meta.contentType,file_size_bytes:bytes.length,sha256:digest,
       extraction_status:'queued',lifecycle_status:'draft',version_no:1,created_by:actor,updated_by:actor,
-      metadata:{sharing_authorized:meta.sharingAuthorized,anonymized:meta.anonymized,categories:meta.categories},original_base64:bytes.toString('base64')};
+      metadata:{categories:meta.categories},original_base64:bytes.toString('base64')};
     const rows=await request('knowledge_sources','POST',{},[payload]);
     if(!Array.isArray(rows)||!rows[0]?.id)fail('PERSISTENCE_ERROR');
     try {
@@ -346,18 +487,19 @@ function createKnowledgeLibrary(options={}) {
     const items=await request('knowledge_items','GET',{select:'id',source_id:`eq.${sourceId}`,limit:1});
     if(items.length)fail('DRAFT_ALREADY_EXISTS');
     const source=rows[0];
-    await request('knowledge_sources','PATCH',{id:`eq.${sourceId}`},{extraction_status:'queued',updated_at:new Date().toISOString(),updated_by:actor});
-    try { return {ok:true,...await extractToDraft(source,source.original_base64,actor),extractionStatus:'verified'}; }
+    const extracting=(await request('knowledge_sources','PATCH',{select:'id,updated_at',id:`eq.${sourceId}`},
+      {extraction_status:'extracting',updated_at:new Date().toISOString(),updated_by:actor}))[0];
+    try {const text=await extractText(source.file_name,source.content_type,decodeBase64(source.original_base64),{app:client,sourceId});
+      return {ok:true,...await extractToDraft({...source,extraction_status:'extracting',updated_at:extracting?.updated_at},source.original_base64,actor,text),extractionStatus:'verified'};}
     catch(error){await request('knowledge_sources','PATCH',{id:`eq.${sourceId}`},{extraction_status:'failed',updated_at:new Date().toISOString(),updated_by:actor}).catch(()=>{});throw error;}
   }
   async function reviewSource(input,actorValue) {
     const actor=actorUid(actorValue),sourceId=String(input?.sourceId||''),itemId=String(input?.itemId||''),action=input?.decision;
     if(!positiveId(sourceId)||!positiveId(itemId)||!['verify','invalidate'].includes(action))fail('INVALID_INPUT');
     if(action==='verify') {
-      const rows=await request('knowledge_sources','GET',{select:'id,domain,jurisdiction,source_uri,published_at,metadata,updated_at,extraction_status,lifecycle_status',id:`eq.${sourceId}`,limit:1});
+      const rows=await request('knowledge_sources','GET',{select:'id,domain,source_uri,published_at,metadata,updated_at,extraction_status,lifecycle_status',id:`eq.${sourceId}`,limit:1});
       const source=rows[0]; if(!source||source.extraction_status!=='draft'||source.lifecycle_status!=='draft'||source.updated_at!==input.expectedUpdatedAt)fail('STALE_SOURCE');
-      if(['industry','legal_tax'].includes(source.domain)&&(!source.jurisdiction||!source.source_uri||!source.published_at))fail('SOURCE_METADATA_REQUIRED');
-      if(source.domain==='top_performer_sharing'&&(source.metadata?.sharing_authorized!==true||source.metadata?.anonymized!==true))fail('SHARING_AUTHORIZATION_REQUIRED');
+      if(['industry','legal_tax'].includes(source.domain)&&(!source.source_uri||!source.published_at))fail('SOURCE_METADATA_REQUIRED');
     }
     const data=searchDataFactory({env,key,fetchImpl});
     const result=await data.auditRdb.rpc('crm_knowledge_source_review_v1',{p_actor_uid:actor,p_source_id:Number(sourceId),
@@ -419,22 +561,18 @@ function createKnowledgeLibrary(options={}) {
   async function sourceList() { return {ok:true,sources:(await sourceRows()).map(metadataForSource)}; }
 
   async function activeItems(domains,market) {
-    const items=await request('knowledge_items','GET',{select:'id,source_id,item_type,source,source_date,valid_from,valid_to,verified,lifecycle_status,version_no,content,metadata,deleted_at',verified:'eq.true',lifecycle_status:'eq.verified',deleted_at:'is.null',order:'source_date.desc.nullslast,id.desc',limit:300});
+    const items=await request('knowledge_items','GET',{select:'id,source_id,item_type,source,source_date,verified,lifecycle_status,version_no,content,metadata,deleted_at',verified:'eq.true',lifecycle_status:'eq.verified',deleted_at:'is.null',order:'updated_at.desc.nullslast,id.desc',limit:300});
     const ids=[...new Set(items.map(row=>row.source_id).filter(positiveId).map(String))];
-    const sources=ids.length?await request('knowledge_sources','GET',{select:'id,domain,title,publisher,jurisdiction,source_uri,published_at,valid_from,valid_to,review_at,lifecycle_status,version_no,deleted_at',id:`in.(${ids.join(',')})`,deleted_at:'is.null',limit:300}):[];
+    const sources=ids.length?await request('knowledge_sources','GET',{select:'id,domain,title,publisher,source_uri,published_at,review_at,lifecycle_status,version_no,deleted_at',id:`in.(${ids.join(',')})`,deleted_at:'is.null',limit:300}):[];
     const sourceMap=new Map(sources.map(row=>[String(row.id),row]));
     const today=todayShanghai();
     return items.filter(row=>{
       const categoryDomain=categoryDomains(row);
       if(![...categoryDomain].some(value=>domains.has(value)))return false;
-      if(row.valid_from&&row.valid_from>today||row.valid_to&&row.valid_to<today)return false;
       const source=row.source_id?sourceMap.get(String(row.source_id)):null;
-      if(row.source_id&&(!source||source.deleted_at||source.lifecycle_status!=='verified'||source.valid_from&&source.valid_from>today||source.valid_to&&source.valid_to<today||source.review_at&&source.review_at<today))return false;
-      const jurisdiction=source?.jurisdiction||row.metadata?.jurisdiction||null;
+      if(row.source_id&&(!source||source.deleted_at||source.lifecycle_status!=='verified'||source.review_at&&source.review_at<today))return false;
       if(categoryDomain.has('legal_tax')&&!market)return false;
-      if(jurisdiction&&market&&jurisdiction.toLowerCase()!==market.toLowerCase())return false;
-      if(jurisdiction&&!market&&[...categoryDomain].some(value=>['legal_tax','industry'].includes(value)))return false;
-      if(categoryDomain.has('top_performer_sharing')&&(row.metadata?.sharing_authorized!==true||row.metadata?.anonymized!==true))return false;
+      if(categoryDomain.has('top_performer_sharing')&&likelySensitive(row.content||''))return false;
       return true;
     }).map(row=>({row,source:row.source_id?sourceMap.get(String(row.source_id))||null:null}));
   }
@@ -453,7 +591,7 @@ function createKnowledgeLibrary(options={}) {
       const id=String(row.id);allowed.set(id,{schema:'public',table:'knowledge_items',id,sourceId:row.source_id?String(row.source_id):null,
         title:row.source||source?.title||'Knowledge item',domain:row.metadata?.domain||null,sourceDate:row.source_date||source?.published_at||null,
         categories:Array.isArray(row.metadata?.categories)?row.metadata.categories:[],
-        jurisdiction:source?.jurisdiction||row.metadata?.jurisdiction||null,versionNo:row.version_no||1,locator:row.metadata?.locator||null});
+        publishedAt:row.metadata?.published_at||source?.published_at||null,versionNo:row.version_no||1,locator:row.metadata?.locator||null});
       refs.push({...allowed.get(id),excerpt:String(row.content||'').slice(0,2200)});
     }
     return {refs,allowed};
@@ -544,6 +682,10 @@ function createKnowledgeLibrary(options={}) {
       case 'trashList':return trashList();
       case 'save':return saveKnowledge(event.data,actor);
       case 'upload':return upload(event.data,actor);
+      case 'uploadStart':return uploadStart(event.data,actor);
+      case 'uploadChunk':return uploadChunk(event.data,actor);
+      case 'uploadFinalize':return uploadFinalize(event.data,actor);
+      case 'uploadCancel':return uploadCancel(event.data,actor);
       case 'retry':return retryExtraction(event.sourceId,actor);
       case 'review':return reviewSource(event.data,actor);
       case 'setValidity':return setValidity(event.data,actor);
@@ -555,8 +697,8 @@ function createKnowledgeLibrary(options={}) {
       default:fail('INVALID_OPERATION');
     }
   }
-  return {run,upload,extractText,list,runDual,selectDual,history};
+  return {run,upload,uploadStart,uploadChunk,uploadFinalize,uploadCancel,extractText,list,runDual,selectDual,history};
 }
 
 async function handleKnowledgeLibrary(event,actor) { return createKnowledgeLibrary().run(event,actor); }
-module.exports={createKnowledgeLibrary,handleKnowledgeLibrary,extractDocx,decodeBase64,likelySensitive,MAX_FILE_BYTES};
+module.exports={createKnowledgeLibrary,handleKnowledgeLibrary,extractDocx,extractPptx,extractXlsx,extractText,decodeBase64,likelySensitive,MAX_FILE_BYTES,UPLOAD_CHUNK_BYTES};

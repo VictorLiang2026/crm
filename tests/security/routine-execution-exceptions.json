@@ -1,6 +1,16 @@
 {
   "routines": [
     {
+      "id": "routine:crm_knowledge_ocr_input_v1(p_source_id bigint, p_upload_id uuid)",
+      "expectedDetail": {
+        "anon_execute": true,
+        "service_execute": false,
+        "security_definer": true,
+        "authenticated_execute": false
+      },
+      "reason": "Authorized 2026-10-27 for knowledge image OCR. The CloudBase ai_parse function can execute this SECURITY DEFINER routine only for the matching source ID and random upload capability while the source is extracting; it returns only PNG/JPEG/WEBP bytes and grants no table access. Revoke after replacing the OCR handoff with a server-authenticated path."
+    },
+    {
       "id": "routine:pmc18_collect_once_v1()",
       "expectedDetail": {
         "anon_execute": true,

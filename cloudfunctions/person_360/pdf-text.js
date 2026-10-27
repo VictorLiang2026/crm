@@ -1,7 +1,7 @@
 'use strict';
 const {fork}=require('node:child_process');
 const path=require('node:path');
-const MAX_BYTES=4*1024*1024, TIMEOUT_MS=8000;
+const MAX_BYTES=6*1024*1024, TIMEOUT_MS=12000;
 const ERRORS=new Set(['PDF_ENCRYPTED','PDF_NO_TEXT','PDF_LIMIT','PDF_TIMEOUT','INVALID_CONTENT']);
 
 // A bounded child process contains native parser crashes as well as blocked JavaScript.

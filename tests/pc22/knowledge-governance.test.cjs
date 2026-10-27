@@ -22,7 +22,31 @@ test('governance saves drafts server-side and review uses authenticated actor pl
   assert.equal(calls[1][1].p_expected_updated_at, '2026-10-16T10:00:00Z');
 });
 
-test('only verified current sourced evidence with confidence enters meeting prep; cases and stories stay separate', async () => {
+test('new strategy records auto publication date and omits removed reference, source, and validity inputs', async () => {
+  let saved;
+  const service = new KnowledgeGovernanceService({
+    request: async (table, method, filters, body) => {
+      if (method === 'POST') { saved = body; return [{ ...body, id: 9, updated_at: '2026-10-27T00:00:00Z' }]; }
+      if (method === 'GET' && filters?.id) return [{ id: 9, updated_at: '2026-10-27T00:00:00Z',
+        lifecycle_status: 'verified', metadata: saved.metadata }];
+      return [];
+    },
+    rpc: async () => ({ ok: true }),
+    now: () => new Date('2026-10-27T00:00:00Z'),
+  });
+  await service.save({ table: 'playbooks', categories: ['conversation_strategy'], scenario: 'Meeting',
+    response_logic: 'Ask and listen', next_objective: 'Agree next step', confidence: 0.8,
+    evidence_refs: '999', case_refs: '998', story_refs: '997', source: 'Old source', valid_to: '2026-10-01' }, 'operator-1');
+  assert.deepEqual(saved.evidence_refs, []);
+  assert.deepEqual(saved.case_refs, []);
+  assert.deepEqual(saved.story_refs, []);
+  assert.equal(saved.source, 'Knowledge Library');
+  assert.equal(saved.valid_from, null);
+  assert.equal(saved.valid_to, null);
+  assert.equal(saved.metadata.published_at, '2026-10-27');
+});
+
+test('only verified sourced evidence with confidence enters meeting prep; knowledge dates and playbook links are optional', async () => {
   const evidence = [
     { id: 1, item_type: 'evidence', lifecycle_status: 'verified', verified: true, source: 'contract',
       content: 'Benefit clause', confidence: 0.9 },
@@ -47,9 +71,9 @@ test('only verified current sourced evidence with confidence enters meeting prep
   const builder = new MeetingPrepContextBuilder({ request, listInteractions: async () => ({ rows: [] }),
     insuranceContext: async () => ({}), now: () => new Date('2026-10-16T12:00:00Z') });
   const context = await builder.build(10, { objection: 'service', scenario: 'Claims' });
-  assert.deepEqual(context.relevant_playbook.content.reliable_evidence.map(row => row.reference.id), [1]);
+  assert.deepEqual(context.relevant_playbook.content.reliable_evidence.map(row => row.reference.id), [1, 2]);
   assert.equal(context.relevant_playbook.content.relevant_playbooks.length, 1);
-  assert.deepEqual(context.relevant_playbook.content.relevant_playbooks[0].evidence.map(row => row.reference.id), [1]);
+  assert.equal(Object.hasOwn(context.relevant_playbook.content.relevant_playbooks[0], 'evidence'), false);
   assert.equal(context.relevant_playbook.status, 'available');
   const unmatched = await builder.build(10, { objection: 'unrelated objection' });
   assert.deepEqual(unmatched.relevant_playbook.content.relevant_playbooks, []);

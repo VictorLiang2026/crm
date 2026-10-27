@@ -62,7 +62,7 @@ export function renderKnowledgeGovernance(ctx) {
         if(!search.toLocaleLowerCase().includes(query))return false;}
       return true;
     });
-    const sortValue=row=>sortField==='title'?titleOf(row):sortField==='category'?categoriesOf(row).join(' '):
+    const sortValue=row=>sortField==='id'?row.id:sortField==='title'?titleOf(row):sortField==='category'?categoriesOf(row).join(' '):
       sortField==='summary'?summaryOf(row):sortField==='status'?(active(row)?'1':'0'):row.updated_at||'';
     filtered.sort((a,b)=>{const cmp=String(sortValue(a)).localeCompare(String(sortValue(b)),undefined,{numeric:true,sensitivity:'base'});
       return sortDir==='asc'?cmp:-cmp;});
@@ -72,7 +72,7 @@ export function renderKnowledgeGovernance(ctx) {
       sortDir=sortField===field&&sortDir==='asc'?'desc':'asc';sortField=field;draw();
     }},`${label}${sortField===field?(sortDir==='asc'?' ↑':' ↓'):''}`);
     const table=h('div',{class:'kg-table-wrap'},h('table',{class:'kg-table'},[
-      h('thead',{},h('tr',{},[header('title',text('title_column')),header('category',text('category')),
+      h('thead',{},h('tr',{},[header('id',text('number')),header('title',text('title_column')),header('category',text('category')),
         header('summary',text('summary')),header('status',text('status')),header('updated_at',text('updated_at')),h('th',{},text('actions'))])),
       h('tbody',{},pageRows.length?pageRows.map(row=>{
         const live=active(row),isSource=row.table==='knowledge_sources',isPlaybook=row.table==='playbooks';
@@ -87,16 +87,17 @@ export function renderKnowledgeGovernance(ctx) {
           h('button',{class:'btn btn-ghost btn-sm',type:'button',onclick:()=>remove(row).catch(error=>ctx.toast(error.message,'error'))},text('delete')),
         ].filter(Boolean);
         return h('tr',{'data-kg-id':String(row.id)},[
+          h('td',{class:'kg-number-cell'},`${row.table==='knowledge_items'?'K':isPlaybook?'P':'S'}-${row.id}`),
           h('td',{},[h('b',{},titleOf(row)||'—'),isPlaybook?h('small',{class:'kg-table-meta'},text('playbook')):null]),
           h('td',{class:'kg-category-tags'},categoriesOf(row).map(category=>h('span',{class:'kg-category-chip'},text(`category_${category}`)))),
           h('td',{class:'kg-summary-cell'},[summary||'—',
             !isSource?h('details',{class:'kg-row-content-details'},[h('summary',{},text('view_content')),
               h('div',{class:'kg-full-content'},isPlaybook?row.response_logic:row.content)]):null]),
           h('td',{},h('span',{class:`kg-status ${live?'kg-verified':'kg-invalidated'}`},text(live?'status_active':'status_invalid'))),
-          h('td',{},row.updated_at?String(row.updated_at).slice(0,16).replace('T',' '):'—'),
+          h('td',{},row.updated_at?String(row.updated_at).slice(0,10):'—'),
           h('td',{class:'kg-table-actions'},actions),
         ]);
-      }):h('tr',{},h('td',{colspan:'6',class:'kg-empty-cell'},text('no_results')))),
+      }):h('tr',{},h('td',{colspan:'7',class:'kg-empty-cell'},text('no_results')))),
     ]));
     const pager=h('div',{class:'kg-pager'},[
       h('span',{},text('result_count').replace('{count}',String(filtered.length))),
@@ -119,9 +120,10 @@ export function renderKnowledgeGovernance(ctx) {
         categoryFilter=event.target.checked?[...categoryFilter,category]:categoryFilter.filter(item=>item!==category);page=1;draw();
       }}),text(`category_${category}`)]))),
   ]);
-  const statusNode=()=>h('label',{class:'kg-field kg-status-filter'},[h('span',{},text('filter_status')),
-    h('select',{onchange:event=>{statusFilter=event.target.value;page=1;draw();}},
-      [['all','filter_all'],['active','status_active'],['invalid','status_invalid']].map(([value,label])=>h('option',{value,selected:statusFilter===value},text(label))))]);
+  const statusNode=()=>h('select',{class:'kg-status-filter','aria-label':text('filter_status'),
+    onchange:event=>{statusFilter=event.target.value;page=1;draw();}},
+    [['all','filter_status'],['active','status_active'],['invalid','status_invalid']]
+      .map(([value,label])=>h('option',{value,selected:statusFilter===value},text(label))));
   const searchForm=h('form',{class:'kg-search',onsubmit:event=>{event.preventDefault();keyword=searchInput.value;fullText=fullSearch.checked;page=1;draw();}},[
     searchInput,h('label',{class:'kg-full-search'},[fullSearch,text('full_search')]),h('button',{class:'btn btn-primary',type:'submit'},text('search')),
   ]);

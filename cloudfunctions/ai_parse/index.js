@@ -34,6 +34,7 @@
 'use strict';
 
 const { rdb, generateText, extractJson, assertOk } = require('./db');
+const { createKnowledgeOcr } = require('./knowledge-ocr-service');
 const { quickCaptureV2 } = require('./quick-capture-v2');
 const { quickCaptureFocused } = require('./quick-capture-focused');
 
@@ -67,6 +68,9 @@ const SYSTEM_VISION = [
 exports.main = async (event, context) => {
   try {
     const action = (event && event.action) || 'parse';
+    if (action === 'ocr_knowledge_source') {
+      return await createKnowledgeOcr({rdb,generateText,assertOk,visionModel:VISION_MODEL}).run(event);
+    }
     if (action === 'quick_capture' && event?.profile === 'focused') {
       return await quickCaptureFocused(event, { rdb, assertOk, generateText, extractJson, today: qcBjToday() });
     }

@@ -64,15 +64,21 @@ test('editing a draft uses an optimistic timestamp condition',async()=>{
   assert.equal(writes[0].url.searchParams.get('updated_at'),`eq.${current.updated_at}`);
 });
 
-test('regulated and top performer categories retain source and privacy safeguards',async()=>{
+test('publication metadata replaces removed jurisdiction/date fields while privacy scanning remains automatic',async()=>{
   const {service,writes}=setup();
-  await assert.rejects(service.run({operation:'save',data:{...base,domain:'legal_tax'}},'operator-1'),
+  await assert.rejects(service.run({operation:'save',data:{...base,domain:'legal_tax',publishedAt:'2026-10-01'}},'operator-1'),
     error=>error.code==='SOURCE_METADATA_REQUIRED');
-  await assert.rejects(service.run({operation:'save',data:{...base,domain:'top_performer_sharing'}},'operator-1'),
-    error=>error.code==='SHARING_AUTHORIZATION_REQUIRED');
-  await assert.rejects(service.run({operation:'save',data:{...base,domain:'top_performer_sharing',sharingAuthorized:true,
-    anonymized:true,content:'客户电话 13812345678'}},'operator-1'),error=>error.code==='PERSONAL_DATA_DETECTED');
-  assert.equal(writes.length,0);
+  const result=await service.run({operation:'save',data:{...base,domain:'top_performer_sharing',
+    publishedAt:'2026-10-21',jurisdiction:'legacy field ignored',validTo:'2026-10-22'}},'operator-1');
+  assert.equal(result.ok,true);
+  const payload=writes[0].body[0];
+  assert.equal(payload.source_date,null);assert.equal(payload.valid_from,null);assert.equal(payload.valid_to,null);
+  assert.equal(payload.metadata.published_at,'2026-10-21');
+  assert.equal(Object.hasOwn(payload.metadata,'jurisdiction'),false);
+  assert.equal(Object.hasOwn(payload.metadata,'sharing_authorized'),false);
+  await assert.rejects(service.run({operation:'save',data:{...base,domain:'top_performer_sharing',
+    content:'客户电话 13812345678'}},'operator-1'),error=>error.code==='PERSONAL_DATA_DETECTED');
+  assert.equal(writes.length,1);
 });
 
 test('superseded history cannot be edited, while invalidated knowledge can be updated and republished',async()=>{
@@ -89,4 +95,65 @@ test('superseded history cannot be edited, while invalidated knowledge can be up
   const {service,rpcCalls}=setup({current});
   await service.run({operation:'save',data:{...base,id:'8',expectedUpdatedAt:current.updated_at,summary:'Edit'}},'operator-1');
   assert.equal(rpcCalls[0].name,'crm_knowledge_set_valid_v1');
+});
+
+test('staged upload accepts a 6 MiB PNG in bounded chunks and hands its source reference to the existing OCR function',async()=>{
+  const rows={knowledge_sources:[],knowledge_items:[]};let nextId=1,ocrRequest=null;
+  const fetchImpl=async(url,options={})=>{
+    const table=new URL(url).pathname.split('/').pop(),method=options.method||'GET',params=new URL(url).searchParams;
+    if(method==='GET'){
+      let found=[...(rows[table]||[])];
+      for(const [key,value] of params){
+        if(key==='select'||key==='limit')continue;
+        if(value==='is.null')found=found.filter(row=>row[key]==null);
+        else if(value.startsWith('eq.'))found=found.filter(row=>String(row[key])===value.slice(3));
+        else if(value.startsWith('neq.'))found=found.filter(row=>String(row[key])!==value.slice(4));
+      }
+      return response(found.slice(0,Number(params.get('limit')||found.length)));
+    }
+    if(method==='POST'){
+      const body=JSON.parse(options.body),created=(Array.isArray(body)?body:[body]).map(row=>({...row,id:nextId++,updated_at:new Date().toISOString()}));
+      rows[table].push(...created);return response(created);
+    }
+    if(method==='PATCH'){
+      let found=[...(rows[table]||[])];
+      for(const [key,value] of params){
+        if(key==='select')continue;
+        if(value==='is.null')found=found.filter(row=>row[key]==null);
+        else if(value.startsWith('eq.'))found=found.filter(row=>String(row[key])===value.slice(3));
+      }
+      const patch=JSON.parse(options.body);for(const row of found)Object.assign(row,patch);
+      return response(found);
+    }
+    if(method==='DELETE'){
+      const before=rows[table].length;rows[table]=rows[table].filter(row=>String(row.id)!==params.get('id')?.slice(3));
+      return response(rows[table].length===before?[]:[{id:params.get('id')?.slice(3)}]);
+    }
+    throw new Error(`Unexpected method ${method}`);
+  };
+  const service=createKnowledgeLibrary({env:'crm-test123',key:'test-key',fetchImpl,
+    client:{callFunction:async input=>{ocrRequest=input;return {result:{ocrText:'识别到的图片文字。'}};}},
+    gatewayFactory:()=>({runAITask:async()=>({result:{summary:'摘要',keyPoints:['知识点'],applicationNotes:['应用'],boundaries:['边界']},taskId:1,resultId:2})}),
+    searchDataFactory:()=>({auditRdb:{rpc:async()=>({data:{ok:true}})}})});
+  const bytes=Buffer.alloc(6*1024*1024);Buffer.from([137,80,78,71,13,10,26,10]).copy(bytes);
+  const started=await service.uploadStart({categories:['on_sale_product'],title:'演示图片',fileName:'source.png',fileSizeBytes:bytes.length},'operator-1');
+  assert.equal(started.chunkCount,8);
+  for(let index=0;index<started.chunkCount;index++){
+    const chunk=bytes.subarray(index*768*1024,Math.min(bytes.length,(index+1)*768*1024));
+    const result=await service.uploadChunk({sourceId:started.sourceId,uploadId:started.uploadId,index,chunkBase64:chunk.toString('base64')},'operator-1');
+    assert.equal(result.ok,true);
+  }
+  const finished=await service.uploadFinalize({sourceId:started.sourceId,uploadId:started.uploadId},'operator-1');
+  assert.equal(finished.ok,true);assert.equal(finished.extractionStatus,'verified');
+  assert.equal(ocrRequest.name,'ai_parse');assert.equal(ocrRequest.data.action,'ocr_knowledge_source');
+  assert.equal(ocrRequest.data.sourceId,started.sourceId);assert.equal(ocrRequest.data.uploadId,started.uploadId);
+  assert.equal(rows.knowledge_sources[0].file_size_bytes,6*1024*1024);
+  assert.equal(rows.knowledge_sources[0].extraction_status,'draft');
+  assert.equal(rows.knowledge_items[0].metadata.summary,'摘要');
+});
+
+test('staged upload rejects files larger than 6 MiB before creating a source record',async()=>{
+  const {service}=setup();
+  await assert.rejects(service.uploadStart({categories:['on_sale_product'],title:'Too big',fileName:'source.png',
+    fileSizeBytes:6*1024*1024+1},'operator-1'),error=>error.code==='FILE_TOO_LARGE');
 });

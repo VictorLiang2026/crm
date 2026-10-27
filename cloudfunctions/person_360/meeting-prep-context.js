@@ -92,13 +92,10 @@ class MeetingPrepContextBuilder {
     const openOpportunities = [...opportunityById.values()]
       .sort((a, b) => String(b.updated_at || '').localeCompare(String(a.updated_at || ''))).slice(0, 10);
     const recent = Array.isArray(interactions?.rows) ? interactions.rows : [];
-    const today = this.now().toISOString().slice(0, 10);
-    const current = row => (!row.valid_from || row.valid_from <= today) && (!row.valid_to || row.valid_to >= today) &&
-      (!row.source_date || row.source_date <= today);
     const [knowledgeRows, playbookRows] = await Promise.all([
-      read('knowledge_items', { select: 'id,source_id,item_type,source,source_date,valid_from,valid_to,verified,confidence,content,lifecycle_status,deleted_at',
+      read('knowledge_items', { select: 'id,source_id,item_type,source,verified,confidence,content,metadata,lifecycle_status,deleted_at',
         lifecycle_status: 'eq.verified', verified: 'eq.true', deleted_at:'is.null', order: 'updated_at.desc,id.desc', limit: 30 }),
-      read('playbooks', { select: 'id,scenario,objection,possible_underlying_reasons,clarifying_questions,response_logic,evidence_refs,case_refs,story_refs,do_not_say,next_objective,source,confidence,valid_from,valid_to,lifecycle_status,deleted_at',
+      read('playbooks', { select: 'id,scenario,objection,possible_underlying_reasons,clarifying_questions,response_logic,do_not_say,next_objective,source,confidence,metadata,lifecycle_status,deleted_at',
         lifecycle_status: 'eq.verified', deleted_at:'is.null', order: 'updated_at.desc,id.desc', limit: 30 }),
     ]);
     const sourceIds = [...new Set(knowledgeRows.map(row => row.source_id).filter(value => value != null).map(String))];
@@ -108,26 +105,18 @@ class MeetingPrepContextBuilder {
     const availableSources = new Set(sourceRows.filter(row => row.lifecycle_status === 'verified').map(row => String(row.id)));
     const evidenceById = new Map(knowledgeRows.filter(row => row.item_type === 'evidence' && row.verified === true &&
       (row.source_id == null || availableSources.has(String(row.source_id))) &&
-      row.confidence != null && Number(row.confidence) >= 0.7 && clip(row.source, 500) && clip(row.content, 5000) && current(row))
+      row.confidence != null && Number(row.confidence) >= 0.7 && clip(row.source, 500) && clip(row.content, 5000))
       .map(row => [String(row.id), row]));
     const curatedEvidence = [...evidenceById.values()].slice(0, 12).map(row => ({
       content: clip(row.content, 1000), source: clip(row.source, 300), confidence: Number(row.confidence),
-      source_date: row.source_date, reference: { ...SOURCE('knowledge_items'), id: row.id, item_type: 'evidence' },
+      published_at: row.metadata?.published_at || null, reference: { ...SOURCE('knowledge_items'), id: row.id, item_type: 'evidence' },
     }));
     const curatedPlaybooks = playbookRows.map(row => ({ row, score: playbookScore(row, objection, scenario) }))
-      .filter(({ row, score }) => score > 0 && current(row) && clip(row.source, 500) &&
-      Number(row.confidence) >= 0.7 && Array.isArray(row.evidence_refs) &&
-      row.evidence_refs.length > 0 && row.evidence_refs.every(ref => evidenceById.has(String(ref))) &&
-      !(row.case_refs || []).some(ref => evidenceById.has(String(ref))) &&
-      !(row.story_refs || []).some(ref => evidenceById.has(String(ref))))
+      .filter(({ row, score }) => score > 0 && Number(row.confidence) >= 0.7)
       .sort((a,b) => b.score - a.score).slice(0, 3).map(({row}) => ({ scenario: clip(row.scenario, 160), objection: clip(row.objection, 500),
         response_logic: clip(row.response_logic, 2000), possible_underlying_reasons: row.possible_underlying_reasons,
         clarifying_questions: row.clarifying_questions, do_not_say: row.do_not_say,
-        next_objective: clip(row.next_objective, 300), source: clip(row.source, 300),
-        evidence: row.evidence_refs.map(ref => evidenceById.get(String(ref))).map(item => ({
-          content: clip(item.content, 700), source: clip(item.source, 250), confidence: Number(item.confidence),
-          reference: { ...SOURCE('knowledge_items'), id: item.id, item_type: 'evidence' },
-        })) }));
+        next_objective: clip(row.next_objective, 300), published_at: row.metadata?.published_at || null }));
 
     return {
       person: { data: { id: person.id, display_name: clip(person.display_name, 120),
@@ -168,7 +157,7 @@ class MeetingPrepContextBuilder {
       relevant_playbook: curatedPlaybooks.length || curatedEvidence.length ? {
         status: 'available', content: { relevant_playbooks: curatedPlaybooks, reliable_evidence: curatedEvidence },
       } : { status: 'unavailable', content: null,
-        reason: 'No reviewed, current, referenced playbook or qualifying evidence matches the governance rules.' },
+        reason: 'No reviewed matching playbook or qualifying evidence is available.' },
     };
   }
 }

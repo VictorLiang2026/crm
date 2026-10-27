@@ -4,6 +4,7 @@ import { t } from './i18n.js';
 import { data } from './data.js';
 
 const text=key=>t(`kg_${key}`);
+const UPLOAD_CHUNK_BYTES=768*1024;
 const CATEGORIES=['on_sale_product','existing_service','recruitment_policy','industry_development',
   'marketing_activity','legal_tax','health_wealth_sharing','top_performer_sharing','customer_case','recruitment_case',
   'conversation_strategy','objection_handling','company_information','other'];
@@ -15,6 +16,11 @@ const categoriesOf=row=>Array.isArray(row?.metadata?.categories)&&row.metadata.c
   :Array.isArray(row?.categories)&&row.categories.length?row.categories
     :[LEGACY[row?.metadata?.domain]||(row?.table==='playbooks'?'conversation_strategy':'other')];
 const field=(key,control)=>h('label',{class:'kg-field'},[h('span',{},text(key)),control]);
+const todayLocal=()=>{const date=new Date();return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;};
+function bytesToBase64(bytes){let binary='';for(let offset=0;offset<bytes.length;offset+=0x8000)
+  binary+=String.fromCharCode(...bytes.subarray(offset,Math.min(offset+0x8000,bytes.length)));
+  return btoa(binary);}
+async function readFileChunk(file,start,end){return bytesToBase64(new Uint8Array(await file.slice(start,end).arrayBuffer()));}
 const textInput=(name,{value='',required=false,type='text',max=500,min=null,step=null,placeholder=''}={})=>h('input',
   {name,type,value,required,...(type==='number'?{max:String(max),...(min==null?{}:{min:String(min)}),...(step==null?{}:{step:String(step)})}:{maxlength:String(max)}),
     ...(placeholder?{placeholder:text(placeholder)}:{})});
@@ -51,14 +57,33 @@ export function renderKnowledgeEditor(ctx,{mode='new',table='knowledge_items',id
       if(isUpload){
         const file=current.elements.file.files?.[0];
         if(!file)throw new Error(text('source_file_required'));
-        if(file.size>3*1024*1024)throw new Error(text('source_file_too_large'));
-        const base64=await new Promise((resolve,reject)=>{const reader=new FileReader();
-          reader.onerror=()=>reject(new Error(text('source_upload_failed')));
-          reader.onload=()=>resolve(String(reader.result).split(',')[1]);reader.readAsDataURL(file);});
-        const result=await data.knowledgeLibrary(ctx,'upload',{data:{...values,fileName:file.name,
-          contentType:file.type||'application/octet-stream',fileBase64:base64,
-          sharingAuthorized:current.elements.sharingAuthorized.checked,anonymized:current.elements.anonymized.checked}});
-        if(!result?.ok)throw new Error(text(result?.errorCode==='PERSONAL_DATA_DETECTED'?'sensitive_blocked':'source_upload_failed'));
+        if(!file.size)throw new Error(text('source_file_required'));
+        if(file.size>6*1024*1024)throw new Error(text('source_file_too_large'));
+        const initialized=await data.knowledgeLibrary(ctx,'uploadStart',{data:{...values,fileName:file.name,fileSizeBytes:file.size}});
+        if(!initialized?.ok)throw new Error(initialized?.error?.code||text('source_upload_failed'));
+        const session={sourceId:initialized.sourceId,uploadId:initialized.uploadId};let finalizing=false;
+        try{
+          for(let index=0;index<initialized.chunkCount;index++){
+            const start=index*UPLOAD_CHUNK_BYTES,end=Math.min(file.size,start+UPLOAD_CHUNK_BYTES);
+            const chunkBase64=await readFileChunk(file,start,end);
+            let result,error;
+            for(let attempt=0;attempt<2;attempt++){
+              try{result=await data.knowledgeLibrary(ctx,'uploadChunk',{data:{...session,index,chunkBase64}});error=null;break;}
+              catch(caught){error=caught;}
+            }
+            if(error)throw error;
+            if(!result?.ok)throw new Error(result?.error?.code||text('source_upload_failed'));
+            formStatus.textContent=text('source_upload_progress').replace('{current}',String(index+1)).replace('{total}',String(initialized.chunkCount));
+          }
+          finalizing=true;
+          const result=await data.knowledgeLibrary(ctx,'uploadFinalize',{data:session});
+          if(!result?.ok){const code=result?.errorCode||result?.error?.code;
+            throw new Error(code==='PERSONAL_DATA_DETECTED'?text('sensitive_blocked'):
+              code==='VISION_MODEL_NOT_CONFIGURED'?text('ocr_model_not_configured'):
+              code==='OCR_FAILED'?text('ocr_failed'):
+                  code==='UNSUPPORTED_TYPE'?text('source_unsupported_type'):
+                    ['INVALID_CONTENT','INVALID_IMAGE'].includes(code)?text('source_invalid_content'):text('source_upload_failed'));}
+        }catch(error){if(!finalizing)await data.knowledgeLibrary(ctx,'uploadCancel',{data:session}).catch(()=>{});throw error;}
       }else if(isPlaybook){
         for(const key of ['possible_underlying_reasons','clarifying_questions','do_not_say'])
           values[key]=String(values[key]||'').split(/\r?\n/).map(value=>value.trim()).filter(Boolean);
@@ -68,8 +93,7 @@ export function renderKnowledgeEditor(ctx,{mode='new',table='knowledge_items',id
       }else{
         const result=await data.knowledgeLibrary(ctx,'save',{data:{...values,
           id:mode==='edit'?id:undefined,expectedUpdatedAt:current.elements.expectedUpdatedAt?.value,
-          confidence:values.confidence===''?0.8:Number(values.confidence),
-          sharingAuthorized:current.elements.sharingAuthorized.checked,anonymized:current.elements.anonymized.checked}});
+          confidence:values.confidence===''?0.8:Number(values.confidence)}});
         if(!result?.ok)throw new Error(result?.error?.message||text('save_failed'));
       }
       ctx.toast(text(isUpload?'upload_success':'save_success'),'ok');location.hash='#/knowledge-governance';
@@ -80,15 +104,10 @@ export function renderKnowledgeEditor(ctx,{mode='new',table='knowledge_items',id
     elements.push(
       field('item_title',textInput('title',{required:true,max:500})),categoryNode,
       field('source_publisher',textInput('publisher',{max:500})),
-      field('source_jurisdiction',textInput('jurisdiction',{max:160,placeholder:'source_jurisdiction_hint'})),
       field('source_uri',textInput('sourceUri',{type:'url',max:2000,placeholder:'source_uri_hint'})),
-      field('source_published_at',textInput('publishedAt',{type:'date'})),
-      field('source_valid_from',textInput('validFrom',{type:'date'})),
-      field('source_valid_to',textInput('validTo',{type:'date'})),
+      field('source_published_at',textInput('publishedAt',{type:'date',value:todayLocal()})),
       field('source_review_at',textInput('reviewAt',{type:'date'})),
-      field('source_file',h('input',{name:'file',type:'file',required:true,accept:'.pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain'})),
-      field('source_sharing_authorized',h('input',{name:'sharingAuthorized',type:'checkbox'})),
-      field('source_anonymized',h('input',{name:'anonymized',type:'checkbox'})),
+      field('source_file',h('input',{name:'file',type:'file',required:true,accept:'.pdf,.docx,.pptx,.xlsx,.txt,.md,.csv,.png,.jpg,.jpeg,.webp,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/plain,text/markdown,text/csv,image/png,image/jpeg,image/webp'})),
       h('p',{class:'foot-note'},text('source_upload_help')),
     );
   }else if(isPlaybook){
@@ -101,12 +120,6 @@ export function renderKnowledgeEditor(ctx,{mode='new',table='knowledge_items',id
       field('response_logic',area('response_logic',{required:true,rows:5,max:4000})),
       field('next_objective',textInput('next_objective',{required:true,max:500})),
       field('do_not_say',area('do_not_say',{rows:2,max:2000,placeholder:'list_lines_hint'})),
-      field('evidence_refs',textInput('evidence_refs',{max:500,placeholder:'reference_ids_hint'})),
-      field('case_refs',textInput('case_refs',{max:500,placeholder:'reference_ids_hint'})),
-      field('story_refs',textInput('story_refs',{max:500,placeholder:'reference_ids_hint'})),
-      field('source',textInput('source',{required:true,max:500})),
-      field('valid_from',textInput('valid_from',{type:'date'})),
-      field('valid_to',textInput('valid_to',{type:'date'})),
       field('confidence',textInput('confidence',{type:'number',min:0,max:1,step:0.01,value:'0.8'})),
     );
   }else{
@@ -115,14 +128,9 @@ export function renderKnowledgeEditor(ctx,{mode='new',table='knowledge_items',id
       field('item_title',textInput('title',{required:true,max:500})),
       field('summary',area('summary',{rows:2,max:1200,placeholder:'summary_ai_hint'})),
       field('content',area('content',{required:true,rows:8,max:8000})),
-      field('source_jurisdiction',textInput('jurisdiction',{max:160,placeholder:'source_jurisdiction_hint'})),
       field('source_uri',textInput('sourceUri',{type:'url',max:2000,placeholder:'source_uri_hint'})),
-      field('source_date',textInput('sourceDate',{type:'date'})),
-      field('valid_from',textInput('validFrom',{type:'date'})),
-      field('valid_to',textInput('validTo',{type:'date'})),
+      field('source_published_at',textInput('publishedAt',{type:'date',value:todayLocal()})),
       field('confidence',textInput('confidence',{type:'number',min:0,max:1,step:0.01,value:'0.8'})),
-      field('source_sharing_authorized',h('input',{name:'sharingAuthorized',type:'checkbox'})),
-      field('source_anonymized',h('input',{name:'anonymized',type:'checkbox'})),
     );
   }
   if(mode==='edit')elements.push(h('input',{type:'hidden',name:'expectedUpdatedAt',value:''}));
@@ -144,19 +152,14 @@ export function renderKnowledgeEditor(ctx,{mode='new',table='knowledge_items',id
       const assign=(name,value)=>{if(form.elements[name]&&value!=null)form.elements[name].value=String(value);};
       if(table==='playbooks'){
         assign('scenario',source.scenario);assign('objection',source.objection);assign('response_logic',source.response_logic);
-        assign('next_objective',source.next_objective);assign('source',source.source);assign('valid_from',source.valid_from);
-        assign('valid_to',source.valid_to);assign('confidence',source.confidence??0.8);
+        assign('next_objective',source.next_objective);assign('confidence',source.confidence??0.8);
         assign('possible_underlying_reasons',(source.possible_underlying_reasons||[]).join('\n'));
         assign('clarifying_questions',(source.clarifying_questions||[]).join('\n'));assign('do_not_say',(source.do_not_say||[]).join('\n'));
-        assign('evidence_refs',(source.evidence_refs||[]).join(','));assign('case_refs',(source.case_refs||[]).join(','));
-        assign('story_refs',(source.story_refs||[]).join(','));
       }else{
         assign('title',source.source);assign('summary',source.metadata?.summary||'');assign('content',source.content);
-        assign('jurisdiction',source.metadata?.jurisdiction||'');assign('sourceUri',source.metadata?.source_uri||'');
-        assign('sourceDate',source.source_date);assign('validFrom',source.valid_from);assign('validTo',source.valid_to);
+        assign('sourceUri',source.metadata?.source_uri||'');
+        assign('publishedAt',source.metadata?.published_at||'');
         assign('confidence',source.confidence??0.8);
-        if(form.elements.sharingAuthorized)form.elements.sharingAuthorized.checked=source.metadata?.sharing_authorized===true;
-        if(form.elements.anonymized)form.elements.anonymized.checked=source.metadata?.anonymized===true;
       }
     }).catch(error=>{formStatus.textContent=error.message||text('edit_not_found');});
   }

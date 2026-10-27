@@ -50,6 +50,7 @@ const AI_AUDIT_READ_TABLES = new Set(['ai_tasks', 'ai_results']);
 const ACTIVITY_REVIEW_READ_TABLES = new Set(['crm_activity_review_commands']);
 const OCR_REVIEW_READ_TABLES = new Set(['crm_ocr_parse_commands']);
 const KNOWLEDGE_GOVERNANCE_TABLES = new Set(['knowledge_items', 'playbooks']);
+const KNOWLEDGE_SOURCE_READ_TABLES = new Set(['knowledge_sources']);
 const PROACTIVE_COACH_TABLES = new Set(['crm_proactive_coach_decisions']);
 const TABLES = new Set([
   'persons', 'households', 'household_members', 'interactions', 'commitments',
@@ -62,6 +63,7 @@ const TABLES = new Set([
   ...ACTIVITY_REVIEW_READ_TABLES,
   ...OCR_REVIEW_READ_TABLES,
   ...KNOWLEDGE_GOVERNANCE_TABLES,
+  ...KNOWLEDGE_SOURCE_READ_TABLES,
   ...PROACTIVE_COACH_TABLES,
   ...LEGACY_INTERACTION_TABLES,
 ]);
@@ -91,7 +93,7 @@ function directoryPage(event) {
 
 function one(rows) { return Array.isArray(rows) ? rows[0] || null : null; }
 
-async function pgRequest(table, method, filters = {}, body) {
+async function pgRequest(table, method, filters = {}, body, { timeoutMs = 8000 } = {}) {
   if (!TABLES.has(table)) throw new Error('Invalid table');
   if (LEGACY_INTERACTION_TABLES.has(table) && method !== 'GET' &&
       !(table === 'activity_participants' && method === 'POST') &&
@@ -105,6 +107,7 @@ async function pgRequest(table, method, filters = {}, body) {
   if (OCR_REVIEW_READ_TABLES.has(table) && method !== 'GET') throw new Error('Invalid source operation');
   if (ACTIVITY_REVIEW_READ_TABLES.has(table) && method !== 'GET') throw new Error('Invalid source operation');
   if (KNOWLEDGE_GOVERNANCE_TABLES.has(table) && !['GET', 'POST', 'PATCH'].includes(method)) throw new Error('Invalid source operation');
+  if (KNOWLEDGE_SOURCE_READ_TABLES.has(table) && method !== 'GET') throw new Error('Invalid source operation');
   if (PROACTIVE_COACH_TABLES.has(table) && method !== 'GET') throw new Error('Invalid source operation');
   if (table === 'commitments' && method !== 'GET') throw new Error('Invalid source operation');
   const env = process.env.TCB_ENV;
@@ -113,7 +116,7 @@ async function pgRequest(table, method, filters = {}, body) {
   const url = new URL(`https://${env}.api.tcloudbasegateway.com/v1/rdb/rest/${table}`);
   for (const [name, value] of Object.entries(filters)) url.searchParams.set(name, String(value));
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 8000);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetch(url, {
       method,
@@ -987,7 +990,9 @@ exports.main = async event => {
     const service = createService();
     switch (event?.action) {
       case 'get': return await service.get(event.personId);
-      case 'extractKnowledgePdfText': return await require('./knowledge-pdf-service').extract(event);
+      case 'extractKnowledgePdfText': return await require('./knowledge-pdf-service').extract(event,async sourceId=>one(await pgRequest(
+        'knowledge_sources','GET',{select:'id,original_base64,file_name,content_type,extraction_status,deleted_at',
+          id:`eq.${sourceId}`,deleted_at:'is.null',limit:1},undefined,{timeoutMs:30000})));
       case 'resolveHouseholdMember':
         return await new HouseholdService({request: pgRequest, rpc: pgRpc}).resolveMemberName(event.name);
       case 'previewHousehold':

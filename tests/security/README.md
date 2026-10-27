@@ -32,3 +32,5 @@
 2026-10-19 PM18 兼容例外：`routine:pmc18_collect_once_v1()` 暂保留 anon-only ACL。实测撤销 anon 并授予 service_role 会使现有 `pmc18_observer` 的 `app.rdb()` 调用失败；恢复 anon 后返回当日已采集快照。例外仅接受 `anon=true`、`authenticated=false`、`service_role=false`、`SECURITY DEFINER=true` 的该精确签名，理由和预期 ACL 见 `routine-execution-exceptions.json`。其他例程仍必须有 service_role 执行权限。PM18 若改为 service_role 通道，需单独审批、部署并回归后移除此例外。
 
 2026-10-19 PM18 匿名网关探针例外：用户批准对 `public.pmc18_observations` 做单表、精确探针。探针只发送 HEAD 并记录 HTTP 状态与 Content-Range 的总行数，不发送 GET、不读取或保存行内容；只接受 HTTP 206 且总行数为正的 20 的倍数（采集器每个完整快照包含 20 项聚合指标）。此例外不授予新权限，也不改变现有 ACL / `pmc18_observer` 行为。若指标数、响应状态或计数格式异常，检查失败关闭。
+
+2026-10-27 Knowledge OCR：用户批准新增 `public.crm_knowledge_ocr_input_v1(bigint,uuid)`。例外只允许 `anon_execute=true`、`authenticated_execute=false`、`service_execute=false`、`security_definer=true`。函数须同时验证来源 ID、随机上传令牌、`extracting` 状态、图片 MIME 类型及 6 MiB / Base64 长度限制，只返回图片原件给既有 `ai_parse` OCR 调用；不授予 `knowledge_sources` 表级读取权限。替换为服务端身份验证调用后，应撤销 anon execute 并移除此例外。
