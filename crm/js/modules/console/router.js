@@ -6,6 +6,7 @@ import {
   renderKnowledgeGovernance, renderResourceDirectory, renderAnalytics, renderPersonFileImport,
   renderTestScenario, renderTestAction,
   renderDualFollowup,
+  renderKnowledgeEditor, renderKnowledgeTrash,
 } from './views.js';
 
 const EXACT = new Map([
@@ -30,6 +31,10 @@ const EXACT = new Map([
   ['#/test-scenario/action', renderTestAction],
   ['#/knowledge-governance', renderKnowledgeGovernance],
   ['#/knowledge-library', renderKnowledgeGovernance],
+  ['#/knowledge/upload', ctx => renderKnowledgeEditor(ctx,{mode:'upload'})],
+  ['#/knowledge/new', ctx => renderKnowledgeEditor(ctx,{mode:'new'})],
+  ['#/knowledge/playbook', ctx => renderKnowledgeEditor(ctx,{mode:'playbook'})],
+  ['#/knowledge/trash', renderKnowledgeTrash],
 ]);
 
 const PATTERNS = [
@@ -44,10 +49,12 @@ const PATTERNS = [
     const params = new URLSearchParams(query || '');
     return renderActivityReport(ctx, type, { startDate: params.get('startDate'), endDate: params.get('endDate') });
   } },
-  { re: /^#\/knowledge-governance(?:\?(.*))?$/, nav: '#/more', render: (ctx, query) => {
+  { re: /^#\/knowledge-governance(?:\?(.*))?$/, nav: '#/knowledge-library', render: (ctx, query) => {
     const params = new URLSearchParams(query || '');
     return renderKnowledgeGovernance(ctx, { focusItemId: params.get('item') });
   } },
+  { re: /^#\/knowledge\/edit\/(knowledge_items|playbooks)\/(\d+)$/, nav: '#/knowledge-library', render: (ctx, table, id) =>
+    renderKnowledgeEditor(ctx,{mode:'edit',table,id}) },
 ];
 
 const NAV_OF = {
@@ -71,8 +78,12 @@ const NAV_OF = {
   '#/settings': '#/more',
   '#/test-scenario': '#/more',
   '#/test-scenario/action': '#/more',
-  '#/knowledge-governance': '#/more',
+  '#/knowledge-governance': '#/knowledge-library',
   '#/knowledge-library': '#/knowledge-library',
+  '#/knowledge/upload': '#/knowledge-library',
+  '#/knowledge/new': '#/knowledge-library',
+  '#/knowledge/playbook': '#/knowledge-library',
+  '#/knowledge/trash': '#/knowledge-library',
   '#/activity-report/customer': '#/today',
   '#/activity-report/recruit': '#/today',
 };

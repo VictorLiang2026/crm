@@ -31,7 +31,7 @@ function familyFixture() {
     if (filters.anchor_person_id) rows = rows.filter(row => String(row.anchor_person_id) === filters.anchor_person_id.slice(3));
     if (filters.household_id) rows = rows.filter(row => String(row.household_id) === filters.household_id.slice(3));
     if (filters.item_type) rows = rows.filter(row => row.item_type === filters.item_type.slice(3));
-    if (filters.deleted_at === 'is.null' && ['households','household_members'].includes(table)) rows = rows.filter(row => !row.deleted_at);
+    if (filters.deleted_at === 'is.null') rows = rows.filter(row => !row.deleted_at);
     if (filters.confirmed_at === 'not.is.null') rows = rows.filter(row => row.confirmed_at);
     return rows;
   }
@@ -57,4 +57,23 @@ test('insurance preparation receives only confirmed household context', async ()
   assert.deepEqual(result.householdContext.facts.map(row => row.content), ['Confirmed family fact']);
   assert.ok(!JSON.stringify(result.householdContext).includes('Legacy unreviewed'));
   assert.ok(!result.householdContext.members.some(row => row.person_id === 3));
+});
+
+test('meeting preparation excludes knowledge whose source is deleted or inactive', async () => {
+  const { data, request } = familyFixture();
+  data.knowledge_items = [
+    { id: 10, source_id: 100, item_type: 'evidence', source: 'Deleted source', content: 'Deleted source evidence',
+      confidence: 0.9, verified: true, lifecycle_status: 'verified' },
+    { id: 11, source_id: 101, item_type: 'evidence', source: 'Active source', content: 'Active source evidence',
+      confidence: 0.9, verified: true, lifecycle_status: 'verified' },
+  ];
+  data.knowledge_sources = [
+    { id: 101, lifecycle_status: 'verified', deleted_at: null },
+  ];
+  data.playbooks = [];
+  const builder = new MeetingPrepContextBuilder({ request, listInteractions: async () => ({ rows: [] }),
+    insuranceContext: async () => ({}), now: () => new Date('2026-10-15T00:00:00Z') });
+  const context = await builder.build(1);
+  assert.equal(JSON.stringify(context).includes('Deleted source evidence'), false);
+  assert.equal(JSON.stringify(context).includes('Active source evidence'), true);
 });

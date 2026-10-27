@@ -96,12 +96,18 @@ class MeetingPrepContextBuilder {
     const current = row => (!row.valid_from || row.valid_from <= today) && (!row.valid_to || row.valid_to >= today) &&
       (!row.source_date || row.source_date <= today);
     const [knowledgeRows, playbookRows] = await Promise.all([
-      read('knowledge_items', { select: 'id,item_type,source,source_date,valid_from,valid_to,verified,confidence,content,lifecycle_status',
-        lifecycle_status: 'eq.verified', verified: 'eq.true', order: 'updated_at.desc,id.desc', limit: 30 }),
-      read('playbooks', { select: 'id,scenario,objection,possible_underlying_reasons,clarifying_questions,response_logic,evidence_refs,case_refs,story_refs,do_not_say,next_objective,source,confidence,valid_from,valid_to,lifecycle_status',
-        lifecycle_status: 'eq.verified', order: 'updated_at.desc,id.desc', limit: 30 }),
+      read('knowledge_items', { select: 'id,source_id,item_type,source,source_date,valid_from,valid_to,verified,confidence,content,lifecycle_status,deleted_at',
+        lifecycle_status: 'eq.verified', verified: 'eq.true', deleted_at:'is.null', order: 'updated_at.desc,id.desc', limit: 30 }),
+      read('playbooks', { select: 'id,scenario,objection,possible_underlying_reasons,clarifying_questions,response_logic,evidence_refs,case_refs,story_refs,do_not_say,next_objective,source,confidence,valid_from,valid_to,lifecycle_status,deleted_at',
+        lifecycle_status: 'eq.verified', deleted_at:'is.null', order: 'updated_at.desc,id.desc', limit: 30 }),
     ]);
+    const sourceIds = [...new Set(knowledgeRows.map(row => row.source_id).filter(value => value != null).map(String))];
+    const sourceRows = sourceIds.length ? await read('knowledge_sources', {
+      select: 'id,lifecycle_status,deleted_at', id: `in.(${sourceIds.join(',')})`, deleted_at: 'is.null', limit: 100,
+    }) : [];
+    const availableSources = new Set(sourceRows.filter(row => row.lifecycle_status === 'verified').map(row => String(row.id)));
     const evidenceById = new Map(knowledgeRows.filter(row => row.item_type === 'evidence' && row.verified === true &&
+      (row.source_id == null || availableSources.has(String(row.source_id))) &&
       row.confidence != null && Number(row.confidence) >= 0.7 && clip(row.source, 500) && clip(row.content, 5000) && current(row))
       .map(row => [String(row.id), row]));
     const curatedEvidence = [...evidenceById.values()].slice(0, 12).map(row => ({

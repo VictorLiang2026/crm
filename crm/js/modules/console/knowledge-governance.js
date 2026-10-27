@@ -1,326 +1,140 @@
 import { h } from './dom.js';
-import { pageHead } from './ui.js';
+import { pageHead, emptyNote } from './ui.js';
 import { t } from './i18n.js';
 import { data } from './data.js';
 
-const text = (key) => t(`kg_${key}`);
-const label = (name, control) => h('label', { class: 'kg-field' }, [h('span', {}, text(name)), control]);
-const input = (name, type = 'text', value = '') => h('input', { name, type, value, maxlength: name === 'content' ? 8000 : 500 });
-function status(row) { return text(`status_${row.lifecycle_status || (row.verified ? 'verified' : 'draft')}`); }
-export function knowledgeValidity(row, now = new Date()) {
-  const today = new Intl.DateTimeFormat('en-CA', {timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
-  const from = row.valid_from || null, to = row.valid_to || null;
-  const valid = value => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) &&
-    Number.isFinite(Date.parse(value)) && new Date(value).toISOString().slice(0,10) === value;
-  if ((from && !valid(from)) || (to && !valid(to)) || (from && to && from > to)) return 'invalid';
-  if (to && to < today) return 'expired';
-  if (from && from > today) return 'future';
-  return from || to ? 'within' : 'unspecified';
-}
-function rowDomain(row, table = 'knowledge_items') {
-  if (table === 'playbooks') return 'playbook';
-  const domain = row.metadata?.domain;
-  if (domain) return domain;
-  return ({product:'product',company:'company',regulation:'legal_tax',case:'case',story:'top_performer_sharing'})[row.item_type] || 'industry';
-}
-function renderRow(ctx, table, row, reload, onEdit, sourceRecord = null) {
-  const isPlaybook = table === 'playbooks';
-  const title = isPlaybook ? `${row.scenario} · ${row.objection}` : row.source;
-  const summary = isPlaybook ? row.response_logic : (row.metadata?.summary || String(row.content || '').slice(0, 220));
-  const state = row.lifecycle_status || (row.verified ? 'verified' : 'draft');
-  const controls = [];
-  const review = async action => {
-    if (row.source_id && sourceRecord && !row.supersedes_id) {
-      await data.knowledgeLibrary(ctx,'review',{data:{sourceId:sourceRecord.id,itemId:row.id,decision:action,
-        expectedUpdatedAt:sourceRecord.updatedAt}});
-    } else {
-      await data.reviewKnowledgeGovernance(ctx, { table, id: row.id, action, expectedUpdatedAt: row.updated_at });
-    }
-    await reload();
-  };
-  if (state === 'draft') controls.push(h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: async () => {
-    if (!window.confirm(text('confirm_verify'))) return;
-    await review('verify');
-  } }, text('verify')));
-  if (!isPlaybook && ['draft','verified'].includes(state)) controls.push(h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => onEdit(row) }, text(state === 'verified' ? 'revise' : 'edit')));
-  if (['draft','verified'].includes(state)) controls.push(h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: async () => {
-    if (!window.confirm(text('confirm_invalidate'))) return;
-    await review('invalidate');
-  } }, text('invalidate')));
-  const validity = isPlaybook ? '' : `${text('validity')}: ${text(`validity_${knowledgeValidity(row)}`)}`;
-  return h('tr', { 'data-kg-id': String(row.id) }, [
-    h('td', {}, [h('b', {}, title || '—'), h('small', { class: 'kg-table-meta' }, `${text('version')}: ${row.version_no || 1}`)]),
-    h('td', {}, text(`domain_${rowDomain(row, table)}`)),
-    h('td', { class: 'kg-summary-cell' }, [
-      summary || '—',
-      !isPlaybook && !row.metadata?.summary ? h('small', { class: 'kg-summary-note' }, text('summary_legacy')) : null,
-      h('details',{class:'kg-row-content-details'},[
-        h('summary',{},text('view_content')),
-        h('div',{class:'kg-full-content'},isPlaybook?row.response_logic:row.content),
-        ...(isPlaybook?['evidence_refs','case_refs','story_refs'].map(key=>h('small',{},`${text(key)}: ${(row[key]||[]).join(', ')||'—'}`)):[]),
-      ]),
-    ]),
-    h('td', {}, row.source_date || row.valid_from || '—'),
-    h('td', {}, validity),
-    h('td', {}, h('span', { class: `kg-status kg-${state}` }, status(row))),
-    h('td', { class: 'kg-table-actions' }, controls),
-  ]);
-}
+const text = key => t(`kg_${key}`);
+const CATEGORIES = ['on_sale_product','existing_service','recruitment_policy','industry_development',
+  'marketing_activity','legal_tax','health_wealth_sharing','top_performer_sharing','customer_case','recruitment_case',
+  'conversation_strategy','objection_handling','company_information','other'];
+const LEGACY = {product:'on_sale_product',company:'company_information',service:'existing_service',
+  recruitment:'recruitment_policy',industry:'industry_development',campaign:'marketing_activity',
+  health_wealth_seminar:'health_wealth_sharing',top_performer_sharing:'top_performer_sharing',
+  legal_tax:'legal_tax',case:'customer_case',playbook:'conversation_strategy'};
+const categoriesOf = row => Array.isArray(row.metadata?.categories) && row.metadata.categories.length ? row.metadata.categories
+  : Array.isArray(row.categories)&&row.categories.length?row.categories
+    : [LEGACY[row.metadata?.domain] || (row.table === 'playbooks' ? 'conversation_strategy' : 'other')];
+const active = row => (row.lifecycle_status || (row.verified ? 'verified' : 'draft')) === 'verified';
+const titleOf = row => row.table === 'playbooks' ? `${row.scenario || ''}${row.objection ? ` · ${row.objection}` : ''}`
+  : row.table === 'knowledge_sources' ? row.title || row.fileName || '' : row.source || '';
+const summaryOf = row => row.table === 'playbooks' ? row.response_logic || ''
+  : row.table === 'knowledge_sources' ? text('source_pending_summary') : row.metadata?.summary || String(row.content || '').slice(0,220);
 
-export function renderKnowledgeGovernance(ctx, { focusItemId = null } = {}) {
-  const main = ctx.main;
-  let records = { knowledge: [], playbooks: [], sources: [], libraryKnowledge: [] };
-  let typeFilter = 'all'; let statusFilter = 'all'; let domainFilter = []; let categoryFilterOpen = false;
-  let keyword = ''; let fullText = false; let sortField = 'updated_at'; let sortDir = 'desc'; let page = 1;
-  const refresh = async () => {
-    const [governance, library] = await Promise.all([data.knowledgeGovernance(ctx), data.knowledgeLibrary(ctx, 'list')]);
-    records = { ...governance, sources: library.sources || [], libraryKnowledge: library.knowledge || [] };
-    const byId = new Map((records.knowledge || []).map(row => [String(row.id), row]));
-    records.libraryKnowledge.forEach(row => {
-      const prior = byId.get(String(row.id)) || {};
-      byId.set(String(row.id), { ...row, ...prior, metadata:{...(row.metadata||{}),...(prior.metadata||{})} });
-    });
-    records.knowledge = [...byId.values()];
+export function renderKnowledgeGovernance(ctx) {
+  let records={knowledge:[],playbooks:[],sources:[]},categoryFilter=[],statusFilter='all',keyword='',fullText=false;
+  let sortField='updated_at',sortDir='desc',page=1,categoryFilterOpen=false;
+  const main=ctx.main;
+  const load=async()=>{
+    const result=await data.knowledgeLibrary(ctx,'list');
+    records={knowledge:result.knowledge||[],playbooks:result.playbooks||[],sources:result.sources||[]};
     draw();
-    if (focusItemId) requestAnimationFrame(() => document.getElementById('kg-focused-item')?.scrollIntoView({ behavior: 'smooth', block: 'center' })); };
-  const sourceStatus = h('p', { class: 'foot-note', role: 'status' });
-  const sourceForm = h('form', { class: 'kg-form', onsubmit: async event => {
-    event.preventDefault();
-    const form = event.currentTarget, fd = new FormData(form), file = fd.get('file');
-    if (!(file instanceof File) || !file.size) { sourceStatus.textContent = text('source_file_required'); return; }
-    if (file.size > 3 * 1024 * 1024) { sourceStatus.textContent = text('source_file_too_large'); return; }
-    const reader = new FileReader();
-    reader.onerror = () => { sourceStatus.textContent = text('source_upload_failed'); };
-    reader.onload = async () => {
-      sourceStatus.textContent = text('source_extracting');
-      const values = Object.fromEntries([...fd.entries()].filter(([key]) => key !== 'file'));
-      try {
-        const response = await data.knowledgeLibrary(ctx, 'upload', { data: { ...values, fileName: file.name,
-          contentType: file.type || 'application/octet-stream', fileBase64: String(reader.result).split(',')[1],
-          sharingAuthorized: fd.get('sharingAuthorized') === 'on', anonymized: fd.get('anonymized') === 'on' } });
-        sourceStatus.textContent = response.ok ? (response.duplicate ? text('source_duplicate') : text('source_draft_created'))
-          : text('source_upload_failed');
-        if (response.ok) { form.reset(); await refresh(); }
-      } catch (_) { sourceStatus.textContent = text('source_upload_failed'); }
-    };
-    reader.readAsDataURL(file);
-  } }, [
-    h('h2', {}, text('source_upload_title')),
-    label('source_domain', h('select', { name: 'domain', required: true }, [
-      ...['product','company','service','recruitment','industry','campaign','health_wealth_seminar','top_performer_sharing','legal_tax','case','playbook']
-        .map(value => h('option', { value }, text(`domain_${value}`))),
-    ])),
-    label('source_title', h('input', { name: 'title', maxlength: 500, required: true })),
-    label('source_publisher', h('input', { name: 'publisher', maxlength: 500 })),
-    label('source_jurisdiction', h('input', { name: 'jurisdiction', maxlength: 160, placeholder: text('source_jurisdiction_hint') })),
-    label('source_uri', h('input', { name: 'sourceUri', type: 'url', maxlength: 2000, placeholder: text('source_uri_hint') })),
-    label('source_published_at', h('input', { name: 'publishedAt', type: 'date' })),
-    label('source_valid_from', h('input', { name: 'validFrom', type: 'date' })),
-    label('source_valid_to', h('input', { name: 'validTo', type: 'date' })),
-    label('source_review_at', h('input', { name: 'reviewAt', type: 'date' })),
-    label('source_file', h('input', { name: 'file', type: 'file', required: true, accept: '.pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain' })),
-    label('source_sharing_authorized', h('input', { name: 'sharingAuthorized', type: 'checkbox' })),
-    label('source_anonymized', h('input', { name: 'anonymized', type: 'checkbox' })),
-    h('p', { class: 'foot-note' }, text('source_upload_help')),
-    h('button', { class: 'btn btn-primary', type: 'submit' }, text('source_upload')),
-    sourceStatus,
-  ]);
-  const sourceDetails = h('details', { class:'kg-source-details' }, [
-    h('summary', {}, text('source_upload_title')), sourceForm,
-  ]);
-  const editorStatus = h('p', { class: 'foot-note', role: 'status' });
-  const form = h('form', { class: 'kg-form kg-editor-form', onsubmit: async event => {
-    event.preventDefault();
-    const currentForm = event.currentTarget, values = Object.fromEntries(new FormData(currentForm).entries());
-    try {
-      const response = await data.knowledgeLibrary(ctx, 'save', { data: { ...values,
-        confidence: values.confidence === '' ? 0.8 : Number(values.confidence),
-        sharingAuthorized:currentForm.elements.sharingAuthorized.checked,
-        anonymized:currentForm.elements.anonymized.checked } });
-      if (!response?.ok) throw new Error(response?.error?.message || 'save failed');
-      editorStatus.textContent = response.revision ? text('revision_created') : text('saved_draft');
-      currentForm.reset(); currentForm.elements.id.value = ''; currentForm.elements.expectedUpdatedAt.value = '';
-      editorDetails.open = false; await refresh();
-    } catch (error) { editorStatus.textContent = error.message || text('save_failed'); }
-  } }, [
-    h('h2', {}, text('new_title')),
-    label('source_domain', h('select', { name: 'domain', required: true }, [
-      ...['product','company','service','recruitment','industry','campaign','health_wealth_seminar','top_performer_sharing','legal_tax','case','playbook']
-        .map(value => h('option', { value }, text(`domain_${value}`))),
-    ])),
-    label('title', h('input', { name: 'title', maxlength: '500', required: true })),
-    label('summary', h('textarea', { name: 'summary', rows: 2, maxlength: 1200, placeholder: text('summary_ai_hint') })),
-    label('content', h('textarea', { name: 'content', rows: 5, maxlength: 8000, required: true })),
-    label('source_jurisdiction', h('input', { name: 'jurisdiction', maxlength: 160, placeholder: text('source_jurisdiction_hint') })),
-    label('source_uri', h('input', { name: 'sourceUri', type: 'url', maxlength: 2000, placeholder: text('source_uri_hint') })),
-    label('source_date', h('input', { name: 'sourceDate', type: 'date' })),
-    label('valid_from', h('input', { name: 'validFrom', type: 'date' })),
-    label('valid_to', h('input', { name: 'validTo', type: 'date' })),
-    label('confidence', h('input', { name: 'confidence', type: 'number', min: '0', max: '1', step: '0.01', value: '0.8' })),
-    label('source_sharing_authorized', h('input', { name: 'sharingAuthorized', type: 'checkbox' })),
-    label('source_anonymized', h('input', { name: 'anonymized', type: 'checkbox' })),
-    h('input', { type: 'hidden', name: 'id', value: '' }),
-    h('input', { type: 'hidden', name: 'expectedUpdatedAt', value: '' }),
-    h('button', { class: 'btn btn-primary', type: 'submit' }, text('save_draft')),
-    editorStatus,
-  ]);
-  const editorDetails = h('details', { class: 'kg-editor-details' }, [
-    h('summary', {}, text('new_title')), form,
-  ]);
-  const referencePreview = h('div', { class: 'kg-reference-preview', 'aria-live': 'polite' });
-  const updateReferencePreview = () => {
-    referencePreview.replaceChildren(...['evidence', 'case', 'story'].map(type => {
-      const raw = playbookForm.elements[`${type}_refs`]?.value || '';
-      const ids = raw.split(',').map(value => value.trim()).filter(Boolean).slice(0, 20);
-      const shown = ids.map(id => {
-        const item = records.knowledge.find(entry => String(entry.id) === id);
-        return item ? `#${id} · ${item.source || item.content?.slice(0, 80) || ''}` : `#${id} · ${text(`${type}_missing`)}`;
-      });
-      return h('p', {}, [text(`${type}_refs`), ': ', shown.length ? shown.join(' · ') : '—']);
-    }));
   };
-  const playbookForm = h('form', { class: 'kg-form kg-playbook-form', onsubmit: async event => {
-    event.preventDefault();
-    const fd = new FormData(event.currentTarget);
-    await data.saveKnowledgeGovernance(ctx, { table: 'playbooks', ...Object.fromEntries(fd.entries()) });
-    event.currentTarget.reset();
-    await refresh();
-  } }, [
-    h('h2', {}, text('new_playbook')),
-    label('scenario', input('scenario')),
-    label('objection', input('objection')),
-    label('response_logic', h('textarea', { name: 'response_logic', rows: 4, maxlength: 4000, required: true })),
-    label('evidence_refs', h('input', { name: 'evidence_refs', maxlength: '500', oninput: updateReferencePreview })),
-    label('case_refs', h('input', { name: 'case_refs', maxlength: '500', oninput: updateReferencePreview })),
-    label('story_refs', h('input', { name: 'story_refs', maxlength: '500', oninput: updateReferencePreview })),
-    referencePreview,
-    label('source', h('input', { name: 'source', maxlength: '500', required: true })),
-    label('valid_from', input('valid_from', 'date')),
-    label('valid_to', input('valid_to', 'date')),
-    label('confidence', h('input', { name: 'confidence', type: 'number', min: '0', max: '1', step: '0.01', value: '0.8', required: true })),
-    h('button', { class: 'btn btn-primary', type: 'submit' }, text('save_draft')),
-  ]);
-  const playbookDetails = h('details', { class:'kg-playbook-details' }, [
-    h('summary', {}, text('new_playbook')), playbookForm,
-  ]);
-  const searchInput = h('input', { type:'search', maxlength:'160', placeholder:text('search_title_hint'),
-    'aria-label':text('search_title_hint'), value:keyword });
-  const fullTextInput = h('input', { type:'checkbox', checked:fullText });
-  const draw = () => {
-    const allRows = [
-      ...records.knowledge.map(row => ({ table:'knowledge_items', row, domain:rowDomain(row) })),
-      ...records.playbooks.map(row => ({ table:'playbooks', row, domain:'playbook' })),
-    ];
-    const query = keyword.trim().toLocaleLowerCase();
-    const filtered = allRows.filter(({row,domain,table}) => {
-      const state = row.lifecycle_status || (row.verified ? 'verified' : 'draft');
-      if (domainFilter.length && !domainFilter.includes(domain)) return false;
-      if (typeFilter !== 'all' && (table === 'playbooks' ? typeFilter !== 'playbook' : row.item_type !== typeFilter)) return false;
-      if (statusFilter !== 'all' && state !== statusFilter) return false;
-      if (query) {
-        const title = table === 'playbooks' ? `${row.scenario} ${row.objection}` : row.source || '';
-        const haystack = fullText ? `${title} ${row.metadata?.summary || ''}` : title;
-        if (!haystack.toLocaleLowerCase().includes(query)) return false;
-      }
+  const rows=()=>[
+    ...records.knowledge.map(row=>({...row,table:'knowledge_items'})),
+    ...records.playbooks.map(row=>({...row,table:'playbooks'})),
+    ...records.sources.filter(source=>!records.knowledge.some(item=>String(item.source_id)===String(source.id)))
+      .map(row=>({...row,table:'knowledge_sources'})),
+  ];
+  const setStatus=async row=>{
+    const next=!active(row);
+    const result=await data.knowledgeLibrary(ctx,'setValidity',{data:{table:row.table,id:row.id,
+      valid:next,expectedUpdatedAt:row.updated_at}});
+    if(!result?.ok)throw new Error(text('state_failed'));
+    await load();
+  };
+  const remove=async row=>{
+    if(!window.confirm(text('confirm_delete')))return;
+    await data.knowledgeLibrary(ctx,'delete',{data:{table:row.table,id:row.id,expectedUpdatedAt:row.updated_at}});
+    await load();
+  };
+  const retry=async row=>{
+    const result=await data.knowledgeLibrary(ctx,'retry',{sourceId:row.id});
+    if(!result?.ok)throw new Error(result?.errorCode||text('retry_failed'));
+    ctx.toast(text('retry_success'),'ok');await load();
+  };
+  const draw=()=>{
+    const all=rows(),query=keyword.trim().toLocaleLowerCase();
+    const filtered=all.filter(row=>{
+      if(categoryFilter.length&&!categoriesOf(row).some(category=>categoryFilter.includes(category)))return false;
+      if(statusFilter==='active'&&!active(row))return false;
+      if(statusFilter==='invalid'&&active(row))return false;
+      if(query){const title=titleOf(row),search=fullText?`${title} ${summaryOf(row)}`:title;
+        if(!search.toLocaleLowerCase().includes(query))return false;}
       return true;
     });
-    const valueFor = ({row,domain,table}) => {
-      if (sortField === 'title') return table === 'playbooks' ? row.scenario : row.source;
-      if (sortField === 'domain') return domain;
-      if (sortField === 'summary') return table === 'playbooks' ? row.response_logic : row.metadata?.summary || row.content;
-      if (sortField === 'status') return row.lifecycle_status || (row.verified ? 'verified' : 'draft');
-      return row[sortField] || '';
-    };
-    filtered.sort((a,b) => {
-      const av = valueFor(a), bv = valueFor(b);
-      const cmp = String(av).localeCompare(String(bv), undefined, {numeric:true, sensitivity:'base'});
-      return sortDir === 'asc' ? cmp : -cmp;
-    });
-    const pageSize = 20, totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-    page = Math.min(page, totalPages);
-    const pageRows = filtered.slice((page - 1) * pageSize, page * pageSize);
-    const sourceItemIds = new Set(records.knowledge.filter(row => row.source_id).map(row => String(row.source_id)));
-    const pendingSources = (records.sources || []).filter(source => !sourceItemIds.has(String(source.id)));
-    const sortHeader = (key,labelText) => h('th', { class:'kg-sortable', onclick:() => {
-      sortDir = sortField === key && sortDir === 'asc' ? 'desc' : 'asc'; sortField = key; draw();
-    } }, `${labelText}${sortField === key ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}`);
-    const domainChoices = ['product','company','service','recruitment','industry','campaign','health_wealth_seminar',
-      'top_performer_sharing','legal_tax','case','playbook'];
-    const table = h('div', { class:'kg-table-wrap' }, h('table', { class:'kg-table' }, [
-      h('thead', {}, h('tr', {}, [sortHeader('title',text('title_column')),sortHeader('domain',text('category')),
-        sortHeader('summary',text('summary')),sortHeader('source_date',text('source_date')),
-        sortHeader('valid_to',text('valid_to')),sortHeader('status',text('status')),h('th',{},text('actions'))])),
-      h('tbody', {}, pageRows.length ? pageRows.map(({row,table:rowTable}) => renderRow(ctx,rowTable,row,refresh,item => {
-        editorDetails.open = true;
-        form.elements.id.value = String(item.id);
-        form.elements.expectedUpdatedAt.value = item.updated_at || '';
-        form.elements.domain.value = rowDomain(item);
-        form.elements.title.value = item.source || '';
-        form.elements.summary.value = item.metadata?.summary || '';
-        form.elements.content.value = item.content || '';
-        form.elements.jurisdiction.value = item.metadata?.jurisdiction || '';
-        form.elements.sourceUri.value = item.metadata?.source_uri || '';
-        form.elements.sourceDate.value = item.source_date || '';
-        form.elements.validFrom.value = item.valid_from || '';
-        form.elements.validTo.value = item.valid_to || '';
-        form.elements.confidence.value = String(item.confidence ?? 0.8);
-        form.elements.sharingAuthorized.checked = item.metadata?.sharing_authorized === true;
-        form.elements.anonymized.checked = item.metadata?.anonymized === true;
-        editorStatus.textContent = item.lifecycle_status === 'verified' ? text('revision_hint') : '';
-        editorDetails.scrollIntoView({behavior:'smooth',block:'start'});
-      }, records.sources.find(source=>String(source.id)===String(row.source_id)))) : [
-        h('tr',{},h('td',{colspan:'7',class:'kg-empty-cell'},text('no_results'))),
-      ]),
+    const sortValue=row=>sortField==='title'?titleOf(row):sortField==='category'?categoriesOf(row).join(' '):
+      sortField==='summary'?summaryOf(row):sortField==='status'?(active(row)?'1':'0'):row.updated_at||'';
+    filtered.sort((a,b)=>{const cmp=String(sortValue(a)).localeCompare(String(sortValue(b)),undefined,{numeric:true,sensitivity:'base'});
+      return sortDir==='asc'?cmp:-cmp;});
+    const size=20,totalPages=Math.max(1,Math.ceil(filtered.length/size));page=Math.min(page,totalPages);
+    const pageRows=filtered.slice((page-1)*size,page*size);
+    const header=(field,label)=>h('th',{class:'kg-sortable',onclick:()=>{
+      sortDir=sortField===field&&sortDir==='asc'?'desc':'asc';sortField=field;draw();
+    }},`${label}${sortField===field?(sortDir==='asc'?' ↑':' ↓'):''}`);
+    const table=h('div',{class:'kg-table-wrap'},h('table',{class:'kg-table'},[
+      h('thead',{},h('tr',{},[header('title',text('title_column')),header('category',text('category')),
+        header('summary',text('summary')),header('status',text('status')),header('updated_at',text('updated_at')),h('th',{},text('actions'))])),
+      h('tbody',{},pageRows.length?pageRows.map(row=>{
+        const live=active(row),isSource=row.table==='knowledge_sources',isPlaybook=row.table==='playbooks';
+        const superseded=row.lifecycle_status==='superseded';
+        const editHref=isSource?'':`#/knowledge/edit/${row.table}/${row.id}`;
+        const summary=summaryOf(row);
+        const actions=[
+          !isSource&&!superseded?h('a',{class:'btn btn-ghost btn-sm',href:editHref},text('edit')):null,
+          isSource&&row.extractionStatus==='failed'?h('button',{class:'btn btn-ghost btn-sm',type:'button',
+            onclick:()=>retry(row).catch(error=>ctx.toast(error.message,'error'))},text('retry')):null,
+          !isSource&&!superseded?h('button',{class:'btn btn-ghost btn-sm',type:'button',onclick:()=>setStatus(row).catch(error=>ctx.toast(error.message,'error'))},text(live?'mark_invalid':'mark_valid')):null,
+          h('button',{class:'btn btn-ghost btn-sm',type:'button',onclick:()=>remove(row).catch(error=>ctx.toast(error.message,'error'))},text('delete')),
+        ].filter(Boolean);
+        return h('tr',{'data-kg-id':String(row.id)},[
+          h('td',{},[h('b',{},titleOf(row)||'—'),isPlaybook?h('small',{class:'kg-table-meta'},text('playbook')):null]),
+          h('td',{class:'kg-category-tags'},categoriesOf(row).map(category=>h('span',{class:'kg-category-chip'},text(`category_${category}`)))),
+          h('td',{class:'kg-summary-cell'},[summary||'—',
+            !isSource?h('details',{class:'kg-row-content-details'},[h('summary',{},text('view_content')),
+              h('div',{class:'kg-full-content'},isPlaybook?row.response_logic:row.content)]):null]),
+          h('td',{},h('span',{class:`kg-status ${live?'kg-verified':'kg-invalidated'}`},text(live?'status_active':'status_invalid'))),
+          h('td',{},row.updated_at?String(row.updated_at).slice(0,16).replace('T',' '):'—'),
+          h('td',{class:'kg-table-actions'},actions),
+        ]);
+      }):h('tr',{},h('td',{colspan:'6',class:'kg-empty-cell'},text('no_results')))),
     ]));
-    const searchForm = h('form', { class:'kg-search', onsubmit:event => {
-      event.preventDefault(); keyword = searchInput.value; fullText = fullTextInput.checked; page = 1; draw();
-    } }, [searchInput, h('label',{class:'kg-full-search'},[fullTextInput,text('full_search')]), h('button',{class:'btn btn-primary',type:'submit'},text('search'))]);
-    const filters = h('div', { class:'kg-filters' }, [
-      h('label',{class:'kg-field'},[h('span',{},text('filter_type')),h('select',{'aria-label':text('filter_type'),onchange:event=>{typeFilter=event.target.value;page=1;draw();}},
-        [['all','filter_all'],['evidence','evidence'],['case','case'],['story','story'],['playbook','playbook']].map(([value,key])=>h('option',{value,selected:typeFilter===value},text(key))))]),
-      h('label',{class:'kg-field'},[h('span',{},text('filter_status')),h('select',{'aria-label':text('filter_status'),onchange:event=>{statusFilter=event.target.value;page=1;draw();}},
-        [['all','filter_all'],['draft','status_draft'],['verified','status_verified'],['superseded','status_superseded'],['invalidated','status_invalidated']].map(([value,key])=>h('option',{value,selected:statusFilter===value},text(key))))]),
-      h('details',{class:'kg-category-filter',open:categoryFilterOpen},[h('summary',{},text('filter_category')),
-        h('div',{class:'kg-category-options'},domainChoices.map(domain=>h('label',{},[
-          h('input',{type:'checkbox',value:domain,checked:domainFilter.includes(domain),onchange:event=>{
-            categoryFilterOpen=event.currentTarget.closest('details').open;
-            domainFilter=event.target.checked?[...domainFilter,domain]:domainFilter.filter(value=>value!==domain);page=1;draw();
-          }}),text(`domain_${domain}`)])))]),
+    const pager=h('div',{class:'kg-pager'},[
+      h('span',{},text('result_count').replace('{count}',String(filtered.length))),
+      h('button',{class:'btn btn-ghost btn-sm',type:'button',disabled:page<=1,onclick:()=>{page--;draw();}},text('previous')),
+      h('span',{},`${page} / ${totalPages}`),
+      h('button',{class:'btn btn-ghost btn-sm',type:'button',disabled:page>=totalPages,onclick:()=>{page++;draw();}},text('next')),
     ]);
-    const toolbar = h('div',{class:'kg-list-tools'},[
-      searchForm,filters,
-      h('div',{class:'kg-list-buttons'},[
-        h('button',{class:'btn btn-primary',type:'button',onclick:()=>{
-          form.reset();form.elements.id.value='';form.elements.expectedUpdatedAt.value='';editorStatus.textContent='';
-          editorDetails.open=true;editorDetails.scrollIntoView({behavior:'smooth',block:'start'});
-        }},text('new_title')),
-        h('button',{class:'btn btn-ghost',type:'button',onclick:async()=>{if(!window.confirm(text('confirm_fixtures')))return;await data.createKnowledgeFixtures(ctx);await refresh();}},text('fixtures')),
-        h('button',{class:'btn btn-ghost',type:'button',onclick:refresh},text('refresh')),
-      ]),
-      h('div',{class:'kg-pager'},[
-        h('span',{},text('result_count').replace('{count}',String(filtered.length))),
-        h('button',{class:'btn btn-ghost btn-sm',type:'button',disabled:page<=1,onclick:()=>{page--;draw();}},text('previous')),
-        h('span',{},`${page} / ${totalPages}`),
-        h('button',{class:'btn btn-ghost btn-sm',type:'button',disabled:page>=totalPages,onclick:()=>{page++;draw();}},text('next')),
-      ]),
-    ]);
-    const extraSources = pendingSources.length ? h('details',{class:'kg-pending-sources'},[
-      h('summary',{},`${text('pending_sources')} (${pendingSources.length})`),
-      ...pendingSources.map(source=>h('article',{class:'kg-pending-source'},[
-        h('b',{},`${text(`domain_${source.domain}`)} · ${source.title}`),
-        h('small',{},`${text('source_file')}: ${source.fileName||'—'} · ${text('source_extraction')}: ${text(`extraction_${source.extractionStatus}`)}`),
-        source.extractionStatus==='failed'?h('button',{class:'btn btn-ghost btn-sm',type:'button',onclick:async()=>{await data.knowledgeLibrary(ctx,'retry',{sourceId:source.id});await refresh();}},text('source_retry')):null,
-      ])),
-    ]) : null;
-    main.replaceChildren(pageHead({ kicker:text('kicker'),title:text('title'),sub:text('description'),
-      actions:[h('button',{class:'btn btn-ghost',type:'button',onclick:()=>{sourceDetails.open=!sourceDetails.open;}},text('source_upload_title'))] }),
-      h('p',{class:'foot-note'},text('validity_scope')),
-      sourceDetails, editorDetails, playbookDetails,
-      h('section',{class:'kg-list kg-library-list'},[
-        h('div',{class:'kg-toolbar'},[h('h2',{},text('items')),h('span',{class:'foot-note'},text('loaded_scope'))]),
-        toolbar,table,extraSources,
-      ]));
+    main.querySelector('.kg-table-wrap')?.replaceWith(table);
+    main.querySelector('.kg-pager')?.replaceWith(pager);
+    main.querySelector('.kg-category-filter')?.replaceWith(categoryFilterNode());
+    main.querySelector('.kg-status-filter')?.replaceWith(statusNode());
   };
-  draw();
-  refresh().catch(error => main.append(h('p', { class: 'form-error' }, error.message || text('load_failed'))));
+  const searchInput=h('input',{type:'search',maxlength:'160',placeholder:text('search_title_hint'),'aria-label':text('search_title_hint'),value:keyword});
+  const fullSearch=h('input',{type:'checkbox',checked:fullText});
+  const categoryFilterNode=()=>h('details',{class:'kg-category-filter',open:categoryFilterOpen},[
+    h('summary',{},`${text('filter_category')}${categoryFilter.length?` · ${categoryFilter.length}`:''}`),
+    h('div',{class:'kg-category-options'},CATEGORIES.map(category=>h('label',{},[
+      h('input',{type:'checkbox',checked:categoryFilter.includes(category),onchange:event=>{
+        categoryFilterOpen=event.currentTarget.closest('details').open;
+        categoryFilter=event.target.checked?[...categoryFilter,category]:categoryFilter.filter(item=>item!==category);page=1;draw();
+      }}),text(`category_${category}`)]))),
+  ]);
+  const statusNode=()=>h('label',{class:'kg-field kg-status-filter'},[h('span',{},text('filter_status')),
+    h('select',{onchange:event=>{statusFilter=event.target.value;page=1;draw();}},
+      [['all','filter_all'],['active','status_active'],['invalid','status_invalid']].map(([value,label])=>h('option',{value,selected:statusFilter===value},text(label))))]);
+  const searchForm=h('form',{class:'kg-search',onsubmit:event=>{event.preventDefault();keyword=searchInput.value;fullText=fullSearch.checked;page=1;draw();}},[
+    searchInput,h('label',{class:'kg-full-search'},[fullSearch,text('full_search')]),h('button',{class:'btn btn-primary',type:'submit'},text('search')),
+  ]);
+  main.replaceChildren(pageHead({kicker:text('kicker'),title:text('title'),sub:text('description'),actions:[
+    h('a',{class:'btn btn-ghost',href:'#/knowledge/upload'},text('upload_button')),
+    h('a',{class:'btn btn-primary',href:'#/knowledge/new'},text('new_knowledge_button')),
+    h('a',{class:'btn btn-ghost',href:'#/knowledge/playbook'},text('new_playbook_button')),
+    h('a',{class:'btn btn-ghost',href:'#/knowledge/trash'},text('trash_button')),
+  ]}),h('section',{class:'card kg-home-card'},[
+    h('div',{class:'card-body kg-list-tools'},[
+      searchForm,h('div',{class:'kg-filters'},[categoryFilterNode(),statusNode()]),
+      h('div',{class:'kg-table-wrap'}),h('div',{class:'kg-pager'}),
+    ]),
+  ]));
+  load().catch(error=>{main.querySelector('.kg-table-wrap').replaceChildren(emptyNote(text('load_failed'),String(error.message||'')));});
 }

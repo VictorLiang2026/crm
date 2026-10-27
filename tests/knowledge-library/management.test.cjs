@@ -4,7 +4,7 @@ const assert=require('node:assert/strict');
 const {createKnowledgeLibrary}=require('../../cloudfunctions/assistant/knowledge-library-service');
 
 function setup({current=null,manualSummary=false}={}){
-  const writes=[],gatewayCalls=[];
+  const writes=[],gatewayCalls=[],rpcCalls=[];
   const fetchImpl=async(url,options={})=>{
     const table=new URL(url).pathname.split('/').pop();
     const method=options.method||'GET';
@@ -19,20 +19,22 @@ function setup({current=null,manualSummary=false}={}){
     return {result:{summary:'AI generated summary'},taskId:12,resultId:34};
   }});
   const service=createKnowledgeLibrary({env:'crm-test123',key:'test-key',fetchImpl,
-    client:{callFunction:async()=>({result:{}})},gatewayFactory});
-  return {service,writes,gatewayCalls};
+    client:{callFunction:async()=>({result:{}})},gatewayFactory,
+    searchDataFactory:()=>({auditRdb:{rpc:async(name,args)=>{rpcCalls.push({name,args});return {data:{ok:true,status:args.p_valid?'verified':'invalidated'}};}}})});
+  return {service,writes,gatewayCalls,rpcCalls};
 }
 function response(value){return {ok:true,text:async()=>JSON.stringify(value)};}
 const base={domain:'product',title:'Product overview',content:'Product content to summarize',sourceDate:'2026-10-01',confidence:.8};
 
 test('new knowledge uses the AI Gateway summary and stores it separately in metadata',async()=>{
-  const {service,writes,gatewayCalls}=setup();
+  const {service,writes,gatewayCalls,rpcCalls}=setup();
   const result=await service.run({operation:'save',data:base},'operator-1');
   assert.equal(result.ok,true);assert.equal(result.summaryGenerated,true);
   assert.equal(gatewayCalls.length,1);assert.equal(gatewayCalls[0].skill,'knowledge_extract');
   assert.equal(writes[0].method,'POST');assert.equal(writes[0].body[0].metadata.summary,'AI generated summary');
   assert.equal(writes[0].body[0].metadata.summary_source,'ai');
   assert.equal(writes[0].body[0].lifecycle_status,'draft');
+  assert.equal(rpcCalls[0].name,'crm_knowledge_review_v1');
 });
 
 test('manual summary is preserved without invoking AI',async()=>{
@@ -73,8 +75,8 @@ test('regulated and top performer categories retain source and privacy safeguard
   assert.equal(writes.length,0);
 });
 
-test('superseded and invalidated history cannot be silently reopened through the save operation',async()=>{
-  for(const lifecycle_status of ['superseded','invalidated']){
+test('superseded history cannot be edited, while invalidated knowledge can be updated and republished',async()=>{
+  for(const lifecycle_status of ['superseded']){
     const current={id:8,item_type:'product',source:'Archived note',content:'Old content',metadata:{domain:'product'},
       lifecycle_status,verified:false,version_no:1,updated_at:'2026-10-20T00:00:00Z'};
     const {service,writes}=setup({current});
@@ -82,4 +84,9 @@ test('superseded and invalidated history cannot be silently reopened through the
       error=>error.code==='INVALID_INPUT');
     assert.equal(writes.length,0);
   }
+  const current={id:8,item_type:'product',source:'Archived note',content:'Old content',metadata:{domain:'product'},
+    lifecycle_status:'invalidated',verified:false,version_no:1,updated_at:'2026-10-20T00:00:00Z'};
+  const {service,rpcCalls}=setup({current});
+  await service.run({operation:'save',data:{...base,id:'8',expectedUpdatedAt:current.updated_at,summary:'Edit'}},'operator-1');
+  assert.equal(rpcCalls[0].name,'crm_knowledge_set_valid_v1');
 });

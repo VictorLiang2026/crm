@@ -204,7 +204,7 @@ const SKILLS = [
     name: 'knowledge_extract', version: '1.0.0', capability: 'summarization',
     contextRecipe: recipe(['document']),
     inputSchema: object({domain:{type:'string',enum:['product','company','service','recruitment','industry','campaign',
-      'health_wealth_seminar','top_performer_sharing','legal_tax','case','playbook']},title:text(500)},['domain','title']),
+      'health_wealth_seminar','top_performer_sharing','legal_tax','case','playbook','other']},title:text(500)},['domain','title']),
     outputSchema: object({summary:text(1800),keyPoints:strings(16,500),applicationNotes:strings(10,500),boundaries:strings(10,500)},
       ['summary','keyPoints','applicationNotes','boundaries']),
     confirmationLevel:'review',timeoutClass:'standard',

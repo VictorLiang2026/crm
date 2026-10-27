@@ -2,6 +2,9 @@
 
 const TYPES = new Set(['evidence', 'case', 'story']);
 const STATES = new Set(['draft', 'verified', 'superseded', 'invalidated']);
+const CATEGORIES = new Set(['on_sale_product','existing_service','recruitment_policy','industry_development',
+  'marketing_activity','legal_tax','health_wealth_sharing','top_performer_sharing','customer_case','recruitment_case',
+  'conversation_strategy','objection_handling','company_information','other']);
 const clip = (value, max) => typeof value === 'string' ? value.trim().slice(0, max) : '';
 const positive = value => /^[1-9]\d*$/.test(String(value || '')) && Number.isSafeInteger(Number(value));
 const refs = value => {
@@ -22,8 +25,8 @@ class KnowledgeGovernanceService {
 
   async list() {
     const [knowledge, playbooks] = await Promise.all([
-      this.request('knowledge_items', 'GET', { select: '*', order: 'updated_at.desc,id.desc', limit: 200 }),
-      this.request('playbooks', 'GET', { select: '*', order: 'updated_at.desc,id.desc', limit: 200 }),
+      this.request('knowledge_items', 'GET', { select: '*', deleted_at:'is.null', order: 'updated_at.desc,id.desc', limit: 200 }),
+      this.request('playbooks', 'GET', { select: '*', deleted_at:'is.null', order: 'updated_at.desc,id.desc', limit: 200 }),
     ]);
     return { knowledge, playbooks };
   }
@@ -35,10 +38,11 @@ class KnowledgeGovernanceService {
     const id = data.id == null ? null : String(data.id);
     if (id && !positive(id)) throw new Error('Invalid governance content');
     const expected = id ? String(data.expectedUpdatedAt || '') : '';
+    let current = null;
     if (id) {
-      const current = (await this.request(table, 'GET', { select: 'id,lifecycle_status,updated_at', id: `eq.${id}`, limit: 1 }))[0];
-      if (!current || current.lifecycle_status !== 'draft' || current.updated_at !== expected) {
-        throw new Error('Content changed or is already reviewed; create a revision instead');
+      current = (await this.request(table, 'GET', { select: '*', id: `eq.${id}`, deleted_at:'is.null', limit: 1 }))[0];
+      if (!current || !['draft','verified','invalidated'].includes(current.lifecycle_status) || current.updated_at !== expected) {
+        throw new Error('Content changed or is no longer editable');
       }
     }
     const parentId = !id && positive(data.supersedesId) ? String(data.supersedesId) : null;
@@ -58,22 +62,29 @@ class KnowledgeGovernanceService {
       next_objective: clip(data.next_objective, 500), source: clip(data.source, 500),
       confidence: data.confidence == null ? null : Number(data.confidence),
       valid_from: data.valid_from || null, valid_to: data.valid_to || null,
-      metadata: { revisionNote: clip(data.revisionNote, 500) }, updated_by: uid,
+      metadata: { ...(current?.metadata&&typeof current.metadata==='object'?current.metadata:{}),
+        ...(data.metadata&&typeof data.metadata==='object'?data.metadata:{}),
+        categories: data.categories||data.metadata?.categories||['conversation_strategy'], revisionNote: clip(data.revisionNote, 500) }, updated_by: uid,
     } : {
       item_type: TYPES.has(data.item_type) ? data.item_type : 'evidence',
       source: clip(data.source, 500), source_date: data.source_date || null,
       valid_from: data.valid_from || null, valid_to: data.valid_to || null,
       verified: false, confidence: data.confidence == null ? null : Number(data.confidence),
       content: clip(data.content, 8000), metadata: {
+        categories: data.categories||data.metadata?.categories||['other'],
         person: { schema: 'public', table: 'persons', id: positive(data.personId) ? Number(data.personId) : null },
         revisionNote: clip(data.revisionNote, 500),
       }, updated_by: uid,
     };
+    if (!Array.isArray(payload.metadata.categories) || !payload.metadata.categories.length ||
+        payload.metadata.categories.some(category => !CATEGORIES.has(category))) throw new Error('Select at least one valid category');
     const mainText = isPlaybook ? [payload.scenario, payload.objection, payload.response_logic] : [payload.source, payload.content];
     if (mainText.some(v => !v)) throw new Error('Source, title and content are required');
     if (!Number.isFinite(payload.confidence) || payload.confidence < 0 || payload.confidence > 1) throw new Error('Invalid confidence');
     if (id) {
-      const rows = await this.request(table, 'PATCH', { id: `eq.${id}`, updated_at: `eq.${expected}` }, payload);
+      if (table === 'knowledge_items') payload.verified = true;
+      payload.lifecycle_status = 'verified';
+      const rows = await this.request(table, 'PATCH', { id: `eq.${id}`, updated_at: `eq.${expected}`, deleted_at:'is.null' }, payload);
       if (rows.length !== 1) throw new Error('Content changed; reload before editing');
       return rows[0];
     }
@@ -82,8 +93,8 @@ class KnowledgeGovernanceService {
     if (parent) { payload.supersedes_id = Number(parent.id); payload.version_no = Number(parent.version_no || 1) + 1; }
     const rows = await this.request(table, 'POST', {}, payload);
     if (!rows[0]) throw new Error('Content could not be saved');
-    if (parent) await this.review({ table, id: rows[0].id, action: 'verify', expectedUpdatedAt: rows[0].updated_at }, uid);
-    return rows[0];
+    await this.review({ table, id: rows[0].id, action: 'verify', expectedUpdatedAt: rows[0].updated_at }, uid);
+    return (await this.request(table, 'GET', { select:'*', id:`eq.${rows[0].id}`, deleted_at:'is.null', limit:1 }))[0] || rows[0];
   }
 
   async review(data, uid) {
