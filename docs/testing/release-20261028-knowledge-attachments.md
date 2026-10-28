@@ -39,3 +39,13 @@
 - Deployment: `assistant` deployed successfully after the release gate passed. A live read-only invocation reached the function and returned the expected `UNAUTHORIZED` response before knowledge processing, confirming the function is callable without creating data.
 - End-to-end save using an authenticated session remains unverified; no production knowledge record or AI summary was created during validation.
 - Release: commit `0e5d655`, tag `release-20261028-083120`; local, GitHub `master`, and CloudBase source checks matched.
+
+## Follow-up: PDF extraction retry failure (2026-10-28)
+
+- Reported symptom: a PDF source uploaded successfully but extraction failed; clicking “重试提取” returned `KNOWLEDGE_LIBRARY_FAILED`.
+- Diagnosis: assistant delegated PDF parsing to `person_360`. The source object was private CloudBase PG Storage and no `knowledge_source_extract` task had been created, so failure was before AI task creation. The old Node SDK storage download path failed and both functions hid the useful cause behind generic errors.
+- Fix: `person_360` now uses the authenticated server-side CloudBase object endpoint for private `knowledge` objects, checks the object owner path and `knowledge_sources.created_by` against the authenticated caller, and returns bounded safe PDF error codes. Assistant passes its authenticated actor to this route and preserves the allowlisted safe codes. Legacy `pg-private://` Base64 source support is retained.
+- Verification: PDF-specific tests 6/6; knowledge-library tests 29/29; full regression 108 passed, 5 historical skips; security tests 5/5; shared copies 58/58 matched. WP01 release gate `PASS_WITH_LIMITATIONS`, 1,162 catalog checks, anonymous checks 77/77, fresh read-only login/permission probe passed. Open declared limitations remain service-runtime, production writes/AI, and real mobile acceptance.
+- Deployment: `assistant` and `person_360` deployed successfully after their WP01 gates passed. Post-deployment CloudBase source check matched 29 functions / 221 source and config files; all 90 reachable page/module/style assets matched. No production knowledge source was retried or modified during validation.
+- Live PDF extraction using the affected authenticated source was not run, to avoid creating/updating a real knowledge draft or AI task. The user can retry the source in the application; if it fails, the UI should now show the safe underlying PDF error code.
+- Release tag: `release-20261028-095808`; the published commit is recorded in Git.

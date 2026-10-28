@@ -23,6 +23,7 @@ const { RelationshipService } = require('./relationship-service');
 const { RelationshipNetworkService } = require('./relationship-network-service');
 const { OcrReviewService } = require('./ocr-review-service');
 const { FileImportService } = require('./file-import-service');
+const { downloadKnowledgeObject } = require('./knowledge-storage');
 const { PersonFileService } = require('./person-file-service');
 const { LegacyOpportunityService, LegacyOpportunityMaintenanceService } = require('./legacy-opportunity-service');
 const { RecruitDirectoryService } = require('./recruit-directory-service');
@@ -51,6 +52,8 @@ const ACTIVITY_REVIEW_READ_TABLES = new Set(['crm_activity_review_commands']);
 const OCR_REVIEW_READ_TABLES = new Set(['crm_ocr_parse_commands']);
 const KNOWLEDGE_GOVERNANCE_TABLES = new Set(['knowledge_items', 'playbooks']);
 const KNOWLEDGE_SOURCE_READ_TABLES = new Set(['knowledge_sources']);
+const KNOWLEDGE_PDF_ERRORS = new Set(['INVALID_CONTENT','UNAUTHORIZED','PDF_SOURCE_UNAVAILABLE','PDF_SOURCE_READ_FAILED',
+  'PDF_STORAGE_DENIED','PDF_STORAGE_READ_FAILED','PDF_STORAGE_TIMEOUT','PDF_LIMIT','PDF_ENCRYPTED','PDF_NO_TEXT','PDF_TIMEOUT']);
 const PROACTIVE_COACH_TABLES = new Set(['crm_proactive_coach_decisions']);
 const TABLES = new Set([
   'persons', 'households', 'household_members', 'interactions', 'commitments',
@@ -990,13 +993,18 @@ exports.main = async event => {
     const service = createService();
     switch (event?.action) {
       case 'get': return await service.get(event.personId);
-      case 'extractKnowledgePdfText': return await require('./knowledge-pdf-service').extract(event,async sourceId=>one(await pgRequest(
-        'knowledge_sources','GET',{select:'id,original_base64,storage_key,file_size_bytes,file_name,content_type,extraction_status,deleted_at',
-          id:`eq.${sourceId}`,deleted_at:'is.null',limit:1},undefined,{timeoutMs:30000})),async storageKey=>{
-            const downloaded=await app.storage.from('knowledge').download(storageKey);
-            if(downloaded?.error||!downloaded?.data)throw new Error('SOURCE_UNAVAILABLE');
-            return Buffer.from(await downloaded.data.arrayBuffer());
-          });
+      case 'extractKnowledgePdfText':
+        if(event.actorUid!==uid)return {error:'UNAUTHORIZED'};
+        try{return await require('./knowledge-pdf-service').extract(event,async(sourceId,actorUid)=>one(await pgRequest(
+          'knowledge_sources','GET',{select:'id,created_by,original_base64,storage_key,file_size_bytes,file_name,content_type,extraction_status,deleted_at',
+            id:`eq.${sourceId}`,created_by:`eq.${actorUid}`,deleted_at:'is.null',limit:1},undefined,{timeoutMs:30000})),
+          (storageKey,actorUid)=>downloadKnowledgeObject(storageKey,actorUid));}
+        catch(error){
+          const code=KNOWLEDGE_PDF_ERRORS.has(error?.code)?error.code:
+            KNOWLEDGE_PDF_ERRORS.has(error?.message)?error.message:'PDF_EXTRACTION_FAILED';
+          console.warn('KNOWLEDGE_PDF_EXTRACTION_FAILED',code);
+          return {error:code};
+        }
       case 'resolveHouseholdMember':
         return await new HouseholdService({request: pgRequest, rpc: pgRpc}).resolveMemberName(event.name);
       case 'previewHousehold':
@@ -1219,6 +1227,13 @@ exports.main = async event => {
       default: return { error: 'Unknown action' };
     }
   } catch (error) {
+    if(event?.action==='extractKnowledgePdfText'){
+      const code=KNOWLEDGE_PDF_ERRORS.has(error?.code)?error.code:
+        KNOWLEDGE_PDF_ERRORS.has(error?.message)?error.message:
+          error?.message==='UNAUTHORIZED'?'UNAUTHORIZED':'PDF_EXTRACTION_FAILED';
+      console.warn('KNOWLEDGE_PDF_EXTRACTION_FAILED',code);
+      return {error:code};
+    }
     const diagnostic = event?.action === 'listPeople' &&
       /^Database request failed \((\d{3})(?:, ((?:PGRST\d{3}|[0-9A-Z]{5})))?\)$/.exec(error.message);
     return { error: error.message === 'UNAUTHORIZED' ? 'UNAUTHORIZED' :

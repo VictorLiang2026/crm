@@ -185,7 +185,8 @@ async function extractText(fileName, mime, bytes, options={}) {
   if (ext==='.pdf') {
     if (!bytes.subarray(0,5).equals(Buffer.from('%PDF-'))) fail('INVALID_CONTENT');
     const response=options.sourceId
-      ? await (options.app||require('./db').app).callFunction({name:'person_360',data:{action:'extractKnowledgePdfText',sourceId:String(options.sourceId)}})
+      ? await (options.app||require('./db').app).callFunction({name:'person_360',data:{action:'extractKnowledgePdfText',
+        sourceId:String(options.sourceId),actorUid:options.actorUid}})
       : await (options.app||require('./db').app).callFunction({name:'person_360',data:{action:'extractKnowledgePdfText',base64:bytes.toString('base64')}});
     const result=response?.result;
     if (!result || result.error || typeof result.text!=='string') fail(result?.error || 'PDF_EXTRACTION_FAILED');
@@ -475,7 +476,7 @@ function createKnowledgeLibrary(options={}) {
       if(marked.length!==1)fail('STALE_SOURCE');
       prepared.updated_at=marked[0].updated_at;prepared.extraction_status='extracting';
       try {
-        const extractedText=await extractText(source.file_name,source.content_type,bytes,{app:client,sourceId,uploadId});
+        const extractedText=await extractText(source.file_name,source.content_type,bytes,{app:client,sourceId,uploadId,actorUid:actor});
         if((source.metadata?.categories||[]).includes('top_performer_sharing')&&likelySensitive(extractedText))fail('PERSONAL_DATA_DETECTED');
         return {ok:true,...await extractToDraft(prepared,null,actor,extractedText),extractionStatus:'verified'};
       } catch(error) {
@@ -507,7 +508,7 @@ function createKnowledgeLibrary(options={}) {
     prepared.updated_at=marked[0].updated_at;
     prepared.extraction_status='extracting';
     try{
-      const extractedText=await extractText(source.file_name,source.content_type,bytes,{app:client,sourceId,uploadId:state.upload_id});
+      const extractedText=await extractText(source.file_name,source.content_type,bytes,{app:client,sourceId,uploadId:state.upload_id,actorUid:actor});
       if((source.metadata?.categories||[]).includes('top_performer_sharing')&&likelySensitive(extractedText))fail('PERSONAL_DATA_DETECTED');
       const draft=await extractToDraft(prepared,source.original_base64,actor,extractedText);
       return {ok:true,...draft,extractionStatus:'verified'};
@@ -568,7 +569,8 @@ function createKnowledgeLibrary(options={}) {
     const source=rows[0];
     const extracting=(await request('knowledge_sources','PATCH',{select:'id,updated_at',id:`eq.${sourceId}`},
       {extraction_status:'extracting',updated_at:new Date().toISOString(),updated_by:actor}))[0];
-    try {const bytes=await sourceBytes(source);const text=await extractText(source.file_name,source.content_type,bytes,{app:client,sourceId,uploadId:source.metadata?.upload?.upload_id});
+    try {const bytes=await sourceBytes(source);const text=await extractText(source.file_name,source.content_type,bytes,
+      {app:client,sourceId,uploadId:source.metadata?.upload?.upload_id,actorUid:actor});
       return {ok:true,...await extractToDraft({...source,extraction_status:'extracting',updated_at:extracting?.updated_at},source.original_base64,actor,text),extractionStatus:'verified'};}
     catch(error){await request('knowledge_sources','PATCH',{id:`eq.${sourceId}`},{extraction_status:'failed',updated_at:new Date().toISOString(),updated_by:actor}).catch(()=>{});throw error;}
   }
