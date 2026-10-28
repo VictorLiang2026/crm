@@ -2460,7 +2460,7 @@ const DICT = {
   // 编辑人物资料（updatePerson，乐观锁）
   'btn_edit_profile': { 'zh-CN': '编辑资料', 'en': 'Edit Profile' },
   'edit_person_title': { 'zh-CN': '编辑人物资料', 'en': 'Edit Person Profile' },
-  'edit_scope_note': { 'zh-CN': '人物与共享经营资料由 Person 维护；客户专属资料在此关联编辑；招募优先级只更新已有招募记录。', 'en': 'Edit shared person data and customer details here; recruit priority updates an existing recruit record only.' },
+  'edit_scope_note': { 'zh-CN': '人物、客户专属资料和已有招募优先级在此统一编辑，点击底部保存一次提交全部修改。', 'en': 'Edit Person, customer details, and existing recruit priority here; one Save submits all changes.' },
   'sec_customer_business': { 'zh-CN': '客户经营资料', 'en': 'Customer Business' },
   'customer_profile_unavailable_note': { 'zh-CN': '当前没有可用的客户档案。人物资料仍可编辑；客户字段需先通过现有流程建立或恢复客户关联。', 'en': 'No active customer record is available. Person data remains editable; use the existing flow to create or restore the customer link.' },
   'customer_profile_saved': { 'zh-CN': '客户经营资料已保存', 'en': 'Customer profile saved' },
@@ -2493,6 +2493,7 @@ const DICT = {
   'edit_no_changes': { 'zh-CN': '没有修改', 'en': 'No changes' },
   'edit_conflict': { 'zh-CN': '资料已被其他设备修改，请刷新后重试。', 'en': 'Changed on another device; refresh and retry.' },
   'person_saved': { 'zh-CN': '资料已保存', 'en': 'Profile saved' },
+  'person_profile_save_failed': { 'zh-CN': '资料未能完整保存；修改仍保留在表单中，请检查后重试。', 'en': 'Nothing was saved; your edits remain in the form. Check the error and retry.' },
   'edit_loading': { 'zh-CN': '正在载入资料…', 'en': 'Loading profile…' },
 
   // 删除人物（服务端预览 → 人工确认 → 执行；级联软删除可恢复）

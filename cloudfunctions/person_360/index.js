@@ -157,6 +157,7 @@ async function pgRpc(name, body) {
     'crm_ocr_parse_preview_v1','crm_ocr_parse_undo_preview_v1','crm_ocr_parse_execute_v1',
     'crm_recruit_candidate_create_v1','crm_recruit_candidate_transition_v1','crm_recruit_coach_outcome_v1',
     'crm_knowledge_review_v1','crm_proactive_coach_decision_v1','crm_file_import_v1',
+    'crm_person_profile_save_v1',
     'crm_legacy_opportunity_v1','crm_recycle_batch_v1','person_role_recovery_v1']).has(name)) throw new Error('Invalid RPC');
   const env = process.env.TCB_ENV;
   const key = process.env.CRM_PERSON360_DB_API_KEY;
@@ -537,47 +538,40 @@ function createService({ request = pgRequest, rpc = pgRpc, disclosure = disclose
   async function updatePerson(data, uid) {
     if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('Invalid update payload');
     const personId = idOf(data.personId);
-    if (!personId) throw new Error('personId required');
     const expectedUpdatedAt = String(data.expectedUpdatedAt || '');
     if (!expectedUpdatedAt) throw new Error('expectedUpdatedAt required (optimistic lock)');
-
-    // 只保留允许的字段，且与入参 camelCase 映射到数据库 snake_case
-    const payload = {};
+    const personFields = {};
+    const incomingPersonFields = data.personFields && typeof data.personFields === 'object' && !Array.isArray(data.personFields)
+      ? data.personFields : data;
     for (const [camelKey, snakeKey] of Object.entries(PERSON_FIELD_MAP)) {
-      if (Object.prototype.hasOwnProperty.call(data, camelKey) &&
-          PERSON_EDITABLE_FIELDS.has(snakeKey)) {
-        const val = data[camelKey];
-        const value = (typeof val === 'string' && val.trim() === '') ? null : val;
-        if (['sales_priority', 'referral_priority'].includes(snakeKey) && value != null &&
-            !['A', 'B', 'C', 'D', 'E'].includes(value)) throw new Error('Invalid priority: ' + camelKey);
-        if (snakeKey === 'customer_stage' && value != null &&
-            !['新认识', '关系维护', '需求挖掘', '方案沟通', '成交推进', '转介绍经营'].includes(value)) {
-          throw new Error('Invalid customer stage');
-        }
-        if (snakeKey === 'first_contact_date' && value != null &&
-            (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value))) {
-          throw new Error('Invalid first contact date');
-        }
-        payload[snakeKey] = value;
+      if (!Object.hasOwn(incomingPersonFields, camelKey) || !PERSON_EDITABLE_FIELDS.has(snakeKey)) continue;
+      const val = incomingPersonFields[camelKey];
+      const value = (typeof val === 'string' && val.trim() === '') ? null : val;
+      if (['sales_priority', 'referral_priority'].includes(snakeKey) && value != null && !['A','B','C','D','E'].includes(value)) {
+        throw new Error('Invalid priority: ' + camelKey);
       }
+      if (snakeKey === 'customer_stage' && value != null && !['新认识','关系维护','需求挖掘','方案沟通','成交推进','转介绍经营'].includes(value)) {
+        throw new Error('Invalid customer stage');
+      }
+      if (['birthday','first_contact_date'].includes(snakeKey) && value != null &&
+          (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value))) throw new Error('Invalid date: ' + camelKey);
+      personFields[snakeKey] = value;
     }
-    if (!Object.keys(payload).length) return { ok: true, updated: false };
-
-    // 乐观锁：WHERE updated_at = expectedUpdatedAt
-    payload.updated_at = new Date().toISOString();
-    const result = await request('persons', 'PATCH', {
-      id: `eq.${personId}`,
-      updated_at: `eq.${expectedUpdatedAt}`,
-      deleted_at: 'is.null',
-    }, payload);
-
-    if (!result || result.length === 0) {
-      return { ok: false, updated: false, conflict: true,
-        message: 'Concurrent modification detected; please refresh and retry' };
-    }
-    return { ok: true, updated: true, id: personId, updatedAt: payload.updated_at };
+    const customerFields = data.customerFields && typeof data.customerFields === 'object' && !Array.isArray(data.customerFields) ? data.customerFields : {};
+    const recruitFields = data.recruitFields && typeof data.recruitFields === 'object' && !Array.isArray(data.recruitFields) ? data.recruitFields : {};
+    if (Object.hasOwn(customerFields,'annual_income') && customerFields.annual_income != null &&
+        (!Number.isSafeInteger(Number(customerFields.annual_income)) || Number(customerFields.annual_income)<0)) throw new Error('Invalid annual_income');
+    if (Object.hasOwn(recruitFields,'recruitment_priority') && recruitFields.recruitment_priority != null &&
+        !['A','B','C','D','E'].includes(recruitFields.recruitment_priority)) throw new Error('Invalid recruitment_priority');
+    return rpc('crm_person_profile_save_v1', {
+      p_actor_uid: uid, p_person_id: Number(personId), p_person_expected_updated_at: expectedUpdatedAt,
+      p_person_fields: personFields,
+      p_customer_id: data.customerId == null ? null : Number(idOf(data.customerId)),
+      p_customer_expected_updated_at: data.customerExpectedUpdatedAt || null, p_customer_fields: customerFields,
+      p_recruit_id: data.recruitId == null ? null : Number(idOf(data.recruitId)),
+      p_recruit_expected_updated_at: data.recruitExpectedUpdatedAt || null, p_recruit_fields: recruitFields,
+    });
   }
-
   // Person 回收站（WP 人物删除）：删除走 preview→execute 三段式，恢复对齐旧回收站直接执行。
   const COMMAND_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 

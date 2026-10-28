@@ -47,21 +47,23 @@ test('all People directory does not issue the customer-stage enrichment query', 
   assert.equal(reads, 0);
 });
 
-test('Person editor keeps customer and recruit writes on their existing service boundaries', () => {
+test('Person editor submits every populated section through the single transactional save', () => {
   const write = read('crm/js/modules/console/write.js');
   assert.match(write, /const hasCustomer = profile\.status === 'linked' && !!profile\.customerId/);
-  assert.match(write, /ctx\.api\.call\('customers',[\s\S]{0,260}expectedUpdatedAt: f\.updated_at/);
-  assert.match(write, /ctx\.api\.call\('recruit_candidates',[\s\S]{0,240}expectedUpdatedAt: f\.recruit_updated_at/);
+  assert.match(write, /customerExpectedUpdatedAt: f\.updated_at/);
+  assert.match(write, /recruitExpectedUpdatedAt: f\.recruit_updated_at/);
+  assert.match(write, /p360\(ctx, 'updatePerson', \{ data: \{/);
+  assert.equal((write.match(/t\('btn_save_customer_profile'\)/g)||[]).length,0);
+  assert.equal((write.match(/t\('btn_save_recruit_priority'\)/g)||[]).length,0);
   assert.match(write, /if \(f\.recruit_id\)/);
   assert.match(write, /customer_profile_json_invalid/);
 });
-
 test('customer edit labels are bilingual and legacy entry points stay untouched', () => {
   const i18n = read('crm/js/modules/console/i18n.js');
   for (const key of [
     'sec_customer_business', 'customer_profile_unavailable_note', 'customer_profile_conflict',
     'btn_save_customer_profile', 'btn_save_recruit_priority', 'people_customer_view',
-    'people_all_view', 'customer_view_stage', 'field_mbti',
+    'people_all_view', 'customer_view_stage', 'field_mbti', 'person_profile_save_failed',
   ]) {
     assert.match(i18n, new RegExp(`'${key}': \\{ 'zh-CN': '[^']+', 'en': '[^']+' \\}`), `missing bilingual key ${key}`);
   }

@@ -4,11 +4,10 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 const { Browser } = require('../regression/browser.cjs');
 
-test('Person editor saves customer fields and existing recruit priority separately with optimistic locks', async () => {
+test('Person editor saves Person, Customer, and Recruit fields with one atomic form submission', async () => {
   const b = new Browser(path.resolve(__dirname, '../..'));
   try {
-    await b.start();
-    await b.open('#/more');
+    await b.start(); await b.open('#/more');
     await b.evaluate(`(async()=>{
       const {openPersonEdit}=await import('/crm/js/modules/console/write.js');
       window.profileMode='linked';window.personWrites=[];
@@ -22,53 +21,39 @@ test('Person editor saves customer fields and existing recruit priority separate
       window.openEditor=()=>openPersonEdit({main:document.getElementById('view'),toast(){},api:{call:async(name,args)=>{
         window.personWrites.push({name,args});
         if(name==='person_360'&&args.action==='getCustomerProfile')return window.profileMode==='linked'?profile:{...profile,status:'person_only',customerId:null};
-        if(name==='customers')return {ok:true,updated:1};
-        if(name==='recruit_candidates')return {ok:true,updated:1};
         if(name==='person_360'&&args.action==='updatePerson')return {ok:true,updated:true};
         throw Error('unexpected action '+name);
       }}},{personId:'71'});
       window.openEditor();
     })()`);
     await b.wait("document.querySelector('.sheet-overlay')?.innerText.includes('客户经营资料')");
-    const visible = await b.evaluate("document.querySelector('.sheet-overlay').innerText");
-    for (const text of ['客户标签','客户备注','年收入','家庭收入','房产信息','业务画像事件']) assert.ok(visible.includes(text), `missing field: ${text}`);
+    const visible=await b.evaluate("document.querySelector('.sheet-overlay').innerText");
+    for(const text of ['客户标签','客户备注','年收入','家庭收入','房产信息','业务画像事件']) assert.ok(visible.includes(text),`missing field: ${text}`);
     await b.evaluate(`(()=>{
       const field=(label)=>[...document.querySelectorAll('.sheet-field')].find(x=>x.querySelector('label')?.textContent===label)?.querySelector('input,textarea,select');
       field('客户标签').value='新标签';field('客户备注').value='新备注';field('年收入').value='250';
-      const events=field('业务画像事件（JSON）');events.value='[{"name":"新事件"}]';
+      field('业务画像事件（JSON）').value='[{"name":"新事件"}]';
+      [...document.querySelectorAll('.sheet-field')].find(x=>x.querySelector('label')?.textContent==='招募优先级').querySelector('select').value='D';
+      window.saveButtonCount=[...document.querySelectorAll('.sheet-overlay button')].filter(x=>x.textContent.trim()==='保存').length;
+      window.legacySaveButtons=[...document.querySelectorAll('.sheet-overlay button')].some(x=>/保存客户资料|保存招募优先级/.test(x.textContent));
+      [...document.querySelectorAll('.sheet-overlay button')].find(x=>x.textContent.trim()==='保存').click();
     })()`);
-    await b.evaluate(`(()=>[...document.querySelectorAll('.sheet-overlay button')].find(x=>x.textContent.trim()==='保存客户资料').click())()`);
-    await b.wait("window.personWrites.some(x=>x.name==='customers')");
-    const customerWrite = await b.evaluate("window.personWrites.find(x=>x.name==='customers')");
-    assert.equal(customerWrite.args.id, '81');
-    assert.equal(customerWrite.args.expectedUpdatedAt, '2026-10-15T01:01:00Z');
-    assert.equal(customerWrite.args.data.tags, '新标签');
-    assert.equal(customerWrite.args.data.additional_info, '新备注');
-    assert.equal(customerWrite.args.data.annual_income, 250);
-    assert.deepEqual(customerWrite.args.data.profile.events, [{name:'新事件'}]);
-
-    await b.evaluate('window.openEditor()');
-    await b.wait("document.querySelector('.sheet-overlay')?.innerText.includes('保存招募优先级')");
-    await b.evaluate(`(()=>{
-      const row=[...document.querySelectorAll('.sheet-field')].find(x=>x.querySelector('label')?.textContent==='招募优先级');
-      row.querySelector('select').value='D';
-      [...document.querySelectorAll('.sheet-overlay button')].find(x=>x.textContent.trim()==='保存招募优先级').click();
-    })()`);
-    await b.wait("window.personWrites.some(x=>x.name==='recruit_candidates')");
-    const recruitWrite = await b.evaluate("window.personWrites.find(x=>x.name==='recruit_candidates')");
-    assert.equal(recruitWrite.args.id, '91');
-    assert.equal(recruitWrite.args.expectedUpdatedAt, '2026-10-15T01:02:00Z');
-    assert.deepEqual(recruitWrite.args.data, {recruitment_priority:'D'});
-
+    await b.wait("window.personWrites.some(x=>x.args.action==='updatePerson')");
+    const call=await b.evaluate("window.personWrites.find(x=>x.args.action==='updatePerson')");
+    assert.equal(call.args.data.personId,'71'); assert.equal(call.args.data.expectedUpdatedAt,'2026-10-15T01:00:00Z');
+    assert.equal(call.args.data.customerId,'81'); assert.equal(call.args.data.customerExpectedUpdatedAt,'2026-10-15T01:01:00Z');
+    assert.equal(call.args.data.customerFields.tags,'新标签'); assert.equal(call.args.data.customerFields.additional_info,'新备注');
+    assert.equal(call.args.data.customerFields.annual_income,250); assert.deepEqual(call.args.data.customerFields.profile.events,[{name:'新事件'}]);
+    assert.equal(call.args.data.recruitId,'91'); assert.equal(call.args.data.recruitExpectedUpdatedAt,'2026-10-15T01:02:00Z');
+    assert.deepEqual(call.args.data.recruitFields,{recruitment_priority:'D'});
+    assert.equal(await b.evaluate('window.saveButtonCount'),1); assert.equal(await b.evaluate('window.legacySaveButtons'),false);
     await b.evaluate("window.profileMode='person';window.openEditor()");
     await b.wait("document.querySelector('.sheet-overlay')?.innerText.includes('没有可用的客户档案')");
-    assert.equal(await b.evaluate("[...document.querySelectorAll('.sheet-field label')].some(x=>x.textContent==='客户标签')"), false);
-    assert.equal(await b.evaluate("window.personWrites.filter(x=>x.name==='customers').length"), 1);
-    await b.healthy();
-    assert.deepEqual(b.networkViolations, []);
+    assert.equal(await b.evaluate("[...document.querySelectorAll('.sheet-field label')].some(x=>x.textContent==='客户标签')"),false);
+    assert.equal(await b.evaluate("window.personWrites.filter(x=>x.args.action==='updatePerson').length"),1);
+    await b.healthy(); assert.deepEqual(b.networkViolations,[]);
   } finally { await b.close(); }
 });
-
 test('People directory customer view is additive, keeps the full directory, and fits iPad orientations', async () => {
   const b = new Browser(path.resolve(__dirname, '../..'));
   try {

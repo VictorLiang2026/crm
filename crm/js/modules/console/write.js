@@ -1563,10 +1563,6 @@ export function openPersonEdit(ctx, { personId, onDone } = {}) {
         h('div', { class: 'sheet-field', style: 'flex:1' }, [h('label', {}, t('field_first_contact_date')), firstContactInput]),
       ]),
       fieldRow(t('field_notes'), notesTa),
-      h('div', { class: 'sheet-actions' }, [
-        h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => sheet.overlay.remove() }, t('cancel')),
-        h('button', { class: 'btn btn-primary', type: 'button', onclick: (e) => doSave(e.currentTarget) }, t('btn_save')),
-      ]),
     ];
     nodes.push(h('hr', { class: 'sheet-divider' }));
     nodes.push(h('h3', { class: 'sheet-section-title' }, t('sec_customer_business')));
@@ -1582,9 +1578,6 @@ export function openPersonEdit(ctx, { personId, onDone } = {}) {
         fieldRow(t('field_mbti'), mbtiInput),
         ...Object.entries(profileInputs).map(([key, input]) => fieldRow(t(`profile_${key}`), input)),
         fieldRow(t('field_customer_profile_json'), profileEvents, t('customer_profile_json_hint')),
-        h('div', { class: 'sheet-actions' }, [
-          h('button', { class: 'btn btn-soft', type: 'button', onclick: (e) => saveCustomer(e.currentTarget) }, t('btn_save_customer_profile')),
-        ]),
       );
     } else {
       nodes.push(h('p', { class: 'sheet-note' }, t('customer_profile_unavailable_note')));
@@ -1593,125 +1586,66 @@ export function openPersonEdit(ctx, { personId, onDone } = {}) {
       nodes.push(
         h('h3', { class: 'sheet-section-title' }, t('col_recruit_priority')),
         fieldRow(t('col_recruit_priority'), recruitPrioritySel),
-        h('div', { class: 'sheet-actions' }, [
-          h('button', { class: 'btn btn-soft', type: 'button', onclick: (e) => saveRecruitPriority(e.currentTarget) }, t('btn_save_recruit_priority')),
-        ]),
       );
     }
+    nodes.push(h('div', { class: 'sheet-actions' }, [
+      h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => sheet.overlay.remove() }, t('cancel')),
+      h('button', { class: 'btn btn-primary', type: 'button', onclick: (e) => doSave(e.currentTarget) }, t('btn_save')),
+    ]));
     sheet.swap(h('div', {}, nodes));
 
     async function doSave(btn) {
-      // linked 人物的 f.updated_at 属于 customers 行；乐观锁必须使用 persons 版本号 person_updated_at
-      const data = { personId: String(personId), expectedUpdatedAt: f.person_updated_at || f.updated_at };
-      const changed = {};
-      const put = (key, val, orig) => { if (String(val ?? '') !== String(orig ?? '')) changed[key] = val; };
-      put('displayName', nameInput.value.trim(), f.customer_name);
-      put('phone', phoneInput.value.trim(), f.phone);
-      put('birthday', birthdayInput.value, String(f.birthday || '').slice(0, 10));
-      put('gender', genderSel.value, f.gender || '');
-      put('occupation', occupationInput.value.trim(), f.occupation);
-      put('organization', organizationInput.value.trim(), f.organization);
-      put('education', educationInput.value.trim(), f.education);
-      put('wechat', wechatInput.value.trim(), f.wx_account);
-      put('source', sourceInput.value.trim(), f.source);
-      put('hobbies', hobbiesTa.value.trim(), f.hobbies);
-      put('customerStage', stageSel.value, f.customer_stage || '');
-      put('salesPriority', salesPrioritySel.value, f.sales_priority || '');
-      put('referralPriority', referralPrioritySel.value, f.referral_priority || '');
-      put('maritalStatus', maritalSel.value, f.marital_status || '');
-      put('firstContactDate', firstContactInput.value, String(f.first_contact_date || '').slice(0, 10));
-      put('notes', notesTa.value.trim(), f.person_notes);
-      if (!Object.keys(changed).length) { sheet.showErr(t('edit_no_changes')); return; }
-      Object.assign(data, changed);
-      if (changed.displayName === '') { sheet.showErr(t('new_person_name')); return; }
+      const personFields = {};
+      const putPerson = (key, val, orig) => { if (String(val ?? '') !== String(orig ?? '')) personFields[key] = val; };
+      putPerson('displayName', nameInput.value.trim(), f.customer_name);
+      putPerson('phone', phoneInput.value.trim(), f.phone);
+      putPerson('birthday', birthdayInput.value, String(f.birthday || '').slice(0, 10));
+      putPerson('gender', genderSel.value, f.gender || '');
+      putPerson('occupation', occupationInput.value.trim(), f.occupation);
+      putPerson('organization', organizationInput.value.trim(), f.organization);
+      putPerson('education', educationInput.value.trim(), f.education);
+      putPerson('wechat', wechatInput.value.trim(), f.wx_account);
+      putPerson('source', sourceInput.value.trim(), f.source);
+      putPerson('hobbies', hobbiesTa.value.trim(), f.hobbies);
+      putPerson('customerStage', stageSel.value, f.customer_stage || '');
+      putPerson('salesPriority', salesPrioritySel.value, f.sales_priority || '');
+      putPerson('referralPriority', referralPrioritySel.value, f.referral_priority || '');
+      putPerson('maritalStatus', maritalSel.value, f.marital_status || '');
+      putPerson('firstContactDate', firstContactInput.value, String(f.first_contact_date || '').slice(0, 10));
+      putPerson('notes', notesTa.value.trim(), f.person_notes);
+      if (Object.hasOwn(personFields, 'displayName') && !personFields.displayName) { sheet.showErr(t('new_person_name')); return; }
+      const customerFields = {};
+      const putCustomer = (key, val, orig) => { if (String(val ?? '') !== String(orig ?? '')) customerFields[key] = val; };
+      if (hasCustomer) {
+        putCustomer('tags', customerTags.value.trim() || null, f.tags);
+        putCustomer('additional_info', customerNotes.value.trim() || null, f.additional_info);
+        putCustomer('household_income', householdIncome.value.trim() || null, f.household_income);
+        putCustomer('properties_info', propertiesInfo.value.trim() || null, f.properties_info);
+        putCustomer('mbti', mbtiInput.value.trim() || null, f.mbti);
+        if (incomeInput.value.trim() === '') putCustomer('annual_income', null, f.annual_income);
+        else { const income = Number(incomeInput.value); if (!Number.isSafeInteger(income) || income < 0) { sheet.showErr(t('customer_income_invalid')); return; } putCustomer('annual_income', income, f.annual_income); }
+        const nextProfile = { ...customerProfile }; let profileChanged = false;
+        for (const [key, input] of Object.entries(profileInputs)) { const value = input.value.trim() || null; if (String(value ?? '') !== String(customerProfile[key] ?? '')) { nextProfile[key] = value; profileChanged = true; } }
+        let events;
+        try { events = JSON.parse(profileEvents.value || '[]'); if (!Array.isArray(events)) throw new Error('events must be an array'); }
+        catch (_) { sheet.showErr(t('customer_profile_json_invalid')); return; }
+        if (JSON.stringify(events) !== JSON.stringify(Array.isArray(customerProfile.events) ? customerProfile.events : [])) { nextProfile.events = events; profileChanged = true; }
+        if (profileChanged) customerFields.profile = nextProfile;
+      }
+      const recruitFields = {};
+      if (f.recruit_id && String(recruitPrioritySel.value || '') !== String(f.recruitment_priority || '')) recruitFields.recruitment_priority = recruitPrioritySel.value || null;
+      if (!Object.keys(personFields).length && !Object.keys(customerFields).length && !Object.keys(recruitFields).length) { sheet.showErr(t('edit_no_changes')); return; }
       busy(btn, true, t('saving'));
       try {
-        const res = await p360(ctx, 'updatePerson', { data });
-        if (res && res.conflict) { busy(btn, false, t('btn_save')); sheet.showErr(t('edit_conflict')); return; }
-        if (!res || res.ok === false) throw new Error((res && res.message) || t('save_failed'));
-        sheet.overlay.remove();
-        ctx.toast(t('person_saved'), 'ok');
-        if (onDone) onDone();
-      } catch (err) { busy(btn, false, t('btn_save')); sheet.showErr(err.message); }
-    }
-
-    async function saveCustomer(btn) {
-      if (!hasCustomer || !profile.customerId) { sheet.showErr(t('customer_profile_unavailable_note')); return; }
-      const changed = {};
-      const put = (key, val, orig) => { if (String(val ?? '') !== String(orig ?? '')) changed[key] = val; };
-      put('tags', customerTags.value.trim() || null, f.tags);
-      put('additional_info', customerNotes.value.trim() || null, f.additional_info);
-      put('household_income', householdIncome.value.trim() || null, f.household_income);
-      put('properties_info', propertiesInfo.value.trim() || null, f.properties_info);
-      put('mbti', mbtiInput.value.trim() || null, f.mbti);
-      if (incomeInput.value.trim() === '') {
-        put('annual_income', null, f.annual_income);
-      } else {
-        const income = Number(incomeInput.value);
-        if (!Number.isSafeInteger(income) || income < 0) { sheet.showErr(t('customer_income_invalid')); return; }
-        put('annual_income', income, f.annual_income);
-      }
-      const nextProfile = { ...customerProfile };
-      let profileChanged = false;
-      for (const [key, input] of Object.entries(profileInputs)) {
-        const value = input.value.trim() || null;
-        if (String(value ?? '') !== String(customerProfile[key] ?? '')) {
-          nextProfile[key] = value;
-          profileChanged = true;
-        }
-      }
-      let events;
-      try {
-        events = JSON.parse(profileEvents.value || '[]');
-        if (!Array.isArray(events)) throw new Error('events must be an array');
-      } catch (_) { sheet.showErr(t('customer_profile_json_invalid')); return; }
-      if (JSON.stringify(events) !== JSON.stringify(Array.isArray(customerProfile.events) ? customerProfile.events : [])) {
-        nextProfile.events = events;
-        profileChanged = true;
-      }
-      if (profileChanged) changed.profile = nextProfile;
-      if (!Object.keys(changed).length) { sheet.showErr(t('edit_no_changes')); return; }
-      busy(btn, true, t('saving'));
-      try {
-        const res = await ctx.api.call('customers', {
-          action: 'update', id: String(profile.customerId), data: changed,
-          expectedUpdatedAt: f.updated_at, editSource: 'form',
-        });
-        if (res?.conflict || res?.code === 'CUSTOMER_CONFLICT') {
-          busy(btn, false, t('btn_save_customer_profile')); sheet.showErr(t('customer_profile_conflict')); return;
-        }
-        if (res?.error || !res || res.ok === false) throw new Error(res?.error || t('customer_profile_save_failed'));
-        sheet.overlay.remove();
-        ctx.toast(t('customer_profile_saved'), 'ok');
-        if (onDone) onDone();
-      } catch (err) {
-        busy(btn, false, t('btn_save_customer_profile'));
-        sheet.showErr(`${t('customer_profile_save_failed')}: ${err.message || ''}`);
-      }
-    }
-
-    async function saveRecruitPriority(btn) {
-      if (!f.recruit_id) { sheet.showErr(t('recruit_priority_unavailable')); return; }
-      if (String(recruitPrioritySel.value || '') === String(f.recruitment_priority || '')) {
-        sheet.showErr(t('edit_no_changes')); return;
-      }
-      busy(btn, true, t('saving'));
-      try {
-        const res = await ctx.api.call('recruit_candidates', {
-          action: 'update', id: String(f.recruit_id), data: { recruitment_priority: recruitPrioritySel.value || null },
-          expectedUpdatedAt: f.recruit_updated_at,
-        });
-        if (res?.conflict || res?.code === 'RECRUIT_CONFLICT') {
-          busy(btn, false, t('btn_save_recruit_priority')); sheet.showErr(t('recruit_priority_conflict')); return;
-        }
-        if (res?.error || !res || res.ok === false) throw new Error(res?.error || t('customer_profile_save_failed'));
-        sheet.overlay.remove();
-        ctx.toast(t('recruit_priority_saved'), 'ok');
-        if (onDone) onDone();
-      } catch (err) {
-        busy(btn, false, t('btn_save_recruit_priority'));
-        sheet.showErr(`${t('customer_profile_save_failed')}: ${err.message || ''}`);
-      }
+        const res = await p360(ctx, 'updatePerson', { data: {
+          personId: String(personId), expectedUpdatedAt: f.person_updated_at || f.updated_at, personFields,
+          customerId: hasCustomer ? String(profile.customerId) : null, customerExpectedUpdatedAt: f.updated_at || null, customerFields,
+          recruitId: f.recruit_id || null, recruitExpectedUpdatedAt: f.recruit_updated_at || null, recruitFields,
+        } });
+        if (res?.conflict || res?.code === 'PROFILE_CONFLICT') { busy(btn, false, t('btn_save')); sheet.showErr(t('edit_conflict')); return; }
+        if (!res || res.error || res.ok === false) throw new Error(res.error || res.message || t('save_failed'));
+        sheet.overlay.remove(); ctx.toast(t('person_saved'), 'ok'); if (onDone) onDone();
+      } catch (err) { busy(btn, false, t('btn_save')); sheet.showErr(`${t('person_profile_save_failed')} ${err.message || ''}`); }
     }
   })();
 }
