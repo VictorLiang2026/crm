@@ -26,7 +26,7 @@
 
 ## Known limits and unverified behavior
 
-- Storage accepts files up to 100 MB. This does not mean every 100 MB file can be synchronously analyzed: the current PDF text parser is intentionally capped at 6 MiB; extracted text is capped at 100,000 characters. Larger PDFs need a separate bounded/async document-processing path.
+- At the initial storage release, PDF text extraction was capped at 6 MiB; later follow-ups below supersede that limit. Extracted text remains capped at 100,000 characters.
 - A real authenticated browser upload, OCR model call, summary generation and resulting knowledge record were not exercised in production. WP01 login evidence was expired; live writes and service-runtime probes remain unverified.
 - Rollback is a recovery option only after confirming no new-format source/object remains; it was not executed.
 
@@ -82,6 +82,15 @@
 
 ## 已知限制
 
-- PDF 同步解析限制为 16 MiB、20 页及 100,000 字符；更大的文件需要异步解析路径。
+- 该次发布时 PDF 同步解析限制为 16 MiB、20 页及 100,000 字符；后续上限变更见下方记录。
 - 删除操作的数据库错误尚未从生产重试日志确认，本轮只加安全诊断日志；部署后需由用户手动重试一次再根据安全错误码定位。
 - `npm audit --omit=dev` 报告 2 个高危传递依赖项来自本轮前已有的 `@cloudbase/node-sdk@4.1.0` / `axios@0.27.2` 链路。本轮未升级 SDK，避免扩大修改范围。
+
+## Follow-up: PDF size and page limits (2026-10-28)
+
+- Requested ceiling: 30 MB (30,000,000 bytes) and 40 pages.
+- Updated the active `assistant` PDF input guard and PDF.js worker page guard. Existing 100,000-character output limit, 20-second worker timeout, 96 MiB worker heap cap, and private storage flow are unchanged.
+- Validation: synthetic 30,000,000-byte, 40-page text PDF extracted successfully; a 30,000,001-byte PDF and a 41-page PDF were rejected. Knowledge Library suite 34/34; full regression 108 passed, 5 historical skips; security suite 5/5. These are local Node runtime fixtures, not a production upload or a representative scan-heavy document.
+- WP01: `PASS_WITH_LIMITATIONS`; 1,162 public catalog checks, 77/77 anonymous probes, 47 authenticated HEAD checks, isolated login, read-only function probe, and PC34 checks passed. Service-role writes, production business writes/AI, and real mobile acceptance remain unverified.
+- Post-deployment: only `assistant` was deployed; 29 CloudBase functions / 224 source-config files and 90 reachable static assets matched. An unauthenticated read-only smoke call returned the expected `UNAUTHORIZED` without entering knowledge-data access.
+- Git commit and release tag are recorded in the publication follow-up below.

@@ -2,7 +2,7 @@
 
 const {fork}=require('node:child_process');
 const path=require('node:path');
-const MAX_BYTES=16*1024*1024;
+const MAX_BYTES=30_000_000;
 const TIMEOUT_MS=20000;
 const ERRORS=new Set(['PDF_ENCRYPTED','PDF_NO_TEXT','PDF_LIMIT','PDF_TIMEOUT','INVALID_CONTENT']);
 

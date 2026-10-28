@@ -74,15 +74,18 @@ test('PDF source extraction rejects mismatched owner and preserves legacy Base64
   assert.deepEqual(result,{text:'legacy text'});assert.equal(extracted,1);assert.equal(downloaded,0);
 });
 
-function simplePdf(){
+function simplePdf(pageCount=1){
   const stream='BT /F1 12 Tf 72 720 Td (Knowledge summary smoke test) Tj ET';
   const objects=[
     '<< /Type /Catalog /Pages 2 0 R >>',
-    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
-    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>',
-    `<< /Length ${Buffer.byteLength(stream)} >>\nstream\n${stream}\nendstream`,
+    `<< /Type /Pages /Kids [${Array.from({length:pageCount},(_,i)=>`${4+i*2} 0 R`).join(' ')}] /Count ${pageCount} >>`,
     '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
   ];
+  for(let i=0;i<pageCount;i++){
+    const pageObject=4+i*2,contentObject=pageObject+1;
+    objects.push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents ${contentObject} 0 R >>`);
+    objects.push(`<< /Length ${Buffer.byteLength(stream)} >>\nstream\n${stream}\nendstream`);
+  }
   let body='%PDF-1.4\n';const offsets=[0];
   objects.forEach((value,index)=>{offsets.push(Buffer.byteLength(body));body+=`${index+1} 0 obj\n${value}\nendobj\n`;});
   const xrefOffset=Buffer.byteLength(body);body+=`xref\n0 ${objects.length+1}\n0000000000 65535 f \n`;
@@ -91,19 +94,23 @@ function simplePdf(){
   return Buffer.from(body,'ascii');
 }
 
-test('bounded local PDF worker extracts a 9.4 MB text PDF under the Node 18 runtime',async()=>{
-  const small=simplePdf(),size=9_433_979;
+test('bounded local PDF worker extracts a 30 MB, 40-page text PDF',async()=>{
+  const small=simplePdf(40),size=MAX_BYTES;
   const bytes=Buffer.concat([small,Buffer.alloc(size-small.length,0x20)]);
-  assert.equal(await extractPdfText(bytes),'Knowledge summary smoke test');
+  assert.equal(await extractPdfText(bytes),Array(40).fill('Knowledge summary smoke test').join('\n\n'));
 },{timeout:30000});
 
-test('PDF text extraction enforces a 16 MiB cap before starting a worker',async()=>{
+test('PDF text extraction enforces a 30 MB cap before starting a worker',async()=>{
   const bytes=Buffer.alloc(MAX_BYTES+1);Buffer.from('%PDF-').copy(bytes);
   await assert.rejects(extractPdfText(bytes),error=>error.code==='PDF_LIMIT');
 });
 
+test('PDF text extraction rejects the first page above the 40-page cap',async()=>{
+  await assert.rejects(extractPdfText(simplePdf(41)),error=>error.code==='PDF_LIMIT');
+});
+
 test('assistant extracts PDFs locally instead of making an unauthenticated internal function call',async()=>{
-  const pdf=Buffer.alloc(9_433_979);Buffer.from('%PDF-').copy(pdf);let sent=0,received;
+  const pdf=Buffer.alloc(MAX_BYTES);Buffer.from('%PDF-').copy(pdf);let sent=0,received;
   const text=await extractText('brochure.pdf','application/pdf',pdf,{app:{callFunction:async()=>{sent++;}},
     pdfTextExtractor:async bytes=>{received=bytes;return 'PDF text';}});
   assert.equal(text,'PDF text');assert.equal(received,pdf);assert.equal(sent,0);
