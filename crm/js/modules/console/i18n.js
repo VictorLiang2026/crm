@@ -633,6 +633,7 @@ const DICT = {
   'nav_recruit': { 'zh-CN': '招募', 'en': 'Recruit' },
   'nav_ai': { 'zh-CN': 'AI 助手', 'en': 'AI Assistant' },
   'nav_knowledge_library': { 'zh-CN': '知识库', 'en': 'Knowledge Library' },
+  'tile_knowledge_library_desc': { 'zh-CN': '知识条目与话术管理', 'en': 'Knowledge items & playbooks' },
   'nav_more': { 'zh-CN': '更多', 'en': 'More' },
   'nav_quick_record': { 'zh-CN': '快速记录', 'en': 'Quick Record' },
 
@@ -3035,6 +3036,9 @@ const DICT = {
   'kg_retry': { 'zh-CN': '重试提取', 'en': 'Retry Extraction' },
   'kg_retry_success': { 'zh-CN': '资料已重新提取并生效。', 'en': 'The source was re-extracted and activated.' },
   'kg_retry_failed': { 'zh-CN': '重新提取失败，请检查资料后重试。', 'en': 'Extraction failed. Check the source and try again.' },
+  'kg_stale_source_refresh': { 'zh-CN': '资料刚刚更新，列表已刷新。请确认当前状态后再删除。', 'en': 'This source changed. The list has been refreshed; review its current state before deleting.' },
+  'kg_pdf_no_text': { 'zh-CN': 'PDF中没有可提取的文字，扫描件OCR也未能识别文字。请检查PDF清晰度后重试。', 'en': 'No text was extracted from this PDF, and OCR found no readable text. Check the scan quality and retry.' },
+  'kg_pdf_render_limit': { 'zh-CN': 'PDF页面尺寸或图像复杂度超过安全处理范围。请尝试拆分或降低扫描分辨率后重新上传。', 'en': 'This PDF page exceeds safe rendering limits. Split the file or lower scan resolution, then upload it again.' },
   'kg_list_lines_hint': { 'zh-CN': '每行一项', 'en': 'One item per line' },
   'kg_reference_ids_hint': { 'zh-CN': '输入知识 ID，以逗号分隔', 'en': 'Enter knowledge IDs, separated by commas' },
   'kg_sensitive_blocked': { 'zh-CN': '检测到可能的客户敏感信息，资料未入库。请先取得授权并完成匿名化。', 'en': 'Possible sensitive client information was detected. The source was not saved; obtain authorization and anonymize it first.' },
@@ -3385,3 +3389,4 @@ export function scanI18n(root) {
     if (k) n.setAttribute('aria-label', t(k));
   });
 }
+

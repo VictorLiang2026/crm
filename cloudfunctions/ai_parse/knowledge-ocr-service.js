@@ -36,6 +36,20 @@ function createKnowledgeOcr({rdb,generateText,assertOk,app,visionModel=process.e
     ]}],{timeout:60000,model:visionModel.trim()});
     return textOf(output);
   }
+  async function imageTexts(images){
+    if(typeof visionModel!=='string'||!visionModel.trim())fail('VISION_MODEL_NOT_CONFIGURED');
+    if(!Array.isArray(images)||images.length<1||images.length>3)fail('INVALID_IMAGE');
+    const prompt='逐页完整识别每张图片中可见的文字，严格按图片顺序输出；每页前标注对应页码或文件名。保留标题、列表、表格行列关系、日期、金额、数字和标点；无法辨认处标记为[无法辨认]。不要总结、推测或补写图片中没有的内容。';
+    const content=[{type:'text',text:prompt}];
+    for(const image of images){
+      const fileName=String(image?.fileName||''),contentType=String(image?.contentType||''),base64=image?.base64;
+      const bytes=decodeImage(fileName,contentType,base64);
+      if(bytes.length>768*1024)fail('INVALID_IMAGE');
+      content.push({type:'image_url',image_url:{url:`data:${contentType};base64,${bytes.toString('base64')}`,detail:'high'}});
+    }
+    const output=await generateText([{role:'user',content}],{timeout:60000,model:visionModel.trim()});
+    return textOf(output);
+  }
   async function imageTextUrl(fileName,contentType,url){
     if(typeof visionModel!=='string'||!visionModel.trim())fail('VISION_MODEL_NOT_CONFIGURED');
     if(!imageMime(fileName)||imageMime(fileName)!==contentType||typeof url!=='string'||!/^https:\/\//i.test(url))fail('INVALID_IMAGE');
@@ -69,10 +83,11 @@ function createKnowledgeOcr({rdb,generateText,assertOk,app,visionModel=process.e
   }
   async function run(event){
     if(event?.sourceId!=null)return fromSource(event.sourceId,event.uploadId);
+    if(Array.isArray(event?.images))return {ocrText:await imageTexts(event.images)};
     const fileName=String(event?.fileName||''),contentType=String(event?.contentType||'');
     return {ocrText:await imageText(fileName,contentType,event?.base64)};
   }
-  return {run,imageText,imageTextUrl,fromSource};
+  return {run,imageText,imageTextUrl,imageTexts,fromSource};
 }
 
 module.exports={createKnowledgeOcr,decodeImage,MAX_BYTES};

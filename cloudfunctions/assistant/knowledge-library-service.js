@@ -171,6 +171,24 @@ async function extractImageText(fileName,mime,bytes,{app:client,sourceId,uploadI
   if(!result||result.error||typeof result.ocrText!=='string')fail(result?.error||'OCR_FAILED');
   return boundedText(result.ocrText);
 }
+async function extractPdfImageText(bytes,{app:client,pdfPageRenderer,ocrPdfBatch}={}){
+  const render=pdfPageRenderer||require('./knowledge-pdf-render').renderPdfPages;
+  const callOcr=ocrPdfBatch|| (async images=>{
+    let response;
+    try{response=await (client||require('./db').app).callFunction({name:'ai_parse',data:{action:'ocr_knowledge_source',images}});}
+    catch(_){fail('OCR_FAILED');}
+    const result=response?.result;
+    if(!result||result.error||typeof result.ocrText!=='string')fail(result?.error||'OCR_FAILED');
+    return boundedText(result.ocrText);
+  });
+  const pages=[];
+  await render(bytes,{onBatch:async images=>{
+    const text=await callOcr(images);
+    if(!text.trim())fail('OCR_FAILED');
+    pages.push(text);
+  }});
+  return boundedText(pages.join('\n\n'));
+}
 async function extractText(fileName, mime, bytes, options={}) {
   const lower=fileName.toLowerCase();
   const ext=lower.slice(lower.lastIndexOf('.'));
@@ -187,7 +205,11 @@ async function extractText(fileName, mime, bytes, options={}) {
     if (!bytes.subarray(0,5).equals(Buffer.from('%PDF-'))) fail('INVALID_CONTENT');
     if(bytes.length>MAX_PDF_TEXT_BYTES)fail('PDF_LIMIT');
     const extractPdfText=options.pdfTextExtractor||require('./knowledge-pdf-text').extractPdfText;
-    return boundedText(await extractPdfText(bytes));
+    try{return boundedText(await extractPdfText(bytes));}
+    catch(error){
+      if(error?.code!=='PDF_NO_TEXT')throw error;
+      return extractPdfImageText(bytes,options);
+    }
   }
   fail('UNSUPPORTED_TYPE');
 }
@@ -568,14 +590,21 @@ function createKnowledgeLibrary(options={}) {
   async function retryExtraction(sourceIdValue,actorValue) {
     const actor=actorUid(actorValue),sourceId=String(sourceIdValue||'');
     if(!positiveId(sourceId))fail('INVALID_INPUT');
-    const rows=await request('knowledge_sources','GET',{select:'*',id:`eq.${sourceId}`,created_by:`eq.${actor}`,deleted_at:'is.null',limit:1});
-    if(!rows.length||(!rows[0].original_base64&&!rows[0].storage_key))fail('SOURCE_UNAVAILABLE');
+    const rows=await request('knowledge_sources','GET',{select:'id,created_by,storage_key,file_name,content_type,updated_at,domain,title,published_at,metadata',
+      id:`eq.${sourceId}`,created_by:`eq.${actor}`,deleted_at:'is.null',limit:1});
+    if(!rows.length)fail('SOURCE_UNAVAILABLE');
     const items=await request('knowledge_items','GET',{select:'id',source_id:`eq.${sourceId}`,limit:1});
     if(items.length)fail('DRAFT_ALREADY_EXISTS');
-    const source=rows[0];
+    const source=rows[0],storageKey=String(source.storage_key||'');
+    if(!storageKey||storageKey.startsWith('pg-private://')) {
+      const legacy=(await request('knowledge_sources','GET',{select:'original_base64',id:`eq.${sourceId}`,
+        created_by:`eq.${actor}`,deleted_at:'is.null',limit:1}))[0];
+      source.original_base64=legacy?.original_base64||'';
+    }
+    if(!source.original_base64&&!source.storage_key)fail('SOURCE_UNAVAILABLE');
     const extracting=(await request('knowledge_sources','PATCH',{select:'id,updated_at',id:`eq.${sourceId}`,created_by:`eq.${actor}`,deleted_at:'is.null'},
       {extraction_status:'extracting',updated_at:new Date().toISOString(),updated_by:actor}))[0];
-    try {const bytes=await sourceBytes(source,actor);const text=await extractText(source.file_name,source.content_type,bytes);
+    try {const bytes=await sourceBytes(source,actor);const text=await extractText(source.file_name,source.content_type,bytes,{app:client});
       return {ok:true,...await extractToDraft({...source,extraction_status:'extracting',updated_at:extracting?.updated_at},source.original_base64,actor,text),extractionStatus:'verified'};}
     catch(error){await request('knowledge_sources','PATCH',{id:`eq.${sourceId}`,created_by:`eq.${actor}`,deleted_at:'is.null'},
       {extraction_status:'failed',updated_at:new Date().toISOString(),updated_by:actor}).catch(()=>{});throw error;}
@@ -617,7 +646,8 @@ function createKnowledgeLibrary(options={}) {
   async function softDelete(input,actorValue) {
     const actor=actorUid(actorValue),table=input?.table,id=String(input?.id||'');
     if(!['knowledge_items','playbooks','knowledge_sources'].includes(table)||!positiveId(id)||!input?.expectedUpdatedAt)fail('INVALID_INPUT');
-    const current=(await request(table,'GET',{select:'id,source_id,updated_at,deleted_at',id:`eq.${id}`,deleted_at:'is.null',limit:1}))[0];
+    const columns=table==='knowledge_items'?'id,source_id,updated_at,deleted_at':'id,updated_at,deleted_at';
+    const current=(await request(table,'GET',{select:columns,id:`eq.${id}`,deleted_at:'is.null',limit:1}))[0];
     if(!current||current.updated_at!==input.expectedUpdatedAt)fail('STALE_SOURCE');
     const now=new Date().toISOString();
     const updated=await request(table,'PATCH',{id:`eq.${id}`,updated_at:`eq.${input.expectedUpdatedAt}`,deleted_at:'is.null'},
@@ -634,7 +664,8 @@ function createKnowledgeLibrary(options={}) {
   async function restore(input,actorValue) {
     const actor=actorUid(actorValue),table=input?.table,id=String(input?.id||'');
     if(!['knowledge_items','playbooks','knowledge_sources'].includes(table)||!positiveId(id))fail('INVALID_INPUT');
-    const current=(await request(table,'GET',{select:'id,source_id,updated_at,deleted_at',id:`eq.${id}`,deleted_at:'not.is.null',limit:1}))[0];
+    const columns=table==='knowledge_items'?'id,source_id,updated_at,deleted_at':'id,updated_at,deleted_at';
+    const current=(await request(table,'GET',{select:columns,id:`eq.${id}`,deleted_at:'not.is.null',limit:1}))[0];
     if(!current)fail('NOT_FOUND');
     const now=new Date().toISOString();
     const updated=await request(table,'PATCH',{id:`eq.${id}`,deleted_at:'not.is.null',updated_at:`eq.${current.updated_at}`},

@@ -1,0 +1,6 @@
+{
+  "name": "canvas",
+  "version": "3.2.3",
+  "main": "index.js",
+  "private": true
+}

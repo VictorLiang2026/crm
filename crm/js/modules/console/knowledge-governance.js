@@ -19,6 +19,9 @@ const titleOf = row => row.table === 'playbooks' ? `${row.scenario || ''}${row.o
   : row.table === 'knowledge_sources' ? row.title || row.fileName || '' : row.source || '';
 const summaryOf = row => row.table === 'playbooks' ? row.response_logic || ''
   : row.table === 'knowledge_sources' ? text('source_pending_summary') : row.metadata?.summary || String(row.content || '').slice(0,220);
+const errorCodeOf = error => String(error?.message||'').match(/^([A-Z][A-Z0-9_]+)(?::|$)/)?.[1]||'';
+const retryErrorText = error => errorCodeOf(error)==='PDF_NO_TEXT'?text('pdf_no_text')
+  : errorCodeOf(error)==='PDF_RENDER_LIMIT'?text('pdf_render_limit'):error?.message||text('retry_failed');
 
 export function renderKnowledgeGovernance(ctx) {
   let records={knowledge:[],playbooks:[],sources:[]},categoryFilter=[],statusFilter='all',keyword='',fullText=false;
@@ -44,12 +47,30 @@ export function renderKnowledgeGovernance(ctx) {
   };
   const remove=async row=>{
     if(!window.confirm(text('confirm_delete')))return;
-    await data.knowledgeLibrary(ctx,'delete',{data:{table:row.table,id:row.id,expectedUpdatedAt:row.updated_at}});
+    try{
+      await data.knowledgeLibrary(ctx,'delete',{data:{table:row.table,id:row.id,expectedUpdatedAt:row.updated_at}});
+    }catch(error){
+      if(errorCodeOf(error)==='STALE_SOURCE'){
+        await load().catch(()=>{});
+        ctx.toast(text('stale_source_refresh'),'error');
+        return;
+      }
+      throw error;
+    }
     await load();
   };
   const retry=async row=>{
-    const result=await data.knowledgeLibrary(ctx,'retry',{sourceId:row.id});
-    if(!result?.ok)throw new Error(result?.errorCode||text('retry_failed'));
+    let result;
+    try{result=await data.knowledgeLibrary(ctx,'retry',{sourceId:row.id});}
+    catch(error){
+      await load().catch(()=>{});
+      if(['PDF_NO_TEXT','PDF_RENDER_LIMIT'].includes(errorCodeOf(error)))throw new Error(retryErrorText(error));
+      throw error;
+    }
+    if(!result?.ok){
+      await load().catch(()=>{});
+      throw new Error(retryErrorText(new Error(result?.errorCode||'')));
+    }
     ctx.toast(text('retry_success'),'ok');await load();
   };
   const draw=()=>{

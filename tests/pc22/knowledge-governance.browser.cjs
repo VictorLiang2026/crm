@@ -119,3 +119,43 @@ test('Knowledge Library supports categories, bilingual search, sorting, status, 
     await browser.send('Emulation.clearDeviceMetricsOverride');
   } finally { await browser.close(); }
 });
+
+test('Knowledge Library refreshes failed PDF retry state and handles stale delete without weakening the guard', async () => {
+  const browser=new Browser(path.resolve(__dirname,'../..'));
+  try{
+    await browser.start();await browser.openConsole('#/more','authCase=1');await browser.wait("document.querySelector('.console-main')");
+    await browser.evaluate(`(async()=>{
+      const {renderKnowledgeGovernance}=await import('/crm/js/modules/console/knowledge-governance.js');
+      const calls=[],toasts=[];let listCount=0;
+      const source=updatedAt=>({id:55,title:'Scanned source',fileName:'scan.pdf',table:'knowledge_sources',
+        extractionStatus:'failed',lifecycle_status:'draft',updated_at:updatedAt,metadata:{categories:['other']}});
+      const ctx={main:document.querySelector('.console-main'),toast:(...args)=>toasts.push(args),api:{call:async(name,payload)=>{
+        calls.push({name,payload});
+        if(payload.operation==='list'){
+          listCount++;
+          const timestamp=['2026-10-28T10:00:00.000Z','2026-10-28T10:01:00.000Z','2026-10-28T10:02:00.000Z'][Math.min(listCount-1,2)];
+          return {ok:true,sources:[source(timestamp)],knowledge:[],playbooks:[]};
+        }
+        if(payload.operation==='retry')throw new Error('PDF_NO_TEXT: Knowledge library operation could not be completed');
+        if(payload.operation==='delete')throw new Error('STALE_SOURCE: Knowledge library operation could not be completed');
+        throw new Error('unexpected operation');
+      }}};
+      window.kgFailure={calls,toasts,get listCount(){return listCount;}};window.confirm=()=>true;renderKnowledgeGovernance(ctx);
+    })()`);
+    await browser.wait("document.querySelector('.kg-table tbody tr[data-kg-id=\"55\"] .kg-action-retry')");
+    await browser.evaluate("document.querySelector('.kg-action-retry').click()");
+    await browser.wait("window.kgFailure.listCount===2 && window.kgFailure.toasts.length===1 && document.querySelector('.kg-action-retry')");
+    assert.match(await browser.evaluate("window.kgFailure.toasts[0][0]"),/OCR也未能识别文字/);
+    await browser.evaluate("document.querySelector('.kg-action-delete').click()");
+    await browser.wait("window.kgFailure.listCount===3 && window.kgFailure.toasts.length>0");
+    const state=await browser.evaluate(`({lists:window.kgFailure.listCount,
+      retryCalls:window.kgFailure.calls.filter(call=>call.payload.operation==='retry').length,
+      deletes:window.kgFailure.calls.filter(call=>call.payload.operation==='delete').map(call=>call.payload.data.expectedUpdatedAt),
+      toast:window.kgFailure.toasts.at(-1)[0],rowDate:document.querySelector('.kg-table tbody tr[data-kg-id="55"] td:nth-child(6)').innerText})`);
+    assert.equal(state.lists,3,'retry failure and stale delete each reload source metadata');
+    assert.equal(state.retryCalls,1);
+    assert.deepEqual(state.deletes,['2026-10-28T10:01:00.000Z'],'delete keeps sending the row timestamp and does not bypass optimistic concurrency');
+    assert.match(state.toast,/资料刚刚更新/);
+    assert.equal(state.rowDate,'2026-10-28');
+  }finally{await browser.close();}
+});

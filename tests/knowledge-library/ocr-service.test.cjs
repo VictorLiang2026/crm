@@ -55,6 +55,19 @@ test('legacy direct image OCR accepts only validated supported image data',async
   assert.equal(calls,1);
 });
 
+test('knowledge PDF page batches reuse the configured vision model and keep pages ordered',async()=>{
+  let sent=null,settings=null;
+  const service=createKnowledgeOcr({rdb:{rpc:async()=>({data:[],error:null})},assertOk:r=>r,
+    visionModel:'configured-vision-model',generateText:async(messages,options)=>{sent=messages;settings=options;return {text:'第1页：甲\n第2页：乙'};}});
+  const images=[1,2].map(page=>({fileName:`page-${page}.png`,contentType:'image/png',base64:PNG}));
+  const result=await service.run({action:'ocr_knowledge_source',images});
+  assert.equal(result.ocrText,'第1页：甲\n第2页：乙');
+  assert.equal(settings.model,'configured-vision-model');
+  assert.equal(sent[0].content.filter(part=>part.type==='image_url').length,2);
+  assert.match(sent[0].content[0].text,/逐页完整识别/);
+  await assert.rejects(service.run({images:[...images,...images]}),error=>error.code==='INVALID_IMAGE');
+});
+
 test('OCR removes only the model answer wrapper while preserving recognized text',async()=>{
   const service=createKnowledgeOcr({rdb:{rpc:async()=>({data:[],error:null})},assertOk:r=>r,
     visionModel:'configured-vision-model',generateText:async()=>({text:'<answer>\nOCR SYNTHETIC 123\n</answer>'})});

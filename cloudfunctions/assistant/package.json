@@ -4,9 +4,11 @@
   "main": "index.js",
   "dependencies": {
     "@cloudbase/node-sdk": "4.1.0",
+    "@napi-rs/canvas": "0.1.100",
     "@thednp/dommatrix": "3.1.2",
     "ajv": "8.20.0",
     "ajv-formats": "3.0.1",
+    "canvas": "file:canvas-shim",
     "pdfjs-dist": "4.8.69"
   }
 }

@@ -95,3 +95,13 @@
 - Post-deployment: only `assistant` was deployed; 29 CloudBase functions / 224 source-config files and 90 reachable static assets matched. An unauthenticated read-only smoke call returned the expected `UNAUTHORIZED` without entering knowledge-data access.
 - Implementation commit: `5c54c2cd2aca6fca8d4d736f53cff7a9ff37823b`.
 - Release tag: `release-20261028-1444` (points to the publication-record commit containing this note and the implementation commit in its ancestry).
+
+## Follow-up: delete and PDF retry persistence errors (2026-10-28)
+
+- Reported symptom: Knowledge Base “删除” and “重试提取” both returned `PERSISTENCE_ERROR`.
+- Read-only diagnosis: recent assistant logs showed HTTP 400 while reading `knowledge_sources`. The live `public` schema confirms `knowledge_sources` and `playbooks` have no `source_id`; only `knowledge_items` has that column. Existing delete/restore reads incorrectly selected `source_id` for every table. Retry also used `select=*`, which fetched the potentially large inline Base64 attachment even when CloudBase private storage was used; the exact database message was not exposed by the safe log and was not inferred.
+- Fix scope: only `cloudfunctions/assistant/knowledge-library-service.js`. Delete/restore now select `source_id` only for knowledge items. Retry reads required metadata first and retrieves `original_base64` in a separate owner-scoped query only for legacy inline attachments. No schema, permissions, UI, other function, or user data changed.
+- Regression: Knowledge Library suite passed 37/37 with Node single-process test isolation. New cases cover source deletion/restore projections, retained item-to-source soft-delete behavior, modern retry projection, and legacy Base64 fallback. Complete WP01 passed: 108 regression checks passed, 5 historical skips; 1,162 public catalog checks and 77/77 anonymous probes passed. WP01 reports `PASS_WITH_LIMITATIONS`; prior login evidence was expired, so no fresh authenticated login was claimed.
+- Deployment: only `assistant` was deployed. The cloud sync check confirmed 29 functions / 224 source and configuration files plus 90 reachable page assets match local. A safe invocation reached the deployed function and returned expected `UNAUTHORIZED` before database access; no record or AI operation was run.
+- Git release: local commit/tag, push, and final GitHub/CloudBase verification are pending; the `assistant` deployment is complete.
+- Rollback: redeploy the `assistant` function from the previous release tag `release-20261028-1444`; no database rollback is needed.
