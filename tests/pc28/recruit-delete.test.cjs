@@ -166,3 +166,19 @@ test('migration binds complete input, 15-minute preview, locks impact and keeps 
   assert.doesNotMatch(rollback,/DROP\s+(TABLE|FUNCTION)/i);
   assert.doesNotMatch(sql,/\bpr\./i);
 });
+
+test('customer-linked candidate deletion skips the inaccessible Person row lock and keeps soft-delete restore scope',()=>{
+  const root=path.resolve(__dirname,'../..');
+  const sql=fs.readFileSync(path.join(root,'cloudbase/migrations/20261028160000_crm_delete_batch_skip_empty_person_lock.sql'),'utf8');
+  const rollback=fs.readFileSync(path.join(root,'cloudbase/migrations/20261028160000_crm_delete_batch_skip_empty_person_lock.rollback.sql'),'utf8');
+  const functionSql=sql.slice(sql.indexOf('CREATE OR REPLACE FUNCTION public.crm_delete_batch'));
+  const rollbackFunction=rollback.slice(rollback.indexOf('CREATE OR REPLACE FUNCTION public.crm_delete_batch'));
+  assert.match(sql,/md5\(pg_catalog\.pg_get_functiondef\('public\.crm_delete_batch\(text,text,bigint\[\]\)'::regprocedure\)\)[\s\S]*34f1d88750276b554dab024fc00a14a2/);
+  assert.match(functionSql,/SELECT array_agg\(DISTINCT person_id ORDER BY person_id\) INTO v_locked_people[\s\S]*IF v_locked_people IS NOT NULL THEN\s+PERFORM id FROM public\.persons WHERE id = ANY\(v_locked_people\) ORDER BY id FOR UPDATE;\s+END IF;/);
+  assert.match(functionSql,/UPDATE public\.recruit_candidates SET deleted_at = v_ts, delete_batch_id = v_batch WHERE id = v_id/);
+  assert.match(functionSql,/UPDATE public\.recruit_followups SET deleted_at=v_ts, delete_batch_id=v_batch/);
+  assert.match(functionSql,/UPDATE public\.recruit_followups SET deleted_at=NULL, delete_batch_id=NULL[\s\S]*delete_batch_id=v_batch AND deleted_at IS NOT NULL/);
+  assert.doesNotMatch(functionSql,/UPDATE\s+public\.persons|DELETE\s+FROM\s+public\.persons/i);
+  assert.match(rollbackFunction,/PERFORM id FROM public\.persons WHERE id = ANY\(v_locked_people\) ORDER BY id FOR UPDATE;/);
+  assert.doesNotMatch(sql,/\bpr\./i);
+});
