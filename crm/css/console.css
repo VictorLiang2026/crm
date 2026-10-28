@@ -693,6 +693,7 @@ body:has(.login), body.is-login { padding-top: env(safe-area-inset-top); }
   .stat-row { grid-template-columns: 1fr 1fr; }
   .ai-grid { grid-template-columns: 1fr; }
   .tile-grid { grid-template-columns: 1fr 1fr; }
+  .more-primary .tile-grid { grid-template-columns: 1fr; }
   .kcol { min-width: 200px; }
   .card-body { padding: 12px 14px; font-size: 14px; }
   .card-head { padding: 10px 14px; font-size: 14px; }

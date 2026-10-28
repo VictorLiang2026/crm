@@ -284,6 +284,7 @@ function moreEntry({ kind, icon, key, hash, descKey, reasonKey }) {
 
 export function renderMore(ctx) {
   const primary = [
+    { kind: 'native', icon: 'book', key: 'nav_knowledge_library', descKey: 'tile_knowledge_library_desc', hash: '#/knowledge-library' },
     { kind: 'native', icon: 'chart', key: 'm16_title', descKey: 'm16_desc', hash: '#/analytics' },
     { kind: 'native', icon: 'gear', key: 'nav_settings', descKey: 'tile_settings_desc', hash: '#/settings' },
     { kind: 'native', icon: 'refresh', key: 'more_recycle_title', descKey: 'trash_hub_note', hash: '#/recycle' },

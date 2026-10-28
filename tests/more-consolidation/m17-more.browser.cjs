@@ -11,7 +11,7 @@ test('M17 More has four primary entries, explicit route kinds, justified compati
    for(const[width,height]of[[820,1180],[1180,820]]){
     await b.send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:false});
     await b.openConsole('#/more','authCase=1');await b.wait("document.querySelector('.more-primary')");
-    assert.deepEqual(await b.evaluate("[...document.querySelectorAll('.more-primary a')].map(x=>x.getAttribute('href'))"),['#/knowledge-governance','#/analytics','#/settings','#/recycle']);
+    assert.deepEqual(await b.evaluate("[...document.querySelectorAll('.more-primary a')].map(x=>x.getAttribute('href'))"),['#/knowledge-library','#/analytics','#/settings','#/recycle']);
     assert.equal(await b.evaluate("document.querySelector('.more-workspaces').open"),false);
     assert.equal(await b.evaluate("document.querySelector('.more-compat')"),null);
     assert.equal(await b.evaluate("[...document.querySelectorAll('#console-main details>summary')].every(x=>getComputedStyle(x).display==='list-item'&&x.getBoundingClientRect().height>=44)"),true);
@@ -30,6 +30,11 @@ test('M17 More has four primary entries, explicit route kinds, justified compati
   await b.send('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:false});
   await b.openConsole('#/more','authCase=1');await b.wait("document.querySelector('.more-workspaces')");
   assert.equal(await b.evaluate("document.querySelector('.more-workspaces').open"),true);
+  const knowledge=await b.evaluate(`(()=>{const a=document.querySelector('.more-primary a[href="#/knowledge-library"]');const r=a?.getBoundingClientRect();return {exists:!!a,visible:!!r&&r.width>0&&r.height>0&&r.right<=innerWidth+1,columns:getComputedStyle(document.querySelector('.more-primary .tile-grid')).gridTemplateColumns}})()`);
+  assert.equal(knowledge.exists,true);assert.equal(knowledge.visible,true);assert.equal(knowledge.columns.split(' ').length,1);
+  await b.evaluate("document.querySelector('.more-primary a[href=\\\"#/knowledge-library\\\"]').click()");
+  await b.wait("location.hash==='#/knowledge-library'");
+  await b.openConsole('#/more','authCase=1');await b.wait("document.querySelector('.more-primary')");
   for(const hash of ['#/activities','#/recruit','#/ai'])assert.equal(await b.evaluate(`document.querySelector('.more-workspaces a[href="${hash}"]').getBoundingClientRect().width>0`),true);
   assert.equal(await b.evaluate('document.documentElement.scrollWidth<=innerWidth+1'),true);
   await b.evaluate("document.querySelector('[data-more-capture]').click()");
