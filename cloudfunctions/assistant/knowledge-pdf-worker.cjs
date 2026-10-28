@@ -1,6 +1,6 @@
 'use strict';
 const path=require('node:path');
-const MAX_PAGES=20,MAX_CHARS=100000;
+const MAX_PAGES=40,MAX_CHARS=100000;
 const respond=value=>{if(process.connected)process.send(value,()=>process.disconnect());};
 
 process.once('message',bytes=>(async()=>{

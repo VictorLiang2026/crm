@@ -8,7 +8,7 @@ const { createSearchData } = require('./search-data');
 
 const MAX_FILE_BYTES = 100_000_000;
 const LEGACY_MAX_FILE_BYTES = 6 * 1024 * 1024;
-const MAX_PDF_TEXT_BYTES = 16 * 1024 * 1024;
+const MAX_PDF_TEXT_BYTES = 30_000_000;
 const KNOWLEDGE_BUCKET = 'knowledge';
 const UPLOAD_CHUNK_BYTES = 768 * 1024;
 const MAX_TEXT_CHARS = 100000;
