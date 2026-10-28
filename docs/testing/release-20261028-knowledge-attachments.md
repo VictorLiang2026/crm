@@ -105,3 +105,10 @@
 - Deployment: only `assistant` was deployed. The cloud sync check confirmed 29 functions / 224 source and configuration files plus 90 reachable page assets match local. A safe invocation reached the deployed function and returned expected `UNAUTHORIZED` before database access; no record or AI operation was run.
 - Git release: local commit/tag, push, and final GitHub/CloudBase verification are pending; the `assistant` deployment is complete.
 - Rollback: redeploy the `assistant` function from the previous release tag `release-20261028-1444`; no database rollback is needed.
+
+## Follow-up: live S-10 PDF OCR timeout diagnosis (2026-10-29)
+
+- Read-only CloudBase logs confirm S-10 reached the deployed `assistant` and returned `PDF_TIMEOUT`. The pending profile-save source changes are not involved: this release commit already exists on GitHub `master`, and CloudBase `i18n.js` content matches that GitHub revision after line-ending normalization.
+- The deployed OCR renderer sets one 65-second deadline for the full render-and-OCR process. `assistant` is configured for 90 seconds and `ai_parse` for 120 seconds. Multiple vision calls took tens of seconds in the inspected window, including one `ai_parse` call that reached its 120-second platform timeout. The parent OCR flow can therefore return a timeout while a model call is still running.
+- Failed `assistant` requests returned `PDF_TIMEOUT` after about 66–71 seconds. Peak memory approached the configured 256 MB. PDF content and OCR payload were excluded from this record.
+- Conclusion: the S-10 timeout is a runtime latency/capacity limitation in the already deployed OCR path. The unpublished migration/baseline/test/documentation changes do not fix it. No retry, database write, extraction, source mutation, or runtime-code change was performed. A separate change to bound/cancel each OCR batch or make extraction asynchronous would alter the existing PDF flow and needs its own scoped approval.

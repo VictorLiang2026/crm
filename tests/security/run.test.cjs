@@ -70,3 +70,22 @@ test('anonymous gateway checks reject visible rows and nonzero aggregate facts',
   assert.equal(observationCount('0-19/20'), null);
   assert.equal(observationCount(null), null);
 });
+
+test('Person profile transaction RPC is public-only, service-role-only, and reversibly scoped', () => {
+  const signature = 'crm_person_profile_save_v1(p_actor_uid text, p_person_id bigint, p_person_expected_updated_at timestamp with time zone, p_person_fields jsonb, p_customer_id bigint, p_customer_expected_updated_at timestamp with time zone, p_customer_fields jsonb, p_recruit_id bigint, p_recruit_expected_updated_at timestamp with time zone, p_recruit_fields jsonb)';
+  const routine = object(copy(), signature);
+  assert.ok(routine, 'approved routine is recorded in the public catalog');
+  assert.deepEqual(routine.detail, {
+    anon_execute: false, service_execute: true, security_definer: false, authenticated_execute: false,
+  });
+  const root = path.resolve(__dirname, '../..');
+  const migration = fs.readFileSync(path.join(root, 'cloudbase/migrations/20261028210000_person_profile_transaction.sql'), 'utf8');
+  const rollback = fs.readFileSync(path.join(root, 'cloudbase/rollbacks/20261028210000_person_profile_transaction.rollback.sql'), 'utf8');
+  assert.match(migration, /CREATE OR REPLACE FUNCTION public\.crm_person_profile_save_v1/);
+  assert.match(migration, /SECURITY INVOKER[\s\S]*SET search_path = pg_catalog, public/);
+  assert.match(migration, /FROM PUBLIC, anon, authenticated/);
+  assert.match(migration, /TO service_role/);
+  assert.doesNotMatch(migration, /(?:\bpr\.|\bpr_[a-z0-9_]+)/i);
+  const rollbackSql = rollback.replace(/\r\n/g, '\n').replace(/^\s*--.*$/gm, '').trim();
+  assert.equal(rollbackSql, 'DROP FUNCTION IF EXISTS public.crm_person_profile_save_v1(\n  text,bigint,timestamptz,jsonb,bigint,timestamptz,jsonb,bigint,timestamptz,jsonb\n);');
+});
