@@ -1034,8 +1034,8 @@ body:has(.login), body.is-login { padding-top: env(safe-area-inset-top); }
 .kg-home-card .kg-table{width:100%;min-width:100%;table-layout:fixed}
 .kg-home-card .kg-table th:nth-child(1),.kg-home-card .kg-table td:nth-child(1){width:7%}.kg-home-card .kg-table td:nth-child(1){min-width:0;max-width:none}
 .kg-home-card .kg-table th:nth-child(2),.kg-home-card .kg-table td:nth-child(2){width:20%}
-.kg-home-card .kg-table th:nth-child(3),.kg-home-card .kg-table td:nth-child(3){width:9%}
-.kg-home-card .kg-table th:nth-child(4),.kg-home-card .kg-table td:nth-child(4){width:37%}
+.kg-home-card .kg-table th:nth-child(3),.kg-home-card .kg-table td:nth-child(3){width:13%}
+.kg-home-card .kg-table th:nth-child(4),.kg-home-card .kg-table td:nth-child(4){width:33%}
 .kg-home-card .kg-table th:nth-child(5),.kg-home-card .kg-table td:nth-child(5){width:8%}
 .kg-home-card .kg-table th:nth-child(6),.kg-home-card .kg-table td:nth-child(6){width:10%}
 .kg-home-card .kg-table th:nth-child(7),.kg-home-card .kg-table td:nth-child(7){width:9%}

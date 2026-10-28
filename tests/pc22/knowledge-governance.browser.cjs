@@ -18,7 +18,7 @@ test('Knowledge Library supports categories, bilingual search, sorting, status, 
       const ctx={main:document.querySelector('.console-main'),api:{call:async(name,payload)=>{
         calls.push({name,payload});
         if(name==='assistant'&&payload.action==='knowledgeLibrary'&&payload.operation==='list')return {ok:true,sources:[],knowledge:[
-          {id:1,item_type:'evidence',source:'Policy',content:'Reviewed clause',metadata:{categories:['industry_development'],summary:'industry summary'},confidence:.9,verified:false,lifecycle_status:'draft',version_no:1,updated_at:'2026-10-16T00:00:00Z'},
+          {id:1,item_type:'evidence',source:'Policy',content:'Reviewed clause',metadata:{categories:['health_wealth_sharing'],summary:'industry summary'},confidence:.9,verified:false,lifecycle_status:'draft',version_no:1,updated_at:'2026-10-16T00:00:00Z'},
           {id:2,item_type:'company',source:'Sales framework',content:'Recruitment notes',metadata:{categories:['recruitment_policy','industry_development'],summary:'needle summary'},confidence:.9,verified:true,lifecycle_status:'verified',version_no:1,updated_at:'2026-10-17T00:00:00Z'}
         ],playbooks:[]};
         return {ok:true};
@@ -100,13 +100,17 @@ test('Knowledge Library supports categories, bilingual search, sorting, status, 
       assert.equal(await browser.evaluate('document.documentElement.scrollWidth<=innerWidth+1'),true,`${width}x${height} overflow`);
       const tableFit=await browser.evaluate(`(()=>{const wrap=document.querySelector('.kg-table-wrap');const table=wrap.querySelector('.kg-table');
         const actionCell=table.querySelector('tbody tr[data-kg-id="1"] .kg-table-actions');
+        const healthChip=table.querySelector('tbody tr[data-kg-id="1"] .kg-category-chip');const range=document.createRange();range.selectNodeContents(healthChip);
         return {wrap:wrap.clientWidth,table:table.getBoundingClientRect().width,scroll:table.scrollWidth,
           columns:[...table.querySelectorAll('thead th')].map(cell=>cell.getBoundingClientRect().width),
+          healthText:healthChip.innerText,healthLineCount:range.getClientRects().length,
           searchWidth:document.querySelector('.kg-search input[type="search"]').getBoundingClientRect().width,
           actionButtons:[...actionCell.querySelectorAll('.btn')].map(button=>({top:button.getBoundingClientRect().top,right:button.getBoundingClientRect().right,cellRight:actionCell.getBoundingClientRect().right}))};})()`);
       assert.ok(tableFit.table<=tableFit.wrap+1&&tableFit.scroll<=tableFit.wrap+1,`${width}x${height} knowledge columns fit without horizontal scrolling: ${JSON.stringify(tableFit)}`);
       assert.ok(tableFit.columns[3]>tableFit.columns[1]&&tableFit.columns[1]>Math.max(...tableFit.columns.filter((_,index)=>![1,3].includes(index))),
         `${width}x${height} summary is widest and title is second widest: ${JSON.stringify(tableFit.columns)}`);
+      assert.equal(tableFit.healthText,'健康财富分享',`${width}x${height} category label remains complete`);
+      assert.equal(tableFit.healthLineCount,1,`${width}x${height} category label fits on one line`);
       assert.ok(tableFit.searchWidth>=360,`${width}x${height} title search remains slightly wider`);
       assert.ok(tableFit.actionButtons[1].top>tableFit.actionButtons[0].top&&tableFit.actionButtons[2].top>tableFit.actionButtons[1].top,
         `${width}x${height} row actions remain vertically stacked`);
