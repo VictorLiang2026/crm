@@ -8,6 +8,7 @@ const { createSearchData } = require('./search-data');
 
 const MAX_FILE_BYTES = 100_000_000;
 const LEGACY_MAX_FILE_BYTES = 6 * 1024 * 1024;
+const MAX_PDF_TEXT_BYTES = 16 * 1024 * 1024;
 const KNOWLEDGE_BUCKET = 'knowledge';
 const UPLOAD_CHUNK_BYTES = 768 * 1024;
 const MAX_TEXT_CHARS = 100000;
@@ -184,13 +185,9 @@ async function extractText(fileName, mime, bytes, options={}) {
   if (['.png','.jpg','.jpeg','.webp'].includes(ext)) return extractImageText(fileName,mime,bytes,options);
   if (ext==='.pdf') {
     if (!bytes.subarray(0,5).equals(Buffer.from('%PDF-'))) fail('INVALID_CONTENT');
-    const response=options.sourceId
-      ? await (options.app||require('./db').app).callFunction({name:'person_360',data:{action:'extractKnowledgePdfText',
-        sourceId:String(options.sourceId),actorUid:options.actorUid}})
-      : await (options.app||require('./db').app).callFunction({name:'person_360',data:{action:'extractKnowledgePdfText',base64:bytes.toString('base64')}});
-    const result=response?.result;
-    if (!result || result.error || typeof result.text!=='string') fail(result?.error || 'PDF_EXTRACTION_FAILED');
-    return boundedText(result.text);
+    if(bytes.length>MAX_PDF_TEXT_BYTES)fail('PDF_LIMIT');
+    const extractPdfText=options.pdfTextExtractor||require('./knowledge-pdf-text').extractPdfText;
+    return boundedText(await extractPdfText(bytes));
   }
   fail('UNSUPPORTED_TYPE');
 }
@@ -213,6 +210,7 @@ function createKnowledgeLibrary(options={}) {
   const fetchImpl=options.fetchImpl||fetch,client=options.client||require('./db').app;
   const gatewayFactory=options.gatewayFactory||createAIGateway;
   const searchDataFactory=options.searchDataFactory||createSearchData;
+  const logger=options.logger||console;
   const callFunction=options.callFunction||client.callFunction.bind(client);
   if (!/^crm-[a-z0-9]+$/.test(env||'') || typeof key!=='string' || !key) fail('INVALID_CONFIG');
   async function request(table,method='GET',filters={},body,{timeoutMs=12000}={}) {
@@ -224,7 +222,13 @@ function createKnowledgeLibrary(options={}) {
     const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),timeoutMs);
     try {
       const response=await fetchImpl(url,{method,headers,body:body===undefined?undefined:JSON.stringify(body),signal:controller.signal});
-      if (!response.ok) { const bodyText=await response.text(); const error=new Error(`Knowledge data request failed (${response.status})`);
+      if (!response.ok) { const bodyText=await response.text(); let databaseCode=null;
+        try {
+          const candidate=JSON.parse(bodyText)?.code;
+          if(typeof candidate==='string'&&/^(?:[0-9A-Z]{5}|PGRST\d{3})$/.test(candidate))databaseCode=candidate;
+        } catch (_) {}
+        logger.warn('KNOWLEDGE_DATA_REQUEST_FAILED',JSON.stringify({table,method,status:response.status,databaseCode}));
+        const error=new Error(`Knowledge data request failed (${response.status})`);
         error.code=response.status===409?'DUPLICATE_SOURCE':response.status===401||response.status===403?'PERMISSION_DENIED':'PERSISTENCE_ERROR';
         if(/23505/.test(bodyText))error.code='DUPLICATE_SOURCE'; throw error; }
       const text=await response.text(); return text?JSON.parse(text):[];
@@ -250,10 +254,12 @@ function createKnowledgeLibrary(options={}) {
       fail('STORAGE_FAILED');
     } finally {clearTimeout(timer);}
   }
-  async function sourceBytes(source) {
+  async function sourceBytes(source,ownerUid) {
     if(typeof source?.original_base64==='string'&&source.original_base64)return decodeBase64(source.original_base64);
     const path=String(source?.storage_key||'');
     if(!path||path.startsWith('pg-private://'))fail('SOURCE_UNAVAILABLE');
+    const pathOwner=path.split('/')[0];
+    if(ownerUid&&pathOwner!==ownerUid)fail('SOURCE_UNAVAILABLE');
     return storageRequest(path,'GET');
   }
   async function sourceRows() {
@@ -360,7 +366,7 @@ function createKnowledgeLibrary(options={}) {
       reviewAt:input.reviewAt||null,fileName,contentType};
   }
   async function extractToDraft(source,base64,actor,preparedText=null) {
-    const text=preparedText||await extractText(source.file_name,source.content_type,await sourceBytes(source),
+    const text=preparedText||await extractText(source.file_name,source.content_type,await sourceBytes(source,actor),
       {app:client,sourceId:source.id,uploadId:source.metadata?.upload?.upload_id});
     if(Array.isArray(source.metadata?.categories)&&source.metadata.categories.includes('top_performer_sharing')&&likelySensitive(text)) fail('PERSONAL_DATA_DETECTED');
     const database=searchDataFactory({env,key,fetchImpl});
@@ -562,17 +568,17 @@ function createKnowledgeLibrary(options={}) {
   async function retryExtraction(sourceIdValue,actorValue) {
     const actor=actorUid(actorValue),sourceId=String(sourceIdValue||'');
     if(!positiveId(sourceId))fail('INVALID_INPUT');
-    const rows=await request('knowledge_sources','GET',{select:'*',id:`eq.${sourceId}`,deleted_at:'is.null',limit:1});
+    const rows=await request('knowledge_sources','GET',{select:'*',id:`eq.${sourceId}`,created_by:`eq.${actor}`,deleted_at:'is.null',limit:1});
     if(!rows.length||(!rows[0].original_base64&&!rows[0].storage_key))fail('SOURCE_UNAVAILABLE');
     const items=await request('knowledge_items','GET',{select:'id',source_id:`eq.${sourceId}`,limit:1});
     if(items.length)fail('DRAFT_ALREADY_EXISTS');
     const source=rows[0];
-    const extracting=(await request('knowledge_sources','PATCH',{select:'id,updated_at',id:`eq.${sourceId}`},
+    const extracting=(await request('knowledge_sources','PATCH',{select:'id,updated_at',id:`eq.${sourceId}`,created_by:`eq.${actor}`,deleted_at:'is.null'},
       {extraction_status:'extracting',updated_at:new Date().toISOString(),updated_by:actor}))[0];
-    try {const bytes=await sourceBytes(source);const text=await extractText(source.file_name,source.content_type,bytes,
-      {app:client,sourceId,uploadId:source.metadata?.upload?.upload_id,actorUid:actor});
+    try {const bytes=await sourceBytes(source,actor);const text=await extractText(source.file_name,source.content_type,bytes);
       return {ok:true,...await extractToDraft({...source,extraction_status:'extracting',updated_at:extracting?.updated_at},source.original_base64,actor,text),extractionStatus:'verified'};}
-    catch(error){await request('knowledge_sources','PATCH',{id:`eq.${sourceId}`},{extraction_status:'failed',updated_at:new Date().toISOString(),updated_by:actor}).catch(()=>{});throw error;}
+    catch(error){await request('knowledge_sources','PATCH',{id:`eq.${sourceId}`,created_by:`eq.${actor}`,deleted_at:'is.null'},
+      {extraction_status:'failed',updated_at:new Date().toISOString(),updated_by:actor}).catch(()=>{});throw error;}
   }
   async function reviewSource(input,actorValue) {
     const actor=actorUid(actorValue),sourceId=String(input?.sourceId||''),itemId=String(input?.itemId||''),action=input?.decision;

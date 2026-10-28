@@ -3,12 +3,14 @@ const test=require('node:test');
 const assert=require('node:assert/strict');
 const {downloadKnowledgeObject,MAX_KNOWLEDGE_PDF_BYTES}=require('../../cloudfunctions/person_360/knowledge-storage');
 const {extract}=require('../../cloudfunctions/person_360/knowledge-pdf-service');
-const {extractText}=require('../../cloudfunctions/assistant/knowledge-library-service');
+const {extractPdfText,MAX_BYTES}=require('../../cloudfunctions/assistant/knowledge-pdf-text');
+const {createKnowledgeLibrary,extractText}=require('../../cloudfunctions/assistant/knowledge-library-service');
 
 function response(status,bytes=Buffer.from('%PDF-text')){
   return {ok:status>=200&&status<300,status,headers:{get:name=>name==='content-length'?String(bytes.length):null},
     arrayBuffer:async()=>bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength)};
 }
+function restResponse(status,body){return {ok:status>=200&&status<300,status,text:async()=>typeof body==='string'?body:JSON.stringify(body)};}
 
 test('knowledge PDF download uses the private server endpoint, owner path and server credential',async()=>{
   const bytes=Buffer.alloc(4713581,1);let requested;
@@ -72,12 +74,65 @@ test('PDF source extraction rejects mismatched owner and preserves legacy Base64
   assert.deepEqual(result,{text:'legacy text'});assert.equal(extracted,1);assert.equal(downloaded,0);
 });
 
-test('assistant retry forwards the verified actor to the PDF-only Person 360 call and preserves safe errors',async()=>{
-  const pdf=Buffer.from('%PDF-fixture');let sent;
-  const text=await extractText('brochure.pdf','application/pdf',pdf,{sourceId:'12',actorUid:'operator-1',
-    app:{callFunction:async request=>{sent=request;return {result:{text:'PDF text'}};}}});
-  assert.equal(text,'PDF text');
-  assert.deepEqual(sent,{name:'person_360',data:{action:'extractKnowledgePdfText',sourceId:'12',actorUid:'operator-1'}});
-  await assert.rejects(extractText('brochure.pdf','application/pdf',pdf,{sourceId:'12',actorUid:'operator-1',
-    app:{callFunction:async()=>({result:{error:'PDF_STORAGE_DENIED'}})}}),error=>error.code==='PDF_STORAGE_DENIED');
+function simplePdf(){
+  const stream='BT /F1 12 Tf 72 720 Td (Knowledge summary smoke test) Tj ET';
+  const objects=[
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>',
+    `<< /Length ${Buffer.byteLength(stream)} >>\nstream\n${stream}\nendstream`,
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+  ];
+  let body='%PDF-1.4\n';const offsets=[0];
+  objects.forEach((value,index)=>{offsets.push(Buffer.byteLength(body));body+=`${index+1} 0 obj\n${value}\nendobj\n`;});
+  const xrefOffset=Buffer.byteLength(body);body+=`xref\n0 ${objects.length+1}\n0000000000 65535 f \n`;
+  body+=offsets.slice(1).map(offset=>`${String(offset).padStart(10,'0')} 00000 n \n`).join('');
+  body+=`trailer\n<< /Size ${objects.length+1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF\n`;
+  return Buffer.from(body,'ascii');
+}
+
+test('bounded local PDF worker extracts a 9.4 MB text PDF under the Node 18 runtime',async()=>{
+  const small=simplePdf(),size=9_433_979;
+  const bytes=Buffer.concat([small,Buffer.alloc(size-small.length,0x20)]);
+  assert.equal(await extractPdfText(bytes),'Knowledge summary smoke test');
+},{timeout:30000});
+
+test('PDF text extraction enforces a 16 MiB cap before starting a worker',async()=>{
+  const bytes=Buffer.alloc(MAX_BYTES+1);Buffer.from('%PDF-').copy(bytes);
+  await assert.rejects(extractPdfText(bytes),error=>error.code==='PDF_LIMIT');
+});
+
+test('assistant extracts PDFs locally instead of making an unauthenticated internal function call',async()=>{
+  const pdf=Buffer.alloc(9_433_979);Buffer.from('%PDF-').copy(pdf);let sent=0,received;
+  const text=await extractText('brochure.pdf','application/pdf',pdf,{app:{callFunction:async()=>{sent++;}},
+    pdfTextExtractor:async bytes=>{received=bytes;return 'PDF text';}});
+  assert.equal(text,'PDF text');assert.equal(received,pdf);assert.equal(sent,0);
+  const tooLarge=Buffer.alloc(MAX_BYTES+1);Buffer.from('%PDF-').copy(tooLarge);
+  await assert.rejects(extractText('brochure.pdf','application/pdf',tooLarge,{pdfTextExtractor:async()=> 'should not run'}),
+    error=>error.code==='PDF_LIMIT');
+});
+
+test('PDF retry reads only a source owned by the authenticated assistant caller',async()=>{
+  let requestUrl;
+  const service=createKnowledgeLibrary({env:'crm-test123',key:'server-only-key',client:{callFunction:async()=>({})},
+    fetchImpl:async url=>{requestUrl=new URL(url);return restResponse(200,[]);}});
+  await assert.rejects(service.run({operation:'retry',sourceId:'6'},'operator-1'),error=>error.code==='SOURCE_UNAVAILABLE');
+  assert.equal(requestUrl.searchParams.get('created_by'),'eq.operator-1');
+});
+
+test('knowledge deletion keeps soft-delete semantics and logs only safe database diagnostics',async()=>{
+  const expectedUpdatedAt='2026-10-28T10:00:00.000Z',source={id:6,source_id:null,updated_at:expectedUpdatedAt,deleted_at:null};
+  const warnings=[],writes=[];
+  const service=createKnowledgeLibrary({env:'crm-test123',key:'server-only-key',client:{callFunction:async()=>({})},
+    logger:{warn:(...args)=>warnings.push(args)},fetchImpl:async(_url,options={})=>{
+      if(options.method==='GET')return restResponse(200,[source]);
+      writes.push({method:options.method,body:JSON.parse(options.body)});
+      return restResponse(400,{code:'23514',message:'private title must not be logged'});
+    }});
+  await assert.rejects(service.run({operation:'delete',data:{table:'knowledge_sources',id:'6',expectedUpdatedAt}},'operator-1'),
+    error=>error.code==='PERSISTENCE_ERROR');
+  assert.equal(writes.length,1);assert.ok(writes[0].body.deleted_at);assert.equal(writes[0].body.updated_by,'operator-1');
+  assert.equal(warnings.length,1);assert.equal(warnings[0][0],'KNOWLEDGE_DATA_REQUEST_FAILED');
+  assert.deepEqual(JSON.parse(warnings[0][1]),{table:'knowledge_sources',method:'PATCH',status:400,databaseCode:'23514'});
+  assert.equal(JSON.stringify(warnings).includes('private title'),false);
 });
