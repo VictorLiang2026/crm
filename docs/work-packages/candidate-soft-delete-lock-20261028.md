@@ -25,9 +25,11 @@
 - No view rebuild was needed: no base-table columns or function signature changed. No grants or RLS policies changed.
 - Full regression through WP01: `108 PASS`, `0 FAIL`, `5` existing skips. WP01 status: `PASS_WITH_LIMITATIONS`; catalog checks `1162/1162`, anonymous probe `77/77`, login and authenticated read-denial checks passed. The three explicitly unverified items are service-role runtime writes, production business writes, and real mobile visual acceptance.
 - WP04 identity audit: `PASS_WITH_EXCEPTIONS`; 782/782 active customers, 576/576 active recruits, 5/5 speakers mapped; three previously declared participant exceptions retained. No new exception was introduced.
-- Release gate, final sync, and Git publication: pending execution.
+- Release gate: `PASS_WITH_LIMITATIONS`, with only `service-runtime`, `live-writes`, and `mobile` explicitly unverified.
+- Final sync: local, GitHub `master`, and cloud sources match. Cloud evidence reported 29 CRM functions / 224 source and configuration files and 90 reachable page/module/style assets; online `admin.html` returned HTTP 200 with a matching SHA-256.
+- Code commit/tag: `9af6a16` / `release-20261028-1252`. Database migration `20261028160000` is registered and applied. No web asset or Cloud Function deployment was required.
 
 ## Deployment
 
 - Database deployment only; no web assets or Cloud Functions require redeployment.
-- No Cloud Function or static asset changed, so no function/hosting upload is required. The release procedure will verify that cloud source remains byte-identical and will record the commit/tag and final three-way sync result.
+- No Cloud Function or static asset changed, so no function/hosting upload was required. Release script verified existing cloud sources remained byte-identical before and after the Git publication.
