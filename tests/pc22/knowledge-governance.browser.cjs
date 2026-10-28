@@ -83,7 +83,7 @@ test('Knowledge Library supports categories, bilingual search, sorting, status, 
     const uploadFields=await browser.evaluate("[...document.querySelectorAll('.kg-page-form [name]')].map(x=>x.name)");
     const uploadInput=await browser.evaluate("({accept:document.querySelector('.kg-page-form [name=file]').accept,label:document.querySelector('.kg-page-form').innerText})");
     assert.match(uploadInput.accept,/\.png/);assert.match(uploadInput.accept,/\.pptx/);assert.match(uploadInput.accept,/\.xlsx/);
-    assert.match(uploadInput.label,/6 MiB/);
+    assert.match(uploadInput.label,/100 MB/);
     for(const removed of ['jurisdiction','validFrom','validTo','sharingAuthorized','anonymized'])assert.equal(uploadFields.includes(removed),false,`upload excludes ${removed}`);
     assert.equal(uploadFields.includes('publishedAt'),true);
     await browser.evaluate("window.kgEditor('new','knowledge_items')");
