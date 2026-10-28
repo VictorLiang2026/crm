@@ -305,7 +305,6 @@ function createKnowledgeLibrary(options={}) {
       confidence=input.confidence==null?0.8:Number(input.confidence);
     if(!validDate(publishedAt)||!Number.isFinite(confidence)||confidence<0||confidence>1)fail('INVALID_INPUT');
     if(sourceUri&&!/^https:\/\//i.test(sourceUri))fail('INVALID_INPUT');
-    if(categories.some(category=>['industry_development','legal_tax'].includes(category))&&(!sourceUri||!publishedAt))fail('SOURCE_METADATA_REQUIRED');
     if(categories.includes('top_performer_sharing')&&likelySensitive(content))fail('PERSONAL_DATA_DETECTED');
     let current=null,currentStatus=null;
     if(id){

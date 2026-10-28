@@ -64,10 +64,18 @@ test('editing a draft uses an optimistic timestamp condition',async()=>{
   assert.equal(writes[0].url.searchParams.get('updated_at'),`eq.${current.updated_at}`);
 });
 
+test('industry and legal knowledge may omit an external source URL while preserving publication date',async()=>{
+  for(const domain of ['industry_development','legal_tax']){
+    const {service,writes}=setup();
+    const result=await service.run({operation:'save',data:{...base,domain,categories:[domain],publishedAt:'2026-10-01'}},'operator-1');
+    assert.equal(result.ok,true,domain);
+    assert.ok(writes[0].body[0].source_uri==null,domain);
+    assert.equal(writes[0].body[0].metadata.published_at,'2026-10-01',domain);
+  }
+});
+
 test('publication metadata replaces removed jurisdiction/date fields while privacy scanning remains automatic',async()=>{
   const {service,writes}=setup();
-  await assert.rejects(service.run({operation:'save',data:{...base,domain:'legal_tax',publishedAt:'2026-10-01'}},'operator-1'),
-    error=>error.code==='SOURCE_METADATA_REQUIRED');
   const result=await service.run({operation:'save',data:{...base,domain:'top_performer_sharing',
     publishedAt:'2026-10-21',jurisdiction:'legacy field ignored',validTo:'2026-10-22'}},'operator-1');
   assert.equal(result.ok,true);

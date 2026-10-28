@@ -29,3 +29,11 @@
 - Storage accepts files up to 100 MB. This does not mean every 100 MB file can be synchronously analyzed: the current PDF text parser is intentionally capped at 6 MiB; extracted text is capped at 100,000 characters. Larger PDFs need a separate bounded/async document-processing path.
 - A real authenticated browser upload, OCR model call, summary generation and resulting knowledge record were not exercised in production. WP01 login evidence was expired; live writes and service-runtime probes remain unverified.
 - Rollback is a recovery option only after confirming no new-format source/object remains; it was not executed.
+
+## Follow-up: optional source URL validation fix (2026-10-28)
+
+- Reported symptom: “上传或提取未完成，请检查资料和必填信息后重试。” despite all visible required fields being complete.
+- Cause: the save path still rejected `industry_development` and `legal_tax` entries without an external source URL, while the form treats that field as optional. This returned `SOURCE_METADATA_REQUIRED` before the attachment/OCR flow could complete.
+- Fix: removed only the hidden URL prerequisite. If a source URL is supplied, the existing HTTPS validation remains; publication date validation remains unchanged.
+- Verification before deployment: Knowledge Library 23/23 passed; full regression 108 passed, 5 historical skips; WP01 release gate `PASS_WITH_LIMITATIONS` with no blockers. Live read-only login/permissions probe passed.
+- Deployment and post-deployment function probe: pending.
