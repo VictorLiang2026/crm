@@ -93,4 +93,5 @@
 - Validation: synthetic 30,000,000-byte, 40-page text PDF extracted successfully; a 30,000,001-byte PDF and a 41-page PDF were rejected. Knowledge Library suite 34/34; full regression 108 passed, 5 historical skips; security suite 5/5. These are local Node runtime fixtures, not a production upload or a representative scan-heavy document.
 - WP01: `PASS_WITH_LIMITATIONS`; 1,162 public catalog checks, 77/77 anonymous probes, 47 authenticated HEAD checks, isolated login, read-only function probe, and PC34 checks passed. Service-role writes, production business writes/AI, and real mobile acceptance remain unverified.
 - Post-deployment: only `assistant` was deployed; 29 CloudBase functions / 224 source-config files and 90 reachable static assets matched. An unauthenticated read-only smoke call returned the expected `UNAUTHORIZED` without entering knowledge-data access.
-- Git commit and release tag are recorded in the publication follow-up below.
+- Implementation commit: `5c54c2cd2aca6fca8d4d736f53cff7a9ff37823b`.
+- Release tag: `release-20261028-1444` (points to the publication-record commit containing this note and the implementation commit in its ancestry).
