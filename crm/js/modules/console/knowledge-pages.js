@@ -50,6 +50,7 @@ export function renderKnowledgeEditor(ctx,{mode='new',table='knowledge_items',id
     if(!values.categories.length){formStatus.textContent=text('category_required');return;}
     const submit=current.querySelector('[type="submit"]');submit.disabled=true;
     try{
+      let queuedUpload=false;
       if(isUpload){
         const file=current.elements.file.files?.[0];
         if(!file)throw new Error(text('source_file_required'));
@@ -73,6 +74,7 @@ export function renderKnowledgeEditor(ctx,{mode='new',table='knowledge_items',id
               code==='OCR_FAILED'?text('ocr_failed'):
                   code==='UNSUPPORTED_TYPE'?text('source_unsupported_type'):
                     ['INVALID_CONTENT','INVALID_IMAGE'].includes(code)?text('source_invalid_content'):text('source_upload_failed'));}
+          queuedUpload=result.queued===true;
         }catch(error){if(!finalizing)await data.knowledgeLibrary(ctx,'uploadCancel',{data:session}).catch(()=>{});throw error;}
       }else if(isPlaybook){
         for(const key of ['possible_underlying_reasons','clarifying_questions','do_not_say'])
@@ -86,7 +88,7 @@ export function renderKnowledgeEditor(ctx,{mode='new',table='knowledge_items',id
           confidence:values.confidence===''?0.8:Number(values.confidence)}});
         if(!result?.ok)throw new Error(result?.error?.message||text('save_failed'));
       }
-      ctx.toast(text(isUpload?'upload_success':'save_success'),'ok');location.hash='#/knowledge-governance';
+      ctx.toast(text(isUpload?(queuedUpload?'ocr_queued':'upload_success'):'save_success'),'ok');location.hash='#/knowledge-governance';
     }catch(error){formStatus.textContent=error.message||text('save_failed');submit.disabled=false;}
   }},[]);
   const elements=[];

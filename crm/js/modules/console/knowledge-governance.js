@@ -18,12 +18,13 @@ const active = row => (row.lifecycle_status || (row.verified ? 'verified' : 'dra
 const titleOf = row => row.table === 'playbooks' ? `${row.scenario || ''}${row.objection ? ` · ${row.objection}` : ''}`
   : row.table === 'knowledge_sources' ? row.title || row.fileName || '' : row.source || '';
 const summaryOf = row => row.table === 'playbooks' ? row.response_logic || ''
-  : row.table === 'knowledge_sources' ? text('source_pending_summary') : row.metadata?.summary || String(row.content || '').slice(0,220);
+  : row.table === 'knowledge_sources' ? (row.ocrProgress ? (row.ocrProgress.stage==='summarize' ? text('ocr_summarizing') : text('ocr_progress').replace('{done}',String(row.ocrProgress.completedPages)).replace('{total}',row.ocrProgress.totalPages?String(row.ocrProgress.totalPages):'…')) : text('source_pending_summary')) : row.metadata?.summary || String(row.content || '').slice(0,220);
 const errorCodeOf = error => String(error?.message||'').match(/^([A-Z][A-Z0-9_]+)(?::|$)/)?.[1]||'';
 const retryErrorText = error => errorCodeOf(error)==='PDF_NO_TEXT'?text('pdf_no_text')
   : errorCodeOf(error)==='PDF_RENDER_LIMIT'?text('pdf_render_limit'):error?.message||text('retry_failed');
 
 export function renderKnowledgeGovernance(ctx) {
+  let pollTimer=null;
   let records={knowledge:[],playbooks:[],sources:[]},categoryFilter=[],statusFilter='all',keyword='',fullText=false;
   let sortField='updated_at',sortDir='desc',page=1,categoryFilterOpen=false;
   const main=ctx.main;
@@ -31,6 +32,8 @@ export function renderKnowledgeGovernance(ctx) {
     const result=await data.knowledgeLibrary(ctx,'list');
     records={knowledge:result.knowledge||[],playbooks:result.playbooks||[],sources:result.sources||[]};
     draw();
+    clearTimeout(pollTimer);
+    if(location.hash.includes('knowledge-governance')&&records.sources.some(row=>row.ocrProgress&&row.extractionStatus==='extracting'))pollTimer=setTimeout(()=>load().catch(()=>{}),12000);
   };
   const rows=()=>[
     ...records.knowledge.map(row=>({...row,table:'knowledge_items'})),
@@ -50,6 +53,7 @@ export function renderKnowledgeGovernance(ctx) {
     try{
       await data.knowledgeLibrary(ctx,'delete',{data:{table:row.table,id:row.id,expectedUpdatedAt:row.updated_at}});
     }catch(error){
+      if(errorCodeOf(error)==='SOURCE_IN_USE'){ctx.toast(text('source_in_use'),'error');return;}
       if(errorCodeOf(error)==='STALE_SOURCE'){
         await load().catch(()=>{});
         ctx.toast(text('stale_source_refresh'),'error');
@@ -71,7 +75,7 @@ export function renderKnowledgeGovernance(ctx) {
       await load().catch(()=>{});
       throw new Error(retryErrorText(new Error(result?.errorCode||'')));
     }
-    ctx.toast(text('retry_success'),'ok');await load();
+    ctx.toast(result.queued?text('ocr_queued'):text('retry_success'),'ok');await load();
   };
   const draw=()=>{
     const all=rows(),query=keyword.trim().toLocaleLowerCase();
@@ -114,7 +118,7 @@ export function renderKnowledgeGovernance(ctx) {
           h('td',{class:'kg-summary-cell'},[summary||'—',
             !isSource?h('details',{class:'kg-row-content-details'},[h('summary',{},text('view_content')),
               h('div',{class:'kg-full-content'},isPlaybook?row.response_logic:row.content)]):null]),
-          h('td',{},h('span',{class:`kg-status ${live?'kg-verified':'kg-invalidated'}`},text(live?'status_active':'status_invalid'))),
+          h('td',{},h('span',{class:`kg-status ${live?'kg-verified':'kg-invalidated'}`},text(row.ocrProgress?'status_processing':live?'status_active':'status_invalid'))),
           h('td',{},row.updated_at?String(row.updated_at).slice(0,10):'—'),
           h('td',{class:'kg-table-actions'},actions),
         ]);

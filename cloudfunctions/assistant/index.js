@@ -407,6 +407,11 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
     }
   };
   return (event, context, callback) => {
+    const triggerSecret=process.env.KNOWLEDGE_OCR_TRIGGER_SECRET;
+    if(event?.Type==='Timer'&&event.TriggerName==='knowledgeOcrWorker'&&typeof triggerSecret==='string'&&
+      triggerSecret.length>=32&&event.Message===triggerSecret) {
+      return knowledgeLibraryRunner({action:'knowledgeLibrary',operation:'processOcrQueue'},'knowledge-ocr-worker',{internalOcrQueue:true});
+    }
     const asyncRequested = typeof callback === 'function' &&
       ((event?.action === 'summarize' && event.asyncWait === true) ||
        (event?.action === 'knowledgeLibrary' && event.operation === 'dualGenerate' && event.data?.asyncWait === true));

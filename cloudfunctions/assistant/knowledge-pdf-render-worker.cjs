@@ -18,7 +18,11 @@ process.once('message',message=>(async()=>{
   try{
     const document=await loading.promise;
     if(document.numPages>MAX_PAGES)throw Error('PDF_LIMIT');
+    const startPage=Number(message?.startPage||1),maxPages=Number(message?.maxPages||MAX_PAGES);
+    if(!Number.isSafeInteger(startPage)||startPage<1||!Number.isSafeInteger(maxPages)||maxPages<1||maxPages>MAX_PAGES) throw Error('PDF_LIMIT');
+    if(startPage>document.numPages){respond({type:'start',pageCount:document.numPages});respond({type:'done',nextPage:startPage});return;}
     respond({type:'start',pageCount:document.numPages});
+    const endPage=Math.min(document.numPages,startPage+maxPages-1);
     let batch=[];
     const sendBatch=async()=>{
       if(!batch.length)return;
@@ -31,7 +35,7 @@ process.once('message',message=>(async()=>{
       if(!acknowledged)throw Error('PDF_OCR_FAILED');
       batch=[];
     };
-    for(let pageNumber=1;pageNumber<=document.numPages;pageNumber++){
+    for(let pageNumber=startPage;pageNumber<=endPage;pageNumber++){
       const page=await document.getPage(pageNumber),base=page.getViewport({scale:1});
       const fittedScale=Math.min(1.35,1400/Math.max(base.width,base.height));
       if(!Number.isFinite(fittedScale)||fittedScale<.2||base.width*base.height>100_000_000)throw Error('PDF_RENDER_LIMIT');
@@ -53,9 +57,9 @@ process.once('message',message=>(async()=>{
       page.cleanup();
       if(!output)throw Error('PDF_RENDER_LIMIT');
       batch.push({page:pageNumber,fileName:`page-${pageNumber}.jpg`,contentType:'image/jpeg',base64:output.toString('base64')});
-      if(batch.length>=MAX_BATCH||pageNumber===document.numPages)await sendBatch();
+      if(batch.length>=MAX_BATCH||pageNumber===endPage)await sendBatch();
     }
-    respond({type:'done'});
+    respond({type:'done',nextPage:endPage+1});
   }catch(error){
     const code=passwordRequested||error.name==='PasswordException'?'PDF_ENCRYPTED':
       ['PDF_LIMIT','PDF_RENDER_LIMIT','PDF_OCR_FAILED','INVALID_CONTENT'].includes(error.message)?error.message:'INVALID_CONTENT';

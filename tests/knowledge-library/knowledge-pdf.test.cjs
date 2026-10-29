@@ -138,6 +138,14 @@ test('scanned PDF pages render to bounded JPEG batches without retaining all pag
   assert.deepEqual(result,{pageCount:1});assert.equal(received,1);
 },{timeout:20000});
 
+test('PDF renderer resumes at a bounded page cursor and preserves the legacy result shape',async()=>{
+  const {renderPdfPages}=require('../../cloudfunctions/assistant/knowledge-pdf-render');
+  const result=await renderPdfPages(scannedPdf(),{startPage:2,maxPages:3,onBatch:async()=>{throw Error('no page should be rendered');}});
+  assert.deepEqual(result,{pageCount:1,nextPage:2});
+  const legacy=await renderPdfPages(scannedPdf(),{onBatch:async()=>{}});
+  assert.deepEqual(legacy,{pageCount:1});
+},{timeout:20000});
+
 test('scanned PDF retries route rendered pages through the OCR batch contract',async()=>{
   const batches=[];
   const text=await extractText('scan.pdf','application/pdf',scannedPdf(),{ocrPdfBatch:async images=>{
@@ -234,7 +242,7 @@ test('knowledge source deletion selects only columns present on knowledge_source
     }});
   const result=await service.run({operation:'delete',data:{table:'knowledge_sources',id:'6',expectedUpdatedAt:source.updated_at}},'operator-1');
   assert.equal(result.ok,true);
-  assert.equal(urls[0].searchParams.get('select'),'id,updated_at,deleted_at');
+  assert.equal(urls[0].searchParams.get('select'),'id,updated_at,deleted_at,extraction_status');
   assert.equal(urls[0].searchParams.has('source_id'),false);
 });
 

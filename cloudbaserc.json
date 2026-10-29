@@ -5,10 +5,17 @@
   "functions": [
     {
       "name": "assistant",
-      "timeout": 90,
+      "timeout": 180,
       "runtime": "Nodejs18.15",
       "handler": "index.main",
-      "memorySize": 256
+      "memorySize": 256,
+      "triggers": [
+        {
+          "name": "knowledgeOcrWorker",
+          "type": "timer",
+          "config": "0 */1 * * * * *"
+        }
+      ]
     },
     {
       "name": "activities",

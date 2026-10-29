@@ -4,10 +4,12 @@ const {fork}=require('node:child_process');
 const path=require('node:path');
 const MAX_BYTES=30_000_000,MAX_PAGES=40,TIMEOUT_MS=65000;
 
-function renderPdfPages(bytes,{onBatch,forkProcess=fork,timeoutMs=TIMEOUT_MS}={}){
+function renderPdfPages(bytes,{onBatch,forkProcess=fork,timeoutMs=TIMEOUT_MS,startPage=1,maxPages=MAX_PAGES}={}){
   if(!Buffer.isBuffer(bytes)||!bytes.subarray(0,5).equals(Buffer.from('%PDF-')))
     return Promise.reject(Object.assign(new Error('INVALID_CONTENT'),{code:'INVALID_CONTENT'}));
   if(bytes.length>MAX_BYTES)
+    return Promise.reject(Object.assign(new Error('PDF_LIMIT'),{code:'PDF_LIMIT'}));
+  if(!Number.isSafeInteger(startPage)||startPage<1||!Number.isSafeInteger(maxPages)||maxPages<1||maxPages>MAX_PAGES)
     return Promise.reject(Object.assign(new Error('PDF_LIMIT'),{code:'PDF_LIMIT'}));
   if(typeof onBatch!=='function')return Promise.reject(Object.assign(new Error('PDF_OCR_FAILED'),{code:'PDF_OCR_FAILED'}));
   return new Promise((resolve,reject)=>{
@@ -32,7 +34,7 @@ function renderPdfPages(bytes,{onBatch,forkProcess=fork,timeoutMs=TIMEOUT_MS}={}
         return;
       }
       if(message?.type==='error')return finish(message.error||'PDF_OCR_FAILED');
-      if(message?.type==='done')return finish(null,{pageCount});
+      if(message?.type==='done')return finish(null,{pageCount,...(startPage!==1||maxPages!==MAX_PAGES?{nextPage:Number(message.nextPage)||pageCount+1}:{})});
       if(message?.type==='pages'&&Array.isArray(message.pages)){
         Promise.resolve().then(()=>onBatch(message.pages)).then(()=>child.send({ack:message.batchId}),
           error=>finish(error?.code||'PDF_OCR_FAILED'));
@@ -40,7 +42,7 @@ function renderPdfPages(bytes,{onBatch,forkProcess=fork,timeoutMs=TIMEOUT_MS}={}
     });
     child.once('error',()=>finish('PDF_OCR_FAILED'));
     child.once('exit',(code,signal)=>{if(!settled)finish(signal==='SIGABRT'||code===134?'PDF_RENDER_LIMIT':'PDF_OCR_FAILED');});
-    child.send({bytes:new Uint8Array(bytes)},error=>{if(error)finish('PDF_OCR_FAILED');});
+    child.send({bytes:new Uint8Array(bytes),startPage,maxPages},error=>{if(error)finish('PDF_OCR_FAILED');});
   });
 }
 

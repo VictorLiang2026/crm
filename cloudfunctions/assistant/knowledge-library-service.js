@@ -224,7 +224,8 @@ function metadataForSource(row) {
     extractionStatus:row.extraction_status,lifecycleStatus:row.lifecycle_status,lifecycle_status:row.lifecycle_status,
     versionNo:row.version_no,createdAt:row.created_at,updatedAt:row.updated_at,deletedAt:row.deleted_at||null,
     updated_at:row.updated_at,deleted_at:row.deleted_at||null,
-    categories:Array.isArray(row.metadata?.categories)?row.metadata.categories:[]};
+    categories:Array.isArray(row.metadata?.categories)?row.metadata.categories:[],
+    ocrProgress:row.metadata?.ocr_job?{stage:row.metadata.ocr_job.stage,completedPages:Math.max(0,Number(row.metadata.ocr_job.next_page||1)-1),totalPages:Number(row.metadata.ocr_job.page_count)||null}:null};
 }
 
 function createKnowledgeLibrary(options={}) {
@@ -423,6 +424,77 @@ function createKnowledgeLibrary(options={}) {
     return {itemId:String(itemRows[0].id),sourceId:String(source.id),draft:false,summary:out.summary,
       keyPoints:out.keyPoints,taskId:String(task.taskId),resultId:String(task.resultId)};
   }
+  async function enqueuePdfOcr(source,actor) {
+    const prior=source.metadata?.ocr_job||{};
+    const job={stage:prior.stage==='summarize'?'summarize':'ocr',next_page:Math.max(1,Number(prior.next_page)||1),
+      page_count:Number.isSafeInteger(Number(prior.page_count))?Number(prior.page_count):null,
+      text:typeof prior.text==='string'?prior.text:'',attempts:0,lease_until:null,last_error:null};
+    const saved=await request('knowledge_sources','PATCH',{select:'id,updated_at',id:'eq.'+source.id,
+      updated_at:'eq.'+source.updated_at,created_by:'eq.'+actor,deleted_at:'is.null'},
+      {metadata:{...source.metadata,ocr_job:job},extraction_status:'extracting',
+       updated_at:new Date().toISOString(),updated_by:actor},{timeoutMs:30000});
+    if(saved.length!==1)fail('STALE_SOURCE');
+    return {ok:true,queued:true,sourceId:String(source.id),extractionStatus:'extracting'};
+  }
+  async function pdfTextLayerOrQueue(source,bytes,actor) {
+    if(source.content_type!=='application/pdf')return null;
+    try{return {text:await require('./knowledge-pdf-text').extractPdfText(bytes)};}
+    catch(error){if(error?.code!=='PDF_NO_TEXT')throw error;return enqueuePdfOcr(source,actor);}
+  }
+  async function processOcrQueue(options={}) {
+    const candidates=await request('knowledge_sources','GET',{select:'*',extraction_status:'eq.extracting',
+      deleted_at:'is.null',order:'updated_at.asc,id.asc',limit:20});
+    const source=candidates.find(row=>row.metadata?.ocr_job&&
+      (!row.metadata.ocr_job.lease_until||Date.parse(row.metadata.ocr_job.lease_until)<Date.now()));
+    if(!source)return {ok:true,processed:false};
+    const actor=actorUid(source.created_by),job={...source.metadata.ocr_job};
+    const claimedJob={...job,lease_until:new Date(Date.now()+5*60*1000).toISOString()};
+    const claimed=(await request('knowledge_sources','PATCH',{select:'id,updated_at',id:'eq.'+source.id,
+      updated_at:'eq.'+source.updated_at,created_by:'eq.'+actor,deleted_at:'is.null'},
+      {metadata:{...source.metadata,ocr_job:claimedJob},updated_at:new Date().toISOString(),updated_by:actor},
+      {timeoutMs:30000}))[0];
+    if(!claimed)return {ok:true,processed:false};
+    source.updated_at=claimed.updated_at;source.metadata={...source.metadata,ocr_job:claimedJob};
+    try {
+      if(job.stage==='summarize') {
+        const result=await extractToDraft(source,null,actor,job.text);
+        const metadata={...source.metadata};delete metadata.ocr_job;
+        await request('knowledge_sources','PATCH',{id:'eq.'+source.id,created_by:'eq.'+actor,deleted_at:'is.null'},
+          {metadata,updated_at:new Date().toISOString(),updated_by:actor},{timeoutMs:30000});
+        return {ok:true,processed:true,sourceId:String(source.id),stage:'complete',itemId:result.itemId};
+      }
+      const bytes=await sourceBytes(source,actor),images=[];
+      const render=options.pdfPageRenderer||require('./knowledge-pdf-render').renderPdfPages;
+      const rendered=await render(bytes,{
+        startPage:job.next_page,maxPages:3,timeoutMs:75000,onBatch:async batch=>{images.push(...batch);}
+      });
+      if(!Number.isSafeInteger(rendered.pageCount)||rendered.pageCount<1||rendered.pageCount>40)fail('PDF_LIMIT');
+      if(job.page_count&&job.page_count!==rendered.pageCount)fail('INVALID_CONTENT');
+      const response=options.ocrPdfBatch?{result:{ocrText:await options.ocrPdfBatch(images)}}:
+        await callFunction({name:'ai_parse',data:{action:'ocr_knowledge_source',images}});
+      const result=response?.result;
+      if(!result||result.error||typeof result.ocrText!=='string'||!result.ocrText.trim())fail(result?.error||'OCR_FAILED');
+      job.text=boundedText(String(job.text||'')+(job.text?'\n\n':'')+boundedText(result.ocrText));
+      job.page_count=rendered.pageCount;job.next_page=rendered.nextPage;
+      if(job.next_page>job.page_count)job.stage='summarize';
+      Object.assign(job,{lease_until:null,attempts:0,last_error:null});
+      const saved=await request('knowledge_sources','PATCH',{select:'id,updated_at',id:'eq.'+source.id,
+        created_by:'eq.'+actor,deleted_at:'is.null'},
+        {metadata:{...source.metadata,ocr_job:job},updated_at:new Date().toISOString(),updated_by:actor,
+         extraction_status:'extracting'},{timeoutMs:30000});
+      if(saved.length!==1)fail('STALE_SOURCE');
+      return {ok:true,processed:true,sourceId:String(source.id),stage:job.stage,
+        completedPages:Math.min(job.page_count,job.next_page-1),totalPages:job.page_count};
+    } catch(error) {
+      const attempts=Number(job.attempts||0)+1,keep=attempts<5;
+      const failedJob={...job,attempts,lease_until:null,last_error:String(error?.code||'OCR_FAILED').slice(0,64)};
+      await request('knowledge_sources','PATCH',{id:'eq.'+source.id,created_by:'eq.'+actor,deleted_at:'is.null'},
+        {metadata:{...source.metadata,ocr_job:failedJob},extraction_status:keep?'extracting':'failed',
+         updated_at:new Date().toISOString(),updated_by:actor},{timeoutMs:30000}).catch(()=>{});
+      return {ok:false,processed:true,sourceId:String(source.id),errorCode:error?.code||'OCR_FAILED',retrying:keep};
+    }
+  }
+
   async function uploadStart(input,actorValue) {
     const actor=actorUid(actorValue),meta=fields(input),fileSizeBytes=Number(input.fileSizeBytes);
     if(!Number.isSafeInteger(fileSizeBytes)||fileSizeBytes<1||fileSizeBytes>LEGACY_MAX_FILE_BYTES)fail('FILE_TOO_LARGE');
@@ -504,7 +576,9 @@ function createKnowledgeLibrary(options={}) {
       if(marked.length!==1)fail('STALE_SOURCE');
       prepared.updated_at=marked[0].updated_at;prepared.extraction_status='extracting';
       try {
-        const extractedText=await extractText(source.file_name,source.content_type,bytes,{app:client,sourceId,uploadId,actorUid:actor});
+        const pdf=await pdfTextLayerOrQueue(prepared,bytes,actor);
+        if(pdf?.queued)return pdf;
+        const extractedText=pdf?.text||await extractText(source.file_name,source.content_type,bytes,{app:client,sourceId,uploadId,actorUid:actor});
         if((source.metadata?.categories||[]).includes('top_performer_sharing')&&likelySensitive(extractedText))fail('PERSONAL_DATA_DETECTED');
         return {ok:true,...await extractToDraft(prepared,null,actor,extractedText),extractionStatus:'verified'};
       } catch(error) {
@@ -536,7 +610,9 @@ function createKnowledgeLibrary(options={}) {
     prepared.updated_at=marked[0].updated_at;
     prepared.extraction_status='extracting';
     try{
-      const extractedText=await extractText(source.file_name,source.content_type,bytes,{app:client,sourceId,uploadId:state.upload_id,actorUid:actor});
+      const pdf=await pdfTextLayerOrQueue(prepared,bytes,actor);
+      if(pdf?.queued)return pdf;
+      const extractedText=pdf?.text||await extractText(source.file_name,source.content_type,bytes,{app:client,sourceId,uploadId:state.upload_id,actorUid:actor});
       if((source.metadata?.categories||[]).includes('top_performer_sharing')&&likelySensitive(extractedText))fail('PERSONAL_DATA_DETECTED');
       const draft=await extractToDraft(prepared,source.original_base64,actor,extractedText);
       return {ok:true,...draft,extractionStatus:'verified'};
@@ -604,8 +680,13 @@ function createKnowledgeLibrary(options={}) {
     if(!source.original_base64&&!source.storage_key)fail('SOURCE_UNAVAILABLE');
     const extracting=(await request('knowledge_sources','PATCH',{select:'id,updated_at',id:`eq.${sourceId}`,created_by:`eq.${actor}`,deleted_at:'is.null'},
       {extraction_status:'extracting',updated_at:new Date().toISOString(),updated_by:actor}))[0];
-    try {const bytes=await sourceBytes(source,actor);const text=await extractText(source.file_name,source.content_type,bytes,{app:client});
-      return {ok:true,...await extractToDraft({...source,extraction_status:'extracting',updated_at:extracting?.updated_at},source.original_base64,actor,text),extractionStatus:'verified'};}
+    try {
+      source.updated_at=extracting?.updated_at||source.updated_at;
+      if(source.metadata?.ocr_job){source.updated_at=extracting?.updated_at||source.updated_at;return enqueuePdfOcr(source,actor);}
+      const bytes=await sourceBytes(source,actor),pdf=await pdfTextLayerOrQueue(source,bytes,actor);
+      if(pdf?.queued)return pdf;
+      const text=pdf?.text||await extractText(source.file_name,source.content_type,bytes,{app:client});
+      return {ok:true,...await extractToDraft({...source,extraction_status:'extracting'},source.original_base64,actor,text),extractionStatus:'verified'};}
     catch(error){await request('knowledge_sources','PATCH',{id:`eq.${sourceId}`,created_by:`eq.${actor}`,deleted_at:'is.null'},
       {extraction_status:'failed',updated_at:new Date().toISOString(),updated_by:actor}).catch(()=>{});throw error;}
   }
@@ -646,9 +727,10 @@ function createKnowledgeLibrary(options={}) {
   async function softDelete(input,actorValue) {
     const actor=actorUid(actorValue),table=input?.table,id=String(input?.id||'');
     if(!['knowledge_items','playbooks','knowledge_sources'].includes(table)||!positiveId(id)||!input?.expectedUpdatedAt)fail('INVALID_INPUT');
-    const columns=table==='knowledge_items'?'id,source_id,updated_at,deleted_at':'id,updated_at,deleted_at';
+    const columns=table==='knowledge_items'?'id,source_id,updated_at,deleted_at':table==='knowledge_sources'?'id,updated_at,deleted_at,extraction_status':'id,updated_at,deleted_at';
     const current=(await request(table,'GET',{select:columns,id:`eq.${id}`,deleted_at:'is.null',limit:1}))[0];
     if(!current||current.updated_at!==input.expectedUpdatedAt)fail('STALE_SOURCE');
+    if(table==='knowledge_sources'&&current.extraction_status==='extracting')fail('SOURCE_IN_USE');
     const now=new Date().toISOString();
     const updated=await request(table,'PATCH',{id:`eq.${id}`,updated_at:`eq.${input.expectedUpdatedAt}`,deleted_at:'is.null'},
       {deleted_at:now,updated_at:now,updated_by:actor});
@@ -837,6 +919,7 @@ function createKnowledgeLibrary(options={}) {
       case 'uploadFinalize':return uploadFinalize(event.data,actor);
       case 'uploadCancel':return uploadCancel(event.data,actor);
       case 'retry':return retryExtraction(event.sourceId,actor);
+      case 'processOcrQueue':if(options.internalOcrQueue!==true)fail('PERMISSION_DENIED');return processOcrQueue(options);
       case 'review':return reviewSource(event.data,actor);
       case 'setValidity':return setValidity(event.data,actor);
       case 'delete':return softDelete(event.data,actor);
@@ -848,7 +931,7 @@ function createKnowledgeLibrary(options={}) {
       default:fail('INVALID_OPERATION');
     }
   }
-  return {run,upload,uploadStart,uploadPrepare,uploadChunk,uploadFinalize,uploadCancel,extractText,list,runDual,dualStatus,selectDual,history};
+  return {run,upload,uploadStart,uploadPrepare,uploadChunk,uploadFinalize,uploadCancel,extractText,list,runDual,dualStatus,selectDual,history,processOcrQueue};
 }
 
 async function handleKnowledgeLibrary(event,actor,options={}) {
