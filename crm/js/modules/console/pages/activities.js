@@ -27,7 +27,17 @@ const TASK_STATUS = {
 // ---------- 列表 ----------
 export function renderActivities(ctx) {
   const listEl = h('div', {});
-  let selectedDate = '';
+  const state = { page: 1, pageSize: 30, keyword: '', activityDate: '', sortField: 'activity_date', sortDir: 'desc' };
+  const search = h('input', { type: 'search', maxlength: '120', placeholder: t('act_directory_search'),
+    'aria-label': t('act_directory_search') });
+  const prev = h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => {
+    if (state.page > 1) { state.page--; runList(); }
+  } }, t('btn_prev'));
+  const next = h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => {
+    state.page++; runList();
+  } }, t('btn_next'));
+  const pageInfo = h('span', { class: 'pager-info' });
+  let cancelQuery = () => {};
 
   const d = new Date();
   const strip = [];
@@ -40,40 +50,53 @@ export function renderActivities(ctx) {
       h('span', {}, weekdayText),
     ]);
     node.onclick = () => {
-      selectedDate = (selectedDate === key) ? '' : key;
+      state.activityDate = (state.activityDate === key) ? '' : key;
       strip.forEach((x) => x.classList.remove('sel'));
-      if (selectedDate) node.classList.add('sel');
+      if (state.activityDate) node.classList.add('sel');
+      state.page = 1;
       runList();
     };
     strip.push(node);
   }
 
   function runList() {
-    loadInto(listEl, async () => {
-      const res = await data.activities(ctx);
-      let rows = res.rows || [];
-      if (selectedDate) rows = rows.filter((r) => String(r.activity_date || '').slice(0, 10) === selectedDate);
+    cancelQuery();
+    cancelQuery = loadInto(listEl, async () => {
+      const res = await data.activityDirectory(ctx, { ...state });
+      const rows = res.rows || [];
+      prev.disabled = state.page <= 1;
+      next.disabled = !res.hasMore;
+      pageInfo.textContent = t('resource_directory_page').replace('{page}', String(state.page));
       if (!rows.length) {
         return h('div', { class: 'card-body' }, [emptyNote(
-          selectedDate ? t('act_empty_today') : t('act_empty_recent'),
-          selectedDate ? t('act_empty_select_other') : t('act_empty_new'))]);
+          state.activityDate ? t('act_empty_today') : t('act_directory_empty'),
+          state.activityDate ? t('act_empty_select_other') : t('act_empty_new'))]);
       }
-      return h('div', { class: 'card-body' }, rows.map((a) => {
-        const diff = dayDiffFromToday(a.activity_date);
-        const dateText = a.activity_date
-          ? `${fmtDate(a.activity_date)} ${weekdayCN(a.activity_date)}${diff != null && diff >= 0 ? '' : ''}`
-          : t('act_date_tbd');
-        return h('a', { class: 'list-row data-row', href: `#/activity/${a.id}` }, [
-          h('span', { class: 'pavatar sm gold' }, (a.name || t('act_person')).charAt(0)),
-          h('div', { style: 'flex:1;min-width:0' }, [
-            h('div', { class: 'row-title' }, a.name),
-            h('div', { class: 'row-sub' },
-              [dateText, translateEnum('activity_type', a.activity_type), a.location].map(textOf).filter(Boolean).join(' · ')),
-          ]),
-          a.status ? bdg(actStatusLabel(a.status), diff != null && diff < 0 ? 'gray' : 'gold') : null,
-          ic('chevron', 'mut'),
-        ]);
-      }));
+      const columns = [
+        ['id', 'col_id'], ['name', 'act_directory_name'], ['activity_date', 'act_date'],
+        ['activity_type', 'act_type'], [null, 'act_location'], [null, 'act_status'],
+        [null, 'act_directory_target'], [null, 'act_directory_actual'],
+      ];
+      const header = h('thead', {}, h('tr', {}, columns.map(([field, label]) => h('th', {
+        class: field ? 'sortable-th' : '',
+        'aria-sort': field && state.sortField === field ? (state.sortDir === 'asc' ? 'ascending' : 'descending') : undefined,
+        onclick: field ? () => {
+          if (state.sortField === field) state.sortDir = state.sortDir === 'asc' ? 'desc' : 'asc';
+          else { state.sortField = field; state.sortDir = 'asc'; }
+          state.page = 1; runList();
+        } : undefined,
+      }, `${t(label)}${field && state.sortField === field ? (state.sortDir === 'asc' ? ' ▲' : ' ▼') : ''}`))));
+      const body = h('tbody', {}, rows.map(a => h('tr', { onclick: () => { location.hash = `#/activity/${a.id}`; } }, [
+        h('td', {}, String(a.id)),
+        h('td', {}, h('a', { href: `#/activity/${a.id}` }, a.name || '')),
+        h('td', {}, a.activity_date ? fmtDate(a.activity_date) : t('act_date_tbd')),
+        h('td', {}, translateEnum('activity_type', a.activity_type)),
+        h('td', {}, a.location || '—'),
+        h('td', {}, a.status ? bdg(actStatusLabel(a.status), 'gold') : '—'),
+        h('td', {}, a.target_participants == null ? '—' : String(a.target_participants)),
+        h('td', {}, a.actual_participants == null ? '—' : String(a.actual_participants)),
+      ])));
+      return h('div', { class: 'table-scroll' }, h('table', { class: 'people-table activity-directory-table' }, [header, body]));
     });
   }
 
@@ -82,17 +105,21 @@ export function renderActivities(ctx) {
       kicker: 'ACTIVITIES', title: t('title_activities'), tag: wpTag(t('act_manage_tag')),
       sub: t('sub_activities'),
       actions: [
-        h('a', { class: 'btn btn-ghost', href: '#/activity-resources' }, t('resource_directory_title')),
+        h('a', { class: 'btn btn-ghost', href: '#/activity-speakers' }, t('resource_directory_speakers_tab')),
+        h('a', { class: 'btn btn-ghost', href: '#/activity-topics' }, t('resource_directory_topics_tab')),
         h('button', { class: 'btn btn-ghost', type: 'button', title: t('act_daily_report'), onclick: () => {
-          const range = selectedDate ? `?startDate=${selectedDate}&endDate=${selectedDate}` : '';
+          const range = state.activityDate ? `?startDate=${state.activityDate}&endDate=${state.activityDate}` : '';
           location.hash = `#/activity-report/customer${range}`;
         } }, [ic('calendar'), t('act_daily_report')]),
         h('button', { class: 'btn btn-primary', type: 'button', onclick: () => openActivityEditor(ctx, { onDone: runList }) }, [ic('plus'), t('act_new')]),
       ],
     }),
     h('div', { class: 'date-strip' }, strip),
-    h('div', { style: 'height:16px' }),
+    h('form', { class: 'more-actions activity-directory-filters', onsubmit: event => {
+      event.preventDefault(); state.keyword = search.value.trim(); state.page = 1; runList();
+    } }, [search, h('button', { class: 'btn btn-primary', type: 'submit' }, t('btn_search'))]),
     h('section', { class: 'card' }, [listEl]),
+    h('div', { class: 'pager' }, [prev, pageInfo, next]),
   );
   runList();
 }

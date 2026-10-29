@@ -5,15 +5,19 @@ function directoryOptions(event) {
   const keyword = String(event.keyword || '').trim().toLowerCase();
   const status = String(event.status || ''), stage = String(event.stage || '');
   const due = event.due == null ? '' : event.due;
+  const sortField = event.sortField == null ? 'updated_at' : String(event.sortField);
+  const sortDir = event.sortDir == null ? 'desc' : String(event.sortDir);
   if (!Number.isInteger(page) || page < 1 || page > 10000 ||
       !Number.isInteger(pageSize) || pageSize < 1 || pageSize > 50 ||
       keyword.length > 120 || !['', 'active', 'inactive'].includes(status) ||
       !['', 'new', 'contacted', 'cooperated', 'stable', 'deep', 'inactive'].includes(stage) ||
-      typeof due !== 'string' || !['', 'overdue', 'today', 'next7', 'unscheduled'].includes(due)) {
+      typeof due !== 'string' || !['', 'overdue', 'today', 'next7', 'unscheduled'].includes(due) ||
+      !['id', 'name', 'last_contact_date', 'next_contact_date', 'cooperation_count', 'updated_at'].includes(sortField) ||
+      !['asc', 'desc'].includes(sortDir)) {
     throw new Error('Invalid resource directory query');
   }
   const today = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10);
-  return { page, pageSize, keyword, status, stage, due, today };
+  return { page, pageSize, keyword, status, stage, due, today, sortField, sortDir };
 }
 function contactFilter(query, options) {
   const { due, today } = options;

@@ -511,6 +511,151 @@ export function renderResourceDirectory(ctx) {
   syncType(); load();
 }
 
+export function renderSpeakerDirectory(ctx) { renderSeparateResourceDirectory(ctx, 'speaker'); }
+export function renderTopicDirectory(ctx) { renderSeparateResourceDirectory(ctx, 'topic'); }
+
+function renderSeparateResourceDirectory(ctx, kind) {
+  const speaker = kind === 'speaker';
+  const state = { keyword: '', status: '', page: 1, pageSize: 30, sortField: 'id', sortDir: 'desc' };
+  if (speaker) { state.stage = ''; state.due = ''; }
+  const host = h('section', { class: 'card resource-directory-results' });
+  const keyword = input('search', '', { placeholder: t(speaker ? 'resource_speaker_search' : 'resource_topic_search'),
+    'aria-label': t(speaker ? 'resource_speaker_search' : 'resource_topic_search'), maxlength: '120' });
+  const status = select([['', t('resource_directory_all')], ['active', t('act_resource_active')],
+    ['inactive', t('act_resource_inactive')]], '');
+  status.setAttribute('aria-label', t('resource_directory_status'));
+  const stage = speaker ? select([['', t('l05_all_stages')], ...SPEAKER_STAGES.map(value =>
+    [value, translateEnum('speaker_stage', value)])], '') : null;
+  const due = speaker ? select(['', 'overdue', 'today', 'next7', 'unscheduled'].map(value =>
+    [value, t('l05_due_' + (value || 'all'))]), '') : null;
+  if (stage) stage.setAttribute('aria-label', t('act_speaker_stage'));
+  if (due) due.setAttribute('aria-label', t('l05_due_label'));
+  const prev = h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => {
+    if (state.page > 1) { state.page--; load(); }
+  } }, t('btn_prev'));
+  const next = h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => {
+    state.page++; load();
+  } }, t('btn_next'));
+  const pageInfo = h('span', { class: 'pager-info' });
+  let request = 0;
+  const columns = speaker ? [
+    ['id', 'col_id'], ['name', 'act_speaker_name'], [null, 'resource_speaker_org_title'],
+    [null, 'act_speaker_stage'], ['last_contact_date', 'act_speaker_last_date'],
+    ['next_contact_date', 'act_speaker_next_date'], ['cooperation_count', 'resource_speaker_cooperations'],
+    [null, 'resource_directory_status'], [null, 'resource_directory_actions'],
+  ] : [
+    ['id', 'col_id'], ['topic_name', 'act_topic_name'], ['category', 'act_topic_category'],
+    [null, 'act_topic_audience'], ['use_count', 'act_topic_usage_count'],
+    ['last_used_date', 'resource_topic_last_used'], [null, 'resource_directory_status'],
+    [null, 'resource_directory_actions'],
+  ];
+  const refresh = () => load();
+  function actionButton(label, handler, extraClass = '') {
+    return h('button', { class: `btn btn-ghost btn-sm ${extraClass}`, type: 'button', onclick: handler }, label);
+  }
+  function speakerActions(row) {
+    return h('div', { class: 'act-resource-actions' }, [
+      row.person_id ? h('a', { class: 'btn btn-ghost btn-sm', href: `#/person/${row.person_id}` }, t('act_speaker_person_master')) : null,
+      actionButton(t('btn_edit'), () => openSpeakerEditor(ctx, row, refresh)),
+      !row.person_id ? actionButton(t('act_speaker_link'), () => openSpeakerLink(ctx, row, refresh)) : null,
+      actionButton(t(row.status === 'active' ? 'act_resource_deactivate' : 'act_resource_activate'), async () => {
+        try {
+          const result = await data.updateActivitySpeaker(ctx, row.id, { status: row.status === 'active' ? 'inactive' : 'active' });
+          if (result.ok !== true) throw new Error(t('save_failed'));
+          ctx.toast(t('act_resource_status_saved'), 'ok'); refresh();
+        } catch (error) { ctx.toast(errorText(error), 'err'); }
+      }),
+      actionButton(t('act_resource_remove'), async () => {
+        try { await confirmResourceRemove(ctx, 'speaker', row, refresh); }
+        catch (error) { ctx.toast(errorText(error), 'err'); }
+      }, 'act-resource-delete'),
+    ]);
+  }
+  function topicActions(row) {
+    return h('div', { class: 'act-resource-actions' }, [
+      actionButton(t('btn_edit'), () => openTopicEditor(ctx, row, refresh)),
+      actionButton(t(row.status === 'active' ? 'act_resource_deactivate' : 'act_resource_activate'), async () => {
+        try {
+          const result = await data.updateActivityTopic(ctx, row.id, { status: row.status === 'active' ? 'inactive' : 'active' });
+          if (result.ok !== true) throw new Error(t('save_failed'));
+          ctx.toast(t('act_resource_status_saved'), 'ok'); refresh();
+        } catch (error) { ctx.toast(errorText(error), 'err'); }
+      }),
+      actionButton(t('act_resource_remove'), async () => {
+        try { await confirmResourceRemove(ctx, 'topic', row, refresh); }
+        catch (error) { ctx.toast(errorText(error), 'err'); }
+      }, 'act-resource-delete'),
+    ]);
+  }
+  function table(rows) {
+    const head = h('thead', {}, h('tr', {}, columns.map(([field, label]) => h('th', {
+      class: field ? 'sortable-th' : '',
+      'aria-sort': field && state.sortField === field ? (state.sortDir === 'asc' ? 'ascending' : 'descending') : undefined,
+      onclick: field ? () => {
+        if (state.sortField === field) state.sortDir = state.sortDir === 'asc' ? 'desc' : 'asc';
+        else { state.sortField = field; state.sortDir = 'asc'; }
+        state.page = 1; load();
+      } : undefined,
+    }, `${t(label)}${field && state.sortField === field ? (state.sortDir === 'asc' ? ' ▲' : ' ▼') : ''}`))));
+    const body = h('tbody', {}, rows.map(row => h('tr', {}, speaker ? [
+      h('td', {}, String(row.id)), h('td', {}, row.linked_person
+        ? h('a', { href: `#/person/${row.person_id}` }, row.name || '') : row.name || ''),
+      h('td', {}, [row.organization, row.position].filter(Boolean).join(' · ') || '—'),
+      h('td', {}, translateEnum('speaker_stage', row.relationship_stage || 'new')),
+      h('td', {}, dateOnly(row.last_contact_date) || '—'),
+      h('td', {}, dateOnly(row.next_contact_date) || '—'),
+      h('td', {}, row.cooperation_count == null ? '—' : String(row.cooperation_count)),
+      h('td', {}, t(row.status === 'active' ? 'act_resource_active' : 'act_resource_inactive')),
+      h('td', {}, speakerActions(row)),
+    ] : [
+      h('td', {}, String(row.id)), h('td', {}, row.topic_name || ''),
+      h('td', {}, row.category || '—'), h('td', {}, row.target_audience || '—'),
+      h('td', {}, row.use_count == null ? '—' : String(row.use_count)),
+      h('td', {}, dateOnly(row.last_used_date) || '—'),
+      h('td', {}, t(row.status === 'active' ? 'act_resource_active' : 'act_resource_inactive')),
+      h('td', {}, topicActions(row)),
+    ])));
+    return h('div', { class: 'table-scroll' }, h('table', { class: 'people-table resource-directory-table' }, [head, body]));
+  }
+  async function load() {
+    const version = ++request;
+    host.replaceChildren(h('p', { class: 'card-body muted' }, t('loading')));
+    try {
+      const result = await data.resourceDirectory(ctx, kind, { ...state });
+      if (version !== request || !host.isConnected) return;
+      if (!Array.isArray(result.rows) || typeof result.hasMore !== 'boolean') throw new Error(t('resource_directory_invalid'));
+      prev.disabled = state.page <= 1;
+      next.disabled = !result.hasMore;
+      pageInfo.textContent = t('resource_directory_page').replace('{page}', String(state.page));
+      host.replaceChildren(result.rows.length ? table(result.rows) :
+        h('div', { class: 'card-body' }, emptyNote(t(speaker ? 'act_speakers_empty' : 'act_topics_empty'), '')));
+    } catch (error) {
+      if (version !== request || !host.isConnected) return;
+      prev.disabled = next.disabled = true;
+      const message = String(error?.message || '').includes('RESOURCE_SEARCH_LIMIT') ? t('resource_directory_limit') : errorText(error);
+      host.replaceChildren(h('div', { class: 'card-body' }, [emptyNote(t('act_load_failed'), message),
+        actionButton(t('resource_directory_retry'), load)]));
+    }
+  }
+  const form = h('form', { class: 'more-actions resource-directory-filters', onsubmit: event => {
+    event.preventDefault(); state.keyword = keyword.value.trim(); state.status = status.value;
+    if (speaker) { state.stage = stage.value; state.due = due.value; }
+    state.page = 1; load();
+  } }, [keyword, status, stage, due,
+    h('button', { class: 'btn btn-primary', type: 'submit' }, t('btn_search'))]);
+  ctx.main.replaceChildren(
+    pageHead({ title: t(speaker ? 'act_speakers_title' : 'act_topics_title'),
+      sub: t(speaker ? 'resource_speaker_note' : 'resource_topic_note'),
+      actions: [h('a', { class: 'btn btn-ghost', href: '#/activities' }, t('title_activities')),
+        actionButton(t(speaker ? 'act_speaker_add' : 'act_topic_add'), () => {
+          if (speaker) openSpeakerEditor(ctx, null, refresh); else openTopicEditor(ctx, null, refresh);
+        })] }),
+    form, ...(speaker ? [h('p', { class: 'foot-note' }, t('l05_time_note'))] : []),
+    host, h('div', { class: 'pager' }, [prev, pageInfo, next]),
+  );
+  load();
+}
+
 export async function renderActivityResources(ctx, activityId, onDone, directory = null) {
   const root = h('div', { class: 'tab-stack act-resources' }, directory ? [] : [h('p', { class: 'muted' }, t('act_resources_note'))]);
   try {

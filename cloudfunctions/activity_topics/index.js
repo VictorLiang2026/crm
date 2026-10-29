@@ -93,8 +93,10 @@ async function directory(event) {
     read: async (options, offset, count) => {
       let q = rdb.from('activity_topics').select().is('deleted_at', null);
       if (options.status) q = q.eq('status', options.status);
-      const result = assertOk(await q.order('updated_at', { ascending: false })
-        .order('id', { ascending: false }).range(offset, offset + count - 1));
+      const ascending = options.sortDir === 'asc';
+      q = q.order(options.sortField, { ascending, nullsFirst: false });
+      if (options.sortField !== 'id') q = q.order('id', { ascending });
+      const result = assertOk(await q.range(offset, offset + count - 1));
       return result.data || [];
     },
     matches: topicMatches,

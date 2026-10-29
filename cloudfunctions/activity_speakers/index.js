@@ -148,17 +148,42 @@ async function list(event) {
 }
 
 async function directory(event) {
+  let canonicalNameRows;
   return directoryPage(event, {
     read: async (options, offset, count) => {
-      let q = rdb.from('activity_speakers').select().is('deleted_at', null);
-      if (options.status) q = q.eq('status', options.status);
-      if (options.stage) q = q.eq('relationship_stage', options.stage);
-      q = contactFilter(q, options);
-      const result = assertOk(await q.order('updated_at', { ascending: false })
-        .order('id', { ascending: false }).range(offset, offset + count - 1));
+      const baseQuery = () => {
+        let q = rdb.from('activity_speakers').select().is('deleted_at', null);
+        if (options.status) q = q.eq('status', options.status);
+        if (options.stage) q = q.eq('relationship_stage', options.stage);
+        return contactFilter(q, options);
+      };
+      if (options.sortField === 'name') {
+        if (!canonicalNameRows) {
+          const rows = [];
+          const startedAt = Date.now();
+          for (let position = 0; position <= 10000; position += 200) {
+            if (Date.now() - startedAt > 6000) throw new Error('RESOURCE_SEARCH_LIMIT: narrow the search criteria');
+            const batch = assertOk(await baseQuery().order('id', { ascending: true })
+              .range(position, position + 200)).data || [];
+            rows.push(...await enrichIdentity(batch.slice(0, 200), true));
+            if (batch.length <= 200) break;
+            if (position >= 9800) throw new Error('RESOURCE_SEARCH_LIMIT: narrow the search criteria');
+          }
+          const collator = new Intl.Collator('zh-CN', { numeric: true, sensitivity: 'base' });
+          const direction = options.sortDir === 'asc' ? 1 : -1;
+          rows.sort((a, b) => direction * (collator.compare(String(a.name || ''), String(b.name || '')) || a.id - b.id));
+          canonicalNameRows = rows;
+        }
+        return canonicalNameRows.slice(offset, offset + count);
+      }
+      const ascending = options.sortDir === 'asc';
+      let q = baseQuery();
+      q = q.order(options.sortField, { ascending, nullsFirst: false });
+      if (options.sortField !== 'id') q = q.order('id', { ascending });
+      const result = assertOk(await q.range(offset, offset + count - 1));
       return result.data || [];
     },
-    enrich: rows => enrichIdentity(rows, true),
+    enrich: rows => event.sortField === 'name' ? rows : enrichIdentity(rows, true),
     matches: (row, keyword) => [row.name, row.organization, row.phone, row.position,
       row.expertise, row.topic_summary, row.notes].some(value => String(value || '').toLowerCase().includes(keyword)),
   });

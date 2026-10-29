@@ -4,13 +4,17 @@ function directoryOptions(event) {
   const page = Number(event.page ?? 1), pageSize = Number(event.pageSize ?? 20);
   const keyword = String(event.keyword || '').trim().toLowerCase();
   const status = String(event.status || ''), stage = String(event.stage || '');
+  const sortField = event.sortField == null ? 'updated_at' : String(event.sortField);
+  const sortDir = event.sortDir == null ? 'desc' : String(event.sortDir);
   if (!Number.isInteger(page) || page < 1 || page > 10000 ||
       !Number.isInteger(pageSize) || pageSize < 1 || pageSize > 50 ||
       keyword.length > 120 || !['', 'active', 'inactive'].includes(status) ||
-      !['', 'new', 'contacted', 'cooperated', 'stable', 'deep', 'inactive'].includes(stage)) {
+      !['', 'new', 'contacted', 'cooperated', 'stable', 'deep', 'inactive'].includes(stage) ||
+      !['id', 'topic_name', 'category', 'use_count', 'last_used_date', 'updated_at'].includes(sortField) ||
+      !['asc', 'desc'].includes(sortDir)) {
     throw new Error('Invalid resource directory query');
   }
-  return { page, pageSize, keyword, status, stage };
+  return { page, pageSize, keyword, status, stage, sortField, sortDir };
 }
 async function directoryPage(event, { read, enrich = async rows => rows, matches, now = Date.now }) {
   const options = directoryOptions(event);
