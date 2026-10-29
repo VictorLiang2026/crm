@@ -8,13 +8,13 @@ const { rdb, normFields, assertOk } = require('./db');
 const { normalizeInsuranceItems, amountColumns } = require('./contract');
 
 const FIELDS = [
-  'customer_id', 'customer_name', 'items',
+  'customer_id', 'customer_name', 'items', 'current_policy_description',
   'ap_ipa', 'ap_ppa', 'ap_ltc', 'ap_ann', 'ap_life', 'ap_term',
   'ap_wl', 'ap_pa', 'ap_ci', 'ap_hi', 'ap_all',
 ];
 const RETRIES = 4;
 const AMOUNT_COLUMNS = ['ap_ipa', 'ap_ppa', 'ap_ltc', 'ap_ann', 'ap_life', 'ap_term', 'ap_wl', 'ap_pa', 'ap_ci', 'ap_hi', 'ap_all'];
-const PERSON_PRODUCT_SELECT = ['id::text', 'version', 'customer_id::text', 'customer_name', 'items',
+const PERSON_PRODUCT_SELECT = ['id::text', 'version', 'customer_id::text', 'customer_name', 'items', 'current_policy_description',
   ...AMOUNT_COLUMNS.map(column => `${column}::text`)].join(',');
 
 exports.main = async (event) => {
@@ -35,6 +35,16 @@ function fail(code, message) {
   const error = new Error(message);
   error.code = code;
   throw error;
+}
+
+function policyDescription(data) {
+  const value = data.current_policy_description;
+  if (value != null && typeof value !== 'string') {
+    fail('INVALID_POLICY_DESCRIPTION', 'Policy description must be text');
+  }
+  const description = value || '';
+  if (description.length > 4000) fail('INVALID_POLICY_DESCRIPTION', 'Policy description exceeds 4000 characters');
+  return description;
 }
 
 function idString(value, label) {
@@ -98,11 +108,15 @@ async function listLegacy(event) {
 }
 
 function personPayload(data, customerId, personName) {
+  const description = policyDescription(data);
   const items = normalizeInsuranceItems(data.items);
   const payload = normFields(data, FIELDS);
   payload.customer_id = customerId;
   payload.customer_name = personName;
   payload.items = JSON.stringify(items);
+  if (Object.prototype.hasOwnProperty.call(data, 'current_policy_description')) {
+    payload.current_policy_description = description;
+  }
   Object.assign(payload, amountColumns(items));
   return payload;
 }
@@ -152,6 +166,9 @@ async function customerNameFor(customerId) {
 
 async function upsertLegacy(event) {
   const data = Object.assign({}, event.data || {});
+  if (Object.prototype.hasOwnProperty.call(data, 'current_policy_description')) {
+    data.current_policy_description = policyDescription(data);
+  }
   const customerId = idString(data.customer_id, 'customer_id');
   if (!data.customer_name) data.customer_name = await customerNameFor(customerId);
   const payload = normFields(data, FIELDS);

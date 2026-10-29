@@ -196,7 +196,7 @@ async function generate(event) {
 
   // 拉上下文：保单、跟进、礼品、历史检视报告、照片
   const [prod, fol, gif, hist, photos] = await Promise.all([
-    rdb.from('products').select('id::text,version,items,ap_ipa::text,ap_ppa::text,ap_ltc::text,ap_ann::text,ap_life::text,ap_term::text,ap_wl::text,ap_pa::text,ap_ci::text,ap_hi::text,ap_all::text').eq('customer_id', customerId),
+    rdb.from('products').select('id::text,version,items,current_policy_description,ap_ipa::text,ap_ppa::text,ap_ltc::text,ap_ann::text,ap_life::text,ap_term::text,ap_wl::text,ap_pa::text,ap_ci::text,ap_hi::text,ap_all::text').eq('customer_id', customerId),
     rdb.from('followups').select().eq('customer_id', customerId)
       .order('followup_date', { ascending: false, nullsFirst: false })
       .order('Id', { ascending: false })
@@ -230,6 +230,7 @@ async function generate(event) {
       ap_ipa: p.ap_ipa, ap_ppa: p.ap_ppa, ap_ltc: p.ap_ltc, ap_ann: p.ap_ann,
       ap_life: p.ap_life, ap_term: p.ap_term, ap_wl: p.ap_wl, ap_pa: p.ap_pa,
       ap_ci: p.ap_ci, ap_hi: p.ap_hi, ap_all: p.ap_all,
+      current_policy_description: p.current_policy_description || '',
       items_detail: items,
     };
   });

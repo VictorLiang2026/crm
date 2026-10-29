@@ -326,7 +326,10 @@ function insuranceNode(ctx, id) {
     if (cov.length) {
       blocks.push(sectionTitle(t('sec_coverage')));
       blocks.push(h('div', {}, cov.slice(0, 10).map((r) => provenanceRow(
-        `${r.label || t('label_coverage_default')}：${r.amount ?? ''}${r.premium != null && r.premium !== '' ? ' / ' + t('label_premium') + ' ' + r.premium : ''}`,
+        `${r.label || t('label_coverage_default')}：${t('insurance_coverage_amount')} ${r.coverageAmount ?? ''}${
+          r.total_premium != null ? ' / ' + t('insurance_total_premium') + ' ' + r.total_premium : ''}${
+          r.paid_premium != null ? ' / ' + t('insurance_paid_premium') + ' ' + r.paid_premium : ''}${
+          r.annual_premium != null ? ' / ' + t('insurance_annual_premium') + ' ' + r.annual_premium : ''}`,
         `${r.provenance || ''}${r.observedAt ? ' · ' + fmtDate(r.observedAt) : ''}`))));
     }
     const review = d.review || {};

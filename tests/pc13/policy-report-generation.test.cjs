@@ -19,7 +19,9 @@ test('policy report generation records the product version and carries human rev
   }];
   const rowsByTable = {
     customers: { Id: 788, customer_name: '虚构客户', person_id: null },
-    products: [{ version: 6, items: '[]' }],
+    products: [{ version: 6, current_policy_description: '【系统测试】虚构客户当前以医疗保障为主，待核实续保条件',
+      items: JSON.stringify([{ key: 'ap_ci', coverage_amount: '100000', total_premium: '5000',
+        paid_premium: '2000', annual_premium: '3000', update_date: '2026-10-01' }]) }],
     followups: [], gifts: [], policy_review_reports: history, photos: [],
   };
   class Query {
@@ -68,6 +70,8 @@ test('policy report generation records the product version and carries human rev
   assert.match(userContent, /人工摘要/);
   assert.match(userContent, /人工核实内容/);
   assert.match(userContent, /人工下一步/);
+  assert.match(userContent, /虚构客户当前以医疗保障为主/);
+  assert.match(userContent, /"total_premium": "5000"/);
   assert.doesNotMatch(userContent, /AI 原摘要/);
   assert.equal(inserted.summary, '新摘要');
 });

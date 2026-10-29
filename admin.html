@@ -124,6 +124,14 @@
   /* 编辑态才显示输入框；浏览态 td 直接显示文本，不显示输入框边框 */
   .prod-table.editing input{width:100%;min-width:96px;padding:7px 10px}
   .prod-table.view-only td.prod-val input{display:none !important}
+  .prod-table-wrap{width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .pol-policy-description{margin-top:14px}
+  .pol-policy-description label{display:block;margin-bottom:6px;font-size:13px;font-weight:600;color:var(--text-secondary)}
+  .pol-policy-description textarea{width:100%;min-height:96px;resize:vertical;padding:9px 11px}
+  .pol-policy-description .pol-description-view{white-space:pre-wrap;overflow-wrap:anywhere;color:var(--text);font-size:13px;line-height:1.55}
+  .pol-policy-description .pol-description-input{display:none}
+  .pol-policy-description.editing .pol-description-input{display:block}
+  .pol-policy-description.editing .pol-description-view{display:none}
   /* 检视区域按钮行 */
   .pol-action-row{display:flex;gap:8px;align-items:center;margin-top:12px;flex-wrap:wrap}
   /* 检视报告卡片（保单 Tab 下半部分） */
@@ -581,12 +589,12 @@ var PRODUCT_CATEGORIES = [
   {key:'ap_hi', label:'健康(HI)'},
   {key:'ap_all', label:'总保额(ALL)'},
 ];
-// 每个险种类别的 5 个字段：保额 / 年缴保费 / 交费年限 / 已交几年 / 更新日期
+// 每个险种类别的 5 个字段：保额 / 总保费 / 已交保费 / 年交保费 / 更新日期
 var PRODUCT_ITEM_FIELDS = [
-  {name:'amount', label:'保额', type:'number'},
-  {name:'premium', label:'年缴保费', type:'number'},
-  {name:'pay_years', label:'交费年限', type:'number'},
-  {name:'paid_years', label:'已交几年', type:'number'},
+  {name:'coverage_amount', label:'保额（元）', type:'number'},
+  {name:'total_premium', label:'总保费（元）', type:'number'},
+  {name:'paid_premium', label:'已交保费（元）', type:'number'},
+  {name:'annual_premium', label:'年交保费（元）', type:'number'},
   {name:'update_date', label:'更新日期', type:'date'},
 ];
 
@@ -2914,10 +2922,11 @@ function renderPolicyReview(cid, rows, reports){
     PRODUCT_ITEM_FIELDS.forEach(function(f){
       var v;
       if(old[f.name] != null && old[f.name] !== '') v = old[f.name];
-      else if(f.name === 'amount' && existing && existing[cat.key] != null) v = existing[cat.key]; // 旧扁平保额回填
+      else if(f.name === 'coverage_amount' && existing && existing[cat.key] != null) v = existing[cat.key]; // 旧扁平保额回填
       else v = '';
       values[cat.key][f.name] = v;
-      var inp = el('input', {type:f.type, name:cat.key+'_'+f.name, placeholder:f.type === 'date' ? '' : '0'});
+      var inp = el('input', {type:f.type, name:cat.key+'_'+f.name, placeholder:f.type === 'date' ? '' : '0',
+        min:f.type === 'number' ? '0' : undefined, step:f.type === 'number' ? '0.01' : undefined});
       if(v !== '' && v != null) inp.value = v;
       inputs[cat.key][f.name] = inp;
     });
@@ -2928,16 +2937,9 @@ function renderPolicyReview(cid, rows, reports){
     if(v == null || v === '') return el('span', {class:'empty-cell'}, '—');
     var s = String(v);
     if(f.type === 'number' && s){
-      try {
-        var n = Number(s);
-        if(!isNaN(n) && isFinite(n)){
-          if(Math.abs(n) >= 1000){
-            s = n.toLocaleString('zh-CN', {maximumFractionDigits: 0});
-          } else {
-            s = String(n);
-          }
-        }
-      } catch(e){}
+      var parts = s.split('.');
+      parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+      s = parts.join('.');
     } else if(f.type === 'date' && s){
       s = String(s).slice(0, 10);
     }
@@ -2968,6 +2970,14 @@ function renderPolicyReview(cid, rows, reports){
     tbody.appendChild(tr);
   });
   table.appendChild(tbody);
+  var tableWrap = el('div', {class:'prod-table-wrap'}, [table]);
+  var descriptionInput = el('textarea', {class:'pol-description-input', maxlength:'4000',
+    'aria-label':'客户当前保单情况说明 / Current Policy Notes'});
+  descriptionInput.value = existing && existing.current_policy_description || '';
+  var descriptionView = el('div', {class:'pol-description-view'}, descriptionInput.value || '—');
+  var descriptionBlock = el('div', {class:'pol-policy-description'}, [
+    el('label', {}, '客户当前保单情况说明'), descriptionInput, descriptionView,
+  ]);
 
   // Sprint10：11 类手工录入收进「补充录入」折叠区；「生成报告」为主入口（products 0 行时 AI 报告不受影响，明细仅补充）
   var hasManualData = false;
@@ -2977,12 +2987,14 @@ function renderPolicyReview(cid, rows, reports){
       if(v != null && String(v).trim() !== '') hasManualData = true;
     });
   });
+  if(descriptionInput.value.trim()) hasManualData = true;
 
   var btnReport = el('button', {class:'btn btn-sm', style:'background:#10b981;color:#fff;font-weight:700'}, '📋 生成保单检视报告');
   var btnToggleMore = el('button', {type:'button', class:'btn btn-sm'}, hasManualData ? '▾ 收起补充录入' : '▸ 补充录入：手工维护 11 类保额/缴费明细');
   var moreWrap = el('div', {class:'pol-more-wrap', style:'margin-top:10px;display:'+(hasManualData?'':'none')}, []);
   box.appendChild(el('div', {class:'pol-action-row'}, [btnReport, btnToggleMore]));
-  moreWrap.appendChild(table);
+  moreWrap.appendChild(tableWrap);
+  moreWrap.appendChild(descriptionBlock);
 
   // 按钮行：浏览态显示「更新」；编辑态显示「保存」+「取消」（生成报告始终在外，编辑时也可用）
   var actionRow = el('div', {class:'pol-action-row'});
@@ -3004,11 +3016,13 @@ function renderPolicyReview(cid, rows, reports){
 
   function enterEdit(){
     table.classList.remove('view-only'); table.classList.add('editing');
+    descriptionBlock.classList.add('editing');
     btnUpdate.style.display = 'none';
     btnSave.style.display = '';       btnCancel.style.display = '';
   }
   function leaveEdit(){
     table.classList.add('view-only'); table.classList.remove('editing');
+    descriptionBlock.classList.remove('editing');
     btnUpdate.style.display = '';
     btnSave.style.display = 'none';   btnCancel.style.display = 'none';
   }
@@ -3023,9 +3037,10 @@ function renderPolicyReview(cid, rows, reports){
         PRODUCT_ITEM_FIELDS.forEach(function(f){ it[f.name] = inputs[cat.key][f.name].value; });
         return it;
       });
-      var data = {customer_id:cid, items: JSON.stringify(items)};
+      var data = {customer_id:cid, items: JSON.stringify(items),
+        current_policy_description: descriptionInput.value};
       // 同步扁平保额列 ap_*（含 ap_ppa），供 AI 建议/保单检视报告生成逻辑继续使用
-      PRODUCT_CATEGORIES.forEach(function(cat){ data[cat.key] = inputs[cat.key].amount.value; });
+      PRODUCT_CATEGORIES.forEach(function(cat){ data[cat.key] = inputs[cat.key].coverage_amount.value; });
       await callFn('products', {action:'upsert', data:data});
       toast('保单检视已保存');
       showDetail(cid);

@@ -958,9 +958,17 @@ body:has(.login), body.is-login { padding-top: env(safe-area-inset-top); }
   .opp-row-meta { justify-content: flex-start; }
 }
 .policy-report-status { color: var(--muted); font-size: 13px; }
+.insurance-fields-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px 14px; margin-top: 12px; }
+.insurance-field { display: flex; flex-direction: column; gap: 5px; min-width: 0; color: var(--ink-2); font-size: 12px; }
+.insurance-field > span { display: flex; align-items: flex-end; min-height: 30px; line-height: 1.2; }
+.insurance-field .sheet-input { width: 100%; min-width: 0; padding: 8px 7px; font-size: 13px; }
+.insurance-description-field { display: flex; flex-direction: column; gap: 7px; margin-top: 14px; color: var(--ink-2); font-size: 13px; }
+.insurance-description-input { width: 100%; min-height: 96px; resize: vertical; }
+.insurance-description-view { min-height: 42px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; color: var(--ink); background: var(--bg); white-space: pre-wrap; overflow-wrap: anywhere; }
 @media (min-width: 768px) {
   .insurance-editor { padding: 18px 4px; }
   .insurance-category { padding: 14px 4px; }
+  .insurance-fields-grid { grid-template-columns: repeat(5,minmax(0,1fr)); gap: 10px; }
   .policy-report-body { padding: 0 20px 20px; }
 }
 

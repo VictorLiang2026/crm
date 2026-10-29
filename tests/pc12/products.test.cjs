@@ -85,32 +85,48 @@ function makeHarness() {
 function itemsWith(overrides = {}) {
   return contract.CATEGORY_KEYS.map((key) => ({
     key, label: key,
-    amount: '', premium: '', pay_years: '', paid_years: '', update_date: '',
+    coverage_amount: '', total_premium: '', paid_premium: '', annual_premium: '', update_date: '',
     ...(overrides[key] || {}),
   }));
 }
 
-test('insurance item validation preserves bigint text and distinguishes blank from zero', () => {
+test('insurance item validation preserves exact money strings and distinguishes blank from zero', () => {
   const items = contract.normalizeInsuranceItems(itemsWith({
-    ap_ipa: { amount: '9223372036854775807', premium: '9007199254740993.50', pay_years: '10.5' },
-    ap_ppa: { amount: '0' },
+    ap_ipa: { coverage_amount: '9223372036854775807.99', total_premium: '9007199254740993.50',
+      paid_premium: '1200', annual_premium: '0.50' },
+    ap_ppa: { coverage_amount: '0' },
   }));
-  assert.equal(items.find(row => row.key === 'ap_ipa').amount, '9223372036854775807');
-  assert.equal(items.find(row => row.key === 'ap_ppa').amount, '0');
-  assert.equal(items.find(row => row.key === 'ap_ltc').amount, '');
-  assert.equal(items.find(row => row.key === 'ap_ipa').premium, '9007199254740993.50');
-  assert.equal(items.find(row => row.key === 'ap_ipa').pay_years, '10.5');
-  assert.equal(contract.amountColumns(items).ap_ipa, '9223372036854775807');
+  assert.equal(items.find(row => row.key === 'ap_ipa').coverage_amount, '9223372036854775807.99');
+  assert.equal(items.find(row => row.key === 'ap_ppa').coverage_amount, '0');
+  assert.equal(items.find(row => row.key === 'ap_ltc').coverage_amount, '');
+  assert.equal(items.find(row => row.key === 'ap_ipa').total_premium, '9007199254740993.50');
+  assert.equal(items.find(row => row.key === 'ap_ipa').annual_premium, '0.50');
+  assert.equal(contract.amountColumns(items).ap_ipa, '9223372036854775807.99');
   assert.equal(contract.amountColumns(items).ap_ppa, '0');
   assert.equal(contract.amountColumns(items).ap_ltc, null);
 });
 
-test('insurance item validation rejects negatives, fractions, invalid dates, duplicates and bigint overflow', () => {
-  assert.throws(() => contract.normalizeInsuranceItems(itemsWith({ ap_ipa: { amount: '-1' } })), /non-negative/);
-  assert.throws(() => contract.normalizeInsuranceItems(itemsWith({ ap_ipa: { amount: '1.5' } })), /non-negative/);
-  assert.throws(() => contract.normalizeInsuranceItems(itemsWith({ ap_ipa: { premium: '-1.5' } })), /non-negative/);
-  assert.throws(() => contract.normalizeInsuranceItems(itemsWith({ ap_ipa: { amount: '9223372036854775808' } })), /range/);
-  assert.throws(() => contract.normalizeInsuranceItems(itemsWith({ ap_ipa: { amount: Number.MAX_SAFE_INTEGER + 1 } })), /exact decimal string/);
+test('cached legacy callers map unchanged coverage and annual premium fields while dropping old year fields', () => {
+  const legacy = itemsWith().map(item => ({ ...item,
+    amount: item.key === 'ap_ipa' ? '120000' : '',
+    premium: item.key === 'ap_ipa' ? '6000' : '',
+    pay_years: '20', paid_years: '5',
+  }));
+  const rows = contract.normalizeInsuranceItems(legacy);
+  const migrated = rows.find(row => row.key === 'ap_ipa');
+  assert.equal(migrated.coverage_amount, '120000');
+  assert.equal(migrated.annual_premium, '6000');
+  assert.equal(migrated.total_premium, '');
+  assert.equal(migrated.paid_premium, '');
+  assert.equal(Object.hasOwn(migrated, 'pay_years'), false);
+});
+
+test('insurance item validation rejects negative money, excess decimals, invalid dates and duplicates', () => {
+  assert.throws(() => contract.normalizeInsuranceItems(itemsWith({ ap_ipa: { coverage_amount: '-1' } })), /non-negative/);
+  assert.throws(() => contract.normalizeInsuranceItems(itemsWith({ ap_ipa: { coverage_amount: '1.555' } })), /2 decimal places/);
+  assert.throws(() => contract.normalizeInsuranceItems(itemsWith({ ap_ipa: { total_premium: '-1.5' } })), /non-negative/);
+  assert.throws(() => contract.normalizeInsuranceItems(itemsWith({ ap_ipa: { coverage_amount: '922337203685477580899' } })), /range/);
+  assert.throws(() => contract.normalizeInsuranceItems(itemsWith({ ap_ipa: { coverage_amount: Number.MAX_SAFE_INTEGER + 1 } })), /exact decimal string/);
   assert.throws(() => contract.normalizeInsuranceItems(itemsWith({ ap_ipa: { update_date: '2026-02-30' } })), /valid date/);
   const duplicate = itemsWith(); duplicate[1].key = duplicate[0].key;
   assert.throws(() => contract.normalizeInsuranceItems(duplicate), /invalid or duplicate/);
@@ -118,20 +134,21 @@ test('insurance item validation rejects negatives, fractions, invalid dates, dup
 
 test('Person route resolves customer server-side and supports initial insert, update, null, zero and duplicate submit conflict', async () => {
   const { api, state } = makeHarness();
-  const input = itemsWith({ ap_ipa: { amount: '9223372036854775807', premium: '9007199254740993' }, ap_ppa: { amount: '0' } });
-  const inserted = await api.main({ action: 'upsert', personId: '783', expectedVersion: '0', data: { customer_id: '789', items: JSON.stringify(input) } });
+  const input = itemsWith({ ap_ipa: { coverage_amount: '9223372036854775807.99', total_premium: '9007199254740993' }, ap_ppa: { coverage_amount: '0' } });
+  const inserted = await api.main({ action: 'upsert', personId: '783', expectedVersion: '0', data: { customer_id: '789', items: JSON.stringify(input), current_policy_description: '已人工了解，待核对保单' } });
   assert.equal(inserted.customerId, '788');
   assert.equal(inserted.version, '1');
   assert.equal(state.products[0].customer_id, '788');
-  assert.equal(state.products[0].ap_ipa, '9223372036854775807');
+  assert.equal(state.products[0].ap_ipa, '9223372036854775807.99');
   assert.equal(state.products[0].ap_ppa, '0');
-  assert.equal(JSON.parse(state.products[0].items).find(row => row.key === 'ap_ipa').premium, '9007199254740993');
+  assert.equal(JSON.parse(state.products[0].items).find(row => row.key === 'ap_ipa').total_premium, '9007199254740993');
+  assert.equal(state.products[0].current_policy_description, '已人工了解，待核对保单');
 
-  const next = itemsWith({ ap_ipa: { amount: '', premium: '' }, ap_ppa: { amount: '0' } });
+  const next = itemsWith({ ap_ipa: { coverage_amount: '' }, ap_ppa: { coverage_amount: '0' } });
   const updated = await api.main({ action: 'upsert', personId: '783', expectedVersion: '1', data: { items: JSON.stringify(next) } });
   assert.equal(updated.version, '2');
   assert.equal(state.products[0].ap_ipa, null);
-  assert.equal(JSON.parse(state.products[0].items).find(row => row.key === 'ap_ipa').amount, '');
+  assert.equal(JSON.parse(state.products[0].items).find(row => row.key === 'ap_ipa').coverage_amount, '');
   assert.equal(state.products[0].ap_ppa, '0');
 
   const replay = await api.main({ action: 'upsert', personId: '783', expectedVersion: '0', data: { items: JSON.stringify(next) } });
@@ -154,8 +171,8 @@ test('concurrent Person saves from the same version allow one write and reject t
   const { api, state } = makeHarness();
   const initial = await api.main({ action: 'upsert', personId: '783', expectedVersion: '0', data: { items: JSON.stringify(itemsWith()) } });
   assert.equal(initial.version, '1');
-  const a = itemsWith({ ap_ci: { amount: '1200' } });
-  const b = itemsWith({ ap_ci: { amount: '1300' } });
+  const a = itemsWith({ ap_ci: { coverage_amount: '1200' } });
+  const b = itemsWith({ ap_ci: { coverage_amount: '1300' } });
   const results = await Promise.all([
     api.main({ action: 'upsert', personId: '783', expectedVersion: '1', data: { items: JSON.stringify(a) } }),
     api.main({ action: 'upsert', personId: '783', expectedVersion: '1', data: { items: JSON.stringify(b) } }),

@@ -12,11 +12,10 @@ const CATEGORIES = [
   ['ap_all', 'insurance_cat_all', '总保额(ALL)'],
 ];
 const FIELDS = [
-  ['amount', 'insurance_amount', 'bigint'], ['premium', 'insurance_premium', 'decimal'],
-  ['pay_years', 'insurance_pay_years', 'decimal'], ['paid_years', 'insurance_paid_years', 'decimal'],
+  ['coverage_amount', 'insurance_coverage_amount'], ['total_premium', 'insurance_total_premium'],
+  ['paid_premium', 'insurance_paid_premium'], ['annual_premium', 'insurance_annual_premium'],
   ['update_date', 'insurance_update_date', 'date'],
 ];
-const MAX_BIGINT = '9223372036854775807';
 const MAX_MONEY_TEXT = 40;
 
 function parseItems(text) {
@@ -36,21 +35,16 @@ function exactText(value) {
   return String(value);
 }
 
-function canonicalValue(value, key, kind) {
+function canonicalMoney(value, key) {
   const text = String(value ?? '').trim();
   if (!text) return '';
-  if (kind === 'bigint' && !/^\d+$/.test(text)) {
-    throw new Error(t('insurance_nonnegative_value').replace('{field}', t(key)));
-  }
-  if (kind !== 'bigint' && !/^(?:\d+(?:\.\d*)?|\.\d+)$/.test(text)) {
+  if (!/^(?:\d+(?:\.\d{1,2})?|\.\d{1,2})$/.test(text)) {
     throw new Error(t('insurance_nonnegative_value').replace('{field}', t(key)));
   }
   const [wholeRaw, fraction] = text.split('.');
   const whole = (wholeRaw || '0').replace(/^0+(?=\d)/, '');
   const canonical = fraction == null ? whole : `${whole}.${fraction}`;
-  const overBigint = kind === 'bigint' && (canonical.length > MAX_BIGINT.length ||
-    (canonical.length === MAX_BIGINT.length && canonical > MAX_BIGINT));
-  if (canonical.length > MAX_MONEY_TEXT || overBigint) {
+  if (whole.length > 19 || canonical.length > MAX_MONEY_TEXT) {
     throw new Error(t('insurance_amount_range').replace('{field}', t(key)));
   }
   return canonical;
@@ -59,8 +53,8 @@ function canonicalValue(value, key, kind) {
 function categoryValues(row, oldItem) {
   const values = {};
   for (const [field] of FIELDS) {
-    // PostgreSQL bigint is the exact source for amount; items is a compatible detail mirror.
-    const source = field === 'amount' && row?.[oldItem?.key] != null ? row[oldItem.key] : oldItem?.[field];
+    // The canonical amount columns are selected as text to preserve decimal precision.
+    const source = field === 'coverage_amount' && row?.[oldItem?.key] != null ? row[oldItem.key] : oldItem?.[field];
     values[field] = exactText(source);
   }
   return values;
@@ -108,21 +102,21 @@ export function renderInsuranceEditor(ctx, personId) {
       CATEGORIES.forEach(([category, labelKey, legacyLabel]) => {
         const oldItem = oldItems.get(category) || { key: category };
         const values = categoryValues(row, { ...oldItem, key: category });
-        const amountLabel = values.amount === '' ? t('insurance_unknown') : `${values.amount} ${t('insurance_currency_unit')}`;
+        const amountLabel = values.coverage_amount === '' ? t('insurance_unknown') : `${values.coverage_amount} ${t('insurance_currency_unit')}`;
         const summary = `${t(labelKey)} · ${editing ? t('insurance_editing') : amountLabel}`;
         const details = h('details', { class: 'insurance-category' });
         details.appendChild(h('summary', {}, summary));
         if (editing) {
-          const grid = h('div', { style: 'display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 14px;margin-top:12px' });
+          const grid = h('div', { class: 'insurance-fields-grid' });
           FIELDS.forEach(([field, labelKey2, kind]) => {
-            const label = h('label', { style: 'display:flex;flex-direction:column;gap:5px;min-width:0' }, t(labelKey2));
+            const label = h('label', { class: 'insurance-field' }, h('span', {}, t(labelKey2)));
             const input = h('input', {
               class: 'sheet-input', type: kind === 'date' ? 'date' : 'text', value: values[field],
-              autocomplete: 'off', inputmode: kind === 'date' ? undefined : kind === 'bigint' ? 'numeric' : 'decimal',
+              autocomplete: 'off', inputmode: kind === 'date' ? undefined : 'decimal',
               'aria-label': `${t(labelKey)} ${t(labelKey2)}`,
             });
             if (kind !== 'date') input.maxLength = MAX_MONEY_TEXT;
-            if (kind === 'bigint' || kind === 'decimal') input.placeholder = t('insurance_unknown');
+            if (kind !== 'date') input.placeholder = t('insurance_unknown');
             label.appendChild(input);
             grid.appendChild(label);
             fieldInputs.set(`${category}.${field}`, input);
@@ -137,6 +131,15 @@ export function renderInsuranceEditor(ctx, personId) {
         }
         root.appendChild(details);
       });
+      const descriptionInput = editing ? h('textarea', { class: 'sheet-note insurance-description-input', rows: 4,
+        maxlength: '4000', 'aria-label': t('insurance_policy_description'),
+        placeholder: t('insurance_policy_description_placeholder') }) : null;
+      if (descriptionInput) descriptionInput.value = row?.current_policy_description || '';
+      const descriptionLabel = h('label', { class: 'insurance-description-field' }, [
+        h('span', {}, t('insurance_policy_description')),
+        editing ? descriptionInput : h('div', { class: 'insurance-description-view' },
+          row?.current_policy_description || t('insurance_unknown')),
+      ]);
       const actions = h('div', { class: 'toolbar', style: 'margin-top:12px' });
       if (!editing) {
         actions.appendChild(h('button', { class: 'btn btn-primary btn-sm', type: 'button',
@@ -151,17 +154,18 @@ export function renderInsuranceEditor(ctx, personId) {
               const item = { key: category, label: legacyLabel };
               FIELDS.forEach(([field, labelKey2, kind]) => {
                 const input = fieldInputs.get(`${category}.${field}`);
-                item[field] = kind === 'date' ? input.value : canonicalValue(input.value, labelKey2,
-                  field === 'amount' ? 'bigint' : 'decimal');
+                item[field] = kind === 'date' ? input.value : canonicalMoney(input.value, labelKey2);
               });
               return item;
             });
-            const payload = { items: JSON.stringify(items) };
-            items.forEach((item) => { payload[item.key] = item.amount === '' ? null : item.amount; });
+            const payload = { items: JSON.stringify(items),
+              current_policy_description: descriptionInput?.value || '' };
+            items.forEach((item) => { payload[item.key] = item.coverage_amount === '' ? null : item.coverage_amount; });
             const saved = await data.savePersonProducts(ctx, personId, version, payload);
             version = String(saved.version);
             if (!row) row = { id: saved.id, customer_id: customerId };
             row.items = payload.items;
+            row.current_policy_description = payload.current_policy_description;
             Object.assign(row, payload);
             row.version = version;
             if (typeof ctx.onWriteDone === 'function') ctx.onWriteDone();
@@ -177,6 +181,7 @@ export function renderInsuranceEditor(ctx, personId) {
         actions.appendChild(h('button', { class: 'btn btn-ghost btn-sm', type: 'button',
           onclick: () => draw(false) }, t('cancel')));
       }
+      root.appendChild(descriptionLabel);
       root.appendChild(actions);
     }
   }).catch((error) => {

@@ -4,38 +4,22 @@ const CATEGORY_KEYS = [
   'ap_ipa', 'ap_ppa', 'ap_ltc', 'ap_ann', 'ap_life', 'ap_term',
   'ap_wl', 'ap_pa', 'ap_ci', 'ap_hi', 'ap_all',
 ];
-const MAX_BIGINT = '9223372036854775807';
-const ITEM_FIELDS = ['amount', 'premium', 'pay_years', 'paid_years', 'update_date'];
+const MAX_MONEY_INTEGER_DIGITS = 19;
+const ITEM_FIELDS = ['coverage_amount', 'total_premium', 'paid_premium', 'annual_premium', 'update_date'];
 
-function normalizeInteger(value, field, max = null) {
+function normalizeMoney(value, field) {
   if (typeof value === 'number' && !Number.isSafeInteger(value)) {
     throw new Error(`${field} must be sent as an exact decimal string`);
   }
   const text = String(value ?? '').trim();
   if (!text) return '';
-  if (!/^\d+$/.test(text)) throw new Error(`${field} must be a non-negative integer`);
-  const canonical = text.replace(/^0+(?=\d)/, '');
-  if (max && (canonical.length > max.length ||
-      (canonical.length === max.length && canonical > max))) {
-    throw new Error(`${field} exceeds the supported range`);
-  }
-  if (canonical.length > 40) throw new Error(`${field} exceeds the supported range`);
-  return canonical;
-}
-
-function normalizeDecimal(value, field) {
-  if (typeof value === 'number' && !Number.isSafeInteger(value)) {
-    throw new Error(`${field} must be sent as an exact decimal string`);
-  }
-  const text = String(value ?? '').trim();
-  if (!text) return '';
-  if (!/^(?:\d+(?:\.\d*)?|\.\d+)$/.test(text)) {
-    throw new Error(`${field} must be a non-negative number`);
+  if (!/^(?:\d+(?:\.\d{1,2})?|\.\d{1,2})$/.test(text)) {
+    throw new Error(`${field} must be a non-negative amount with up to 2 decimal places`);
   }
   const [wholeRaw, fraction] = text.split('.');
   const whole = (wholeRaw || '0').replace(/^0+(?=\d)/, '');
   const normalized = fraction == null ? whole : `${whole}.${fraction}`;
-  if (normalized.length > 40) throw new Error(`${field} exceeds the supported range`);
+  if (whole.length > MAX_MONEY_INTEGER_DIGITS) throw new Error(`${field} exceeds the supported range`);
   return normalized;
 }
 
@@ -68,17 +52,24 @@ function normalizeInsuranceItems(value) {
   return CATEGORY_KEYS.map((key) => {
     const item = byKey.get(key);
     const normalized = { key, label: String(item.label || '').slice(0, 120) };
+    // Accept old cached callers for fields that retain their meaning; persist only the new schema.
+    const legacyValue = {
+      coverage_amount: item.amount,
+      annual_premium: item.premium,
+    };
     for (const field of ITEM_FIELDS) {
+      const value = (item[field] == null || item[field] === '') && legacyValue[field] != null
+        ? legacyValue[field] : item[field];
       normalized[field] = field === 'update_date' ? normalizeDate(item[field]) :
-        field === 'amount' ? normalizeInteger(item[field], `${key}.${field}`, MAX_BIGINT) :
-          normalizeDecimal(item[field], `${key}.${field}`);
+        normalizeMoney(value, `${key}.${field}`);
     }
     return normalized;
   });
 }
 
 function amountColumns(items) {
-  return Object.fromEntries(items.map((item) => [item.key, item.amount === '' ? null : item.amount]));
+  return Object.fromEntries(items.map((item) => [item.key,
+    item.coverage_amount === '' ? null : item.coverage_amount]));
 }
 
-module.exports = { CATEGORY_KEYS, MAX_BIGINT, normalizeInsuranceItems, amountColumns };
+module.exports = { CATEGORY_KEYS, MAX_MONEY_INTEGER_DIGITS, normalizeInsuranceItems, amountColumns };

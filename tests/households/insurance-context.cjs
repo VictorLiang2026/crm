@@ -15,8 +15,9 @@ function fixture(customerId = 101) {
   const rows = {
     customers: customerId == null ? [] : [{ Id: customerId, person_id: 11, deleted_at: null }],
     persons: [{ id: 11, display_name: '【系统测试·勿联系】虚构甲', legacy_customer_id: customerId }],
-    products: [{ id: 1, created_at: '2026-09-19T00:00:00Z',
-      items: JSON.stringify([{ key: 'ap_ci', amount: '100000', premium: '3000', update_date: '2026-09-20' }]) }],
+    products: [{ id: 1, created_at: '2026-09-19T00:00:00Z', current_policy_description: '客户关注医疗保障的续保情况',
+      items: JSON.stringify([{ key: 'ap_ci', coverage_amount: '100000', total_premium: '5000',
+        paid_premium: '2000', annual_premium: '3000', update_date: '2026-09-20' }]) }],
     policy_review_reports: [{ id: 2, report_date: '2026-09-20', summary: 'AI 摘要',
       edited_summary: '人工摘要', gaps_found: 'AI 缺口', edited_gaps: '人工确认待讨论的问题',
       edited_next_action: '准备资料', updated_at: '2026-09-21T00:00:00Z' }],
@@ -54,6 +55,11 @@ test('insurance context merges existing sources without raw files, OCR text or d
   const { service, calls } = fixture();
   const result = await service.getInsuranceContext(11);
   assert.equal(result.existingCoverage[0].label, '医疗(CI)');
+  assert.equal(result.existingCoverage[0].coverageAmount, '100000');
+  assert.equal(result.existingCoverage[0].total_premium, '5000');
+  assert.equal(result.existingCoverage[0].paid_premium, '2000');
+  assert.equal(result.existingCoverage[0].annual_premium, '3000');
+  assert.equal(result.policyDescription.content, '客户关注医疗保障的续保情况');
   assert.equal(result.existingCoverage[0].observedAt, '2026-09-20');
   assert.deepEqual(result.existingCoverage[0].source, { type: 'products', id: 1 });
   assert.equal(result.review.latest.summary, '人工摘要');
@@ -72,12 +78,11 @@ test('insurance context merges existing sources without raw files, OCR text or d
   assert.ok(!JSON.stringify(result).includes('MUST_NOT_READ'));
 });
 
-test('insurance context prefers the bigint column returned as text over JSON values', async () => {
+test('insurance context prefers the exact amount column returned as text over JSON values', async () => {
   const { service, calls, rows } = fixture();
   rows.products[0].ap_ci = '9223372036854775807';
   const result = await service.getInsuranceContext(11);
-  assert.equal(result.existingCoverage[0].amount, '9223372036854775807');
-  assert.equal(result.existingCoverage[0].premium, '3000');
+  assert.equal(result.existingCoverage[0].coverageAmount, '9223372036854775807');
   assert.ok(calls.find(call => call.table === 'products').filters.select.includes('ap_ci::text'));
 });
 

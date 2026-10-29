@@ -39,13 +39,15 @@ function coverageFrom(row) {
     .map(item => [item.key, item]));
   return Object.entries(CATEGORIES).flatMap(([key, label]) => {
     const item = byKey.get(key) || {};
-    // bigint ap_* is the exact canonical amount; prefer it over a JSON number that
-    // a JavaScript parser could round. The legacy details remain the fallback.
+    // ap_* remains the canonical exact coverage amount. All financial values are strings.
     const amount = row[key] != null ? row[key] : item.amount;
-    const premium = item.premium;
-    if ((amount == null || amount === '') && (premium == null || premium === '')) return [];
-    return [{ label, amount: amount == null ? null : String(amount),
-      premium: premium == null || premium === '' ? null : String(premium),
+    const coverage = amount == null || amount === '' ? item.coverage_amount : amount;
+    const fields = ['total_premium', 'paid_premium', 'annual_premium'];
+    const values = Object.fromEntries(fields.map(field => [field,
+      item[field] == null || item[field] === '' ? null : String(item[field])]));
+    if ((coverage == null || coverage === '') && fields.every(field => values[field] == null)) return [];
+    return [{ label, coverageAmount: coverage == null || coverage === '' ? null : String(coverage),
+      ...values,
       observedAt: item.update_date || row.created_at || null,
       provenance: '手工录入的保障明细，保单真实性待核实',
       source: { type: 'products', id: row.id } }];
@@ -67,7 +69,7 @@ class InsuranceContextService {
     const customerId = customerRow?.Id ?? null;
     const [products, reports, ocr, photos, ownOpportunities, legacyOpportunities,
       actions, links, interactions, facts, householdContext] = await Promise.all([
-      customerId ? read('products', { select: 'id::text,items,created_at,' + Object.keys(CATEGORIES).map(key => `${key}::text`).join(','),
+      customerId ? read('products', { select: 'id::text,items,current_policy_description,created_at,' + Object.keys(CATEGORIES).map(key => `${key}::text`).join(','),
         customer_id: `eq.${customerId}`, deleted_at: 'is.null', order: 'id.desc', limit: 3 }) : [],
       customerId ? read('policy_review_reports', {
         select: 'id,report_date,report_type,summary,edited_summary,gaps_found,edited_gaps,edited_recommendations,next_action,edited_next_action,updated_at',
@@ -137,7 +139,8 @@ class InsuranceContextService {
         note: clip(row.photo_notes, 160), category: row.category, createdAt: row.created_at,
         source: { type: 'photos', id: row.id }, provenance: '附件元数据，内容待人工核实' }));
     const existingCoverage = products.flatMap(coverageFrom);
-    const hasEvidence = existingCoverage.length > 0 || insuranceOcr.length > 0 || evidence.length > 0;
+    const policyDescription = clip(products[0]?.current_policy_description, 4000);
+    const hasEvidence = existingCoverage.length > 0 || !!policyDescription || insuranceOcr.length > 0 || evidence.length > 0;
     const potentialGaps = hasEvidence ? reports.flatMap(row => {
       const content = clip(row.edited_gaps, 500);
       return content ? [{ content, observedAt: row.updated_at || row.report_date,
@@ -146,6 +149,9 @@ class InsuranceContextService {
     }) : [];
     return {
       existingCoverage,
+      policyDescription: policyDescription ? { content: policyDescription,
+        source: { type: 'products', id: products[0]?.id },
+        provenance: '人工录入的客户保单情况说明，尚未经核实' } : null,
       review: { latest: latestReport ? { id: latestReport.id, date: latestReport.report_date,
         type: latestReport.report_type, summary: clip(latestReport.edited_summary || latestReport.summary, 500),
         source: { type: 'policy_review_reports', id: latestReport.id },
