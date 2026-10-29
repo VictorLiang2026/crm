@@ -1074,3 +1074,7 @@ body:has(.login), body.is-login { padding-top: env(safe-area-inset-top); }
 .kg-form-actions{display:flex;justify-content:flex-end;gap:10px;padding-top:6px}
 .kg-trash-list{display:grid;gap:12px}.kg-trash-list .kg-table{min-width:720px}
 @media(max-width:1100px){.kg-categories-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.playbook-response-details{margin-top:4px;border-top:1px solid var(--line,#e3e5e9)}
+.playbook-response-details>summary{min-height:44px;display:list-item;list-style-position:inside;padding:10px 2px;cursor:pointer;color:var(--blue,#385d9c);font-size:13px;font-weight:600}
+.playbook-response-details:not([open])>.playbook-response-body{display:none}
+.playbook-response-body{padding:2px 4px 8px}

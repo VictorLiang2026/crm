@@ -628,40 +628,46 @@ export function renderPerson(ctx, id, initialSection) {
   // AI 对话策略（WP3.3b）
   const playbookPanel = h('div', { class: 'card summary-card', style: 'display:none;margin-bottom:12px' });
   function renderPlaybookResult(res) {
-    const blocks = [];
-    blocks.push(h('div', { class: 'summary-section' }, [
+    const objection = h('div', { class: 'summary-section' }, [
       h('b', { class: 'summary-label' }, t('sec_objection')),
       h('p', { class: 'summary-text' }, res.objection),
-    ]));
-    if (Array.isArray(res.possibleUnderlyingReasons) && res.possibleUnderlyingReasons.length) blocks.push(h('div', { class: 'summary-section' }, [
+    ]);
+    const details = [];
+    if (Array.isArray(res.possibleUnderlyingReasons) && res.possibleUnderlyingReasons.length) details.push(h('div', { class: 'summary-section' }, [
       h('b', { class: 'summary-label' }, t('sec_underlying_reasons')),
       h('ul', { class: 'summary-list' }, res.possibleUnderlyingReasons.map((s) => h('li', {}, s))),
     ]));
-    if (Array.isArray(res.clarifyingQuestions) && res.clarifyingQuestions.length) blocks.push(h('div', { class: 'summary-section' }, [
+    if (Array.isArray(res.clarifyingQuestions) && res.clarifyingQuestions.length) details.push(h('div', { class: 'summary-section' }, [
       h('b', { class: 'summary-label' }, t('sec_clarifying_questions')),
       h('ul', { class: 'summary-list' }, res.clarifyingQuestions.map((s) => h('li', {}, s))),
     ]));
-    if (res.responseLogic) blocks.push(h('div', { class: 'summary-section' }, [
+    if (res.responseLogic) details.push(h('div', { class: 'summary-section' }, [
       h('b', { class: 'summary-label' }, t('sec_response_logic')),
       h('p', { class: 'summary-text' }, res.responseLogic),
     ]));
-    if (res.nextObjective) blocks.push(h('div', { class: 'summary-section' }, [
+    if (res.nextObjective) details.push(h('div', { class: 'summary-section' }, [
       h('b', { class: 'summary-label' }, t('sec_next_objective')),
       h('p', { class: 'summary-text' }, res.nextObjective),
     ]));
-    if (Array.isArray(res.doNotSay) && res.doNotSay.length) blocks.push(h('div', { class: 'summary-section' }, [
+    if (Array.isArray(res.doNotSay) && res.doNotSay.length) details.push(h('div', { class: 'summary-section' }, [
       h('b', { class: 'summary-label' }, t('sec_do_not_say')),
       h('ul', { class: 'summary-list evidence' }, res.doNotSay.map((s) => h('li', {}, s))),
     ]));
-    blocks.push(aiSourcesNode(res.evidenceSources, id, 'sec_ai_cited_sources'));
-    if (res.createdAt) blocks.push(h('p', { class: 'foot-note' }, t('generated_at').replace('{time}', res.createdAt)));
-    else if (res.taskId) blocks.push(h('p', { class: 'foot-note' }, t('playbook_foot').replace('{taskId}', res.taskId)));
-    blocks.push(h('div', { style: 'margin-top:10px' }, [
+    details.push(aiSourcesNode(res.evidenceSources, id, 'sec_ai_cited_sources'));
+    if (res.createdAt) details.push(h('p', { class: 'foot-note' }, t('generated_at').replace('{time}', res.createdAt)));
+    else if (res.taskId) details.push(h('p', { class: 'foot-note' }, t('playbook_foot').replace('{taskId}', res.taskId)));
+    details.push(h('div', { style: 'margin-top:10px' }, [
       h('button', {
         class: 'btn btn-soft btn-sm', type: 'button', onclick: showPlaybookInput,
       }, t('btn_regenerate')),
     ]));
-    playbookPanel.replaceChildren(h('div', { class: 'card-body' }, blocks));
+    playbookPanel.replaceChildren(h('div', { class: 'card-body' }, [
+      objection,
+      h('details', { class: 'playbook-response-details' }, [
+        h('summary', {}, t('kg_view_content')),
+        h('div', { class: 'playbook-response-body' }, details),
+      ]),
+    ]));
   }
   function showPlaybookInput() {
     playbookPanel.style.display = '';
