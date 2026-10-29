@@ -22,7 +22,9 @@ test('activity, speaker and topic directories navigate directly, search, sort an
       const page=(items,args)=>{
         const field=args.sortField||'id', direction=args.sortDir==='asc'?1:-1;
         const keyword=String(args.keyword||'').toLowerCase();
-        const matches=items.filter(row=>!keyword||Object.values(row).some(value=>String(value||'').toLowerCase().includes(keyword)));
+        const matches=items.filter(row=>(!args.startDate||row.activity_date>=args.startDate)&&
+          (!args.endDate||row.activity_date<=args.endDate)&&
+          (!keyword||Object.values(row).some(value=>String(value||'').toLowerCase().includes(keyword))));
         matches.sort((a,b)=>direction*(String(a[field]??'').localeCompare(String(b[field]??''),'zh-CN',{numeric:true})||a.id-b.id));
         const start=(args.page-1)*args.pageSize;
         return {rows:matches.slice(start,start+args.pageSize),page:args.page,pageSize:args.pageSize,
@@ -34,18 +36,30 @@ test('activity, speaker and topic directories navigate directly, search, sort an
     })()`);
     await browser.wait("document.querySelector('.activity-directory-table tbody tr')");
     assert.equal(await browser.evaluate("document.querySelectorAll('.activity-directory-table tbody tr').length"),30);
+    assert.equal(await browser.evaluate("document.querySelectorAll('.activity-directory-table thead th').length"),5);
+    assert.equal(await browser.evaluate("document.querySelector('.date-strip')"),null);
+    for (const size of [{width:820,height:1180},{width:1180,height:820}]) {
+      await browser.send('Emulation.setDeviceMetricsOverride',{...size,deviceScaleFactor:2,mobile:false});
+      assert.equal(await browser.evaluate('document.documentElement.scrollWidth<=innerWidth+1'),true,`activity list overflows at ${size.width}px`);
+    }
     assert.equal(await browser.evaluate("document.querySelector('a[href=\"#/activity-speakers\"]')?.textContent"),'嘉宾资料');
     assert.equal(await browser.evaluate("document.querySelector('a[href=\"#/activity-topics\"]')?.textContent"),'活动主题');
     assert.equal(await browser.evaluate("document.querySelector('a[href=\"#/activity-resources\"]')"),null);
     await browser.evaluate("document.querySelector('.activity-directory-table th:first-child').click()");
-    await browser.wait("window.directoryCase.calls.at(-1).kind==='activity'&&window.directoryCase.calls.at(-1).sortField==='id'");
-    assert.equal(await browser.evaluate("document.querySelector('.activity-directory-table tbody tr td:first-child').textContent"),'1');
+    await browser.wait("window.directoryCase.calls.at(-1).kind==='activity'&&window.directoryCase.calls.at(-1).sortField==='name'");
+    assert.equal(await browser.evaluate("document.querySelector('.activity-directory-table tbody tr td:first-child').textContent"),'Fictional Activity 01');
     await browser.evaluate("document.querySelector('.activity-directory-table th:first-child').click()");
     await browser.wait("window.directoryCase.calls.at(-1).sortDir==='desc'");
-    assert.equal(await browser.evaluate("document.querySelector('.activity-directory-table tbody tr td:first-child').textContent"),'75');
-    await browser.evaluate("document.querySelector('.activity-directory-filters input').value='Activity 01';document.querySelector('.activity-directory-filters').requestSubmit()");
-    await browser.wait("window.directoryCase.calls.at(-1).keyword==='Activity 01'");
+    assert.equal(await browser.evaluate("document.querySelector('.activity-directory-table tbody tr td:first-child').textContent"),'Fictional Activity 75');
+    await browser.evaluate("document.querySelector('.activity-directory-table th:nth-child(4)').click()");
+    await browser.wait("window.directoryCase.calls.at(-1).sortField==='location'");
+    await browser.evaluate("document.querySelector('.activity-directory-table th:nth-child(5)').click()");
+    await browser.wait("window.directoryCase.calls.at(-1).sortField==='status'");
+    await browser.evaluate(`(()=>{const f=document.querySelector('.activity-date-filters');f.querySelector('input[type=search]').value='Activity 01';const dates=f.querySelectorAll('input[type=date]');dates[0].value='2026-10-01';dates[1].value='2026-10-31';f.requestSubmit()})()`);
+    await browser.wait("window.directoryCase.calls.at(-1).keyword==='Activity 01'&&window.directoryCase.calls.at(-1).startDate==='2026-10-01'&&window.directoryCase.calls.at(-1).endDate==='2026-10-31'");
     assert.equal(await browser.evaluate("document.querySelectorAll('.activity-directory-table tbody tr').length"),1);
+    await browser.evaluate("document.querySelector('.activity-date-filters button[type=button]').click()");
+    await browser.wait("window.directoryCase.calls.at(-1).keyword===''&&window.directoryCase.calls.at(-1).startDate===''&&window.directoryCase.calls.at(-1).endDate==='' ");
     await browser.evaluate("location.hash='#/activity-speakers'");
     await browser.wait("document.querySelector('.resource-directory-table tbody tr')");
     assert.equal(await browser.evaluate("document.querySelector('.page-title')?.textContent"),'嘉宾资料');
@@ -66,6 +80,9 @@ test('activity, speaker and topic directories navigate directly, search, sort an
     assert.equal(await browser.evaluate("document.querySelectorAll('.resource-directory-table tbody tr').length"),1);
     await browser.evaluate("(async()=>{const {setLang}=await import('/crm/js/modules/console/i18n.js');setLang('en');const {renderTopicDirectory}=await import('/crm/js/modules/console/activity-people.js');renderTopicDirectory({main:document.querySelector('#console-main'),toast:()=>{}})})()");
     await browser.wait("document.querySelector('.page-title')?.textContent==='Activity Topics'");
+    await browser.evaluate("location.hash='#/activities'");
+    await browser.wait("document.querySelector('.activity-directory-table th:first-child')?.textContent.includes('Activity Name')");
+    assert.equal(await browser.evaluate("document.querySelector('.activity-date-filters label')?.textContent.includes('From')"),true);
     for (const size of [{width:820,height:1180},{width:1180,height:820}]) {
       await browser.send('Emulation.setDeviceMetricsOverride',{...size,deviceScaleFactor:2,mobile:false});
       assert.equal(await browser.evaluate('document.documentElement.scrollWidth<=innerWidth+1'),true);

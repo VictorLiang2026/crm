@@ -86,18 +86,26 @@ async function list(event) {
 async function directory(event) {
   const page = Number(event.page ?? 1), pageSize = Number(event.pageSize ?? 30);
   const keyword = String(event.keyword || '').trim().toLowerCase();
-  const activityDate = String(event.activityDate || '');
+  const startDate = String(event.startDate || '');
+  const endDate = String(event.endDate || '');
   const sortField = event.sortField == null ? 'activity_date' : String(event.sortField);
   const sortDir = event.sortDir == null ? 'desc' : String(event.sortDir);
+  const validDate = value => {
+    if (!value) return true;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+    const date = new Date(`${value}T00:00:00Z`);
+    return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
+  };
   if (!Number.isInteger(page) || page < 1 || page > 10000 ||
       !Number.isInteger(pageSize) || pageSize < 1 || pageSize > 50 || keyword.length > 120 ||
-      (activityDate && !/^\d{4}-\d{2}-\d{2}$/.test(activityDate)) ||
-      !['id', 'name', 'activity_date', 'activity_type'].includes(sortField) ||
+      !validDate(startDate) || !validDate(endDate) || (startDate && endDate && startDate > endDate) ||
+      !['id', 'name', 'activity_date', 'activity_type', 'location', 'status'].includes(sortField) ||
       !['asc', 'desc'].includes(sortDir)) throw new Error('Invalid activity directory query');
   const ascending = sortDir === 'asc';
   const read = async (offset, count) => {
     let q = rdb.from('activities').select().is('deleted_at', null);
-    if (activityDate) q = q.eq('activity_date', activityDate);
+    if (startDate) q = q.gte('activity_date', startDate);
+    if (endDate) q = q.lte('activity_date', endDate);
     q = q.order(sortField, { ascending, nullsFirst: false });
     if (sortField !== 'id') q = q.order('id', { ascending });
     const result = assertOk(await q.range(offset, offset + count - 1));

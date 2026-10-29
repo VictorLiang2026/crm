@@ -12,7 +12,7 @@ import { renderActivityPreparation } from '../activity-preparation.js';
 import { t, translateEnum } from '../i18n.js';
 import {
   wpTag, pageHead, emptyNote, loadInto, bdg, kvGrid, sectionTitle,
-  fmtDate, weekdayCN, dayDiffFromToday, textOf,
+  fmtDate, weekdayCN,
 } from '../ui.js';
 
 const ACT_TABS = ['act_tab_flow', 'act_tab_attend', 'act_tab_acts', 'act_tab_candidates', 'act_tab_gifts', 'act_tab_photos', 'act_tab_review', 'act_tab_resources'];
@@ -25,11 +25,38 @@ const TASK_STATUS = {
   completed: ['status_completed', 'jade'], skipped: ['status_skipped', 'gray'],
 };
 // ---------- 列表 ----------
+function activityPageSize() {
+  const compactViewport = typeof window.matchMedia === 'function'
+    ? window.matchMedia('(max-width: 1180px), (any-pointer: coarse)').matches
+    : window.innerWidth <= 1180;
+  return compactViewport ? 30 : 20;
+}
+
 export function renderActivities(ctx) {
   const listEl = h('div', {});
-  const state = { page: 1, pageSize: 30, keyword: '', activityDate: '', sortField: 'activity_date', sortDir: 'desc' };
+  const state = { page: 1, pageSize: activityPageSize(), keyword: '', startDate: '', endDate: '', sortField: 'activity_date', sortDir: 'desc' };
   const search = h('input', { type: 'search', maxlength: '120', placeholder: t('act_directory_search'),
     'aria-label': t('act_directory_search') });
+  const startDate = h('input', { type: 'date', 'aria-label': t('act_directory_start_date'), title: t('act_directory_start_date') });
+  const endDate = h('input', { type: 'date', 'aria-label': t('act_directory_end_date'), title: t('act_directory_end_date') });
+  const filters = h('form', { class: 'activity-date-filters', onsubmit: event => {
+    event.preventDefault();
+    state.keyword = search.value.trim();
+    state.startDate = startDate.value;
+    state.endDate = endDate.value;
+    state.page = 1;
+    runList();
+  } }, [
+    search,
+    h('label', {}, [t('act_directory_start_date'), startDate]),
+    h('label', {}, [t('act_directory_end_date'), endDate]),
+    h('button', { class: 'btn btn-primary btn-sm', type: 'submit' }, t('btn_search')),
+    h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => {
+      search.value = ''; startDate.value = ''; endDate.value = '';
+      state.keyword = ''; state.startDate = ''; state.endDate = ''; state.page = 1;
+      runList();
+    } }, t('act_directory_clear')),
+  ]);
   const prev = h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => {
     if (state.page > 1) { state.page--; runList(); }
   } }, t('btn_prev'));
@@ -38,26 +65,6 @@ export function renderActivities(ctx) {
   } }, t('btn_next'));
   const pageInfo = h('span', { class: 'pager-info' });
   let cancelQuery = () => {};
-
-  const d = new Date();
-  const strip = [];
-  for (let i = 0; i < 7; i++) {
-    const day = new Date(d.getFullYear(), d.getMonth(), d.getDate() + i);
-    const key = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`;
-    const weekdayText = i === 0 ? t('act_today') : (t('act_weekday_prefix') || '') + t('act_weekday_' + day.getDay());
-    const node = h('button', { class: 'day' + (i === 0 ? ' today' : ''), type: 'button' }, [
-      h('b', {}, String(day.getDate())),
-      h('span', {}, weekdayText),
-    ]);
-    node.onclick = () => {
-      state.activityDate = (state.activityDate === key) ? '' : key;
-      strip.forEach((x) => x.classList.remove('sel'));
-      if (state.activityDate) node.classList.add('sel');
-      state.page = 1;
-      runList();
-    };
-    strip.push(node);
-  }
 
   function runList() {
     cancelQuery();
@@ -69,13 +76,12 @@ export function renderActivities(ctx) {
       pageInfo.textContent = t('resource_directory_page').replace('{page}', String(state.page));
       if (!rows.length) {
         return h('div', { class: 'card-body' }, [emptyNote(
-          state.activityDate ? t('act_empty_today') : t('act_directory_empty'),
-          state.activityDate ? t('act_empty_select_other') : t('act_empty_new'))]);
+          t('act_directory_empty'),
+          (state.startDate || state.endDate || state.keyword) ? t('act_directory_empty_filtered') : t('act_empty_new'))]);
       }
       const columns = [
-        ['id', 'col_id'], ['name', 'act_directory_name'], ['activity_date', 'act_date'],
-        ['activity_type', 'act_type'], [null, 'act_location'], [null, 'act_status'],
-        [null, 'act_directory_target'], [null, 'act_directory_actual'],
+        ['name', 'act_directory_name'], ['activity_date', 'act_date'],
+        ['activity_type', 'act_type'], ['location', 'act_location'], ['status', 'act_status'],
       ];
       const header = h('thead', {}, h('tr', {}, columns.map(([field, label]) => h('th', {
         class: field ? 'sortable-th' : '',
@@ -87,14 +93,11 @@ export function renderActivities(ctx) {
         } : undefined,
       }, `${t(label)}${field && state.sortField === field ? (state.sortDir === 'asc' ? ' ▲' : ' ▼') : ''}`))));
       const body = h('tbody', {}, rows.map(a => h('tr', { onclick: () => { location.hash = `#/activity/${a.id}`; } }, [
-        h('td', {}, String(a.id)),
         h('td', {}, h('a', { href: `#/activity/${a.id}` }, a.name || '')),
         h('td', {}, a.activity_date ? fmtDate(a.activity_date) : t('act_date_tbd')),
         h('td', {}, translateEnum('activity_type', a.activity_type)),
         h('td', {}, a.location || '—'),
         h('td', {}, a.status ? bdg(actStatusLabel(a.status), 'gold') : '—'),
-        h('td', {}, a.target_participants == null ? '—' : String(a.target_participants)),
-        h('td', {}, a.actual_participants == null ? '—' : String(a.actual_participants)),
       ])));
       return h('div', { class: 'table-scroll' }, h('table', { class: 'people-table activity-directory-table' }, [header, body]));
     });
@@ -108,16 +111,17 @@ export function renderActivities(ctx) {
         h('a', { class: 'btn btn-ghost', href: '#/activity-speakers' }, t('resource_directory_speakers_tab')),
         h('a', { class: 'btn btn-ghost', href: '#/activity-topics' }, t('resource_directory_topics_tab')),
         h('button', { class: 'btn btn-ghost', type: 'button', title: t('act_daily_report'), onclick: () => {
-          const range = state.activityDate ? `?startDate=${state.activityDate}&endDate=${state.activityDate}` : '';
+          const params = new URLSearchParams();
+          if (state.startDate) params.set('startDate', state.startDate);
+          if (state.endDate) params.set('endDate', state.endDate);
+          const query = params.toString();
+          const range = query ? `?${query}` : '';
           location.hash = `#/activity-report/customer${range}`;
         } }, [ic('calendar'), t('act_daily_report')]),
         h('button', { class: 'btn btn-primary', type: 'button', onclick: () => openActivityEditor(ctx, { onDone: runList }) }, [ic('plus'), t('act_new')]),
       ],
     }),
-    h('div', { class: 'date-strip' }, strip),
-    h('form', { class: 'more-actions activity-directory-filters', onsubmit: event => {
-      event.preventDefault(); state.keyword = search.value.trim(); state.page = 1; runList();
-    } }, [search, h('button', { class: 'btn btn-primary', type: 'submit' }, t('btn_search'))]),
+    filters,
     h('section', { class: 'card' }, [listEl]),
     h('div', { class: 'pager' }, [prev, pageInfo, next]),
   );

@@ -17,6 +17,7 @@ function service(name, tables) {
       in(key, values) { filters.push(row => values.includes(row[key])); return q; },
       lt(key, value) { filters.push(row => row[key] != null && row[key] < value); return q; },
       gt(key, value) { filters.push(row => row[key] != null && row[key] > value); return q; },
+      gte(key, value) { filters.push(row => row[key] != null && row[key] >= value); return q; },
       lte(key, value) { filters.push(row => row[key] != null && row[key] <= value); return q; },
       order(key, options) { orders.push([key, options]); return q; },
       range(first, last) { start = first; end = last + 1; return q; },
@@ -51,6 +52,7 @@ test('activity directory searches beyond legacy 100, filters by date and sorts a
     id: index + 1, name: `Fictional activity ${String(130 - index).padStart(3, '0')}`,
     activity_date: index < 65 ? '2026-10-29' : '2026-11-01',
     activity_type: 'salon', location: index === 0 ? 'Needle Place' : 'Fictional Place',
+    status: index % 2 ? 'preparing' : 'confirmed',
     deleted_at: null,
   }));
   const call = service('activities', { activities: rows });
@@ -60,9 +62,15 @@ test('activity directory searches beyond legacy 100, filters by date and sorts a
   assert.equal(first.hasMore, true);
   assert.equal(new Set([...first.rows, ...second.rows].map(row => row.id)).size, 100);
   assert.equal(first.rows[0].name, 'Fictional activity 001');
-  const filtered = await call({ action: 'directory', keyword: 'needle', activityDate: '2026-10-29' });
+  const filtered = await call({ action: 'directory', keyword: 'needle', startDate: '2026-10-29', endDate: '2026-10-29' });
   assert.deepEqual(Array.from(filtered.rows, row => row.id), [1]);
+  const byLocation = await call({ action: 'directory', sortField: 'location', sortDir: 'desc', pageSize: 10 });
+  assert.equal(byLocation.rows[0].location, 'Needle Place');
+  const byStatus = await call({ action: 'directory', sortField: 'status', sortDir: 'asc', pageSize: 10 });
+  assert.equal(byStatus.rows[0].status, 'confirmed');
   assert.equal((await call({ action: 'list' })).rows.length, 100);
+  assert.match((await call({ action: 'directory', startDate: '2026-02-30' })).error, /Invalid activity directory/);
+  assert.match((await call({ action: 'directory', startDate: '2026-11-01', endDate: '2026-10-01' })).error, /Invalid activity directory/);
   assert.match((await call({ action: 'directory', sortField: 'deleted_at' })).error, /Invalid activity directory/);
 });
 
