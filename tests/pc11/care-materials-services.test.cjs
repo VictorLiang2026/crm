@@ -42,7 +42,7 @@ function loadService(folder, initial) {
         return found.map((row) => ({ Id: row.Id, id: row.id }));
       }
       if (this.mode === 'insert') {
-        const row = { ...this.payload, Id: 9001, id: 9001 };
+        const row = { deleted_at: null, ...this.payload, Id: 9001, id: 9001 };
         rows[this.table].push(row);
         calls.push({ table: this.table, mode: this.mode, affected: 1 });
         return [{ Id: row.Id, id: row.id }];
@@ -105,6 +105,26 @@ test('gifts list pagination is additive and scoped gift writes reject mismatched
   const removed = await service.main({ action: 'remove', id: 1, customer_id: 788 });
   assert.equal(removed.ok, true);
   assert.equal(service.rows.gifts.some((row) => row.Id === 1), false);
+});
+
+test('gifts resolve legacy customer writes to a Person and accept Person-only gift records', async () => {
+  const service = loadService('gifts', {
+    gifts: [],
+    customers: [{ Id: 788, person_id: 783, deleted_at: null }],
+    persons: [{ id: 783, display_name: 'Test Person', deleted_at: null }],
+  });
+  const legacy = await service.main({ action: 'create', data: { customer_id: 788, gift_name: 'legacy' } });
+  assert.equal(legacy.id, 9001);
+  assert.equal(service.rows.gifts[0].person_id, 783);
+  assert.equal(service.rows.gifts[0].customer_id, 788);
+  const personOnly = await service.main({ action: 'create', data: { person_id: 783, customer_id: null, gift_name: 'person only' } });
+  assert.equal(personOnly.id, 9001);
+  assert.equal(service.rows.gifts[1].person_id, 783);
+  assert.equal(service.rows.gifts[1].customer_id, null);
+  const mismatch = await service.main({ action: 'create', data: { person_id: 784, customer_id: 788, gift_name: 'mismatch' } });
+  assert.equal(mismatch.error, 'person/customer mismatch');
+  const rows = await service.main({ action: 'list', person_id: 783 });
+  assert.equal(rows.rows.length, 2);
 });
 
 test('photos metadata pagination excludes base64; get/update/remove are customer-scoped and category is checked', async () => {

@@ -1705,6 +1705,7 @@ export function openPersonDelete(ctx, { personId, displayName, onDone } = {}) {
     const cascade = [];
     if (p.customerId) cascade.push(kvRow(t('del_cascade_customer'), `#${p.customerId}`));
     if (p.recruitCount) cascade.push(kvRow(t('del_cascade_recruit'), `×${p.recruitCount}`));
+    if (p.giftCount) cascade.push(kvRow(t('del_cascade_gift'), `×${p.giftCount}`));
     if (p.opportunityCount) cascade.push(kvRow(t('del_cascade_opportunity'), `×${p.opportunityCount}`));
     if (p.relationshipCount) cascade.push(kvRow(t('del_cascade_relationship'), `×${p.relationshipCount}`));
     if (p.householdCount) cascade.push(kvRow(t('del_cascade_household'), `×${p.householdCount}`));

@@ -120,15 +120,15 @@ export const data = {
   executeOcrParse: (ctx, previewId) => p360(ctx, 'executeOcrParse', { previewId }),
   previewOcrUndo: (ctx, data) => p360(ctx, 'previewOcrUndo', { data }),
   // ---------- 客户关怀与资料（仅 Person 关联的 customer_id） ----------
-  gifts: (ctx, customerId, paging = {}) => call(ctx, 'gifts', {
-    action: 'list', customer_id: Number(customerId), ...(paging || {}),
+  gifts: (ctx, personId, paging = {}) => call(ctx, 'gifts', {
+    action: 'list', person_id: Number(personId), ...(paging || {}),
   }),
   createGift: (ctx, payload) => call(ctx, 'gifts', { action: 'create', data: payload }),
-  updateGift: (ctx, id, customerId, payload) => call(ctx, 'gifts', {
-    action: 'update', id: Number(id), customer_id: Number(customerId), data: payload,
+  updateGift: (ctx, id, personId, payload) => call(ctx, 'gifts', {
+    action: 'update', id: Number(id), person_id: Number(personId), data: payload,
   }),
-  removeGift: (ctx, id, customerId) => call(ctx, 'gifts', {
-    action: 'remove', id: Number(id), customer_id: Number(customerId),
+  removeGift: (ctx, id, personId) => call(ctx, 'gifts', {
+    action: 'remove', id: Number(id), person_id: Number(personId),
   }),
   photos: (ctx, customerId, paging = {}) => call(ctx, 'photos', {
     action: 'list', customer_id: Number(customerId), ...(paging || {}),

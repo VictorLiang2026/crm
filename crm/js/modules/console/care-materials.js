@@ -1,4 +1,4 @@
-// Person 360 的礼品与附件入口：数据仍按 customer_id 归档；文件内容只在用户请求时读取。
+// Person 360 gifts belong to the Person; file records remain customer-scoped and lazy-loaded.
 import { h } from './dom.js';
 import { data } from './data.js';
 import { openSheet } from './write.js';
@@ -45,15 +45,10 @@ function readBase64(file) {
 
 export async function careMaterialsNode(ctx, personId, { onDone } = {}) {
   const profile = await data.customerProfile(ctx, personId);
-  if (profile.status !== 'linked' || !profile.customerId) {
-    return h('div', { class: 'tab-stack care-materials' }, [
-      sectionTitle(t('care_materials_title')),
-      emptyNote(t('care_customer_required'), t('care_customer_required_note')),
-    ]);
-  }
-
-  const customerId = Number(profile.customerId);
-  const root = h('div', { class: 'tab-stack care-materials', 'data-customer-id': String(customerId) });
+  if (profile.status !== 'linked' && profile.status !== 'person_only') throw new Error(t('care_load_failed'));
+  const personKey = String(profile.personId || personId);
+  const customerId = profile.customerId ? Number(profile.customerId) : null;
+  const root = h('div', { class: 'tab-stack care-materials', 'data-person-id': personKey, 'data-customer-id': customerId ? String(customerId) : null });
   const giftList = h('div', { class: 'care-materials-list' });
   const photoList = h('div', { class: 'care-materials-list' });
   const giftStatus = h('p', { class: 'care-status', role: 'status' });
@@ -100,8 +95,8 @@ export async function careMaterialsNode(ctx, personId, { onDone } = {}) {
           given_date: date.field.value || null,
           notes: notes.field.value.trim() || null,
         };
-        if (row) actionError(await data.updateGift(ctx, row.Id, customerId, payload), t('care_save_failed'));
-        else actionError(await data.createGift(ctx, { ...payload, customer_id: customerId }), t('care_save_failed'));
+        if (row) actionError(await data.updateGift(ctx, row.Id, personKey, payload), t('care_save_failed'));
+        else actionError(await data.createGift(ctx, { ...payload, person_id: personKey, customer_id: customerId }), t('care_save_failed'));
         sheet.overlay.remove();
         ctx.toast(t(row ? 'care_gift_saved' : 'care_gift_added'), 'ok');
         await refreshGifts(true);
@@ -125,7 +120,7 @@ export async function careMaterialsNode(ctx, personId, { onDone } = {}) {
     if (!window.confirm(t('care_delete_gift_confirm'))) return;
     button.disabled = true;
     try {
-      actionError(await data.removeGift(ctx, row.Id, customerId), t('care_delete_failed'));
+      actionError(await data.removeGift(ctx, row.Id, personKey), t('care_delete_failed'));
       ctx.toast(t('care_gift_deleted'), 'ok');
       await refreshGifts(true);
     } catch (error) {
@@ -242,7 +237,7 @@ export async function careMaterialsNode(ctx, personId, { onDone } = {}) {
     if (reset) { gifts.clear(); giftOffset = 0; }
     giftStatus.textContent = t('loading');
     try {
-      const res = actionError(await data.gifts(ctx, customerId, { limit: PAGE_SIZE, offset: giftOffset }), t('care_load_failed'));
+      const res = actionError(await data.gifts(ctx, personKey, { limit: PAGE_SIZE, offset: giftOffset }), t('care_load_failed'));
       (res.rows || []).forEach((row) => gifts.set(String(row.Id), row));
       giftOffset = gifts.size;
       giftList.replaceChildren(...(gifts.size ? [...gifts.values()].map(renderGift) : [emptyNote(t('care_no_gifts'), '')]));
@@ -267,7 +262,7 @@ export async function careMaterialsNode(ctx, personId, { onDone } = {}) {
   giftMore.addEventListener('click', async () => {
     giftMore.disabled = true;
     try {
-      const res = actionError(await data.gifts(ctx, customerId, { limit: PAGE_SIZE, offset: giftOffset }), t('care_load_failed'));
+      const res = actionError(await data.gifts(ctx, personKey, { limit: PAGE_SIZE, offset: giftOffset }), t('care_load_failed'));
       (res.rows || []).forEach((row) => gifts.set(String(row.Id), row));
       giftOffset = gifts.size;
       giftList.replaceChildren(...[...gifts.values()].map(renderGift));
@@ -358,14 +353,17 @@ export async function careMaterialsNode(ctx, personId, { onDone } = {}) {
         h('p', { class: 'care-section-note' }, t('care_gifts_note')),
         giftStatus, giftList, giftMore,
       ]),
-      h('section', { class: 'care-materials-section' }, [
+      customerId ? h('section', { class: 'care-materials-section' }, [
         h('div', { class: 'care-section-head' }, [sectionTitle(t('care_files_title')), photoAdd]),
         h('p', { class: 'care-section-note' }, t('care_files_note')),
         h('p', { class: 'care-status' }, [t('care_upload_limit')]),
         photoInput, filters, photoStatus, photoList, photoMore,
+      ]) : h('section', { class: 'care-materials-section' }, [
+        sectionTitle(t('care_files_title')),
+        emptyNote(t('care_customer_required'), t('care_customer_required_note')),
       ]),
     ]),
   );
-  await Promise.all([refreshGifts(true), refreshPhotos(true)]);
+  await Promise.all([refreshGifts(true), customerId ? refreshPhotos(true) : Promise.resolve()]);
   return root;
 }

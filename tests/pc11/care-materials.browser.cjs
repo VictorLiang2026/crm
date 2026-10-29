@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 const { Browser } = require('../regression/browser.cjs');
 
-test('Person care materials keeps customer-only contract, lazy file reads, bilingual copy, and iPad layouts', async () => {
+test('Person care materials stores gifts on a Person and keeps files customer-scoped, bilingual, and iPad-ready', async () => {
   const browser = new Browser(path.resolve(__dirname, '../..'));
   try {
     await browser.start();
@@ -18,7 +18,7 @@ test('Person care materials keeps customer-only contract, lazy file reads, bilin
       window.pc11Ctx={toast:(message,type)=>window.pc11Calls.push({toast:message,type}),api:{call:async(name,args)=>{
         window.pc11Calls.push({name,args});
         if(name==='person_360'&&args.action==='getCustomerProfile')return{status:'linked',personId:'783',customerId:788};
-        if(name==='gifts'&&args.action==='list')return{rows:[{Id:1001,customer_id:788,gift_name:'[CRM_TEST_ONLY]节日礼品',quantity:1,given_date:'2026-10-10',notes:'[CRM_TEST_ONLY]说明'}],hasMore:false};
+        if(name==='gifts'&&args.action==='list')return{rows:[{Id:1001,person_id:783,customer_id:788,gift_name:'[CRM_TEST_ONLY]节日礼品',quantity:1,given_date:'2026-10-10',notes:'[CRM_TEST_ONLY]说明'}],hasMore:false};
         if(name==='photos'&&args.action==='list')return{rows:[{id:25,customer_id:788,category:'photo',file_name:'[CRM_TEST_ONLY]photo.jpg',content_type:'image/jpeg',sort_order:0,created_at:'2026-10-04',photo_notes:'[CRM_TEST_ONLY]附件'}],hasMore:false};
         if(name==='gifts'&&args.action==='create')return{id:1002};
         if(name==='gifts'&&args.action==='update')return{ok:true};
@@ -30,10 +30,12 @@ test('Person care materials keeps customer-only contract, lazy file reads, bilin
         throw Error('unexpected '+name+'.'+args.action);
       }}};
       document.getElementById('view').replaceChildren(await careMaterialsNode(window.pc11Ctx,'783'));
-      window.pc11OnlyCtx={api:{call:async(name,args)=>{
+      window.pc11OnlyCtx={toast:()=>{},api:{call:async(name,args)=>{
         window.pc11Calls.push({name,args});
         if(name==='person_360'&&args.action==='getCustomerProfile')return{status:'person_only',customerId:null};
-        throw Error('person-only must not access customer data');
+        if(name==='gifts'&&args.action==='list')return{rows:[{Id:1004,person_id:785,customer_id:null,gift_name:'[CRM_TEST_ONLY]人物礼品'}],hasMore:false};
+        if(name==='gifts'&&args.action==='create')return{id:1005};
+        throw Error('person-only must not access customer files');
       }}};
     })()`);
     await browser.wait("document.querySelector('.care-materials')?.innerText.includes('节日礼品')");
@@ -44,6 +46,8 @@ test('Person care materials keeps customer-only contract, lazy file reads, bilin
     assert.equal(metaRequest.customer_id, 788);
     assert.equal(metaRequest.limit, 30);
     assert.equal(metaRequest.offset, 0);
+    const giftRequest = await browser.evaluate("window.pc11Calls.find(c=>c.name==='gifts'&&c.args.action==='list').args");
+    assert.equal(giftRequest.person_id,783);
 
     await browser.evaluate("document.querySelector('.care-file-record .care-record-actions .btn-soft').click()");
     await browser.wait("window.pc11Calls.some(c=>c.name==='photos'&&c.args.action==='get')");
@@ -63,6 +67,7 @@ test('Person care materials keeps customer-only contract, lazy file reads, bilin
     })()`);
     await browser.wait("window.pc11Calls.some(c=>c.name==='gifts'&&c.args.action==='create')");
     const giftCreate = await browser.evaluate("window.pc11Calls.find(c=>c.name==='gifts'&&c.args.action==='create').args");
+    assert.equal(giftCreate.data.person_id,'783');
     assert.equal(giftCreate.data.customer_id,788);
     assert.equal(giftCreate.data.quantity,2);
     assert.equal(Object.hasOwn(giftCreate.data,'category'),false);
@@ -95,11 +100,19 @@ test('Person care materials keeps customer-only contract, lazy file reads, bilin
     assert.equal(en.gift,'Add Gift');
     assert.match(en.delete,/permanent/);
 
-    const beforePersonOnly = await browser.evaluate("window.pc11Calls.filter(c=>c.name==='gifts'||c.name==='photos').length");
+    const beforePersonOnly = await browser.evaluate("window.pc11Calls.filter(c=>c.name==='photos').length");
     await browser.evaluate("document.getElementById('view').replaceChildren('')");
     await browser.evaluate(`(async()=>document.getElementById('view').replaceChildren(await careMaterialsNode(window.pc11OnlyCtx,'785')))()`);
-    await browser.wait("document.querySelector('.care-materials')?.innerText.includes('需要有效的客户关联')");
-    assert.equal(await browser.evaluate("window.pc11Calls.filter(c=>c.name==='gifts'||c.name==='photos').length"), beforePersonOnly);
+    await browser.wait("document.querySelector('.care-materials')?.innerText.includes('人物礼品')");
+    assert.equal(await browser.evaluate("window.pc11Calls.filter(c=>c.name==='photos').length"), beforePersonOnly);
+    const personOnlyCreateReady = await browser.evaluate("document.querySelector('.care-materials-section:first-child .care-section-head button.btn-primary')?.textContent.trim()");
+    assert.equal(personOnlyCreateReady,'新增礼品');
+    await browser.evaluate("document.querySelector('.care-materials-section:first-child .care-section-head button.btn-primary').click()");
+    await browser.wait("document.querySelector('.sheet-overlay')?.innerText.includes('礼品名称')");
+    await browser.evaluate(`(()=>{const name=document.querySelector('.sheet-overlay [name="gift_name"]');name.value='[CRM_TEST_ONLY]人物专属礼品';[...document.querySelectorAll('.sheet-overlay .sheet-actions button')].find(b=>b.textContent.trim()==='保存').click()})()`);
+    await browser.wait("window.pc11Calls.some(c=>c.name==='gifts'&&c.args.action==='create'&&c.args.data.person_id==='785')");
+    const personOnlyGift = await browser.evaluate("window.pc11Calls.find(c=>c.name==='gifts'&&c.args.action==='create'&&c.args.data.person_id==='785').args.data");
+    assert.equal(personOnlyGift.customer_id,null);
 
     await browser.evaluate(`(async()=>document.getElementById('view').replaceChildren(await careMaterialsNode(window.pc11Ctx,'783')))()`);
     await browser.wait("document.querySelector('.care-materials')");
