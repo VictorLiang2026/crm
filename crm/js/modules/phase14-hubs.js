@@ -338,7 +338,6 @@ export function renderMore({ root }) {
   for (const [title, hash, description] of [
     ['账号与应用维护', '#/account', '修改密码、退出登录、强制加载最新版'],
     ['测试场景', '#/test-scenario', '受控生成 / 打开虚构测试场景'],
-    ['传统客户列表', '#/customers', '原客户列表与详情'],
     ['传统跟进', '#/more/followups', '选择客户后进入旧跟进记录'],
     ['经营漏斗', '#/funnels', '原漏斗分析'],
     ['AI建议历史', '#/ai-suggestions', '原建议记录'],

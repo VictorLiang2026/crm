@@ -1094,7 +1094,12 @@ function route(){
   if(hash === '#/ai-suggestions') return showAiSuggestions();
   if(hash === '#/today') return showTodayCoach();
   if(hash === '#/funnels') return showFunnels();
-  if(hash === '#/customers') return showList();
+  if(hash === '#/customers') return import('/crm/js/modules/legacy-customer-route.js').then(function(module){
+    if(location.hash !== hash) return;
+    return module.renderLegacyCustomerRoute({root:$('view')});
+  }).catch(function(e){ return import('/crm/js/modules/console/i18n.js').then(function(i18n){
+    $('view').textContent = i18n.t('legacy_customer_route_load_error') + ': ' + e.message;
+  }); });
   if(hash === '#/customers/trash') return showCustomerTrash();
   if(hash === '#/activities') return showActivities();
   if(hash === '#/speakers') return showSpeakers();
@@ -2692,19 +2697,13 @@ async function renderOpps(cid){
         ]) : null,
       ]),
       el('div', {}, [
-        o.status !== '关闭' ? el('a', {class:'btn-sm', style:'margin-right:8px;color:#047857;font-weight:600', onclick:function(){ openOppFollowup(cid, o); }}, '记录沟通') : null,
-        el('a', {class:'btn-sm', style:'margin-right:8px', onclick:function(){ openOppForm(cid, o); }}, '编辑'),
-        o.status !== '关闭' ? el('a', {class:'btn-sm', style:'margin-right:8px', onclick:async function(){
+        !['成交','关闭'].includes(o.status) ? el('a', {class:'btn-sm', style:'margin-right:8px;color:#047857;font-weight:600', onclick:function(){ openOppFollowup(cid, o); }}, '记录沟通') : null,
+        !['成交','关闭'].includes(o.status) ? el('a', {class:'btn-sm', style:'margin-right:8px', onclick:function(){ openOppForm(cid, o); }}, '编辑') : null,
+        !['成交','关闭'].includes(o.status) ? el('a', {class:'btn-sm', style:'margin-right:8px', onclick:async function(){
           var rr = await callFn('opportunities', {action:'close', id:o.id});
           if(rr.error){ toast('操作失败：'+rr.error); return; }
           toast('已关闭'); showDetail(cid);
         }}, '关闭') : null,
-        el('a', {class:'btn-sm btn-danger', onclick:async function(){
-          if(!confirm('删除该经营机会？')) return;
-          var rr = await callFn('opportunities', {action:'remove', id:o.id});
-          if(rr.error){ toast('删除失败：'+rr.error); return; }
-          toast('已删除'); showDetail(cid);
-        }}, '删除'),
       ]),
     ]));
     if(o.last_progress) card.appendChild(el('p', {}, esc(o.last_progress)));

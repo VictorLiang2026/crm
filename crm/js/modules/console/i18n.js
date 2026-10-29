@@ -2,6 +2,11 @@
 const DEFAULT = 'zh-CN';
 
 const DICT = {
+  'legacy_customer_route_kicker': { 'zh-CN':'旧客户入口', 'en':'Legacy Customer Link' },
+  'legacy_customer_route_title': { 'zh-CN':'请在新版人物页继续', 'en':'Continue in the New People Directory' },
+  'legacy_customer_route_intro': { 'zh-CN':'旧客户列表入口已停用。新版人物目录支持搜索人物并进入人物档案。', 'en':'The legacy customer list is retired. Use the new People directory to search and open Person profiles.' },
+  'legacy_customer_route_people_link': { 'zh-CN':'打开人物目录', 'en':'Open People Directory' },
+  'legacy_customer_route_load_error': { 'zh-CN':'旧客户入口加载失败', 'en':'Could not load the legacy customer notice' },
   'test_kicker': { 'zh-CN':'开发维护', 'en':'Maintenance' },
   'test_title': { 'zh-CN':'生成 / 打开测试场景', 'en':'Create / Open Test Scenario' },
   'test_warning': { 'zh-CN':'仅使用虚构内容。样本参与真实看板计算；请勿联系、外发或填写真实保单。', 'en':'Use fictional data only. Samples affect live dashboards; do not contact, share, or enter real policies.' },

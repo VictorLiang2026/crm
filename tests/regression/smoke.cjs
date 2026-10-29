@@ -30,11 +30,13 @@ module.exports = async function smoke(root, test) {
       assert.equal(await b.evaluate("document.getElementById('view').innerText.includes('CRM 登录')"), true);
       assert.equal(await b.evaluate('window.__crmTest.calls.length'), 0);
     });
-    await check('login.success', '模拟登录成功后进入原目标路由', async () => {
+    await check('login.success', '模拟登录成功后旧客户列表入口转向新版人物页', async () => {
       await b.evaluate("document.querySelector('[name=username]').value='[CRM_TEST_ONLY]'; document.querySelector('[name=password]').value='local-fixture-only'");
       await b.click('button', '登录');
-      await b.wait(text('[CRM_TEST_ONLY]客户甲'));
-      await b.wait(called('customers', 'list'));
+      await b.wait(text('请在新版人物页继续'));
+      assert.equal(await b.evaluate("document.querySelector('#view a[href=\"#/people\"]')?.getAttribute('href')"), '#/people');
+      await b.evaluate("document.querySelector('#view a[href=\"#/people\"]')?.click()");
+      await b.wait(called('person_360', 'listPeople'));
     });
     await check('login.timeout', '原有五分钟无操作机制仍要求重新登录', async () => {
       await b.evaluate("localStorage.setItem('crm_last_activity',String(Date.now()-6*60*1000))");
@@ -42,7 +44,7 @@ module.exports = async function smoke(root, test) {
       assert.equal(await b.evaluate("getComputedStyle(document.getElementById('mod-switch')).display"), 'none');
       await b.evaluate("document.querySelector('[name=username]').value='[CRM_TEST_ONLY]'; document.querySelector('[name=password]').value='local-fixture-only'");
       await b.click('button', '登录');
-      await b.wait(text('[CRM_TEST_ONLY]客户甲'));
+      await b.wait(text('请在新版人物页继续'));
     });
     await check('phase14.navigation', '七项主导航和全局快速记录始终可见', async () => {
       await open('#/today', '今日');
@@ -68,7 +70,8 @@ module.exports = async function smoke(root, test) {
     });
     await check('phase14.ai-more', 'AI助手与更多保留旧入口', async () => {
       await open('#/ai', 'AI CRM 搜索');
-      await open('#/more', '传统客户列表');
+      await open('#/more', '传统跟进');
+      assert.equal(await b.evaluate("document.getElementById('view').innerText.includes('传统客户列表')"), false);
       for (const textLabel of ['传统跟进', '经营漏斗', 'AI建议历史', '保单检视', '产品',
         '伴手礼', '照片/OCR', '嘉宾资源', '主题资源', '招募目标', '客户活动量',
         '增员活动量', '客户回收站', '增员回收站']) {
@@ -108,7 +111,7 @@ module.exports = async function smoke(root, test) {
     await check('account.password', '旧密码错误不更新；成功后退出并用新密码登录', async () => {
       await b.evaluate("document.querySelector('[name=username]').value='[CRM_TEST_ONLY]'; document.querySelector('[name=password]').value='local-fixture-only'");
       await b.click('button', '登录');
-      await b.wait(text('[CRM_TEST_ONLY]客户甲'));
+      await b.wait(text('请在新版人物页继续'));
       assert.notEqual(await b.evaluate("getComputedStyle(document.getElementById('mod-switch')).display"), 'none');
       await open('#/account', '修改密码', 'authCase=1');
       await b.evaluate("document.querySelector('[name=account-old-password]').value='wrong'; document.querySelector('[name=account-new-password]').value='NewTestPass123!'; document.querySelector('[name=account-confirm-password]').value='NewTestPass123!'");
@@ -195,12 +198,14 @@ module.exports = async function smoke(root, test) {
       await b.wait(text('行动已创建：#990777'));
       assert.equal(await b.evaluate("window.__crmTest.calls.filter(c=>c.name==='assistant' && c.stage==='execute').length"), 1);
     });
-    await check('customers.list', '客户列表显示记录与客户详情导航', async () => {
-      await open('#/customers', '[CRM_TEST_ONLY]客户甲');
-      await b.click('#view a', '[CRM_TEST_ONLY]客户甲');
-      await b.wait(called('customers', 'get'));
-      await b.wait(text('总览'));
-      assert.equal(await b.evaluate('location.hash'), '#/customer/910001');
+    await check('customers.legacy-route', '旧客户列表只提示进入新版人物目录', async () => {
+      await b.open('#/customers');
+      await b.wait("document.querySelector('.legacy-customer-route a[href=\"#/people\"]')");
+      assert.equal(await b.evaluate("document.querySelector('#view a[href=\"#/people\"]')?.getAttribute('href')"), '#/people');
+      assert.equal(await b.evaluate("window.__crmTest.calls.some(c=>c.name==='customers' && c.action==='list')"), false);
+      await b.evaluate("document.querySelector('#view a[href=\"#/people\"]')?.click()");
+      await b.wait(called('person_360', 'listPeople'));
+      assert.equal(await b.evaluate('location.hash'), '#/people');
     });
     await check('customer.detail', '客户详情及跟进下一步展示', async () => {
       await open('#/customer/910001', '[CRM_TEST_ONLY]预约沟通');
@@ -360,20 +365,20 @@ module.exports = async function smoke(root, test) {
       await b.click('.tab', '经营机会');
       await b.wait(text('家庭保障'));
       assert.equal(await b.evaluate("window.__crmTest.calls.find(c=>c.name==='opportunities').customer_id"), 910001);
+      assert.deepEqual(await b.evaluate("(() => { const card=[...document.querySelectorAll('#view .card')].find(x=>x.innerText.includes('教育规划')&&!x.querySelector('.card')); return card?[...card.querySelectorAll('a,button')].map(x=>x.textContent.trim()):null; })()"), []);
+      assert.equal(await b.evaluate("window.__crmTest.calls.some(c=>c.name==='opportunities' && c.action==='remove')"), false);
     });
-    await check('customers.pagination', '客户分页每页最多50条且第二页可达', async () => {
-      await open('#/customers', '[CRM_TEST_ONLY]客户', 'mode=pagination');
-      assert.equal(await b.evaluate("document.querySelectorAll('#view tbody tr').length"), 50);
-      assert.equal(await b.evaluate("window.__crmTest.calls.find(c=>c.name==='customers' && c.action==='list').pageSize"), 50);
-      await b.click('#view button', '下一页');
-      await b.wait("document.querySelectorAll('#view tbody tr').length === 5");
-      assert.equal(await b.evaluate("window.__crmTest.calls.some(c=>c.name==='customers' && c.action==='list' && c.page===2)"), true);
+    await check('customers.pagination-retired', '旧客户列表分页入口已停用，不再查询客户表', async () => {
+      await b.open('#/customers', 'mode=pagination');
+      await b.wait("document.querySelector('.legacy-customer-route a[href=\"#/people\"]')");
+      assert.equal(await b.evaluate("document.querySelector('.legacy-customer-route a[href=\"#/people\"]') != null"), true);
+      assert.equal(await b.evaluate("window.__crmTest.calls.some(c=>c.name==='customers' && c.action==='list')"), false);
     });
-    await check('customers.search', '客户搜索无匹配提示', async () => {
-      await open('#/customers', '[CRM_TEST_ONLY]客户甲');
+    await check('people.search', '新版人物目录搜索无匹配提示', async () => {
+      await open('#/people', '人');
       await b.evaluate("document.querySelector('input[type=search]').value='NO_MATCH_TEST_ONLY'");
       await b.click('#view button', '搜索');
-      await b.wait(text('没有找到匹配的客户'));
+      await b.wait(text('没有找到人物'));
     });
     await check('today.page', '今日经营页使用隔离建议响应', async () => {
       // A fresh origin-local cache is cleared; no real AI request can leave the harness.
@@ -592,7 +597,7 @@ module.exports = async function smoke(root, test) {
       });
     }
     for (const [key, route, expected] of [
-      ['customers', '#/customers', '暂无客户'], ['activities', '#/activities', '暂无活动'],
+      ['customers', '#/customers', '请在新版人物页继续'], ['activities', '#/activities', '暂无活动'],
       ['recycle', '#/customers/trash', '回收站为空'], ['funnels', '#/funnels', '漏斗为空']
     ]) await check('empty.' + key, '空数据状态：' + key, () => open(route, expected, 'mode=empty'));
     for (const [key, route, api, tab] of [
@@ -605,7 +610,7 @@ module.exports = async function smoke(root, test) {
       await b.wait(text('TEST_API_FAILURE'));
     });
     await check('quickcapture.preserve', '快速录入点击背景保留草稿', async () => {
-      await open('#/customers', '[CRM_TEST_ONLY]客户甲');
+      await open('#/customer/910001', '[CRM_TEST_ONLY]预约沟通');
       assert.equal(await b.evaluate("[...document.querySelectorAll('button')].some(x=>x.textContent==='快速记录 V2' && x.style.display!=='none')"), false);
       await b.evaluate("document.getElementById('qc-entry-btn').click()");
       await b.wait("Boolean(document.querySelector('.modal-overlay textarea'))");
@@ -613,7 +618,7 @@ module.exports = async function smoke(root, test) {
       assert.equal(await b.evaluate("document.querySelector('.modal-overlay textarea')?.value"), '[CRM_TEST_ONLY]未保存草稿');
     });
     await check('quickcapture.v2.confirm', 'V2 测试账号手选 Person、逐项编辑、服务端预览后写入', async () => {
-      await open('#/customers', '[CRM_TEST_ONLY]客户甲', 'v2=1');
+      await open('#/customer/910001', '[CRM_TEST_ONLY]预约沟通', 'v2=1');
       await b.wait("[...document.querySelectorAll('button')].some(x=>x.textContent==='快速记录 V2' && x.style.display!=='none')");
       await b.click('button', '快速记录 V2');
       await b.wait("Boolean(document.querySelector('.qcv2-modal>textarea'))");

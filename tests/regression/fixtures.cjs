@@ -156,11 +156,13 @@ function installFixtures() {
     'ocr_records:list': () => ({ rows: [] }),
     'policy_review_reports:update': () => ({ ok: true }),
     'person_360:lookupCustomer': () => ({ personId: 980001 }),
-    'person_360:listPeople': data => ({ rows: mode === 'empty' ? [] : [
-      { id: 980001, display_name: marker + '客户甲', legacy_customer_id: customer.Id,
-        customer_id: customer.Id, roles:['customer'], occupation: '顾问', organization: marker + '机构' },
-    ], page: Number(data.page) || 1, pageSize: Number(data.pageSize) || 50,
-      total:mode==='empty'?0:1,totalPages:1,hasMore:false }),
+    'person_360:listPeople': data => {
+      const person = { id: 980001, display_name: marker + '客户甲', legacy_customer_id: customer.Id,
+        customer_id: customer.Id, roles:['customer'], occupation: '顾问', organization: marker + '机构' };
+      const matched = mode !== 'empty' && (!data.keyword || person.display_name.includes(data.keyword)) ? [person] : [];
+      return { rows: matched, page: Number(data.page) || 1, pageSize: Number(data.pageSize) || 50,
+        total:matched.length,totalPages:1,hasMore:false };
+    },
     'person_360:listRecruitDirectory': data => ({ rows: mode === 'empty' ? [] : [
       { ...candidate, person_id: 980001, source: 'legacy', next_action: marker + '确认意向' },
     ], page: Number(data.page) || 1, pageSize: Number(data.pageSize) || 20,
@@ -383,7 +385,10 @@ function installFixtures() {
     },
     'ai_recommendations:list': () => rows([{ id:932001, recommendation_date:'2026-10-10',
       suggested_followup_goal:'【CRM_TEST_ONLY】再次沟通', suggested_message:'【CRM_TEST_ONLY】建议沟通内容' }]),
-    'opportunities:list': () => rows([{ id: 960001, customer_id: customer.Id, opportunity_type: '家庭保障', status: '沟通', notes: marker + '机会说明' }]),
+    'opportunities:list': () => rows([
+      { id: 960001, customer_id: customer.Id, opportunity_type: '家庭保障', status: '沟通', notes: marker + '机会说明' },
+      { id: 960002, customer_id: customer.Id, opportunity_type: '教育规划', status: '成交', notes: marker + '终态机会' },
+    ]),
     'activities:list': () => rows([activity]),
     'activities:directory': data => ({ rows: mode === 'empty' ? [] : [activity],
       page: data.page || 1, pageSize: data.pageSize || 30, hasMore: false, total: null }),
