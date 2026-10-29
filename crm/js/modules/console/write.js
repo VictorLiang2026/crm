@@ -938,15 +938,49 @@ export function openQuickCapture(ctx, { personId, onDone } = {}) {
     const extras = h('div', {}, [factsWrap, ...memoryNotes]);
     // Compatibility responses retain their separate signal editor; focused drafts never promote guesses to facts.
     if (!p.focused) extras.appendChild(sigsWrap);
-    const nextItems = [...(p.commitments || []), ...(p.suggestions || [])];
+    const parsedNextItems = [...(p.commitments || []), ...(p.suggestions || [])];
+    const nextItems = p.focused
+      ? (() => {
+        if (!parsedNextItems.length) return [];
+        const existingItems = new Map();
+        parsedNextItems.forEach(item => {
+          if (item.existing) existingItems.set(`${item.existing.kind}:${item.existing.id}`, item.existing);
+        });
+        const only = parsedNextItems.length === 1 ? parsedNextItems[0] : null;
+        const lines = parsedNextItems.map(item => {
+          const label = item.kind === 'commitment' ? t('capture_promise') : t('capture_suggestion');
+          const details = [item.date || t('capture_date_unknown'), item.method, item.reason,
+            item.evidence ? `${t('capture_evidence')}${item.evidence}` : null]
+            .filter(Boolean).join(' · ');
+          const existing = item.existing ? ` · ${t('capture_existing_task')} #${item.existing.id}` : '';
+          return `${label}：${item.title}${details ? `（${details}）` : ''}${existing}`;
+        });
+        return [{
+          kind: 'action',
+          title: only ? only.title : t('capture_action_plan_title'),
+          description: lines.join('\n'),
+          existing: existingItems.size === 1 ? [...existingItems.values()][0] : null,
+          multipleExisting: existingItems.size > 1,
+          tooLong: lines.join('\n').length > 4000,
+          date: only?.date || null,
+        }];
+      })()
+      : parsedNextItems;
     const nextReview = h('div', { class: 'sheet-field' }, [
       h('label', {}, t('capture_next_steps')),
       h('div', { class: 'sheet-note' }, t('capture_next_hint')),
-      ...(nextItems.length ? nextItems.map(item => h('div', { class: 'sheet-note', style: 'margin-top:8px' }, [
-        h('strong', {}, `${t(item.kind === 'commitment' ? 'capture_promise' : 'capture_suggestion')} · ${item.title}`),
-        h('div', {}, `${item.date || t('capture_date_unknown')} · ${item.method || item.evidence || ''}`),
-        item.reason ? h('div', {}, item.reason) : null,
+      ...(nextItems.length ? nextItems.map(item => h('div', {
+        class: 'sheet-note', style: 'margin-top:8px;white-space:pre-line',
+        ...(p.focused ? { 'data-capture-action-plan': 'true' } : {}),
+      }, [
+        h('strong', {}, `${p.focused ? t('capture_action_plan_title') : t(item.kind === 'commitment' ? 'capture_promise' : 'capture_suggestion')} · ${item.title}`),
+        p.focused
+          ? h('div', { style: 'margin-top:6px' }, item.description)
+          : h('div', {}, `${item.date || t('capture_date_unknown')} · ${item.method || item.evidence || ''}`),
+        !p.focused && item.reason ? h('div', {}, item.reason) : null,
         item.existing ? h('div', {}, `${t('capture_existing_task')} #${item.existing.id}`) : null,
+        item.multipleExisting ? h('div', { style: 'margin-top:6px' }, t('capture_multiple_existing')) : null,
+        item.tooLong ? h('div', { style: 'margin-top:6px' }, t('capture_plan_too_long')) : null,
       ])) : [h('div', { class: 'sheet-note' }, t('capture_no_next'))]),
     ]);
     function afterSave(savedPersonId, savedName) {
@@ -954,22 +988,27 @@ export function openQuickCapture(ctx, { personId, onDone } = {}) {
       if (onDone) onDone();
       if (recordOnly.checked || !nextItems.length) { sheet.overlay.remove(); return; }
       sheet.swap(h('div', {}, [
-        h('p', { class: 'sheet-note' }, t('capture_saved_next')),
+        h('p', { class: 'sheet-note' }, t(p.focused ? 'capture_saved_plan' : 'capture_saved_next')),
         ...nextItems.map(item => {
+          if (item.multipleExisting || item.tooLong) return h('p', { class: 'sheet-note' },
+            t(item.multipleExisting ? 'capture_multiple_existing' : 'capture_plan_too_long'));
           const button = h('button', { class: 'btn btn-soft', type: 'button', onclick: () => {
             openWorkItemEditor(ctx, {
               kind: item.existing?.kind || item.kind, row: item.existing || null,
               personId: String(savedPersonId), personName: savedName,
               initialTitle: item.title,
-              initialDescription: [item.reason, item.method, item.evidence].filter(Boolean).join('\n'),
+              initialDescription: item.description || [item.reason, item.method, item.evidence].filter(Boolean).join('\n'),
               // Date-only suggestions remain visible; the person chooses an actual reminder time.
               initialCommitmentType: item.commitmentType || '',
               onDone: () => { button.disabled = true; button.textContent = t('work_item_saved'); if (onDone) onDone(); },
             });
-          } }, t(item.existing ? 'capture_review_existing' : 'capture_prepare_task'));
+          }, ...(p.focused ? { 'data-capture-plan-action': 'true' } : {}) },
+          t(item.existing ? 'capture_review_existing' : 'capture_prepare_task'));
           return h('div', { class: 'sheet-field' }, [
             h('strong', {}, item.title),
-            h('p', { class: 'sheet-note' }, `${item.date || t('capture_date_unknown')} · ${item.method || item.evidence || ''}`),
+            h('p', { class: 'sheet-note', style: 'white-space:pre-line' }, p.focused
+              ? item.description
+              : `${item.date || t('capture_date_unknown')} · ${item.method || item.evidence || ''}`),
             button,
           ]);
         }),

@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 const { Browser } = require('../regression/browser.cjs');
 
-async function setup(b, recordOnly = false) {
+async function setup(b, recordOnly = false, multipleItems = false) {
   await b.start(); await b.open('#/more');
   await b.evaluate(`(async()=>{
     await new Promise((resolve,reject)=>{
@@ -20,7 +20,8 @@ async function setup(b, recordOnly = false) {
         memories:[{content:'只周末联系',evidence:'只周末联系'}],contextChecked:!!args.personId,
         suggestions:[{kind:'action',title:'发资料',date:null,method:'微信发送',reason:'应对方要求',
           existing:args.personId?{id:7,kind:'action',person_id:783,title:'原有发资料任务',status:'open'}:null}],
-        commitments:[]}};
+        commitments:${multipleItems ? JSON.stringify([{kind:'commitment',title:'确认保费预算',date:'2026-10-25',
+          evidence:'我答应下周确认保费预算',commitmentType:'I_PROMISED'}]) : '[]'}}};
       if(args.action==='resolveQuickCaptureName')return {displayName:'虚构甲',status:'confirm_existing',
         candidates:[{id:783,displayName:'虚构甲'}]};
       if(args.action==='listPersonWorkItems')return {personId:783,rows:[
@@ -59,6 +60,29 @@ test('record-only preview has zero memories and signals, raw note intact, no tas
     await b.healthy();
   } finally { await b.close(); }
 });
+test('focused capture consolidates suggestions and promises into one reviewed action plan', async () => {
+  const b = new Browser(path.resolve(__dirname, '../..'));
+  try {
+    await setup(b, false, true);
+    const plan = await b.evaluate(`({count:document.querySelectorAll('[data-capture-action-plan]').length,
+      text:document.querySelector('[data-capture-action-plan]')?.innerText||''})`);
+    assert.equal(plan.count, 1);
+    assert.match(plan.text, /发资料/);
+    assert.match(plan.text, /确认保费预算/);
+    await b.evaluate("[...document.querySelectorAll('.sheet-overlay .sheet-actions button')].at(-1).click()");
+    await b.wait("window.focus.calls.some(c=>c.args.action==='previewIdentity')");
+    await b.evaluate("[...document.querySelectorAll('.sheet-overlay .sheet-actions button')].at(-1).click()");
+    await b.wait("document.querySelector('[data-capture-plan-action]')");
+    assert.equal(await b.evaluate("document.querySelectorAll('[data-capture-plan-action]').length"), 1);
+    await b.evaluate("document.querySelector('[data-capture-plan-action]').click()");
+    await b.wait("document.querySelectorAll('.sheet-overlay').length===2");
+    const description = await b.evaluate("[...document.querySelectorAll('.sheet-overlay')].at(-1).querySelector('textarea')?.value||''");
+    assert.match(description, /发资料/);
+    assert.match(description, /确认保费预算/);
+    assert.equal(await b.evaluate("window.focus.calls.some(c=>c.args.action==='previewWorkItem')"), false);
+    await b.healthy();
+  } finally { await b.close(); }
+});
 test('history is read only after person selection; existing tasks open for separate edit preview', async () => {
   const b = new Browser(path.resolve(__dirname, '../..'));
   try {
@@ -68,7 +92,7 @@ test('history is read only after person selection; existing tasks open for separ
     await b.evaluate("[...document.querySelectorAll('.sheet-overlay .sheet-actions button')].at(-1).click()");
     await b.wait("window.focus.calls.some(c=>c.args.action==='previewIdentity')");
     await b.evaluate("[...document.querySelectorAll('.sheet-overlay .sheet-actions button')].at(-1).click()");
-    await b.wait("document.querySelector('.sheet-overlay')?.innerText.includes('以下事项尚未写入待办')");
+    await b.wait("document.querySelector('.sheet-overlay')?.innerText.includes('行动计划尚未写入待办')");
     assert.equal(await b.evaluate("window.focus.calls.some(c=>c.args.action==='previewWorkItem')"), false);
     await b.evaluate("document.querySelector('.sheet-overlay .btn-soft').click()");
     await b.wait("document.querySelectorAll('.sheet-overlay').length===2");
