@@ -4,7 +4,8 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 const { Browser } = require('../regression/browser.cjs');
 
-const routes = ['#/people', '#/opportunities', '#/activities', '#/recruit', '#/ai', '#/more', '#/people-trash'];
+const routes = ['#/people', '#/opportunities', '#/activities', '#/activity-speakers', '#/activity-topics',
+  '#/recruit', '#/ai', '#/more', '#/people-trash'];
 const viewports = [{ width: 820, height: 1180 }, { width: 1180, height: 820 }];
 
 test('PC34 Console modules render in both languages across iPad orientations', async () => {

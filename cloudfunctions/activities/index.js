@@ -46,6 +46,7 @@ exports.main = async (event, context) => {
     const action = (event && event.action) || '';
     switch (action) {
       case 'list':            return await list(event);
+      case 'directory':       return await directory(event);
       case 'get':             return await get(event);
       case 'create':          return await create(event);
       case 'update':          return await update(event);
@@ -79,6 +80,50 @@ async function list(event) {
     .order('created_at', { ascending: false })
     .limit(100));
   return { rows: r.data || [] };
+}
+
+// Console activity directory. Keep the legacy list contract and its ordering unchanged.
+async function directory(event) {
+  const page = Number(event.page ?? 1), pageSize = Number(event.pageSize ?? 30);
+  const keyword = String(event.keyword || '').trim().toLowerCase();
+  const activityDate = String(event.activityDate || '');
+  const sortField = event.sortField == null ? 'activity_date' : String(event.sortField);
+  const sortDir = event.sortDir == null ? 'desc' : String(event.sortDir);
+  if (!Number.isInteger(page) || page < 1 || page > 10000 ||
+      !Number.isInteger(pageSize) || pageSize < 1 || pageSize > 50 || keyword.length > 120 ||
+      (activityDate && !/^\d{4}-\d{2}-\d{2}$/.test(activityDate)) ||
+      !['id', 'name', 'activity_date', 'activity_type'].includes(sortField) ||
+      !['asc', 'desc'].includes(sortDir)) throw new Error('Invalid activity directory query');
+  const ascending = sortDir === 'asc';
+  const read = async (offset, count) => {
+    let q = rdb.from('activities').select().is('deleted_at', null);
+    if (activityDate) q = q.eq('activity_date', activityDate);
+    q = q.order(sortField, { ascending, nullsFirst: false });
+    if (sortField !== 'id') q = q.order('id', { ascending });
+    const result = assertOk(await q.range(offset, offset + count - 1));
+    return result.data || [];
+  };
+  const start = (page - 1) * pageSize;
+  let rows = [];
+  if (!keyword) {
+    rows = await read(start, pageSize + 1);
+  } else {
+    let matched = 0;
+    const startedAt = Date.now();
+    for (let offset = 0; offset < 10000; offset += 200) {
+      if (Date.now() - startedAt > 6000) throw new Error('ACTIVITY_SEARCH_LIMIT: narrow the search criteria');
+      const batch = await read(offset, 201);
+      for (const row of batch.slice(0, 200)) {
+        if (![row.name, row.location, row.activity_type, row.description]
+          .some(value => String(value || '').toLowerCase().includes(keyword))) continue;
+        if (matched++ >= start) rows.push(row);
+        if (rows.length > pageSize) break;
+      }
+      if (rows.length > pageSize || batch.length <= 200) break;
+      if (offset >= 9800) throw new Error('ACTIVITY_SEARCH_LIMIT: narrow the search criteria');
+    }
+  }
+  return { rows: rows.slice(0, pageSize), page, pageSize, hasMore: rows.length > pageSize, total: null };
 }
 
 async function get(event) {

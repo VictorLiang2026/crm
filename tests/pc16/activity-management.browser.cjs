@@ -17,7 +17,7 @@ test('PC16 activity create/edit/delete and task CRUD retain review, legacy repor
         priority:'high',due_date:'2026-10-18',note:'虚构备注',source:'manual',updated_at:'2026-10-16T01:05:00.000Z'};
       window.pc16={calls:[],activity,task,created:[],updated:[],removed:[],
         async call(name,args){this.calls.push({name,args});
-          if(name==='activities'&&args.action==='list')return {rows:[this.activity]};
+          if(name==='activities'&&args.action==='directory')return {rows:[this.activity],page:1,pageSize:30,hasMore:false,total:null};
           if(name==='activities'&&args.action==='create'){this.created.push(args.data);return {id:43};}
           if(name==='activities'&&args.action==='get')return {activity:this.activity,participants:[]};
           if(name==='activities'&&args.action==='updateConsole'){this.updated.push(args);return {ok:true};}
@@ -34,7 +34,7 @@ test('PC16 activity create/edit/delete and task CRUD retain review, legacy repor
       const ctx={main:host,api:{call:(name,args)=>window.pc16.call(name,args)},toast:(message,type)=>{window.pc16.lastToast={message,type}}};
       window.pc16ctx=ctx;window.pc16render={renderActivities,renderActivity};renderActivities(ctx);
     })()`);
-    await browser.wait("document.querySelector('#pc16-host .data-row')");
+    await browser.wait("document.querySelector('#pc16-host .activity-directory-table tbody tr')");
     const newButton=await browser.evaluate(`(()=>[...document.querySelectorAll('#pc16-host button')].find(b=>b.innerText.includes('新建活动'))?.innerText)()`);
     assert.ok(newButton,'new activity button is live');
     await browser.evaluate(`(()=>[...document.querySelectorAll('#pc16-host button')].find(b=>b.innerText.includes('新建活动')).click())()`);
