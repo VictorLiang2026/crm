@@ -7,7 +7,7 @@ const codeOf=error=>String(error?.message||'').match(/CONTENT_[A-Z_]+/)?.[0];
 export async function openKnowledgeContent(ctx,row,onSaved=()=>{}) {
   const body=h('div',{class:'kc-panel'}),sheet=openSheet({title:tr('title'),sub:tr('intro'),body});
   (document.getElementById('sheet-root')||document.body).appendChild(sheet.overlay);
-  let record,history=[],job=null,busy=false;
+  let record,history=[],pending=null,job=null,busy=false;
   const call=(op,value)=>data.knowledgeLibrary(ctx,'content',{contentOperation:op,data:value});
   const identity=()=>({table:row.table,id:row.id,expectedUpdatedAt:record.updatedAt});
   const errorBox=h('p',{class:'sheet-err',role:'alert'});
@@ -28,14 +28,33 @@ export async function openKnowledgeContent(ctx,row,onSaved=()=>{}) {
       ]),
       h('p',{},`${tr('selected')}: ${tr(preview.after.selected)}${preview.after.paused?` · ${tr('paused')}`:''}`),
       h('div',{class:'kg-form-actions'},[
-        button('confirm',async()=>{await call('apply',{commandId:preview.commandId});await load();await onSaved();ctx.toast(tr('saved'),'ok');},'btn btn-primary'),
+        button('confirm',async()=>{const result=await call('apply',{commandId:preview.commandId});await load();await onSaved();ctx.toast(result.status==='pending_review'?tr('pending_title'):tr('saved'),'ok');},'btn btn-primary'),
         button('cancel',async()=>draw()),
       ]),
     ]);
     body.replaceChildren(panel,errorBox);
   };
   const preview=async input=>showPreview(await call('preview',{...identity(),...input}));
-  const load=async()=>{const result=await call('get',{table:row.table,id:row.id});record=result.record;history=result.history||[];job=result.job||job;draw();};
+  const load=async()=>{const result=await call('get',{table:row.table,id:row.id});record=result.record;history=result.history||[];pending=result.pending||null;job=result.job||job;draw();};
+  const historyView=()=>h('details',{},[h('summary',{},tr('history')),h('p',{},tr('history_note')),
+    ...history.map(item=>h('div',{class:'kg-form-actions'},[
+      h('span',{},String(item.applied_at||'').replace('T',' ').slice(0,19)),
+      button('restore',async()=>preview({action:'restore',historyId:item.id})),
+    ]))]);
+  const drawPending=()=>{
+    const candidate=pending.after;
+    body.replaceChildren(h('p',{},`${record.title||''} · ${tr('selected')}: ${tr(record.selected)} · v${record.version}`),
+      h('section',{class:'kc-pending'},[
+        h('h3',{},tr('pending_title')),h('p',{},tr('pending_note')),
+        h('p',{},`${tr('created_at')}: ${String(pending.createdAt||'').replace('T',' ').slice(0,19)}`),
+        h('div',{class:'kc-compare'},[pairView('original',candidate.original),pairView('gpt',candidate.gpt)]),
+        h('div',{class:'kg-form-actions'},[
+          button('approve',async()=>{await call('approve',{commandId:pending.commandId});await load();await onSaved();ctx.toast(tr('saved'),'ok');},'btn btn-primary'),
+          button('reject',async()=>{await call('reject',{commandId:pending.commandId});await load();await onSaved();ctx.toast(tr('rejected'),'ok');}),
+          button('continue_edit',async()=>{const next=pending.after;await call('reject',{commandId:pending.commandId});pending=null;await onSaved();draw({original:next.original,gpt:next.gpt});}),
+        ]),
+      ]),historyView(),errorBox);
+  };
   const drawJob=()=>{
     const node=h('section',{class:'kc-job'});
     if(!job)return node;
@@ -52,6 +71,7 @@ export async function openKnowledgeContent(ctx,row,onSaved=()=>{}) {
     return node;
   };
   const draw=(candidate={})=>{
+    if(pending){drawPending();return;}
     const pairEditors=['original','gpt'].map(target=>{
       const pair=candidate[target]||record[target];
       const txt=h('textarea',{rows:7,maxlength:'120000','aria-label':`${tr(target)} ${tr('text')}`},pair.text||'');
@@ -78,12 +98,7 @@ export async function openKnowledgeContent(ctx,row,onSaved=()=>{}) {
     });
     body.replaceChildren(h('p',{},`${record.title||''} · ${tr('selected')}: ${tr(record.selected)} · v${record.version}`),
       record.paused?h('p',{class:'kc-candidate-note'},tr('paused')):h('span'),
-      ...pairEditors,drawJob(),
-      h('details',{},[h('summary',{},tr('history')),h('p',{},tr('history_note')),
-        ...history.map(item=>h('div',{class:'kg-form-actions'},[
-          h('span',{},String(item.applied_at||'').replace('T',' ').slice(0,19)),
-          button('restore',async()=>preview({action:'restore',historyId:item.id})),
-        ]))]),errorBox);
+      ...pairEditors,drawJob(),historyView(),errorBox);
   };
   try{await load();}catch(error){body.replaceChildren(errorBox);errorBox.textContent=errorText(error);}
   return sheet;

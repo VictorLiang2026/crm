@@ -49,8 +49,11 @@ export function renderKnowledgeGovernance(ctx) {
   ];
   const setStatus=async row=>{
     const next=!active(row);
-    const result=await data.knowledgeLibrary(ctx,'setValidity',{data:{table:row.table,id:row.id,
-      valid:next,expectedUpdatedAt:row.updated_at}});
+    const sourceReview=next&&row.table==='knowledge_items'&&row.source_id&&row.sourceLifecycleStatus==='draft'&&row.sourceExtractionStatus==='draft';
+    const result=sourceReview
+      ?await data.knowledgeLibrary(ctx,'review',{data:{sourceId:String(row.source_id),itemId:String(row.id),decision:'verify',expectedUpdatedAt:row.sourceUpdatedAt}})
+      :await data.knowledgeLibrary(ctx,'setValidity',{data:{table:row.table,id:row.id,
+        valid:next,expectedUpdatedAt:row.updated_at}});
     if(!result?.ok)throw new Error(text('state_failed'));
     await load();
   };
@@ -157,7 +160,7 @@ export function renderKnowledgeGovernance(ctx) {
       h('thead',{},h('tr',{},[header('id',text('number')),header('title',text('title_column')),header('category',text('category')),
         header('summary',t('kc_original')),h('th',{},text('gpt_content')),header('status',text('status')),header('updated_at',text('updated_at')),h('th',{},text('actions'))])),
       h('tbody',{},pageRows.length?pageRows.map(row=>{
-        const live=active(row),isSource=row.table==='knowledge_sources',isPlaybook=row.table==='playbooks';
+        const live=active(row),isSource=row.table==='knowledge_sources',isPlaybook=row.table==='playbooks',pending=!live&&row.lifecycle_status==='draft';
         const superseded=row.lifecycle_status==='superseded';
         const editHref=isSource?'':`#/knowledge/edit/${row.table}/${row.id}`;
         const actions=[
@@ -165,16 +168,17 @@ export function renderKnowledgeGovernance(ctx) {
           !isSource&&!superseded?h('a',{class:'btn btn-ghost btn-sm kg-action-edit',href:editHref},text('edit')):null,
           isSource&&row.extractionStatus==='failed'?h('button',{class:'btn btn-ghost btn-sm kg-action-retry',type:'button',
             onclick:()=>retry(row).catch(error=>ctx.toast(error.message,'error'))},text('retry')):null,
-          !isSource&&!superseded?h('button',{class:`btn btn-ghost btn-sm kg-action-status ${live?'kg-action-invalidate':'kg-action-activate'}`,type:'button',onclick:()=>setStatus(row).catch(error=>ctx.toast(error.message,'error'))},text(live?'mark_invalid':'mark_valid')):null,
+          !isSource&&!superseded?h('button',{class:`btn btn-ghost btn-sm kg-action-status ${live?'kg-action-invalidate':'kg-action-activate'}`,type:'button',onclick:()=>setStatus(row).catch(error=>ctx.toast(error.message,'error'))},text(live?'mark_invalid':pending?'review_activate':'mark_valid')):null,
           h('button',{class:'btn btn-ghost btn-sm kg-action-delete',type:'button',onclick:()=>remove(row).catch(error=>ctx.toast(error.message,'error'))},text('delete')),
         ].filter(Boolean);
         return h('tr',{'data-kg-id':String(row.id)},[
           h('td',{class:'kg-number-cell'},`${row.table==='knowledge_items'?'K':isPlaybook?'P':'S'}-${row.id}`),
-          h('td',{},[h('b',{},titleOf(row)||'—'),isPlaybook?h('small',{class:'kg-table-meta'},text('playbook')):null,
+          h('td',{},[h('b',{},titleOf(row)||'—'),row.contentReviewPending?h('small',{class:'kg-table-meta kg-review-pending'},text('content_pending_review')):null,
+            isPlaybook?h('small',{class:'kg-table-meta'},text('playbook')):null,
             !isSource?h('small',{class:'kg-table-meta'},`${t('kc_selected')}: ${t(row.selected_content_source==='gpt'?'kc_gpt':'kc_original')}${row.contentPaused?' · '+t('kc_paused'):''}`):null]),
           h('td',{class:'kg-category-tags'},categoriesOf(row).map(category=>h('span',{class:'kg-category-chip'},text(`category_${category}`)))),
           ...contentCells(row),
-          h('td',{},h('span',{class:`kg-status ${live?'kg-verified':'kg-invalidated'}`},text(row.ocrProgress?'status_processing':live?'status_active':'status_invalid'))),
+          h('td',{},h('span',{class:`kg-status ${live?'kg-verified':'kg-invalidated'}`},text(row.ocrProgress?'status_processing':live?'status_active':pending?'status_pending_review':'status_invalid'))),
           h('td',{},row.updated_at?String(row.updated_at).slice(0,10):'—'),
           h('td',{class:'kg-table-actions'},actions),
         ]);

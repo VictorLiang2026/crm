@@ -1096,6 +1096,9 @@ body:has(.login), body.is-login { padding-top: env(safe-area-inset-top); }
 /* Paired knowledge content: iPad panel, existing sheet and controls. */
 .kc-panel { padding: 0 20px 24px; }
 .kc-editor { padding: 12px 0; border-bottom: 1px solid #dfe3e8; }
+.kc-pending { padding: 14px; margin: 12px 0; border: 1px solid #e5bf5e; border-radius: 10px; background: #fff9e8; }
+.kc-pending h3 { margin-top: 0; }
+.kg-review-pending { color: #8a5a00; font-weight: 600; }
 .kc-editor label { display: block; margin: 10px 0; }
 .kc-editor textarea { display: block; width: 100%; box-sizing: border-box; margin-top: 6px; padding: 10px; border: 1px solid var(--line,#dfe3e8); border-radius: 8px; font: inherit; }
 .kc-review input { margin-right: 8px; }

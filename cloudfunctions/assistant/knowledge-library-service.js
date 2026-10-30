@@ -25,7 +25,7 @@ const LEGACY_CATEGORY = Object.freeze({product:'on_sale_product',service:'existi
   industry:'industry_development',campaign:'marketing_activity',health_wealth_seminar:'health_wealth_sharing',
   top_performer_sharing:'top_performer_sharing',legal_tax:'legal_tax',case:'customer_case',playbook:'conversation_strategy',
   company:'company_information'});
-const REST_TABLES = new Set(['knowledge_sources','knowledge_items','playbooks','ai_tasks','ai_results']);
+const REST_TABLES = new Set(['knowledge_sources','knowledge_items','playbooks','knowledge_content_commands','ai_tasks','ai_results']);
 const EXTENSIONS = Object.freeze({
   '.pdf': 'application/pdf', '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
@@ -297,14 +297,23 @@ function createKnowledgeLibrary(options={}) {
     const rows=await request('knowledge_sources','GET',{select:'id,domain,title,publisher,source_uri,published_at,review_at,file_name,file_size_bytes,sha256,extraction_status,lifecycle_status,version_no,created_at,updated_at,deleted_at,metadata',deleted_at:'is.null',order:'updated_at.desc,id.desc',limit:200});
     return rows.filter(row=>row.metadata?.upload?.phase!=='receiving');
   }
-  async function list() {
-    const [sources,items,playbooks]=await Promise.all([
+  async function list(actorValue) {
+    const actor=actorUid(actorValue);
+    const [sources,items,playbooks,pendingCommands]=await Promise.all([
       sourceRows(),request('knowledge_items','GET',{select:'id,source_id,item_type,source,source_date,valid_from,valid_to,verified,lifecycle_status,version_no,supersedes_id,confidence,content,metadata,updated_at,deleted_at,'+CONTENT_COLUMNS,deleted_at:'is.null',order:'updated_at.desc,id.desc',limit:200}),
       request('playbooks','GET',{select:'id,scenario,objection,possible_underlying_reasons,clarifying_questions,response_logic,evidence_refs,case_refs,story_refs,do_not_say,next_objective,source,confidence,valid_from,valid_to,version_no,supersedes_id,metadata,lifecycle_status,updated_at,deleted_at,'+CONTENT_COLUMNS,deleted_at:'is.null',order:'updated_at.desc,id.desc',limit:100}),
+      request('knowledge_content_commands','GET',{select:'record_table,record_id,created_at',actor_uid:`eq.${actor}`,status:'eq.pending_review',limit:300}),
     ]);
+    const pendingKeys=new Map(pendingCommands.map(command=>[`${command.record_table}:${command.record_id}`,command.created_at]));
     return {ok:true,sources:sources.map(metadataForSource),
-      knowledge:items.map(row=>managementRow(row,'knowledge_items',sources.find(s=>String(s.id)===String(row.source_id)))),
-      playbooks:playbooks.map(row=>managementRow(row,'playbooks'))};
+      knowledge:items.map(row=>{
+        const source=sources.find(s=>String(s.id)===String(row.source_id));
+        return {...managementRow(row,'knowledge_items',source),sourceUpdatedAt:source?.updated_at||null,
+          sourceLifecycleStatus:source?.lifecycle_status||null,sourceExtractionStatus:source?.extraction_status||null,
+          contentReviewPending:pendingKeys.has(`knowledge_items:${row.id}`),contentReviewPendingAt:pendingKeys.get(`knowledge_items:${row.id}`)||null};
+      }),
+      playbooks:playbooks.map(row=>({...managementRow(row,'playbooks'),contentReviewPending:pendingKeys.has(`playbooks:${row.id}`),
+        contentReviewPendingAt:pendingKeys.get(`playbooks:${row.id}`)||null}))};
   }
   async function trashList() {
     const [sources,items,playbooks]=await Promise.all([
@@ -386,14 +395,14 @@ function createKnowledgeLibrary(options={}) {
       rows=await request('knowledge_items','POST',{},[{...payload,created_by:actor}]);
     }
     if(!rows?.[0]?.id)fail('PERSISTENCE_ERROR');
-    if(current&&!parent&&currentStatus==='invalidated') {
+    if(current&&!parent&&currentStatus==='invalidated'&&!generated) {
       const database=searchDataFactory({env,key,fetchImpl});
       const activated=await database.auditRdb.rpc('crm_knowledge_set_valid_v1',{p_table:'knowledge_items',p_id:Number(rows[0].id),
         p_valid:true,p_actor_uid:actor,p_expected_updated_at:rows[0].updated_at});
       if(activated?.error||!activated?.data?.ok)fail(activated?.data?.code||'VERIFY_FAILED');
-    } else await verifyItem(rows[0].id,actor,rows[0].updated_at);
+    } else if(!generated) await verifyItem(rows[0].id,actor,rows[0].updated_at);
     const saved=(await request('knowledge_items','GET',{select:'*',id:`eq.${rows[0].id}`,deleted_at:'is.null',limit:1}))[0]||rows[0];
-    return {ok:true,row:saved,summaryGenerated:!!generated,revision:!!parent};
+    return {ok:true,row:saved,summaryGenerated:!!generated,reviewRequired:!!generated,revision:!!parent};
   }
   function fields(input) {
     if (!object(input)) fail('INVALID_INPUT');
@@ -436,13 +445,9 @@ function createKnowledgeLibrary(options={}) {
       confidence:null,content,metadata:meta,lifecycle_status:'draft',created_by:actor,updated_by:actor,
       supersedes_id:null,version_no:source.version_no,source_id:source.id}]);
     if(!Array.isArray(itemRows)||!itemRows[0]?.id) fail('PERSISTENCE_ERROR');
-    const sourceUpdated=(await request('knowledge_sources','PATCH',{id:`eq.${source.id}`},
-      {extraction_status:'draft',extracted_at:new Date().toISOString(),updated_at:new Date().toISOString(),updated_by:actor}))[0];
-    const databaseForVerify=searchDataFactory({env,key,fetchImpl});
-    const verified=await databaseForVerify.auditRdb.rpc('crm_knowledge_source_review_v1',{p_actor_uid:actor,
-      p_source_id:Number(source.id),p_item_id:Number(itemRows[0].id),p_action:'verify',p_expected_updated_at:sourceUpdated?.updated_at});
-    if(verified?.error||!verified?.data?.ok)fail(verified?.data?.code||'VERIFY_FAILED');
-    return {itemId:String(itemRows[0].id),sourceId:String(source.id),draft:false,summary:out.summary,
+    await request('knowledge_sources','PATCH',{id:`eq.${source.id}`},
+      {extraction_status:'draft',extracted_at:new Date().toISOString(),updated_at:new Date().toISOString(),updated_by:actor});
+    return {itemId:String(itemRows[0].id),sourceId:String(source.id),draft:true,reviewRequired:true,summary:out.summary,
       keyPoints:out.keyPoints,taskId:String(task.taskId),resultId:String(task.resultId)};
   }
   async function enqueuePdfOcr(source,actor) {
@@ -601,7 +606,7 @@ function createKnowledgeLibrary(options={}) {
         if(pdf?.queued)return pdf;
         const extractedText=pdf?.text||await extractText(source.file_name,source.content_type,bytes,{app:client,sourceId,uploadId,actorUid:actor});
         if((source.metadata?.categories||[]).includes('top_performer_sharing')&&likelySensitive(extractedText))fail('PERSONAL_DATA_DETECTED');
-        return {ok:true,...await extractToDraft(prepared,null,actor,extractedText),extractionStatus:'verified'};
+        return {ok:true,...await extractToDraft(prepared,null,actor,extractedText),extractionStatus:'draft'};
       } catch(error) {
         if(error.code==='PERSONAL_DATA_DETECTED') {
           await storageRequest(source.storage_key,'DELETE').catch(()=>{});
@@ -636,7 +641,7 @@ function createKnowledgeLibrary(options={}) {
       const extractedText=pdf?.text||await extractText(source.file_name,source.content_type,bytes,{app:client,sourceId,uploadId:state.upload_id,actorUid:actor});
       if((source.metadata?.categories||[]).includes('top_performer_sharing')&&likelySensitive(extractedText))fail('PERSONAL_DATA_DETECTED');
       const draft=await extractToDraft(prepared,source.original_base64,actor,extractedText);
-      return {ok:true,...draft,extractionStatus:'verified'};
+      return {ok:true,...draft,extractionStatus:'draft'};
     }catch(error){
       if(error.code==='PERSONAL_DATA_DETECTED'){
         await request('knowledge_sources','DELETE',{id:`eq.${sourceId}`,created_by:`eq.${actor}`,deleted_at:'is.null'}).catch(()=>{});
@@ -678,7 +683,7 @@ function createKnowledgeLibrary(options={}) {
     if(!Array.isArray(rows)||!rows[0]?.id)fail('PERSISTENCE_ERROR');
     try {
       const draft=await extractToDraft(rows[0],payload.original_base64,actor,extractedText);
-      return {ok:true,...draft,extractionStatus:'verified'};
+      return {ok:true,...draft,extractionStatus:'draft'};
     } catch(error) {
       await request('knowledge_sources','PATCH',{id:`eq.${rows[0].id}`},{extraction_status:'failed',updated_at:new Date().toISOString(),updated_by:actor}).catch(()=>{});
       return {ok:false,sourceId:String(rows[0].id),extractionStatus:'failed',errorCode:error.code||'EXTRACTION_FAILED'};
@@ -707,7 +712,7 @@ function createKnowledgeLibrary(options={}) {
       const bytes=await sourceBytes(source,actor),pdf=await pdfTextLayerOrQueue(source,bytes,actor);
       if(pdf?.queued)return pdf;
       const text=pdf?.text||await extractText(source.file_name,source.content_type,bytes,{app:client});
-      return {ok:true,...await extractToDraft({...source,extraction_status:'extracting'},source.original_base64,actor,text),extractionStatus:'verified'};}
+      return {ok:true,...await extractToDraft({...source,extraction_status:'extracting'},source.original_base64,actor,text),extractionStatus:'draft'};}
     catch(error){await request('knowledge_sources','PATCH',{id:`eq.${sourceId}`,created_by:`eq.${actor}`,deleted_at:'is.null'},
       {extraction_status:'failed',updated_at:new Date().toISOString(),updated_by:actor}).catch(()=>{});throw error;}
   }
@@ -945,7 +950,7 @@ function createKnowledgeLibrary(options={}) {
   async function run(event,actor,options={}) {
     if(event?.operation==='content')return contentService.run(event.contentOperation,actor,event.data);
     switch(event?.operation){
-      case 'list':return list();
+      case 'list':return list(actor);
       case 'trashList':return trashList();
       case 'save':return saveKnowledge(event.data,actor);
       case 'upload':return upload(event.data,actor);

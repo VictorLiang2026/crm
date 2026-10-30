@@ -9,14 +9,16 @@ test('iPad bilingual manual GPT editor requires server preview and explicit conf
   await b.evaluate(`(async()=>{
    const {openKnowledgeContent}=await import('/crm/js/modules/console/knowledge-content.js');
    window.kcI18n=await import('/crm/js/modules/console/i18n.js');
-   window.kcCalls=[];window.kcRecord={id:1,table:'knowledge_items',title:'Synthetic fixture',updatedAt:'2026-10-30T00:00:00Z',
+   window.kcCalls=[];window.kcPending=null;window.kcRecord={id:1,table:'knowledge_items',title:'Synthetic fixture',updatedAt:'2026-10-30T00:00:00Z',
     original:{text:'System text',summary:'System summary',reviewed:true},gpt:{text:null,summary:null,reviewed:false},selected:'original',version:0};
    const ctx={toast:()=>{},api:{call:async(name,event)=>{
     window.kcCalls.push(event);const d=event.data;
-    if(event.contentOperation==='get')return {ok:true,record:window.kcRecord,history:[]};
+    if(event.contentOperation==='get')return {ok:true,record:window.kcRecord,history:[],pending:window.kcPending};
     if(event.contentOperation==='preview'){const after=structuredClone(window.kcRecord);Object.assign(after[d.target],d.patch,{reviewed:d.reviewed});
      window.kcAfter=after;return {ok:true,commandId:'server-preview',before:window.kcRecord,after};}
-    if(event.contentOperation==='apply'){window.kcRecord=window.kcAfter;return {ok:true};}
+    if(event.contentOperation==='apply'){window.kcPending={commandId:'pending-command',after:window.kcAfter,createdAt:'2026-10-30T00:00:00Z'};return {status:'pending_review'};}
+    if(event.contentOperation==='approve'){window.kcRecord=window.kcPending.after;window.kcPending=null;return {ok:true};}
+    if(event.contentOperation==='reject'){window.kcPending=null;return {ok:true};}
     throw Error('unexpected call');}}};
    window.kcOpen=()=>openKnowledgeContent(ctx,{id:1,table:'knowledge_items'});await window.kcOpen();
   })()`);
@@ -28,8 +30,12 @@ test('iPad bilingual manual GPT editor requires server preview and explicit conf
   assert.equal(await b.evaluate("window.kcCalls.some(e=>e.contentOperation==='apply')"),false);
   assert.equal(await b.evaluate("document.querySelector('.kc-preview img')===null && !window.kcXss"),true);
   await b.click('.kc-preview button','确认执行');
-  await b.wait("document.querySelectorAll('.kc-editor').length===2");
+  await b.wait("document.querySelector('.kc-pending')");
   assert.deepEqual(await b.evaluate("window.kcCalls.filter(e=>e.contentOperation==='apply').map(e=>e.data)"),[{commandId:'server-preview'}]);
+  assert.equal(await b.evaluate("window.kcRecord.gpt.text===null && window.kcPending.after.gpt.text.includes('<img')"),true);
+  await b.click('.kc-pending button','审核通过并生效');
+  await b.wait("document.querySelectorAll('.kc-editor').length===2");
+  assert.equal(await b.evaluate("window.kcCalls.some(e=>e.contentOperation==='approve')"),true);
   await b.click('[data-content-target="gpt"] button','清空原文');
   await b.wait("document.querySelector('.kc-preview')");
   assert.equal(await b.evaluate("window.kcCalls.at(-1).data.patch.text"),null);

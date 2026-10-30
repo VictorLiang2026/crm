@@ -47,7 +47,7 @@ test('new knowledge uses the AI Gateway summary and stores it separately in meta
   assert.equal(writes[0].method,'POST');assert.equal(writes[0].body[0].metadata.summary,'AI generated summary');
   assert.equal(writes[0].body[0].metadata.summary_source,'ai');
   assert.equal(writes[0].body[0].lifecycle_status,'draft');
-  assert.equal(rpcCalls[0].name,'crm_knowledge_review_v1');
+  assert.equal(result.reviewRequired,true);assert.equal(rpcCalls.length,0);
 });
 
 test('manual summary is preserved without invoking AI',async()=>{
@@ -119,7 +119,7 @@ test('superseded history cannot be edited, while invalidated knowledge can be up
 });
 
 test('staged upload accepts a 6 MiB PNG in bounded chunks and hands its source reference to the existing OCR function',async()=>{
-  const rows={knowledge_sources:[],knowledge_items:[]};let nextId=1,ocrRequest=null;
+  const rows={knowledge_sources:[],knowledge_items:[]};let nextId=1,ocrRequest=null;const reviewCalls=[];
   const fetchImpl=async(url,options={})=>{
     const table=new URL(url).pathname.split('/').pop(),method=options.method||'GET',params=new URL(url).searchParams;
     if(method==='GET'){
@@ -155,7 +155,7 @@ test('staged upload accepts a 6 MiB PNG in bounded chunks and hands its source r
   const service=createKnowledgeLibrary({env:'crm-test123',key:'test-key',fetchImpl,
     client:{callFunction:async input=>{ocrRequest=input;return {result:{ocrText:'识别到的图片文字。'}};}},
     gatewayFactory:()=>({runAITask:async()=>({result:{summary:'摘要',keyPoints:['知识点'],applicationNotes:['应用'],boundaries:['边界']},taskId:1,resultId:2})}),
-    searchDataFactory:()=>({auditRdb:{rpc:async()=>({data:{ok:true}})}})});
+    searchDataFactory:()=>({auditRdb:{rpc:async(name,args)=>{reviewCalls.push({name,args});return {data:{ok:true}};}}})});
   const bytes=Buffer.alloc(6*1024*1024);Buffer.from([137,80,78,71,13,10,26,10]).copy(bytes);
   const started=await service.uploadStart({categories:['on_sale_product'],title:'演示图片',fileName:'source.png',fileSizeBytes:bytes.length},'operator-1');
   assert.equal(started.chunkCount,8);
@@ -165,12 +165,13 @@ test('staged upload accepts a 6 MiB PNG in bounded chunks and hands its source r
     assert.equal(result.ok,true);
   }
   const finished=await service.uploadFinalize({sourceId:started.sourceId,uploadId:started.uploadId},'operator-1');
-  assert.equal(finished.ok,true);assert.equal(finished.extractionStatus,'verified');
+  assert.equal(finished.ok,true);assert.equal(finished.extractionStatus,'draft');assert.equal(finished.reviewRequired,true);
   assert.equal(ocrRequest.name,'ai_parse');assert.equal(ocrRequest.data.action,'ocr_knowledge_source');
   assert.equal(ocrRequest.data.sourceId,started.sourceId);assert.equal(ocrRequest.data.uploadId,started.uploadId);
   assert.equal(rows.knowledge_sources[0].file_size_bytes,6*1024*1024);
   assert.equal(rows.knowledge_sources[0].extraction_status,'draft');
   assert.equal(rows.knowledge_items[0].metadata.summary,'摘要');
+  assert.equal(reviewCalls.some(call=>call.name==='crm_knowledge_source_review_v1'),false);
 });
 
 test('staged upload rejects files larger than 6 MiB before creating a source record',async()=>{
@@ -220,7 +221,7 @@ test('private storage upload accepts an attached industry source without a publi
   assert.match(initialized.storageKey,/^operator-1\/[0-9a-f-]{36}\/notes\.md$/);
   const source=rows.knowledge_sources[0];assert.equal(source.source_uri,null);assert.equal(source.original_base64,null);
   const finalized=await service.uploadFinalize({sourceId:initialized.sourceId,uploadId:initialized.uploadId},'operator-1');
-  assert.equal(finalized.ok,true);assert.equal(finalized.extractionStatus,'verified');
+  assert.equal(finalized.ok,true);assert.equal(finalized.extractionStatus,'draft');assert.equal(finalized.reviewRequired,true);
   assert.match(storageUrl,/\/knowledge\/operator-1\//);
   assert.equal(rows.knowledge_items[0].metadata.summary,'行业摘要');
 });

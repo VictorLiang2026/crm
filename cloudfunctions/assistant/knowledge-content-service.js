@@ -1,7 +1,7 @@
 'use strict';
 const { isDeepStrictEqual } = require('node:util');
 const fail = code => { const error = new Error(code); error.code = code; throw error; };
-const OPS = new Set(['get','preview','apply','command','regenerate','retry']);
+const OPS = new Set(['get','preview','apply','approve','reject','command','regenerate','retry']);
 function createKnowledgeContentService({ rpc, request, sourceBytes, extractText, extractPdfText, generateSummary, callFunction, renderPdfPages }) {
   async function invoke(operation, actor, data) {
     if (typeof actor !== 'string' || !actor.trim()) fail('UNAUTHORIZED');
