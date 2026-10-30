@@ -37,7 +37,8 @@ function createKnowledgeContentService({ rpc, request, sourceBytes, extractText,
           if(rendered.nextPage<=rendered.pageCount){await save('queued');return {ok:true,processed:true};}
         } else {
           try { payload.text=source.content_type==='application/pdf' ? await extractPdfText(bytes) :
-            await extractText(source.file_name,source.content_type,bytes,{app:{callFunction}}); } catch(error) {
+            await extractText(source.file_name,source.content_type,bytes,{app:{callFunction},
+              ...(source.metadata?.upload?.upload_id ? {sourceId:source.id,uploadId:source.metadata.upload.upload_id} : {})}); } catch(error) {
             if(error.code!=='PDF_NO_TEXT')throw error;
             payload.pdfOcr=true;await save('queued');return {ok:true,processed:true};
           }

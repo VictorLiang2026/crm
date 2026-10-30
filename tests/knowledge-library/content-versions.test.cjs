@@ -3,6 +3,7 @@ const test=require('node:test'),assert=require('node:assert/strict'),{createHash
 const {effectiveContent,projectContent,managementRow}=require('../../cloudfunctions/_shared/knowledge-content');
 const {createKnowledgeContentService}=require('../../cloudfunctions/assistant/knowledge-content-service');
 const {KnowledgeGovernanceService}=require('../../cloudfunctions/person_360/knowledge-governance-service');
+const {extractText}=require('../../cloudfunctions/assistant/knowledge-library-service');
 const base={id:1,content:'System text',metadata:{summary:'System summary',secretUnselected:'not for prompt'},lifecycle_status:'verified'};
 function managed(selected='gpt') {return {...base,gpt_original_text:'GPT text',gpt_summary:'GPT summary',selected_content_source:selected,
  content_state:{version:2,baseSignature:createHash('md5').update('System text\x1fSystem summary').digest('hex'),
@@ -84,4 +85,14 @@ test('PDF OCR regeneration resumes three-page batches and waits for a separate s
  await service.worker();assert.equal(job.payload.stage,'extract');assert.equal(job.payload.nextPage,4);
  await service.worker();assert.equal(job.payload.stage,'summary');assert.equal(generated,0);assert.deepEqual(starts,[1,4]);
  await service.worker();assert.equal(generated,1);
+});
+test('large image regeneration reuses private source capability instead of sending image bytes through callFunction',async()=>{
+ const record={updatedAt:'stamp',source:{id:3}},job={id:'job',actor_uid:'actor',record_table:'knowledge_items',record_id:1,before_state:record,
+  payload:{stage:'extract',part:'both',nextPage:1}};
+ const image=Buffer.alloc(7*1024*1024);Buffer.from([137,80,78,71,13,10,26,10]).copy(image);let ocrRequest;
+ const service=createKnowledgeContentService({rpc:async(name,args)=>({data:args.p_operation==='claim'?{ok:true,job}:args.p_operation==='get'?{ok:true,record}:
+  (job.payload=args.p_data.payload,{ok:true})}),request:async()=>[{id:3,file_name:'large.png',content_type:'image/png',lifecycle_status:'verified',metadata:{upload:{upload_id:'private-capability'}}}],
+  sourceBytes:async()=>image,extractText,callFunction:async request=>{ocrRequest=request;return {result:{ocrText:'Recognized content'}};}});
+ await service.worker();assert.deepEqual(ocrRequest,{name:'ai_parse',data:{action:'ocr_knowledge_source',sourceId:'3',uploadId:'private-capability'}});
+ assert.equal(job.payload.text,'Recognized content');assert.equal(job.payload.stage,'summary');
 });
