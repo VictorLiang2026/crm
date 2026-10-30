@@ -1,6 +1,7 @@
 /** Person summary: read public facts via RDB REST, call person_summary skill via AI Gateway. */
 'use strict';
 
+const { InteractionService, interactionSource } = require('./interaction-service');
 const { app } = require('./db');
 const { createAIGateway } = require('./ai-gateway');
 const { createSearchData } = require('./search-data');
@@ -49,10 +50,10 @@ async function runSummarize(event, options = {}) {
     throw e;
   }
 
-  const interactions = await restGet('interactions', {
-    select: 'id,interaction_type,interaction_at,channel,summary,importance',
-    person_id: `eq.${personId}`, order: 'interaction_at.desc,id.desc', limit: 20,
-  });
+  const { rows: interactions } = await new InteractionService({ request: (table, method, filters) => {
+    if (method !== 'GET') throw Error('Read-only history');
+    return restGet(table, filters);
+  } }).listForPerson(personId, { limit: 20 });
 
   const opps = await restGet('opportunities', {
     select: 'id,opportunity_type,status,next_action,discovered_at,updated_at',
@@ -79,7 +80,7 @@ async function runSummarize(event, options = {}) {
   };
   const sources = [
     { schema: 'public', table: 'persons', id: String(person.id), label: person.display_name, at: null },
-    ...context.recent_interactions.map(row => ({ schema: 'public', table: 'interactions', id: String(row.id), label: row.type || 'interaction', at: row.at })),
+    ...interactions.map(row => ({ ...interactionSource(row), label: row.interaction_type || 'interaction' })),
     ...context.open_opportunities.map(row => ({ schema: 'public', table: 'opportunities', id: String(row.id), label: row.type || 'opportunity', at: row.updated_at || row.discovered_at || null })),
   ];
 

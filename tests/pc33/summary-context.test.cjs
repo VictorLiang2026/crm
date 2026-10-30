@@ -11,6 +11,7 @@ test('Person summary keeps source provenance inside Gateway metadata and preserv
   loaded.filename = file;
   let request;
   const stubs = {
+    './interaction-service': require('../../cloudfunctions/_shared/interaction-service'),
     './db': { app: {} },
     './ai-gateway': { createAIGateway: () => ({ runAITask: async value => {
       request = value;
@@ -58,7 +59,7 @@ test('Person summary keeps source provenance inside Gateway metadata and preserv
 test('summary task status returns the audited result without rereading the Person',async()=>{
   const file=path.resolve(__dirname,'../../cloudfunctions/assistant/summarize-service.js');
   const loaded=new Module(file);loaded.filename=file;
-  loaded.require=id=>id==='./db'?{app:{}}:id==='./ai-gateway'?{createAIGateway:()=>({})}:
+  loaded.require=id=>id==='./interaction-service'?require('../../cloudfunctions/_shared/interaction-service'):id==='./db'?{app:{}}:id==='./ai-gateway'?{createAIGateway:()=>({})}:
     id==='./search-data'?{createSearchData:()=>({auditRdb:{}})}:(()=>{throw Error(`Unexpected import ${id}`)})();
   loaded._compile(fs.readFileSync(file,'utf8'),file);
   const previousFetch=global.fetch,previousEnv={env:process.env.TCB_ENV,key:process.env.CRM_ASSISTANT_DB_API_KEY};

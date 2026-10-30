@@ -44,7 +44,7 @@ const sample = {
     canonical_person_id: 7, deleted_at: null }],
   activity_tasks: [{ id: 13, activity_id: 11, task_title: 'review' }],
   persons: [{ id: 7, display_name: '测试客户', phone: 'never-forward-this', deleted_at: null }],
-  interactions: [{ id: 16, person_id: 7, activity_id: 11, interaction_type: 'conversation',
+  interactions: [{ deleted_at: null, id: 16, person_id: 7, activity_id: 11, interaction_type: 'conversation',
     summary: '活动后深入沟通', importance: 4 }],
   actions: [{ id: 17, person_id: 7, activity_id: 11, title: '后续联系', status: 'open' }],
   relationships: [{ id: 18, from_person_id: 7, to_person_id: 8,

@@ -31,7 +31,8 @@
  */
 'use strict';
 
-const { rdb, generateText, extractJson, assertOk } = require('./db');
+const { customerHistory } = require('./person-history');
+const { app, rdb, generateText, extractJson, assertOk } = require('./db');
 
 // 枚举词表（与 DB enum、前端 GOALS/STAGE 常量完全一致）：AI 输出超出词表置 null
 var GOAL_ENUM = ['建立联系', '约见面', '邀请活动', '获取家庭信息', '推进签单', '推进招募', '推进转介绍'];
@@ -141,11 +142,7 @@ async function analyzeProfile(event) {
     Object.assign(customer, ident);
 
   // 最近 50 条跟进（先按时间倒序取 50 条，再反转为正序供 AI 通读演变）
-  var rows = assertOk(await rdb.from('followups')
-    .select('followup_date, followup_notes')
-    .eq('customer_id', customerId).is('deleted_at', null)
-    .order('followup_date', { ascending: false, nullsFirst: false })
-    .order('Id', { ascending: false }).limit(50)).data || [];
+  var rows = assertOk(await customerHistory(app, rdb, customer, 50)).data || [];
   var folRows = rows.slice().reverse();
 
   var curProfile = {};
@@ -360,11 +357,7 @@ exports.main = async (event, context) => {
     Object.assign(customer, ident);
 
     // 最近 5 条跟进：仅作上下文（避免把旧事当新信息），不照抄
-    var folRows = assertOk(await rdb.from('followups')
-      .select('followup_date, followup_notes, next_followup_date, next_followup_goal')
-      .eq('customer_id', customerId).is('deleted_at', null)
-      .order('followup_date', { ascending: false, nullsFirst: false })
-      .order('Id', { ascending: false }).limit(5)).data || [];
+    var folRows = assertOk(await customerHistory(app, rdb, customer, 5)).data || [];
 
     var today = todayStr();
 

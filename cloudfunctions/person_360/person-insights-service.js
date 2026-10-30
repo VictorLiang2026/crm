@@ -1,7 +1,6 @@
 /** Read-through, bounded Person 360 timeline and context. No legacy backfill. */
 'use strict';
-const { InteractionService } = require('./interaction-service');
-const { LegacyInteractionAdapter } = require('./legacy-interaction-adapter');
+const { InteractionService, boundedInteractionRead } = require('./interaction-service');
 const testData = require('./test-data');
 const { classifyContextItems } = require('./context-facts');
 
@@ -20,9 +19,6 @@ const safeSize = value => {
   if (!Number.isInteger(n) || n < 1 || n > 20) throw Error('Invalid timeline page size');
   return n;
 };
-const sourceKey = row => row.source_id == null ? `interactions:${row.id}` : `${row.source_type}:${row.source_id}`;
-const at = row => Date.parse(row.interaction_at) || 0;
-const LEGACY_SOURCES = new Set(['followups', 'recruit_followups', 'activity_participants']);
 const latest = (...values) => values.filter(Boolean).sort((a, b) => Date.parse(b) - Date.parse(a))[0] || null;
 
 class PersonInsightsService {
@@ -32,72 +28,15 @@ class PersonInsightsService {
     this.disclose = disclose;
   }
 
-  // Legacy Adapter caps each source query at 50. Read additional source pages here,
-  // before merging and deduplicating, so page 2 never repeats or silently skips rows.
-  boundedRead() {
-    return async (table, method, filters = {}, body) => {
-      if (method !== 'GET') throw Error('Invalid source operation');
-      if (!['interactions', 'followups', 'recruit_followups', 'activity_participants', 'activity_speakers', 'recruit_candidates'].includes(table)) {
-        return this.request(table, method, filters, body);
-      }
-      const rows = [];
-      const cap = 401;
-      while (rows.length < cap) {
-        const limit = Math.min(50, cap - rows.length);
-        const batch = await this.request(table, 'GET', { ...filters,
-          order: filters.order || (table === 'recruit_candidates' || table === 'activity_speakers' ? 'id.asc' : undefined),
-          limit, offset: rows.length });
-        rows.push(...batch);
-        if (batch.length < limit) break;
-      }
-      if (rows.length === cap) throw Error('Timeline read limit reached');
-      return rows;
-    };
-  }
-
   async timeline(personId, options = {}) {
     const page = safePage(options.page), pageSize = safeSize(options.pageSize);
     const id = idOf(personId);
-    const read = this.boundedRead();
-    const person = await new InteractionService({ request: read }).findPerson(id);
-    // PMC-19 CL-03: legacy_customer_id removed; resolve customer_id via customers.person_id
-    const customer = (await read('customers', 'GET', { select: 'Id', person_id: `eq.${id}`,
-      deleted_at: 'is.null', limit: 1 }))[0] || null;
-    const customerId = customer?.Id ?? null;
-    const adapter = new LegacyInteractionAdapter({ request: read });
-    const stored = await read('interactions', 'GET', {
-      select: 'id,person_id,interaction_type,interaction_at,channel,summary,raw_note,activity_id,source_type,source_id,created_at',
-      person_id: `eq.${id}`, order: 'interaction_at.desc,id.desc', limit: 50,
-    });
-    const virtual = [];
-    if (customerId != null) virtual.push(...await adapter.listForCustomer(String(customerId), id));
-    virtual.push(...await adapter.listCanonicalAttended(id));
-    if (customerId == null) {
-      const candidates = await read('recruit_candidates', 'GET', {
-        select: 'id,person_id', person_id: `eq.${id}`, deleted_at: 'is.null', limit: 50,
-      });
-      if (candidates.length) {
-        const follows = await read('recruit_followups', 'GET', {
-          select: 'id,candidate_id,followup_date,created_at,interaction_summary,followup_notes,contact_method',
-          candidate_id: `in.(${candidates.map(row => idOf(row.id)).join(',')})`, deleted_at: 'is.null',
-          order: 'followup_date.desc,id.desc', limit: 50,
-        });
-        for (const row of follows) virtual.push({
-          id: `recruit_followups:${row.id}`, interaction_type: 'recruit_followup',
-          interaction_at: row.followup_date || row.created_at, channel: row.contact_method || null,
-          summary: row.interaction_summary || row.followup_notes || '增员跟进',
-          source_type: 'recruit_followups', source_id: row.id, candidate_id: row.candidate_id, virtual: true,
-        });
-      }
-    }
-    // The original legacy row is authoritative. An imported ledger copy cannot
-    // resurrect a deleted followup or show stale text after the old editor saves.
-    const activeLegacy = new Set(virtual.map(sourceKey));
-    const rows = [...stored.filter(row => !LEGACY_SOURCES.has(row.source_type) || activeLegacy.has(sourceKey(row))), ...virtual];
-    const unique = [...new Map(rows.map(row => [sourceKey(row), row])).values()];
-    unique.sort((a, b) => at(b) - at(a) || String(b.id).localeCompare(String(a.id)));
+    const { rows: unique, person, customerId } = await new InteractionService({
+      request: boundedInteractionRead(this.request),
+    }).collectForPerson(id);
     const pageRows = unique.slice((page - 1) * pageSize, page * pageSize).map(row => ({
-      id: row.id, type: row.interaction_type, at: row.interaction_at,
+      id: row.id, interactionId: row.virtual ? null : row.id, type: row.interaction_type, at: row.interaction_at,
+      timePrecision: row.time_precision || null, editable: !row.virtual && ['manual','followups'].includes(row.source_type),
       summary: row.summary, channel: row.channel || null,
       source: `public.${row.source_id == null ? 'interactions' : row.source_type}#${row.source_id ?? row.id}`,
       activityId: row.activity_id || null, candidateId: row.candidate_id || null,
@@ -132,7 +71,7 @@ class PersonInsightsService {
     const [sources, audits, origins] = await Promise.all([
       interactionIds.length ? this.request('interactions', 'GET', {
         select: 'id,person_id,interaction_type,interaction_at,channel,summary,raw_note',
-        id: `in.(${interactionIds.join(',')})`, person_id: `eq.${id}`, limit: 45,
+        deleted_at: 'is.null', id: `in.(${interactionIds.join(',')})`, person_id: `eq.${id}`, limit: 45,
       }) : [],
       itemIds.length ? this.request('crm_context_item_commands', 'GET', {
         select: 'item_id,operation,status,executed_at,result', item_id: `in.(${itemIds.join(',')})`,

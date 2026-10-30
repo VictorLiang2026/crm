@@ -31,7 +31,7 @@ async function buildCandidateContext(data, personId) {
   const customerId = customer?.Id ?? null;
   const [interactions, items, participants, recruit, opportunities] = await Promise.all([
     read('interactions', { select: 'id,interaction_at,summary,importance,source_type,source_id',
-      person_id: `eq.${id}`, order: 'interaction_at.desc,id.desc', limit: 5 }),
+      person_id: `eq.${id}`, deleted_at: 'is.null', order: 'interaction_at.desc.nullslast,id.desc', limit: 5 }),
     read('context_items', { select: 'id,item_type,category,content,confidence,confirmed,valid_from,valid_to,created_at',
       person_id: `eq.${id}`, order: 'created_at.desc,id.desc', limit: 30 }),
     read('activity_participants', { select: 'id,activity_id,status,relationship_note,created_at',

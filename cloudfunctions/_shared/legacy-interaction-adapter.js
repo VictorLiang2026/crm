@@ -24,7 +24,7 @@ function excerpt(value, fallback) {
 }
 
 function representation(sourceType, row, at, summary, rawNote, channel, activityId) {
-  if (!at) return null;
+  if (!at && sourceType !== 'followups') return null;
   const sourceId = sourceType === 'followups' ? row.Id : row.id;
   return {
     id: `${sourceType}:${idOf(sourceId)}`, interaction_type: sourceType === 'activity_participants' ?
@@ -33,7 +33,7 @@ function representation(sourceType, row, at, summary, rawNote, channel, activity
     raw_note: typeof rawNote === 'string' ? rawNote.slice(0, 10000) || null : null,
     activity_id: activityId || null,
     source_type: sourceType, source_id: sourceId, importance: 3,
-    created_at: timestamp(row.created_at), virtual: true,
+    created_at: timestamp(row.created_at), interaction_id: row.interaction_id || null, virtual: true,
   };
 }
 
@@ -93,7 +93,7 @@ class LegacyInteractionAdapter {
     const rows = [];
     const [followups, candidates] = await Promise.all([
       this.request('followups', 'GET', {
-        select: 'Id,followup_date,created_at,interaction_summary,followup_notes,activity_id',
+        select: 'Id,interaction_id,followup_date,created_at,interaction_summary,followup_notes,activity_id',
         customer_id: `eq.${customerId}`, deleted_at: 'is.null',
         order: 'followup_date.desc,Id.desc', limit: MAX_LIMIT,
       }),

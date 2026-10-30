@@ -25,6 +25,7 @@ global.fetch = async (url, options) => {
   const table = u.pathname.split('/').pop();
   calls.push({ table, method: options.method, filters: Object.fromEntries(u.searchParams), body: options.body });
   assert.equal(options.headers['Accept-Profile'], 'public');
+  if (table === 'crm_person_interaction_v1') return {ok:true,json:async()=>({ok:true,interaction:{id:901}})};
   let rows = [];
   if (table === 'persons') rows = [{ id: 11, display_name: '测试人物' }];
   if (table === 'customers') rows = [{ Id: 101, person_id: 11, deleted_at: null }];
@@ -54,10 +55,22 @@ test('new actions reject missing login before database requests', async () => {
   assert.deepEqual(await main({ action: 'listInteractions', personId: 11 }), { error: 'UNAUTHORIZED' });
   assert.deepEqual(await main({ action: 'listRecruitContext', personId: 11 }), { error: 'UNAUTHORIZED' });
   assert.deepEqual(await main({ action: 'createInteraction', personId: 11, data: {} }), { error: 'UNAUTHORIZED' });
+  for (const action of ['getUnifiedInteraction','saveUnifiedInteraction','removeUnifiedInteraction']) {
+    assert.deepEqual(await main({action,personId:11,data:{actor_uid:'forged',confirmed:true}}),{error:'UNAUTHORIZED'});
+  }
   assert.deepEqual(await main({ action: 'recordActivityInteraction', data: {} }), { error: 'UNAUTHORIZED' });
   assert.deepEqual(await main({ action: 'listDueCommitments' }), { error: 'UNAUTHORIZED' });
   assert.deepEqual(await main({ action: 'getRelationshipDecay', personId: 11 }), { error: 'UNAUTHORIZED' });
   assert.equal(calls.length, 0);
+});
+
+test('unified editor uses the authenticated actor and scoped RPC rather than client identity',async()=>{
+  uid='server-actor';calls.length=0;
+  const result=await main({action:'saveUnifiedInteraction',personId:'11',uid:'forged',data:{actor_uid:'forged',summary:'Test'}});
+  assert.equal(result.interaction.id,901);
+  const call=calls.find(row=>row.table==='crm_person_interaction_v1');
+  const body=JSON.parse(call.body);assert.equal(body.p_actor_uid,'server-actor');assert.equal(body.p_person_id,11);assert.equal(body.p_operation,'save');
+  calls.length=0;assert.match((await main({action:'saveUnifiedInteraction',personId:'11,12',data:{}})).error,/Invalid/);assert.equal(calls.length,0);
 });
 
 test('relationship decay endpoint only reads bounded public sources after login', async () => {

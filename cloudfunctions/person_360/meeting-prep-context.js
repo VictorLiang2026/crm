@@ -140,7 +140,7 @@ class MeetingPrepContextBuilder {
       recent_interactions: recent.slice(0, 6).map(row => ({
         at: row.interaction_at, type: clip(row.interaction_type, 80), channel: clip(row.channel, 80),
         summary: clip(row.summary, 500), importance: row.importance,
-        source: { ...SOURCE(row.virtual ? row.source_type : 'interactions'), id: row.source_id || row.id },
+        source: { ...SOURCE(row.source_id == null ? 'interactions' : row.source_type), id: row.source_id ?? row.id },
       })),
       facts: classifiedItems.trustedFacts.slice(0, 10).map(contextItem),
       signals: [

@@ -268,17 +268,37 @@ function installFixtures() {
       contactAllowed:false, testData:{status:'verified',containsTestData:true,recordCount:1,
         sources:[{batchKey:'crm_test_fixture',table:'customers',count:1}]} }),
     'person_360:getTimelinePage': () => ({ rows: mode === 'empty' ? [] : [
-      ...followups.map(row => ({ id:`followups:${row.Id}`, type:'followup',
+      ...followups.map(row => ({ id:`followups:${row.Id}`, interactionId:row.interaction_id,editable:!!row.interaction_id,type:'followup',
         at:String(row.Id) === '920001' ? '2026-09-28T08:00:00Z' : row.followup_date,
         summary:String(row.Id) === '920001' ? marker+'虚构客户跟进' : row.interaction_summary || row.followup_notes,
         source:`public.followups#${row.Id}`,
         customerId:String(customer.Id), activityId:row.activity_id || null })),
-      ...manualInteractions.map(row => ({ id:row.id, type:row.interaction_type, at:row.interaction_at,
+      ...manualInteractions.filter(row=>row.source_type==='manual').map(row => ({ id:row.id, interactionId:row.id,editable:true,type:row.interaction_type, at:row.interaction_at,
         summary:row.summary, source:`public.interactions#${row.id}`, activityId:row.activity_id || null })),
     ],
       page:1,pageSize:10,hasMore:false,testData:{status:'verified',containsTestData:mode !== 'empty',
         recordCount:mode === 'empty'?0:1,sources:mode === 'empty'?[]:[{batchKey:'crm_test_fixture',table:'followups',count:1}]} }),
     'person_360:listInteractions': () => ({ rows: manualInteractions.slice().reverse(), limit:5, hasMore:false }),
+    'person_360:getUnifiedInteraction': data => ({interaction:manualInteractions.find(row=>row.id===data.data.id),
+      followup:followups.find(row=>row.interaction_id===data.data.id)||null,version:'fixture-version'}),
+    'person_360:saveUnifiedInteraction': data => {
+      const payload=data.data;
+      let interaction=manualInteractions.find(row=>row.id===payload.id);
+      if(!interaction){interaction={id:990401+manualInteractions.length,person_id:data.personId,source_type:payload.customer_id?'followups':'manual',source_id:null};manualInteractions.push(interaction);}
+      Object.assign(interaction,payload);
+      if(payload.customer_id){
+        let f=followups.find(row=>row.interaction_id===interaction.id);
+        if(!f){f={Id:920002+followups.length-1,interaction_id:interaction.id,customer_id:payload.customer_id};followups.push(f);}
+        Object.assign(f,payload,{interaction_summary:payload.summary,followup_notes:payload.raw_note,followup_date:payload.interaction_at?.slice(0,10)});
+        interaction.source_id=f.Id;
+      }
+      return {ok:true,interaction};
+    },
+    'person_360:removeUnifiedInteraction': data => {
+      const index=followups.findIndex(row=>row.interaction_id===data.data.id);
+      if(index<0)return {error:'INTERACTION_NOT_FOUND'};
+      followups.splice(index,1);return {ok:true};
+    },
     'person_360:createInteraction': data => {
       const interaction = { id: 990401 + manualInteractions.length, person_id:data.personId,
         ...data.data, source_type:'manual', source_id:null };
@@ -499,7 +519,7 @@ function installFixtures() {
           'person_360:previewIdentity','person_360:executeIdentity',
           'person_360:previewActivityReview','activity_speakers:update',
           'policy_review_reports:update',
-          'person_360:linkSpeakerPerson','person_360:createInteraction',
+          'person_360:linkSpeakerPerson','person_360:createInteraction','person_360:saveUnifiedInteraction','person_360:removeUnifiedInteraction',
           'followups:create','followups:update'].includes(key) ? (key==='assistant:quickCaptureV2'?data:data.data) : null });
       if (!loggedIn) return fail('CALL_BEFORE_LOGIN: ' + key);
       if (mode === 'error' && (!params.get('fail') || params.get('fail') === key)) return { result: { error: 'TEST_API_FAILURE' } };

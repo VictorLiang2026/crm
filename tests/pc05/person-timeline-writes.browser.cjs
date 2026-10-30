@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 const { Browser } = require('../regression/browser.cjs');
 
-test('Person timeline records interactions and manages source customer followups once', async () => {
+test('legacy interaction forms remain callable after unified launcher migration', async () => {
   const browser = new Browser(path.resolve(__dirname, '../..'));
   try {
     await browser.start();
@@ -13,9 +13,9 @@ test('Person timeline records interactions and manages source customer followups
     await browser.click('.tab', '互动时间线');
     await browser.wait("document.querySelectorAll('.tab-stack').length>0");
     const timelineReady = await browser.evaluate("({text:document.getElementById('app')?.innerText, buttons:[...document.querySelectorAll('.tab-stack button')].map(button=>button.textContent), calls:window.__crmTest.calls, errors:window.__crmTest.errors})");
-    assert.ok(timelineReady.buttons.includes('记录人工互动'), JSON.stringify(timelineReady));
+    assert.ok(timelineReady.buttons.includes('记录互动'), JSON.stringify(timelineReady));
 
-    await browser.click('.tab-stack .stack-head button', '记录人工互动');
+    await browser.evaluate(`window.__legacyCtx={api:{call:async(name,data)=>(await cloudbase.init().callFunction({name,data})).result},toast:()=>{}};window.__legacyDone=()=>{window.dispatchEvent(new HashChangeEvent('hashchange'));setTimeout(()=>document.querySelectorAll('.tab')[1]?.click(),100)};import('/crm/js/modules/console/write.js').then(m=>m.openPersonInteraction(window.__legacyCtx,{personId:'980001',onDone:window.__legacyDone}));`);
     await browser.wait("document.querySelector('.sheet input[type=datetime-local]')");
     await browser.evaluate(`(() => {
       const sheet=document.querySelector('.sheet');
@@ -42,8 +42,8 @@ test('Person timeline records interactions and manages source customer followups
     await browser.click('.tab', '活动');
     await browser.wait("document.querySelectorAll('.tab-stack').length>0");
     await browser.click('.tab', '互动时间线');
-    await browser.wait("[...document.querySelectorAll('.tab-stack button')].some(button=>button.textContent.includes('新增客户跟进'))");
-    await browser.click('.tab-stack .stack-head button', '新增客户跟进');
+    await browser.wait("[...document.querySelectorAll('.tab-stack button')].some(button=>button.textContent.includes('记录互动'))");
+    await browser.evaluate(`import('/crm/js/modules/console/write.js').then(m=>m.openPersonFollowup(window.__legacyCtx,{personId:'980001',customerId:'910001',onDone:window.__legacyDone}));`);
     await browser.wait("document.querySelector('.sheet input[type=date]')");
     // iPad portrait and landscape: keep the write sheet within the viewport.
     await browser.send('Emulation.setDeviceMetricsOverride', { width: 820, height: 1180, deviceScaleFactor: 2, mobile: false });
@@ -129,8 +129,8 @@ test('Person timeline records interactions and manages source customer followups
     await browser.evaluate("document.querySelectorAll('.tab')[1]?.click()");
     await browser.wait("document.querySelectorAll('.tab-stack').length>0");
     const english = await browser.evaluate("[...document.querySelectorAll('.tab-stack button')].map(button=>button.textContent)");
-    assert.ok(english.includes('Add Interaction'), JSON.stringify(english));
-    assert.ok(english.includes('Add Customer Follow-up'), JSON.stringify(english));
+    assert.ok(english.includes('Record interaction'), JSON.stringify(english));
+    assert.equal(english.includes('Add Customer Follow-up'), false);
     await browser.healthy();
   } finally { await browser.close(); }
 });

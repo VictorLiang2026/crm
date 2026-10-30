@@ -13,7 +13,8 @@
  */
 'use strict';
 
-const { rdb, generateText, extractJson, assertOk } = require('./db');
+const { customerHistory } = require('./person-history');
+const { app, rdb, generateText, extractJson, assertOk } = require('./db');
 const aiStd = require('./ai');
 
 function clip(s, n) {
@@ -82,9 +83,7 @@ exports.main = async (event, context) => {
     Object.assign(customer, ident);
 
     const [fol, prod, gif, parts, refOpp] = await Promise.all([
-      rdb.from('followups').select('followup_date, followup_notes, next_followup_goal')
-        .eq('customer_id', customerId).is('deleted_at', null)
-        .order('followup_date', { ascending: false }).limit(8),
+      customerHistory(app, rdb, customer, 8),
       rdb.from('products').select('ap_all').eq('customer_id', customerId),
       rdb.from('gifts').select('gift_name, given_date').eq('customer_id', customerId)
         .order('given_date', { ascending: false, nullsFirst: false }).limit(5),
@@ -138,7 +137,7 @@ exports.main = async (event, context) => {
       },
       identity: ident.identity,
       recent_followups: folRows.map(function (f) {
-        return { date: f.followup_date ? String(f.followup_date).slice(0, 10) : '', notes: clip(f.followup_notes, 200), goal: f.next_followup_goal || '' };
+        return { source: f.source, type: f.interaction_type, date: f.followup_date ? String(f.followup_date).slice(0, 10) : '', notes: clip(f.followup_notes, 200), goal: f.next_followup_goal || '' };
       }),
       deals: { policy_count: prodRows.length, total_cover: totalCover || null },
       recent_services: gifRows.map(function (g) { return { name: g.gift_name, date: g.given_date ? String(g.given_date).slice(0, 10) : '' }; }),

@@ -97,6 +97,7 @@ function directoryPage(event) {
 function one(rows) { return Array.isArray(rows) ? rows[0] || null : null; }
 
 async function pgRequest(table, method, filters = {}, body, { timeoutMs = 8000 } = {}) {
+  if (table === 'interactions' && method === 'GET') filters = { ...filters, deleted_at: 'is.null' };
   if (!TABLES.has(table)) throw new Error('Invalid table');
   if (LEGACY_INTERACTION_TABLES.has(table) && method !== 'GET' &&
       !(table === 'activity_participants' && method === 'POST') &&
@@ -157,7 +158,7 @@ async function pgRpc(name, body) {
     'crm_ocr_parse_preview_v1','crm_ocr_parse_undo_preview_v1','crm_ocr_parse_execute_v1',
     'crm_recruit_candidate_create_v1','crm_recruit_candidate_transition_v1','crm_recruit_coach_outcome_v1',
     'crm_knowledge_review_v1','crm_proactive_coach_decision_v1','crm_file_import_v1',
-    'crm_person_profile_save_v1',
+    'crm_person_profile_save_v1','crm_person_interaction_v1',
     'crm_legacy_opportunity_v1','crm_recycle_batch_v1','person_role_recovery_v1']).has(name)) throw new Error('Invalid RPC');
   const env = process.env.TCB_ENV;
   const key = process.env.CRM_PERSON360_DB_API_KEY;
@@ -183,6 +184,7 @@ async function pgRpc(name, body) {
       const message = typeof problem?.message === 'string' ? problem.message : '';
       const code = typeof problem?.code === 'string' && /^(?:PGRST\d{3}|[0-9A-Z]{5})$/.test(problem.code)
         ? problem.code : '';
+      if (name === 'crm_person_interaction_v1' && /^INTERACTION_[A-Z_]+$/.test(message)) throw new Error(message);
       if (code === '42501' && name.startsWith('crm_context_item_')) {
         throw new Error('Context item permission denied');
       }
@@ -1196,6 +1198,14 @@ exports.main = async event => {
         .preview(event.data,uid);
       case 'executeWorkItem': return await new WorkItemService({request:pgRequest,rpc:pgRpc})
         .execute(event.previewId,uid);
+      case 'getUnifiedInteraction':
+      case 'saveUnifiedInteraction':
+      case 'removeUnifiedInteraction': {
+        const operation = { getUnifiedInteraction: 'get', saveUnifiedInteraction: 'save', removeUnifiedInteraction: 'remove' }[event.action];
+        if (!/^[1-9]\d*$/.test(String(event.personId || '')) || !Number.isSafeInteger(Number(event.personId))) throw Error('Invalid Person ID');
+        return await pgRpc('crm_person_interaction_v1', { p_operation: operation, p_actor_uid: uid,
+          p_person_id: Number(event.personId), p_data: event.data || {} });
+      }
       case 'createInteraction': return await new InteractionService({ request: pgRequest })
         .createManual(event.personId, event.data, uid);
       case 'recordActivityInteraction': return await new ActivityInteractionService({ request: pgRequest })
@@ -1230,6 +1240,7 @@ exports.main = async event => {
     }
     const diagnostic = event?.action === 'listPeople' &&
       /^Database request failed \((\d{3})(?:, ((?:PGRST\d{3}|[0-9A-Z]{5})))?\)$/.exec(error.message);
+    if (/^INTERACTION_[A-Z_]+$/.test(error.message)) return { error: error.message };
     return { error: error.message === 'UNAUTHORIZED' ? 'UNAUTHORIZED' :
       event?.action === 'previewOcrUndo' && error.message === 'OCR_UNDO_CONFLICT' ? 'OCR_UNDO_CONFLICT' :
       diagnostic ? `Person 360 request failed (HTTP ${diagnostic[1]}${diagnostic[2] ? `, ${diagnostic[2]}` : ''})` :

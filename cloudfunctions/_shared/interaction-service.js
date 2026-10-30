@@ -48,12 +48,11 @@ class InteractionService {
     return person;
   }
 
-  async listForPerson(personId, options = {}) {
-    const limit = listLimit(options.limit);
+  async collectForPerson(personId) {
     const person = await this.findPerson(personId);
     const stored = await this.request('interactions', 'GET', {
-      select: 'id,person_id,interaction_type,interaction_at,channel,summary,raw_note,activity_id,source_type,source_id,importance,created_at',
-      person_id: `eq.${idOf(person.id)}`, order: 'interaction_at.desc,id.desc', limit: MAX_LIMIT,
+      select: 'id,person_id,interaction_type,interaction_at,time_precision,channel,summary,raw_note,activity_id,source_type,source_id,importance,created_at',
+      person_id: `eq.${idOf(person.id)}`, deleted_at: 'is.null', order: 'interaction_at.desc.nullslast,id.desc', limit: MAX_LIMIT,
     });
     const rows = stored.map(item => ({ ...item, virtual: false }));
     const adapter = new LegacyInteractionAdapter({ request: this.request });
@@ -64,6 +63,22 @@ class InteractionService {
     }));
     if (customer) {
       legacyRows.push(...await adapter.listForCustomer(String(customer.Id), person.id));
+    } else {
+      const candidates = await this.request('recruit_candidates', 'GET', {
+        select: 'id,person_id', person_id: `eq.${idOf(person.id)}`, deleted_at: 'is.null', limit: MAX_LIMIT,
+      });
+      if (candidates.length) {
+        const follows = await this.request('recruit_followups', 'GET', {
+          select: 'id,candidate_id,followup_date,created_at,interaction_summary,followup_notes,contact_method',
+          candidate_id: `in.(${candidates.map(row => idOf(row.id)).join(',')})`, deleted_at: 'is.null',
+          order: 'followup_date.desc.nullslast,id.desc', limit: MAX_LIMIT,
+        });
+        legacyRows.push(...follows.map(row => ({ id: `recruit_followups:${row.id}`,
+          interaction_type: 'recruit_followup', interaction_at: timestamp(row.followup_date || row.created_at),
+          channel: row.contact_method || null, summary: row.interaction_summary || row.followup_notes || '增员跟进',
+          raw_note: row.followup_notes || null, source_type: 'recruit_followups', source_id: row.id,
+          candidate_id: row.candidate_id, virtual: true })));
+      }
     }
     legacyRows.push(...await adapter.listCanonicalAttended(person.id));
     // PMC-16: drop stored ledger copies of legacy sources that no longer exist, so a
@@ -72,8 +87,11 @@ class InteractionService {
     // ledger row preferred.
     const activeLegacy = new Set(legacyRows.map(row =>
       row.source_id == null ? `manual:${row.id}` : `${row.source_type}:${row.source_id}`));
-    rows.push(...legacyRows);
-    const filtered = rows.filter(row => row.virtual ||
+    // Only linked migration rows are canonical. Older unlinked imports keep their
+    // established live-source precedence, so an old editor can never show stale text.
+    const linked = new Map(legacyRows.filter(row => row.interaction_id).map(row => [String(row.interaction_id), row]));
+    const candidates = [...rows.filter(row => linked.has(String(row.id))), ...legacyRows, ...rows];
+    const filtered = candidates.filter(row => row.virtual ||
       !LEGACY_SOURCES.has(row.source_type) || activeLegacy.has(`${row.source_type}:${row.source_id}`));
     // A future import may materialize a legacy source. Show it once, preferring the ledger row.
     const seen = new Set();
@@ -83,9 +101,15 @@ class InteractionService {
       seen.add(key);
       return true;
     });
-    unique.sort((a, b) => Date.parse(b.interaction_at) - Date.parse(a.interaction_at) ||
+    unique.sort((a, b) => (Date.parse(b.interaction_at) || 0) - (Date.parse(a.interaction_at) || 0) ||
       String(b.id).localeCompare(String(a.id)));
-    return { rows: unique.slice(0, limit), limit, hasMore: unique.length > limit };
+    return { rows: unique, person, customerId: customer?.Id ?? null };
+  }
+
+  async listForPerson(personId, options = {}) {
+    const limit = listLimit(options.limit);
+    const { rows } = await new InteractionService({ request: boundedInteractionRead(this.request) }).collectForPerson(personId);
+    return { rows: rows.slice(0, limit), limit, hasMore: rows.length > limit };
   }
 
   async createManual(personId, data, uid) {
@@ -128,4 +152,23 @@ class InteractionService {
   }
 }
 
-module.exports = { InteractionService };
+function boundedInteractionRead(request) {
+  return async (table, method, filters = {}, body) => {
+    if (method !== 'GET') throw Error('Invalid source operation');
+    if (!['interactions','followups','recruit_followups','activity_participants','activity_speakers','recruit_candidates'].includes(table)) return request(table, method, filters, body);
+    const rows = [], cap = 401;
+    while (rows.length < cap) {
+      const limit = Math.min(50, cap - rows.length);
+      const batch = await request(table, method, { ...filters,
+        order: filters.order || 'id.asc', limit, offset: rows.length }, body);
+      rows.push(...batch);
+      if (batch.length < limit) return rows;
+    }
+    throw Error('Timeline read limit reached');
+  };
+}
+function interactionSource(row) {
+  return { schema: 'public', table: row.source_id == null ? 'interactions' : row.source_type,
+    id: String(row.source_id ?? row.id), at: row.interaction_at || null };
+}
+module.exports = { InteractionService, boundedInteractionRead, interactionSource };

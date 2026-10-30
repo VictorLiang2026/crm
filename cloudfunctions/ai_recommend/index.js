@@ -22,7 +22,8 @@
  */
 'use strict';
 
-const { rdb, generateText, extractJson, assertOk } = require('./db');
+const { customerHistory } = require('./person-history');
+const { app, rdb, generateText, extractJson, assertOk } = require('./db');
 const aiStd = require('./ai');
 
 // 操作员默认信息（前端未传时兜底）
@@ -141,10 +142,7 @@ exports.main = async (event, context) => {
     Object.assign(customer, ident);
 
     const [fol, prod, gif, hist, photos, prr] = await Promise.all([
-      rdb.from('followups').select().eq('customer_id', customerId)
-        .order('followup_date', { ascending: false, nullsFirst: false })
-        .order('Id', { ascending: false })
-        .limit(5),
+      customerHistory(app, rdb, customer, 5),
       rdb.from('products').select().eq('customer_id', customerId),
       rdb.from('gifts').select().eq('customer_id', customerId)
         .order('given_date', { ascending: false, nullsFirst: false })
@@ -209,7 +207,7 @@ exports.main = async (event, context) => {
       },
       identity: ident.identity,
       recent_followups: folRows.map(function (f) {
-        return { date: f.followup_date, notes: f.followup_notes, next_date: f.next_followup_date, next_goal: f.next_followup_goal };
+        return { source: f.source, type: f.interaction_type, date: f.followup_date, notes: f.followup_notes, next_date: f.next_followup_date, next_goal: f.next_followup_goal };
       }),
       products: prodRows.map(function (p) {
         // items 为 11 个险种类别的明细 JSON（保额/总保费/已交保费/年交保费/更新日期）

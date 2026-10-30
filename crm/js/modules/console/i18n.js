@@ -2,6 +2,16 @@
 const DEFAULT = 'zh-CN';
 
 const DICT = {
+  ui_interaction_add: {'zh-CN':'记录互动','en':'Record interaction'},
+  ui_interaction_edit: {'zh-CN':'编辑互动','en':'Edit interaction'},
+  ui_interaction_scene: {'zh-CN':'交流场景','en':'Context'},
+  ui_interaction_general: {'zh-CN':'一般交流','en':'General conversation'},
+  ui_interaction_customer: {'zh-CN':'客户跟进','en':'Customer follow-up'},
+  ui_interaction_advanced: {'zh-CN':'更多销售信息','en':'More sales details'},
+  ui_interaction_unknown_date: {'zh-CN':'历史记录没有日期，可保留空白，或在核实后补充。','en':'This historical record has no date. Leave blank or enter a verified date.'},
+  ui_interaction_stale: {'zh-CN':'记录已被更新，请关闭后重新打开，核对最新内容再保存。','en':'This record has changed. Reopen it and review the latest content before saving.'},
+  ui_interaction_failed: {'zh-CN':'操作未完成，请稍后重试；如记录已变化，请重新打开。','en':'Could not complete the operation. Retry, or reopen if the record has changed.'},
+  ui_interaction_required: {'zh-CN':'请填写时间和摘要，关联编号须为正整数。','en':'Enter a time and summary. Linked IDs must be positive integers.'},
   kg_gpt_content: {'zh-CN':'GPT内容','en':'GPT content'},
   kg_view_original: {'zh-CN':'查看原文','en':'View original text'},
   kg_linked_content: {'zh-CN':'同时展开或收起本行的系统内容与 GPT 内容','en':'Expand or collapse both versions in this row'},

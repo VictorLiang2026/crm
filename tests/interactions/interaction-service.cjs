@@ -24,7 +24,7 @@ function fixture({ materialized = false, standalone = false } = {}) {
       interaction_at: '2026-09-15T10:00:00Z', summary: '人工记录', source_type: 'manual', source_id: null },
       ...(materialized ? [{ id: 2, person_id: 11, interaction_type: 'followup',
         interaction_at: '2026-09-10T00:00:00Z', summary: '已导入', source_type: 'followups', source_id: 5 }] : [])],
-    followups: [{ Id: 5, customer_id: 101, followup_date: '2026-09-10', interaction_summary: '电话沟通', followup_notes: '客户反馈' }],
+    followups: [{ Id: 5, interaction_id: materialized ? 2 : null, customer_id: 101, followup_date: '2026-09-10', interaction_summary: '电话沟通', followup_notes: '客户反馈' }],
     recruit_candidates: [{ id: 7, customer_id: 101, person_id: 11 },
       { id: 9, customer_id: 202, person_id: 22 }],
     recruit_followups: [{ id: 8, candidate_id: 7, followup_date: '2026-09-12',
@@ -104,11 +104,11 @@ test('materialized source takes precedence over the same virtual row', async () 
   assert.equal(matches[0].summary, '已导入');
 });
 
-test('standalone Person reads only their direct interactions', async () => {
+test('Person without customer includes their canonical recruit history', async () => {
   const { service, calls } = fixture({ standalone: true });
   const result = await service.listForPerson(11);
-  assert.deepEqual(result.rows.map(row => row.source_type), ['manual']);
-  assert.ok(calls.every(call => ['persons', 'customers', 'interactions', 'activity_participants', 'activity_speakers'].includes(call.table)));
+  assert.deepEqual(result.rows.map(row => row.source_type), ['manual','recruit_followups']);
+  assert.ok(calls.every(call => ['persons', 'customers', 'interactions', 'activity_participants', 'activity_speakers','recruit_candidates','recruit_followups'].includes(call.table)));
   assert.ok(calls.filter(call => call.table === 'activity_participants')
     .every(call => call.filters.canonical_person_id === 'eq.11' && call.filters.status === 'eq.attended'));
 });

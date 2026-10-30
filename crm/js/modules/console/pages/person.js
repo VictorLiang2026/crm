@@ -12,6 +12,7 @@ import { renderFamily } from '../family-actions.js';
 import { relationshipNode } from '../relationship-actions.js';
 import { relationshipNetworkNode } from '../relationship-network.js';
 import { careMaterialsNode } from '../care-materials.js';
+import { openUnifiedInteraction } from '../person-interaction.js';
 import { renderOcrReview } from '../ocr-review.js';
 import { renderInsuranceEditor } from '../insurance-editor.js';
 import { renderInsuranceReports } from '../insurance-reports.js';
@@ -200,9 +201,9 @@ function timelineNode(ctx, id) {
         h('div', { class: 'row-sub', title: fullLabel || undefined },
           `${fmtDate(r.at)} ${weekdayCN(r.at)} · ${typeLabel}${r.channel ? ' · ' + translateEnum('channel', r.channel) : ''}`),
         h('div', { class: 'row-source' }, r.source || ''),
-        followupMatch && r.customerId ? h('div', { class: 'sheet-actions', style: 'justify-content:flex-start;margin-top:6px' }, [
+        r.editable || (followupMatch && r.customerId) ? h('div', { class: 'sheet-actions', style: 'justify-content:flex-start;margin-top:6px' }, [
           h('button', { class: 'btn btn-ghost btn-sm', type: 'button',
-            onclick: () => openPersonFollowup(ctx, { personId: String(id), customerId: String(r.customerId),
+            onclick: () => r.editable ? openUnifiedInteraction(ctx, { personId: String(id), interactionId: r.interactionId, onDone: ctx.onWriteDone }) : openPersonFollowup(ctx, { personId: String(id), customerId: String(r.customerId),
               followupId: followupMatch[1], onDone: ctx.onWriteDone }) }, t('btn_edit')),
         ]) : null,
       ]),
@@ -223,9 +224,7 @@ function timelineNode(ctx, id) {
     const customerId = profile?.status === 'linked' ? profile.customerId : null;
     const actionButtons = [
       h('button', { class: 'btn btn-soft btn-sm', type: 'button',
-        onclick: () => openPersonInteraction(ctx, { personId: String(id), onDone: ctx.onWriteDone }) }, t('btn_add_interaction')),
-      customerId ? h('button', { class: 'btn btn-soft btn-sm', type: 'button',
-        onclick: () => openPersonFollowup(ctx, { personId: String(id), customerId: String(customerId), onDone: ctx.onWriteDone }) }, t('btn_add_customer_followup')) : null,
+        onclick: () => openUnifiedInteraction(ctx, { personId: String(id), customerId, onDone: ctx.onWriteDone }) }, t('ui_interaction_add')),
     ].filter(Boolean);
     actions.replaceChildren(...actionButtons);
   }

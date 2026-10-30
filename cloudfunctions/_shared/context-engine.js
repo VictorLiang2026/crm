@@ -71,6 +71,7 @@ function createContextEngine({ rdb, now = () => new Date() } = {}) {
   if (!rdb || typeof rdb.from !== 'function') throw new ContextError('INVALID_CONFIG', 'CloudBase RDB is required');
 
   async function read(table, filters, { order, limit = 1, one = false } = {}) {
+    if (table === 'interactions') filters = { ...filters, deleted_at: null };
     if (!Object.hasOwn(FIELDS, table)) throw new ContextError('INVALID_CONFIG', 'Unknown context source');
     // Customer-owned actions stay on customers; Person-owned fields are joined below.
     const selectFields = table === 'customers'
