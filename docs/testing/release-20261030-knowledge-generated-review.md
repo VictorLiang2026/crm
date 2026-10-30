@@ -37,7 +37,7 @@ Database integration used a synthetic `public.knowledge_items` row and `service_
 
 Baseline was checked at GitHub master `4031c572adc006f4eb8ed5e8e1ab01b6db3068cf`, with the production page/assets and all 29 function source/config sets matching. The original dirty checkout was preserved in stash `codex preserve pre-sync local WIP 20261030`; it was not included.
 
-Release tag planned: `release-20261030-202500`. The tag will identify the published release commit.
+Feature release commit: `c6a8072f40ae210a526778d4f1b989aa15cfdf65`; tag: `release-20261030-202500`.
 
 Deployment completed to production `crm-d1gkae8ddc930d151`:
 
@@ -47,6 +47,8 @@ Deployment completed to production `crm-d1gkae8ddc930d151`:
 - A read-only production invocation of `assistant` knowledge-library list returned successfully. It performed no write or regeneration. No production edit/approval was submitted.
 
 Release gate result: `PASS_WITH_LIMITATIONS`; WP01 automated checks passed, the 108-case isolated regression passed with 5 declared skips, anonymous checks passed 78/78, and the fresh WP04 identity audit passed with 3 previously documented exceptions. Remaining evidence gaps are real interactive login, write/runtime coverage, and real mobile acceptance. No production user-interface approval flow was exercised with a human account.
+
+Post-release full parity check passed for local source, GitHub master, and CloudBase. This record update changes no cloud artifacts.
 
 ## Limits
 
