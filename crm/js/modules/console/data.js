@@ -15,11 +15,12 @@ async function call(ctx, name, params) {
 }
 
 const p360 = (ctx, action, extra) => call(ctx, 'person_360', { action, ...(extra || {}) });
-const aiTask = (ctx, startPayload, taskType, personId) => resolveAITask(
+const aiTask = (ctx, startPayload, taskType, personId, options) => resolveAITask(
   () => call(ctx, 'assistant', startPayload),
-  ({ taskId, personId: targetId, taskType: targetType }) => call(ctx, 'assistant', {
+  ({ taskId, personId: targetId, taskType: targetType, startedAt, fallbackLookup }) => call(ctx, 'assistant', {
     action: 'aiTaskStatus', taskId, personId: targetId, taskType: targetType,
-  }), taskType, personId);
+    ...(fallbackLookup ? { startedAt } : {}),
+  }), taskType, personId, options);
 
 export const data = {
   // ---------- 今日 ----------
@@ -54,7 +55,7 @@ export const data = {
   knowledgeGovernance: (ctx) => p360(ctx, 'listKnowledgeGovernance'),
   knowledgeLibrary: (ctx, operation = 'list', payload = {}) => call(ctx, 'assistant', { action: 'knowledgeLibrary', operation, ...payload }),
   dualFollowup: (ctx, payload) => aiTask(ctx, { action: 'knowledgeLibrary', operation: 'dualGenerate',
-    data: { ...payload, asyncWait: true } }, 'customer_followup_dual', payload?.personId),
+    data: { ...payload, asyncWait: true } }, 'customer_followup_dual', payload?.personId, { recoverStartup: true }),
   selectDualFollowup: (ctx, payload) => call(ctx, 'assistant', { action: 'knowledgeLibrary', operation: 'dualSelect', data: payload }),
   dualFollowupHistory: (ctx, personId) => call(ctx, 'assistant', { action: 'knowledgeLibrary', operation: 'dualHistory', personId }),
   saveKnowledgeGovernance: (ctx, payload) => p360(ctx, 'saveKnowledgeGovernance', { data: payload }),

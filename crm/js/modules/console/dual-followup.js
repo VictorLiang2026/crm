@@ -60,7 +60,8 @@ export function renderDualFollowup(ctx, personId) {
       draw();
     } catch (error) {
       const code = String(error?.code || error?.message || '').split(':')[0];
-      status.textContent = text(code === 'TIMEOUT' ? 'timeout' : code === 'AI_RETRY_LATER' ? 'retry_later' : 'generate_failed');
+      status.textContent = text(code === 'TIMEOUT' || code === 'AI_TASK_TIMEOUT' || code === 'AI_TASK_START_TIMEOUT'
+        ? 'timeout' : code === 'AI_RETRY_LATER' ? 'retry_later' : 'generate_failed');
       result = null;
       draw();
     } finally {

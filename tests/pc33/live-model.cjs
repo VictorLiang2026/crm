@@ -8,6 +8,8 @@ const crypto = require('node:crypto');
 const { spawn } = require('node:child_process');
 const root = path.resolve(__dirname, '../..');
 const source = fs.readFileSync(path.join(root, 'admin.html'), 'utf8');
+const pollingSource = fs.readFileSync(path.join(root, 'crm/js/modules/console/ai-task-polling.mjs'), 'utf8')
+  .replace('export async function resolveAITask', 'async function resolveAITask');
 const start = source.indexOf('var authInst = null;');
 const end = source.indexOf('// ==================== 表单生成');
 const sdk = source.match(/https:\/\/static\.cloudbase\.net\/cloudbase-js-sdk\/\d+\.\d+\.\d+\/cloudbase\.full\.js/)?.[0];
@@ -42,7 +44,13 @@ async function probe(nonce, payload, runRepeat) {
       }
       throw Error('LOCAL_TIMEOUT');
     }
-    const first = await resolveTask(await callFn('assistant', payload));
+    async function resolveDualTask() {
+      return resolveAITask(() => callFn('assistant', payload),
+        ({ taskId, personId, taskType, startedAt, fallbackLookup }) => callFn('assistant', {
+          action: 'aiTaskStatus', taskId, personId, taskType, ...(fallbackLookup ? { startedAt } : {}),
+        }), 'customer_followup_dual', '783', { recoverStartup: true });
+    }
+    const first = dual ? await resolveDualTask() : await resolveTask(await callFn('assistant', payload));
     const validDual = dual && first?.ok === true && Number.isSafeInteger(Number(first.taskId)) &&
       Array.isArray(first.candidates) && first.candidates.length === 2 &&
       first.candidates.map(item => item?.candidateType).sort().join(',') === 'library_based,strategy_based' &&
@@ -55,7 +63,7 @@ async function probe(nonce, payload, runRepeat) {
       report.taskId = Number(first.taskId);
       report.resultId = Number(dual ? first.candidates[0].id : first.resultId);
       if (runRepeat) {
-        const repeat = await resolveTask(await callFn('assistant', payload));
+        const repeat = dual ? await resolveDualTask() : await resolveTask(await callFn('assistant', payload));
         report.sameTask = Number(repeat?.taskId) === report.taskId;
         report.sameResult = Number(repeat?.resultId) === report.resultId;
         report.repeat = repeat?.ok === true && report.sameTask && report.sameResult ? 'PASS' :
@@ -72,11 +80,11 @@ async function probe(nonce, payload, runRepeat) {
       report.errorStatus=Number.isInteger(status)&&status>=100&&status<=599?status:null;
       report.errorCode=/^[A-Z0-9_:-]{1,48}$/.test(code)&&['UNAUTHORIZED','INVALID_INPUT','NOT_FOUND','INVALID_CONFIG',
         'INVALID_RESULT','RATE_LIMIT','TIMEOUT','FUNCTIONS_TIME_LIMIT_EXCEEDED','UPSTREAM_UNAVAILABLE',
-        'PERSISTENCE_ERROR','AI_IN_PROGRESS','AI_RETRY_LATER','AI_AUDIT_UNKNOWN','AI_REQUEST_FAILED',
+        'PERSISTENCE_ERROR','AI_IN_PROGRESS','AI_RETRY_LATER','AI_AUDIT_UNKNOWN','AI_REQUEST_FAILED','AI_TASK_TIMEOUT',
         'NETWORK_ERROR','REQUEST_TIMEOUT','ERR_ABORTED','ABORT_ERR'].includes(code)?code:null;
       const safeCodes=new Set(['UNAUTHORIZED','INVALID_INPUT','NOT_FOUND','INVALID_CONFIG','INVALID_RESULT',
         'RATE_LIMIT','TIMEOUT','FUNCTIONS_TIME_LIMIT_EXCEEDED','UPSTREAM_UNAVAILABLE','PERSISTENCE_ERROR',
-        'AI_IN_PROGRESS','AI_RETRY_LATER','AI_AUDIT_UNKNOWN','AI_REQUEST_FAILED','NETWORK_ERROR',
+        'AI_IN_PROGRESS','AI_RETRY_LATER','AI_AUDIT_UNKNOWN','AI_REQUEST_FAILED','AI_TASK_TIMEOUT','NETWORK_ERROR',
         'REQUEST_TIMEOUT','ERR_ABORTED','ABORT_ERR']);
       const failure=error?.message==='LOCAL_TIMEOUT'?'LOCAL_TIMEOUT':safeCodes.has(code)?code:'REQUEST_FAILED';
       if(report.first==='PASS'&&runRepeat)report.repeat=failure;
@@ -100,7 +108,7 @@ const html = '<!doctype html><meta charset="utf-8"><title>PC33 AI 测试账号�
   (dual ? '双视角跟进建议' : playbook ? '对话建议' : '摘要并核对同请求重用') + '；不写业务数据，不保存账号、令牌或生成内容。</p>' +
   '<div id="env-label"></div><div id="view"></div><div id="modal-root"></div><div id="toast-root"></div>' +
   '<script src="' + sdk + '"></script><script>var CONFIG={envId:' + JSON.stringify(envId) + '};var app=null;function route(){}' +
-  source.slice(start, end) + '\n(' + probe.toString() + ')(' + JSON.stringify(nonce) + ',' +
+  source.slice(start, end) + '\n' + pollingSource + '\n(' + probe.toString() + ')(' + JSON.stringify(nonce) + ',' +
   JSON.stringify(payload) + ',' + JSON.stringify(!playbook && !dual) + ');</script>';
 let origin;
 const server = http.createServer((req, res) => {
@@ -118,14 +126,14 @@ const server = http.createServer((req, res) => {
         'NEW_RESULT','UNAUTHORIZED','INVALID_INPUT','NOT_FOUND','INVALID_CONFIG','INVALID_RESULT','RATE_LIMIT',
         'TIMEOUT','FUNCTIONS_TIME_LIMIT_EXCEEDED','UPSTREAM_UNAVAILABLE','PERSISTENCE_ERROR','AI_IN_PROGRESS','AI_RETRY_LATER',
         'NETWORK_ERROR','REQUEST_TIMEOUT','ERR_ABORTED','ABORT_ERR',
-        'AI_AUDIT_UNKNOWN','AI_REQUEST_FAILED','SUMMARY_FAILED']);
+        'AI_AUDIT_UNKNOWN','AI_REQUEST_FAILED','AI_TASK_TIMEOUT','SUMMARY_FAILED']);
       if (!codes.has(input.login) || !codes.has(input.first) || !codes.has(input.repeat) ||
           ![null,'Error','TypeError','AbortError','TimeoutError','OTHER'].includes(input.errorType) ||
           !(input.errorStatus===null || (Number.isInteger(input.errorStatus)&&input.errorStatus>=100&&input.errorStatus<=599)) ||
           !Array.isArray(input.errorKeys)||input.errorKeys.length>12||input.errorKeys.some(key=>typeof key!=='string'||!/^[A-Za-z][A-Za-z0-9_]{0,31}$/.test(key)) ||
           !(input.errorCode===null || ['UNAUTHORIZED','INVALID_INPUT','NOT_FOUND','INVALID_CONFIG','INVALID_RESULT',
             'RATE_LIMIT','TIMEOUT','FUNCTIONS_TIME_LIMIT_EXCEEDED','UPSTREAM_UNAVAILABLE','PERSISTENCE_ERROR',
-            'AI_IN_PROGRESS','AI_RETRY_LATER','AI_AUDIT_UNKNOWN','AI_REQUEST_FAILED','NETWORK_ERROR',
+            'AI_IN_PROGRESS','AI_RETRY_LATER','AI_AUDIT_UNKNOWN','AI_REQUEST_FAILED','AI_TASK_TIMEOUT','NETWORK_ERROR',
             'REQUEST_TIMEOUT','ERR_ABORTED','ABORT_ERR'].includes(input.errorCode)) ||
           typeof input.sameTask !== 'boolean' || typeof input.sameResult !== 'boolean' ||
           (input.taskId != null && !(Number.isSafeInteger(input.taskId) && input.taskId > 0)) ||

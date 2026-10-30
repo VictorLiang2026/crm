@@ -875,14 +875,27 @@ function createKnowledgeLibrary(options={}) {
   }
   async function dualStatus(input) {
     const taskId=String(input?.taskId||'').trim(),personId=String(input?.personId||'').trim();
-    if(!positiveId(taskId)||!positiveId(personId))fail('INVALID_INPUT');
-    const tasks=await request('ai_tasks','GET',{select:'id,task_type,status,subject_type,subject_id,context_snapshot',
-      id:`eq.${taskId}`,task_type:'eq.customer_followup_dual',subject_type:'eq.person',subject_id:`eq.${personId}`,limit:1});
-    const task=tasks[0];if(!task)fail('NOT_FOUND');
-    if(task.status==='failed')return {ok:false,status:'failed',taskId,error:{code:'AI_REQUEST_FAILED'}};
-    if(task.status!=='completed')return {ok:true,status:'pending',taskId};
+    if(!positiveId(personId))fail('INVALID_INPUT');
+    let tasks,startedMs=NaN;
+    if(taskId){
+      if(!positiveId(taskId))fail('INVALID_INPUT');
+      tasks=await request('ai_tasks','GET',{select:'id,task_type,status,subject_type,subject_id,context_snapshot',
+        id:`eq.${taskId}`,task_type:'eq.customer_followup_dual',subject_type:'eq.person',subject_id:`eq.${personId}`,limit:1});
+    }else{
+      const startedAt=String(input?.startedAt||'').trim();startedMs=Date.parse(startedAt);
+      if(!startedAt||!Number.isFinite(startedMs))fail('INVALID_INPUT');
+      tasks=await request('ai_tasks','GET',{select:'id,task_type,status,subject_type,subject_id,context_snapshot,created_at',
+        task_type:'eq.customer_followup_dual',subject_type:'eq.person',subject_id:`eq.${personId}`,
+        order:'created_at.desc,id.desc',limit:20});
+    }
+    const task=taskId?tasks[0]:tasks.find(row=>row.status==='running'||
+      (Number.isFinite(startedMs)&&Date.parse(row.created_at)>=startedMs));
+    if(!task)return {ok:true,status:'pending',taskId:''};
+    const resolvedTaskId=String(task.id);
+    if(task.status==='failed')return {ok:false,status:'failed',taskId:resolvedTaskId,error:{code:'AI_REQUEST_FAILED'}};
+    if(task.status!=='completed')return {ok:true,status:'pending',taskId:resolvedTaskId};
     const rows=await request('ai_results','GET',{select:'id,task_id,run_id,result_json,rank,user_selected,user_edited,final_result_json',
-      task_id:`eq.${taskId}`,order:'rank.asc,id.asc',limit:2});
+      task_id:`eq.${resolvedTaskId}`,order:'rank.asc,id.asc',limit:2});
     if(rows.length!==2)fail('AI_AUDIT_UNKNOWN');
     const snapshot=task.context_snapshot||{},byKind=new Map();
     for(const row of rows){
@@ -900,7 +913,7 @@ function createKnowledgeLibrary(options={}) {
         userEdited:row.user_edited===true,finalResult:row.final_result_json||null});
     }
     if(byKind.size!==2||!byKind.has('strategy_based')||!byKind.has('library_based'))fail('INVALID_RESULT');
-    return {ok:true,status:'completed',personId,taskId,runId:String(rows[0].run_id||''),reused:false,
+    return {ok:true,status:'completed',personId,taskId:resolvedTaskId,runId:String(rows[0].run_id||''),reused:false,
       candidates:['strategy_based','library_based'].map(kind=>byKind.get(kind)),
       selectionNotice:'选择仅表示采用此建议作为工作参考，不表示已经联系客户或执行任何业务动作。',
       execution:{modelCalled:true,businessDataRead:true,businessDataWritten:false}};

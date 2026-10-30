@@ -24,3 +24,20 @@ test('AI task polling surfaces failed and expired work with stable codes',async(
     await new Promise(resolve=>setTimeout(resolve,2));return {ok:true,status:'pending',taskId:'46'};
   },'customer_followup_dual','783',{intervalMs:0,timeoutMs:1}),error=>error.code==='AI_TASK_TIMEOUT');
 });
+
+test('dual task polling falls back to the durable Person task when startup response stalls',async()=>{
+  const calls=[];let checks=0;
+  const result=await resolveAITask(()=>new Promise(()=>{}),async args=>{
+    calls.push(args);checks++;
+    return checks===1?{ok:true,status:'pending',taskId:'47'}:
+      {ok:true,status:'completed',taskId:'47',candidates:[{candidateType:'strategy_based'},{candidateType:'library_based'}]};
+  },'customer_followup_dual','783',{intervalMs:0,timeoutMs:100,startupTimeoutMs:1,recoverStartup:true});
+  assert.equal(result.status,'completed');
+  assert.equal(calls.length,2);
+  assert.equal(calls[0].taskId,'');
+  assert.equal(calls[0].taskType,'customer_followup_dual');
+  assert.equal(calls[0].personId,'783');
+  assert.ok(Number.isFinite(Date.parse(calls[0].startedAt)));
+  assert.equal(calls[1].taskId,'47');
+  assert.equal('startedAt' in calls[1],false);
+});

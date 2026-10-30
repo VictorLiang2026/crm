@@ -72,11 +72,12 @@ test('dual recommendations send a pending task ID and preserve background comple
 });
 
 test('AI task status route authenticates first and only accepts supported task types',async()=>{
-  let calls=0;
+  let calls=0,seen;
   const main=createMain(()=>({uid:'test-operator',isAnonymous:false}),...Array(12).fill(undefined),undefined,
-    undefined,async input=>{calls++;return {ok:true,status:'pending',taskId:input.taskId};});
-  const response=await main({action:'aiTaskStatus',taskId:'9',personId:'783',taskType:'person_summary'});
+    undefined,async input=>{calls++;seen=input;return {ok:true,status:'pending',taskId:input.taskId};});
+  const response=await main({action:'aiTaskStatus',personId:'783',taskType:'customer_followup_dual',startedAt:'2026-10-30T00:00:00.000Z'});
   assert.equal(response.status,'pending');assert.equal(calls,1);
+  assert.equal(seen.startedAt,'2026-10-30T00:00:00.000Z');
   const invalid=await main({action:'aiTaskStatus',taskId:'9',personId:'783',taskType:'other'});
   assert.equal(invalid.error.code,'INVALID_INPUT');assert.equal(calls,1);
   const anonymous=createMain(()=>({uid:'anon',isAnonymous:true}),...Array(12).fill(undefined));
