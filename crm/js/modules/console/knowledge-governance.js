@@ -28,10 +28,15 @@ export function renderKnowledgeGovernance(ctx) {
   let pollTimer=null;
   let records={knowledge:[],playbooks:[],sources:[]},categoryFilter=[],statusFilter='all',keyword='',fullText=false;
   let sortField='updated_at',sortDir='desc',page=1,categoryFilterOpen=false;
+  // Scoped to this page instance; never retain knowledge text across sessions.
+  const contentCache=new Map();
+  const contentKey=row=>JSON.stringify([row.table,row.id,row.updated_at,row.contentVersion,row.lifecycle_status]);
   const main=ctx.main;
   const load=async()=>{
     const result=await data.knowledgeLibrary(ctx,'list');
     records={knowledge:result.knowledge||[],playbooks:result.playbooks||[],sources:result.sources||[]};
+    const currentKeys=new Set(rows().map(contentKey));
+    for(const key of contentCache.keys())if(!currentKeys.has(key))contentCache.delete(key);
     draw();
     clearTimeout(pollTimer);
     if(location.hash.includes('knowledge-governance')&&records.sources.some(row=>row.ocrProgress&&row.extractionStatus==='extracting'))pollTimer=setTimeout(()=>load().catch(()=>{}),12000);
@@ -78,6 +83,57 @@ export function renderKnowledgeGovernance(ctx) {
     }
     ctx.toast(result.queued?text('ocr_queued'):text('retry_success'),'ok');await load();
   };
+  const contentCells=row=>{
+    if(row.table==='knowledge_sources')return [
+      h('td',{class:'kg-summary-cell'},summaryOf(row)),h('td',{class:'kg-summary-cell'},'—'),
+    ];
+    const key=contentKey(row),historical=row.lifecycle_status==='superseded';
+    if(!contentCache.has(key))contentCache.set(key,{summary:false,text:false,status:'idle',record:null});
+    const entry=contentCache.get(key),parts=[];
+    const needsDetail=!!(row.gpt_original_preview||row.gpt_summary_preview)&&!historical;
+    const requestDetail=async()=>{
+      if(!needsDetail||entry.status==='loading'||entry.status==='ready')return;
+      entry.status='loading';entry.refresh();
+      try{
+        const result=await data.knowledgeLibrary(ctx,'content',{contentOperation:'get',data:{table:row.table,id:row.id}});
+        if(!result?.ok||!result.record?.original||!result.record?.gpt||result.record.table!==row.table||String(result.record.id)!==String(row.id))throw new Error('INVALID_CONTENT');
+        entry.record=result.record;entry.status='ready';
+      }catch(error){entry.status='error';}
+      entry.refresh();
+    };
+    const cells=['original','gpt'].map(pair=>h('td',{class:'kg-summary-cell kg-content-cell','data-kg-pair':pair},
+      ['summary','text'].map(part=>{
+        const id=`kg-content-${row.table}-${row.id}-${pair}-${part}`;
+        const body=h('div',{id,class:'kg-content-body',hidden:true});
+        const toggle=h('button',{class:'kg-content-toggle',type:'button','data-kg-part':part,
+          'aria-expanded':'false','aria-controls':id,title:text('linked_content'),onclick:()=>{
+            entry[part]=!entry[part];entry.refresh();
+            if(entry[part]&&entry.status==='idle')void requestDetail();
+          }},part==='summary'?t('kc_summary'):text('view_original'));
+        parts.push({pair,part,body,toggle});
+        return h('div',{class:'kg-content-part'},[toggle,body]);
+      })));
+    entry.refresh=()=>{
+      for(const {pair,part,body,toggle} of parts){
+        toggle.setAttribute('aria-expanded',String(entry[part]));body.hidden=!entry[part];
+        if(!entry[part]){body.replaceChildren();continue;}
+        if(pair==='gpt'&&needsDetail&&entry.status!=='ready'){
+          body.replaceChildren(h('span',{role:'status'},text(entry.status==='error'?'content_load_failed':'content_loading')));
+          if(entry.status==='error')body.append(h('button',{class:'btn btn-ghost btn-sm kg-content-retry',type:'button',onclick:()=>void requestDetail()},text('content_retry')));
+          continue;
+        }
+        // List responses already contain complete system content. GPT previews must
+        // never masquerade as full text. Historical rows keep their read-only preview.
+        const value=entry.record?entry.record[pair][part]:pair==='original'
+          ?(part==='summary'?row.metadata?.summary:row.table==='playbooks'?row.response_logic:row.content)
+          :(part==='summary'?row.gpt_summary_preview:row.gpt_original_preview);
+        body.replaceChildren(h('div',{class:'kg-full-content',tabindex:'0'},value?.trim()?value:t('kc_empty')));
+        if(pair==='gpt'&&historical&&value)body.append(h('small',{class:'kg-summary-note'},text('historical_preview')));
+      }
+    };
+    entry.refresh();
+    return cells;
+  };
   const draw=()=>{
     const all=rows(),query=keyword.trim().toLocaleLowerCase();
     const filtered=all.filter(row=>{
@@ -99,12 +155,11 @@ export function renderKnowledgeGovernance(ctx) {
     }},`${label}${sortField===field?(sortDir==='asc'?' ↑':' ↓'):''}`);
     const table=h('div',{class:'kg-table-wrap'},h('table',{class:'kg-table'},[
       h('thead',{},h('tr',{},[header('id',text('number')),header('title',text('title_column')),header('category',text('category')),
-        header('summary',text('summary')),h('th',{},t('kc_gpt_text')),h('th',{},t('kc_gpt_summary')),header('status',text('status')),header('updated_at',text('updated_at')),h('th',{},text('actions'))])),
+        header('summary',t('kc_original')),h('th',{},text('gpt_content')),header('status',text('status')),header('updated_at',text('updated_at')),h('th',{},text('actions'))])),
       h('tbody',{},pageRows.length?pageRows.map(row=>{
         const live=active(row),isSource=row.table==='knowledge_sources',isPlaybook=row.table==='playbooks';
         const superseded=row.lifecycle_status==='superseded';
         const editHref=isSource?'':`#/knowledge/edit/${row.table}/${row.id}`;
-        const summary=summaryOf(row);
         const actions=[
           !isSource&&!superseded?h('button',{class:'btn btn-ghost btn-sm kg-action-content',type:'button',onclick:()=>openKnowledgeContent(ctx,row,load).catch(error=>ctx.toast(error.message,'error'))},t('kc_title')):null,
           !isSource&&!superseded?h('a',{class:'btn btn-ghost btn-sm kg-action-edit',href:editHref},text('edit')):null,
@@ -118,16 +173,12 @@ export function renderKnowledgeGovernance(ctx) {
           h('td',{},[h('b',{},titleOf(row)||'—'),isPlaybook?h('small',{class:'kg-table-meta'},text('playbook')):null,
             !isSource?h('small',{class:'kg-table-meta'},`${t('kc_selected')}: ${t(row.selected_content_source==='gpt'?'kc_gpt':'kc_original')}${row.contentPaused?' · '+t('kc_paused'):''}`):null]),
           h('td',{class:'kg-category-tags'},categoriesOf(row).map(category=>h('span',{class:'kg-category-chip'},text(`category_${category}`)))),
-          h('td',{class:'kg-summary-cell'},[summary||'—',
-            !isSource?h('details',{class:'kg-row-content-details'},[h('summary',{},text('view_content')),
-              h('div',{class:'kg-full-content'},isPlaybook?row.response_logic:row.content)]):null]),
-          h('td',{class:'kg-summary-cell'},row.gpt_original_preview||'—'),
-          h('td',{class:'kg-summary-cell'},row.gpt_summary_preview||'—'),
+          ...contentCells(row),
           h('td',{},h('span',{class:`kg-status ${live?'kg-verified':'kg-invalidated'}`},text(row.ocrProgress?'status_processing':live?'status_active':'status_invalid'))),
           h('td',{},row.updated_at?String(row.updated_at).slice(0,10):'—'),
           h('td',{class:'kg-table-actions'},actions),
         ]);
-      }):h('tr',{},h('td',{colspan:'9',class:'kg-empty-cell'},text('no_results')))),
+      }):h('tr',{},h('td',{colspan:'8',class:'kg-empty-cell'},text('no_results')))),
     ]));
     const pager=h('div',{class:'kg-pager'},[
       h('span',{},text('result_count').replace('{count}',String(filtered.length))),

@@ -1053,12 +1053,21 @@ body:has(.login), body.is-login { padding-top: env(safe-area-inset-top); }
 .kg-home-card .kg-table th:nth-child(1),.kg-home-card .kg-table td:nth-child(1){width:5%}.kg-home-card .kg-table td:nth-child(1){min-width:0;max-width:none}
 .kg-home-card .kg-table th:nth-child(2),.kg-home-card .kg-table td:nth-child(2){width:15%}
 .kg-home-card .kg-table th:nth-child(3),.kg-home-card .kg-table td:nth-child(3){width:10%}
-.kg-home-card .kg-table th:nth-child(4),.kg-home-card .kg-table td:nth-child(4){width:18%}
-.kg-home-card .kg-table th:nth-child(5),.kg-home-card .kg-table td:nth-child(5){width:12%}
-.kg-home-card .kg-table th:nth-child(6),.kg-home-card .kg-table td:nth-child(6){width:12%}
-.kg-home-card .kg-table th:nth-child(7),.kg-home-card .kg-table td:nth-child(7){width:8%}
+.kg-home-card .kg-table th:nth-child(4),.kg-home-card .kg-table td:nth-child(4){width:21%}
+.kg-home-card .kg-table th:nth-child(5),.kg-home-card .kg-table td:nth-child(5){width:21%}
+.kg-home-card .kg-table th:nth-child(6),.kg-home-card .kg-table td:nth-child(6){width:8%}
+.kg-home-card .kg-table th:nth-child(7),.kg-home-card .kg-table td:nth-child(7){width:10%}
 .kg-home-card .kg-table th:nth-child(8),.kg-home-card .kg-table td:nth-child(8){width:10%}
-.kg-home-card .kg-table th:nth-child(9),.kg-home-card .kg-table td:nth-child(9){width:10%}
+.kg-home-card .kg-content-cell{min-width:0;max-width:none;white-space:normal}
+.kg-content-part+.kg-content-part{margin-top:4px}
+.kg-content-toggle{display:flex;align-items:center;gap:5px;width:100%;min-height:32px;padding:4px 0;border:0;background:transparent;color:var(--ink-2);font:inherit;text-align:left;cursor:pointer;overflow-wrap:anywhere}
+.kg-content-toggle::before{content:'';flex:none;width:6px;height:6px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(-45deg)}
+.kg-content-toggle[aria-expanded=true]::before{transform:rotate(45deg)}
+.kg-content-toggle:focus-visible{outline:2px solid var(--red);outline-offset:2px}
+.kg-content-body{font-size:12px;overflow-wrap:anywhere}
+.kg-content-body[hidden]{display:none}
+.kg-content-body .kg-full-content{max-height:220px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;padding:6px 0}
+.kg-content-body .kg-content-retry{white-space:normal;margin-top:6px;max-width:100%}
 .kg-home-card .kg-table td:nth-child(2){min-width:0;max-width:none;overflow-wrap:anywhere}
 .kg-home-card .kg-table .kg-number-cell{font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--ink-600,#565e6b)}
 .kg-home-card .kg-table .kg-category-tags{min-width:0}

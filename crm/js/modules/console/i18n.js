@@ -2,6 +2,13 @@
 const DEFAULT = 'zh-CN';
 
 const DICT = {
+  kg_gpt_content: {'zh-CN':'GPT内容','en':'GPT content'},
+  kg_view_original: {'zh-CN':'查看原文','en':'View original text'},
+  kg_linked_content: {'zh-CN':'同时展开或收起本行的系统内容与 GPT 内容','en':'Expand or collapse both versions in this row'},
+  kg_content_loading: {'zh-CN':'正在加载完整内容…','en':'Loading full content…'},
+  kg_content_load_failed: {'zh-CN':'完整内容加载失败，请重试。','en':'Could not load full content. Please retry.'},
+  kg_content_retry: {'zh-CN':'重新加载','en':'Retry loading'},
+  kg_historical_preview: {'zh-CN':'历史版本：仅提供预览，可能不完整。','en':'Historical version: preview only; may be incomplete.'},
   kc_title: {'zh-CN':'内容版本','en':'Content versions'},
   kc_intro: {'zh-CN':'分别维护两套内容；先保存，再选择整套引用。清空已选内容会暂停引用。','en':'Maintain both pairs. Save, then select a complete pair. Clearing selected content pauses its use.'},
   kc_original: {'zh-CN':'系统内容','en':'System content'},
