@@ -37,7 +37,7 @@ Database integration used a synthetic `public.knowledge_items` row and `service_
 
 Baseline was checked at GitHub master `4031c572adc006f4eb8ed5e8e1ab01b6db3068cf`, with the production page/assets and all 29 function source/config sets matching. The original dirty checkout was preserved in stash `codex preserve pre-sync local WIP 20261030`; it was not included.
 
-Release commit/tag: pending final Git publication.
+Release tag planned: `release-20261030-202500`. The tag will identify the published release commit.
 
 Deployment completed to production `crm-d1gkae8ddc930d151`:
 
