@@ -5,6 +5,7 @@ const { InteractionService } = require('./interaction-service');
 const { InsuranceContextService } = require('./insurance-context-service');
 const { classifyContextItems } = require('./context-facts');
 const { HouseholdContextService } = require('./household-context');
+const { CONTENT_COLUMNS, projectContent } = require('./knowledge-content');
 
 const OPEN_OPPORTUNITY_STATUSES = new Set(['成交', '关闭']);
 const SOURCE = table => ({ schema: 'public', table });
@@ -92,29 +93,32 @@ class MeetingPrepContextBuilder {
     const openOpportunities = [...opportunityById.values()]
       .sort((a, b) => String(b.updated_at || '').localeCompare(String(a.updated_at || ''))).slice(0, 10);
     const recent = Array.isArray(interactions?.rows) ? interactions.rows : [];
-    const [knowledgeRows, playbookRows] = await Promise.all([
-      read('knowledge_items', { select: 'id,source_id,item_type,source,verified,confidence,content,metadata,lifecycle_status,deleted_at',
+    const [knowledgeRaw, playbookRaw] = await Promise.all([
+      read('knowledge_items', { select: 'id,source_id,item_type,source,verified,confidence,content,metadata,lifecycle_status,deleted_at,valid_from,valid_to,'+CONTENT_COLUMNS,
         lifecycle_status: 'eq.verified', verified: 'eq.true', deleted_at:'is.null', order: 'updated_at.desc,id.desc', limit: 30 }),
-      read('playbooks', { select: 'id,scenario,objection,possible_underlying_reasons,clarifying_questions,response_logic,do_not_say,next_objective,source,confidence,metadata,lifecycle_status,deleted_at',
+      read('playbooks', { select: 'id,scenario,objection,possible_underlying_reasons,clarifying_questions,response_logic,do_not_say,next_objective,source,confidence,metadata,lifecycle_status,deleted_at,valid_from,valid_to,'+CONTENT_COLUMNS,
         lifecycle_status: 'eq.verified', deleted_at:'is.null', order: 'updated_at.desc,id.desc', limit: 30 }),
     ]);
-    const sourceIds = [...new Set(knowledgeRows.map(row => row.source_id).filter(value => value != null).map(String))];
+    const sourceIds = [...new Set(knowledgeRaw.map(row => row.source_id).filter(value => value != null).map(String))];
     const sourceRows = sourceIds.length ? await read('knowledge_sources', {
-      select: 'id,lifecycle_status,deleted_at', id: `in.(${sourceIds.join(',')})`, deleted_at: 'is.null', limit: 100,
+      select: 'id,lifecycle_status,deleted_at,sha256,version_no,review_at,valid_from,valid_to', id: `in.(${sourceIds.join(',')})`, deleted_at: 'is.null', limit: 100,
     }) : [];
     const availableSources = new Set(sourceRows.filter(row => row.lifecycle_status === 'verified').map(row => String(row.id)));
+    const today=this.now().toISOString().slice(0,10);
+    const knowledgeRows=knowledgeRaw.map(row=>projectContent(row,'knowledge_items',sourceRows.find(s=>String(s.id)===String(row.source_id)),today)).filter(Boolean);
+    const playbookRows=playbookRaw.map(row=>projectContent(row,'playbooks',null,today)).filter(Boolean);
     const evidenceById = new Map(knowledgeRows.filter(row => row.item_type === 'evidence' && row.verified === true &&
       (row.source_id == null || availableSources.has(String(row.source_id))) &&
       row.confidence != null && Number(row.confidence) >= 0.7 && clip(row.source, 500) && clip(row.content, 5000))
       .map(row => [String(row.id), row]));
     const curatedEvidence = [...evidenceById.values()].slice(0, 12).map(row => ({
       content: clip(row.content, 1000), source: clip(row.source, 300), confidence: Number(row.confidence),
-      published_at: row.metadata?.published_at || null, reference: { ...SOURCE('knowledge_items'), id: row.id, item_type: 'evidence' },
+      summary:row.metadata?.summary||'',published_at: row.metadata?.published_at || null, reference: { ...SOURCE('knowledge_items'), id: row.id, item_type: 'evidence',...row.contentReference },
     }));
     const curatedPlaybooks = playbookRows.map(row => ({ row, score: playbookScore(row, objection, scenario) }))
       .filter(({ row, score }) => score > 0 && Number(row.confidence) >= 0.7)
       .sort((a,b) => b.score - a.score).slice(0, 3).map(({row}) => ({ scenario: clip(row.scenario, 160), objection: clip(row.objection, 500),
-        response_logic: clip(row.response_logic, 2000), possible_underlying_reasons: row.possible_underlying_reasons,
+        response_logic: clip(row.response_logic, 2000), summary:row.metadata?.summary||'',reference:{...SOURCE('playbooks'),id:row.id,...row.contentReference},possible_underlying_reasons: row.possible_underlying_reasons,
         clarifying_questions: row.clarifying_questions, do_not_say: row.do_not_say,
         next_objective: clip(row.next_objective, 300), published_at: row.metadata?.published_at || null }));
 

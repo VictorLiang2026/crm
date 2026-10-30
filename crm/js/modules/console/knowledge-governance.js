@@ -2,6 +2,7 @@ import { h } from './dom.js';
 import { pageHead, emptyNote } from './ui.js';
 import { t } from './i18n.js';
 import { data } from './data.js';
+import { openKnowledgeContent } from './knowledge-content.js';
 
 const text = key => t(`kg_${key}`);
 const CATEGORIES = ['on_sale_product','existing_service','recruitment_policy','industry_development',
@@ -17,7 +18,7 @@ const categoriesOf = row => Array.isArray(row.metadata?.categories) && row.metad
 const active = row => (row.lifecycle_status || (row.verified ? 'verified' : 'draft')) === 'verified';
 const titleOf = row => row.table === 'playbooks' ? `${row.scenario || ''}${row.objection ? ` · ${row.objection}` : ''}`
   : row.table === 'knowledge_sources' ? row.title || row.fileName || '' : row.source || '';
-const summaryOf = row => row.table === 'playbooks' ? row.response_logic || ''
+const summaryOf = row => row.contentManaged ? row.metadata?.summary || '' : row.table === 'playbooks' ? row.metadata?.summary || row.response_logic || ''
   : row.table === 'knowledge_sources' ? (row.ocrProgress ? (row.ocrProgress.stage==='summarize' ? text('ocr_summarizing') : text('ocr_progress').replace('{done}',String(row.ocrProgress.completedPages)).replace('{total}',row.ocrProgress.totalPages?String(row.ocrProgress.totalPages):'…')) : text('source_pending_summary')) : row.metadata?.summary || String(row.content || '').slice(0,220);
 const errorCodeOf = error => String(error?.message||'').match(/^([A-Z][A-Z0-9_]+)(?::|$)/)?.[1]||'';
 const retryErrorText = error => errorCodeOf(error)==='PDF_NO_TEXT'?text('pdf_no_text')
@@ -98,13 +99,14 @@ export function renderKnowledgeGovernance(ctx) {
     }},`${label}${sortField===field?(sortDir==='asc'?' ↑':' ↓'):''}`);
     const table=h('div',{class:'kg-table-wrap'},h('table',{class:'kg-table'},[
       h('thead',{},h('tr',{},[header('id',text('number')),header('title',text('title_column')),header('category',text('category')),
-        header('summary',text('summary')),header('status',text('status')),header('updated_at',text('updated_at')),h('th',{},text('actions'))])),
+        header('summary',text('summary')),h('th',{},t('kc_gpt_text')),h('th',{},t('kc_gpt_summary')),header('status',text('status')),header('updated_at',text('updated_at')),h('th',{},text('actions'))])),
       h('tbody',{},pageRows.length?pageRows.map(row=>{
         const live=active(row),isSource=row.table==='knowledge_sources',isPlaybook=row.table==='playbooks';
         const superseded=row.lifecycle_status==='superseded';
         const editHref=isSource?'':`#/knowledge/edit/${row.table}/${row.id}`;
         const summary=summaryOf(row);
         const actions=[
+          !isSource&&!superseded?h('button',{class:'btn btn-ghost btn-sm kg-action-content',type:'button',onclick:()=>openKnowledgeContent(ctx,row,load).catch(error=>ctx.toast(error.message,'error'))},t('kc_title')):null,
           !isSource&&!superseded?h('a',{class:'btn btn-ghost btn-sm kg-action-edit',href:editHref},text('edit')):null,
           isSource&&row.extractionStatus==='failed'?h('button',{class:'btn btn-ghost btn-sm kg-action-retry',type:'button',
             onclick:()=>retry(row).catch(error=>ctx.toast(error.message,'error'))},text('retry')):null,
@@ -113,16 +115,19 @@ export function renderKnowledgeGovernance(ctx) {
         ].filter(Boolean);
         return h('tr',{'data-kg-id':String(row.id)},[
           h('td',{class:'kg-number-cell'},`${row.table==='knowledge_items'?'K':isPlaybook?'P':'S'}-${row.id}`),
-          h('td',{},[h('b',{},titleOf(row)||'—'),isPlaybook?h('small',{class:'kg-table-meta'},text('playbook')):null]),
+          h('td',{},[h('b',{},titleOf(row)||'—'),isPlaybook?h('small',{class:'kg-table-meta'},text('playbook')):null,
+            !isSource?h('small',{class:'kg-table-meta'},`${t('kc_selected')}: ${t(row.selected_content_source==='gpt'?'kc_gpt':'kc_original')}${row.contentPaused?' · '+t('kc_paused'):''}`):null]),
           h('td',{class:'kg-category-tags'},categoriesOf(row).map(category=>h('span',{class:'kg-category-chip'},text(`category_${category}`)))),
           h('td',{class:'kg-summary-cell'},[summary||'—',
             !isSource?h('details',{class:'kg-row-content-details'},[h('summary',{},text('view_content')),
               h('div',{class:'kg-full-content'},isPlaybook?row.response_logic:row.content)]):null]),
+          h('td',{class:'kg-summary-cell'},row.gpt_original_preview||'—'),
+          h('td',{class:'kg-summary-cell'},row.gpt_summary_preview||'—'),
           h('td',{},h('span',{class:`kg-status ${live?'kg-verified':'kg-invalidated'}`},text(row.ocrProgress?'status_processing':live?'status_active':'status_invalid'))),
           h('td',{},row.updated_at?String(row.updated_at).slice(0,10):'—'),
           h('td',{class:'kg-table-actions'},actions),
         ]);
-      }):h('tr',{},h('td',{colspan:'7',class:'kg-empty-cell'},text('no_results')))),
+      }):h('tr',{},h('td',{colspan:'9',class:'kg-empty-cell'},text('no_results')))),
     ]));
     const pager=h('div',{class:'kg-pager'},[
       h('span',{},text('result_count').replace('{count}',String(filtered.length))),

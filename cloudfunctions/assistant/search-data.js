@@ -23,6 +23,13 @@ function createSearchData({ env, key, fetchImpl = fetch } = {}) {
         signal: controller.signal,
       });
       if (!response.ok) {
+        if (path === 'rpc/crm_knowledge_content_v1') {
+          let code='PERSISTENCE_ERROR';
+          try { const failure=JSON.parse(await response.text());
+            if (/^CONTENT_[A-Z_]{1,64}$/.test(failure?.message||'')) code=failure.message;
+          } catch (_) {}
+          const error=new Error(code);error.code=code;throw error;
+        }
         if (path === 'rpc/crm_ai_claim_v2') {
           let code = 'UNKNOWN';
           let category = 'DB_ERROR_OTHER';
@@ -79,7 +86,7 @@ function createSearchData({ env, key, fetchImpl = fetch } = {}) {
   }, async rpc(name, args) {
     if (!['crm_ai_claim_v2', 'crm_ai_finish_v1', 'crm_ai_finish_dual_v1',
       'crm_ai_select_dual_v1', 'crm_knowledge_source_review_v1','crm_knowledge_review_v1',
-      'crm_knowledge_set_valid_v1'].includes(name)) throw new Error('Invalid AI audit RPC');
+      'crm_knowledge_set_valid_v1','crm_knowledge_content_v1'].includes(name)) throw new Error('Invalid AI audit RPC');
     const data = await request(`rpc/${name}`, 'POST', {}, args);
     if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('Invalid AI audit RPC response');
     return { data };

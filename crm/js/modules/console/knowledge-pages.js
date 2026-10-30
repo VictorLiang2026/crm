@@ -139,6 +139,13 @@ export function renderKnowledgeEditor(ctx,{mode='new',table='knowledge_items',id
       const source=table==='playbooks'?result.playbooks?.find(row=>String(row.id)===String(id)):
         result.knowledge?.find(row=>String(row.id)===String(id));
       if(!source)throw new Error(text('edit_not_found'));
+      if(source.contentManaged){
+        for(const name of ['content','summary','response_logic'])if(form.elements[name]){
+          form.elements[name].readOnly=true;form.elements[name].required=false;
+        }
+        formStatus.replaceChildren(h('p',{},t('kc_managed_edit')),h('button',{type:'button',class:'btn btn-primary',
+          onclick:()=>openKnowledgeContent(ctx,{...source,table},()=>{location.hash='#/knowledge-governance';})},t('kc_title')));
+      }
       form.elements.expectedUpdatedAt.value=source.updated_at||'';
       setCategories(form,categoriesOf({...source,table}));
       const assign=(name,value)=>{if(form.elements[name]&&value!=null)form.elements[name].value=String(value);};
@@ -180,3 +187,4 @@ export function renderKnowledgeTrash(ctx){
     h('section',{class:'card'},[h('div',{class:'card-body'},[status,list])]));
   load().catch(error=>{list.replaceChildren(emptyNote(text('load_failed'),String(error.message||'')));});
 }
+import { openKnowledgeContent } from './knowledge-content.js';

@@ -1,4 +1,5 @@
 'use strict';
+const { contentVersions, managementRow } = require('./knowledge-content');
 
 const TYPES = new Set(['evidence', 'case', 'story']);
 const STATES = new Set(['draft', 'verified', 'superseded', 'invalidated']);
@@ -23,7 +24,8 @@ class KnowledgeGovernanceService {
       this.request('knowledge_items', 'GET', { select: '*', deleted_at:'is.null', order: 'updated_at.desc,id.desc', limit: 200 }),
       this.request('playbooks', 'GET', { select: '*', deleted_at:'is.null', order: 'updated_at.desc,id.desc', limit: 200 }),
     ]);
-    return { knowledge, playbooks };
+    return { knowledge:knowledge.map(row=>managementRow(row,'knowledge_items')),
+      playbooks:playbooks.map(row=>managementRow(row,'playbooks')) };
   }
 
   async save(data, uid) {
@@ -73,6 +75,13 @@ class KnowledgeGovernanceService {
         revisionNote: clip(data.revisionNote, 500),
       }, updated_by: uid,
     };
+    if(current?.content_state?.original){
+      const original=contentVersions(current,table).original,field=isPlaybook?'response_logic':'content';
+      if(String(data[field]||'').trim()!==String(original.text||'').trim())throw new Error('CONTENT_USE_VERSION_EDITOR');
+      payload[field]=current[field];
+      // Metadata and structured playbook fields keep their existing editor; content stays version-managed.
+      payload.metadata.summary=current.metadata?.summary;
+    }
     if (!Array.isArray(payload.metadata.categories) || !payload.metadata.categories.length ||
         payload.metadata.categories.some(category => !CATEGORIES.has(category))) throw new Error('Select at least one valid category');
     const mainText = isPlaybook ? [payload.scenario, payload.response_logic] : [payload.source, payload.content];

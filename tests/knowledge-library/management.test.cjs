@@ -24,6 +24,19 @@ function setup({current=null,manualSummary=false}={}){
   return {service,writes,gatewayCalls,rpcCalls};
 }
 function response(value){return {ok:true,text:async()=>JSON.stringify(value)};}
+test('managed knowledge keeps metadata edits while refusing legacy content overwrite',async()=>{
+  const sig=require('node:crypto').createHash('md5').update('Base text\x1fBase summary').digest('hex');
+  const current={id:7,item_type:'evidence',source:'Old title',content:'Base text',metadata:{summary:'Base summary'},verified:true,
+    lifecycle_status:'verified',updated_at:'stamp',gpt_original_text:'GPT',gpt_summary:'Summary',selected_content_source:'gpt',
+    content_state:{baseSignature:sig,original:{text:'Managed text',summary:'Managed summary',reviewed:true},gpt:{reviewed:true}}};
+  const {service,writes,gatewayCalls,rpcCalls}=setup({current});
+  const data={id:7,title:'New title',categories:['other'],content:'Managed text',summary:'Managed summary',expectedUpdatedAt:'stamp',confidence:.9};
+  await service.run({operation:'save',data},'actor');
+  assert.equal(writes[0].body.source,'New title');assert.equal(writes[0].body.content,undefined);
+  assert.equal(writes[0].body.metadata.summary,'Base summary');assert.equal(writes[0].body.content_state,undefined);
+  assert.equal(gatewayCalls.length,0);assert.equal(rpcCalls.length,0);
+  await assert.rejects(()=>service.run({operation:'save',data:{...data,content:'Overwrite'}},'actor'),e=>e.code==='CONTENT_USE_VERSION_EDITOR');
+});
 const base={domain:'product',title:'Product overview',content:'Product content to summarize',sourceDate:'2026-10-01',confidence:.8};
 
 test('new knowledge uses the AI Gateway summary and stores it separately in metadata',async()=>{

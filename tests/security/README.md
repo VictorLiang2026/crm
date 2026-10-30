@@ -12,6 +12,8 @@
 
 ## 运行
 
+2026-10-30 知识内容版本：仅加入 `knowledge_content_commands` 及两个 `crm_knowledge_content*_v1` RPC。确认命令表 FORCE RLS、service_role-only 策略、SELECT/INSERT/UPDATE 最小授权，RPC 仅服务角色可执行。新表继承的默认全权限已通过单独迁移收紧。1181 项完整目录断言无其他对象漂移。
+
 1. 确认 CloudBase 环境为 `crm-d1gkae8ddc930d151`，使用 `queryPgDatabase(action="sql", limit=1)` 执行 `verify-public.sql` 全文。结果必须 `success=true`、`returnedRows=1`、`truncated=false`。
 2. 将工具返回的 JSON 或其中 `data.rows[0].snapshot` 保存为 `tests/security/.results/live.json`，不要将凭据或业务行写进文件。此目录已被 Git 忽略。
 3. 运行 `node tests/security/run.cjs --input tests/security/.results/live.json --output tests/security/.results/report.json`。退出码 0 为通过；非 0 为失败。`npm run test:security` 测试断言引擎的拒绝路径。

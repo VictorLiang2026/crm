@@ -1050,20 +1050,22 @@ body:has(.login), body.is-login { padding-top: env(safe-area-inset-top); }
 .kg-category-filter>summary{list-style:none}
 .kg-status-filter{box-sizing:border-box;min-height:42px;min-width:142px;padding:8px 10px;border:1px solid var(--line,#e3e5e9);border-radius:8px;background:#fff;color:var(--ink,#2e333b);font:inherit}
 .kg-home-card .kg-table{width:100%;min-width:100%;table-layout:fixed}
-.kg-home-card .kg-table th:nth-child(1),.kg-home-card .kg-table td:nth-child(1){width:7%}.kg-home-card .kg-table td:nth-child(1){min-width:0;max-width:none}
-.kg-home-card .kg-table th:nth-child(2),.kg-home-card .kg-table td:nth-child(2){width:20%}
-.kg-home-card .kg-table th:nth-child(3),.kg-home-card .kg-table td:nth-child(3){width:13%}
-.kg-home-card .kg-table th:nth-child(4),.kg-home-card .kg-table td:nth-child(4){width:33%}
-.kg-home-card .kg-table th:nth-child(5),.kg-home-card .kg-table td:nth-child(5){width:8%}
-.kg-home-card .kg-table th:nth-child(6),.kg-home-card .kg-table td:nth-child(6){width:10%}
-.kg-home-card .kg-table th:nth-child(7),.kg-home-card .kg-table td:nth-child(7){width:9%}
+.kg-home-card .kg-table th:nth-child(1),.kg-home-card .kg-table td:nth-child(1){width:5%}.kg-home-card .kg-table td:nth-child(1){min-width:0;max-width:none}
+.kg-home-card .kg-table th:nth-child(2),.kg-home-card .kg-table td:nth-child(2){width:15%}
+.kg-home-card .kg-table th:nth-child(3),.kg-home-card .kg-table td:nth-child(3){width:10%}
+.kg-home-card .kg-table th:nth-child(4),.kg-home-card .kg-table td:nth-child(4){width:18%}
+.kg-home-card .kg-table th:nth-child(5),.kg-home-card .kg-table td:nth-child(5){width:12%}
+.kg-home-card .kg-table th:nth-child(6),.kg-home-card .kg-table td:nth-child(6){width:12%}
+.kg-home-card .kg-table th:nth-child(7),.kg-home-card .kg-table td:nth-child(7){width:8%}
+.kg-home-card .kg-table th:nth-child(8),.kg-home-card .kg-table td:nth-child(8){width:10%}
+.kg-home-card .kg-table th:nth-child(9),.kg-home-card .kg-table td:nth-child(9){width:10%}
 .kg-home-card .kg-table td:nth-child(2){min-width:0;max-width:none;overflow-wrap:anywhere}
 .kg-home-card .kg-table .kg-number-cell{font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--ink-600,#565e6b)}
 .kg-home-card .kg-table .kg-category-tags{min-width:0}
 .kg-home-card .kg-table .kg-category-chip{display:block;width:max-content;max-width:100%;box-sizing:border-box;margin:0 0 5px;padding:3px 7px;border:1px solid var(--line,#e3e5e9);border-radius:999px;background:#f7f8fa;color:var(--ink-600,#565e6b);font-size:11px;white-space:normal;overflow-wrap:anywhere}
 .kg-home-card .kg-table-actions{white-space:normal}
 .kg-home-card .kg-table-actions .btn{display:flex;box-sizing:border-box;width:max-content;max-width:100%;height:auto;min-height:0;margin:0 0 4px;padding:3px 7px;justify-content:center;border-width:1px;border-radius:999px;font-size:11px;line-height:1.2;text-align:center;white-space:normal}
-.kg-home-card .kg-table-actions .kg-action-edit,.kg-home-card .kg-table-actions .kg-action-retry{background:#edf3ff;border-color:#cfddf4;color:#315a91}
+.kg-home-card .kg-table-actions .kg-action-edit,.kg-home-card .kg-table-actions .kg-action-retry,.kg-home-card .kg-table-actions .kg-action-content{background:#edf3ff;border-color:#cfddf4;color:#315a91}
 .kg-home-card .kg-table-actions .kg-action-activate{background:#eaf6ee;border-color:#cbe7d3;color:#286b41}
 .kg-home-card .kg-table-actions .kg-action-invalidate{background:#fff4e5;border-color:#f0d8ae;color:#805414}
 .kg-home-card .kg-table-actions .kg-action-delete{background:#fff0f0;border-color:#efcece;color:#963f45}
@@ -1082,3 +1084,13 @@ body:has(.login), body.is-login { padding-top: env(safe-area-inset-top); }
 .playbook-response-details>summary{min-height:44px;display:list-item;list-style-position:inside;padding:10px 2px;cursor:pointer;color:var(--blue,#385d9c);font-size:13px;font-weight:600}
 .playbook-response-details:not([open])>.playbook-response-body{display:none}
 .playbook-response-body{padding:2px 4px 8px}
+/* Paired knowledge content: iPad panel, existing sheet and controls. */
+.kc-panel { padding: 0 20px 24px; }
+.kc-editor { padding: 12px 0; border-bottom: 1px solid #dfe3e8; }
+.kc-editor label { display: block; margin: 10px 0; }
+.kc-editor textarea { display: block; width: 100%; box-sizing: border-box; margin-top: 6px; padding: 10px; border: 1px solid var(--line,#dfe3e8); border-radius: 8px; font: inherit; }
+.kc-review input { margin-right: 8px; }
+.kc-compare { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; }
+.kc-pair-preview pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 240px; overflow: auto; font: inherit; }
+.kc-candidate-note { padding: 10px; background: #fff5d9; color: #5c4200; border-radius: 8px; }
+.kc-panel .kg-form-actions { flex-wrap: wrap; gap: 8px; }

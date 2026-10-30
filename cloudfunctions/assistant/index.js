@@ -392,7 +392,7 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
           'STORAGE_FAILED','INVALID_ACTOR',
           'NOT_FOUND','INVALID_OPERATION','PERSISTENCE_ERROR','UNAUTHORIZED',
           'PERMISSION_DENIED','DUPLICATE_SOURCE','AI_IN_PROGRESS','AI_RETRY_LATER','AI_AUDIT_UNKNOWN',
-          'INVALID_RESULT','INVALID_CONFIG','TIMEOUT','UPSTREAM_UNAVAILABLE','AI_REQUEST_FAILED'].includes(error?.code)
+          'INVALID_RESULT','INVALID_CONFIG','TIMEOUT','UPSTREAM_UNAVAILABLE','AI_REQUEST_FAILED'].includes(error?.code) || /^CONTENT_[A-Z_]{1,64}$/.test(error?.code||'')
           ? error.code : 'KNOWLEDGE_LIBRARY_FAILED';
         return {ok:false,error:{code,message:'Knowledge library operation could not be completed'}};
       }

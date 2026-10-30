@@ -2,6 +2,7 @@
 'use strict';
 
 const { defaultRegistry } = require('./skill-registry');
+const { CONTENT_COLUMNS, projectContent } = require('./knowledge-content');
 
 const SKILL = 'conversation_playbook';
 const SOURCE = table => ({ schema: 'public', table });
@@ -61,25 +62,27 @@ class ConversationPlaybookContextBuilder {
         person_id: `eq.${personId}`, order: 'created_at.desc,id.desc', limit: 30 }),
       read('opportunities', { select: 'id,opportunity_type,status,last_progress,next_action',
         person_id: `eq.${personId}`, deleted_at: 'is.null', order: 'updated_at.desc,id.desc', limit: 15 }),
-      read('playbooks', { select: 'id,scenario,objection,possible_underlying_reasons,clarifying_questions,response_logic,evidence_refs,do_not_say,next_objective',
+      read('playbooks', { select: 'id,scenario,objection,possible_underlying_reasons,clarifying_questions,response_logic,evidence_refs,do_not_say,next_objective,metadata,lifecycle_status,deleted_at,valid_from,valid_to,'+CONTENT_COLUMNS,
         order: 'created_at.desc,id.desc', limit: 60 }),
     ]);
 
     const today = this.now().toISOString().slice(0, 10);
-    const playbooks = playbookRows.map(row => ({ row, score: playbookScore(row, input.objection, input.scenario) }))
+    const playbooks = playbookRows.map(row=>projectContent(row,'playbooks',null,today)).filter(Boolean).map(row => ({ row, score: playbookScore(row, input.objection, input.scenario) }))
       .filter(item => item.score > 0).sort((a, b) => b.score - a.score)
       .slice(0, 3).map(item => item.row);
     const evidenceIds = [...new Set(playbooks.flatMap(row => Array.isArray(row.evidence_refs) ? row.evidence_refs : [])
       .map(value => { try { return idOf(value); } catch (_) { return null; } }).filter(Boolean))].slice(0, 20);
     const evidenceRows = evidenceIds.length ? await read('knowledge_items', {
-      select: 'id,item_type,source,source_date,valid_from,valid_to,verified,confidence,content',
+      select: 'id,source_id,item_type,source,source_date,valid_from,valid_to,verified,confidence,content,metadata,lifecycle_status,deleted_at,'+CONTENT_COLUMNS,
       id: `in.(${evidenceIds.join(',')})`, limit: 20,
     }) : [];
     const validIds = new Set(evidenceIds);
-    const evidence = evidenceRows.filter(row => validIds.has(String(row.id)) && reliableEvidence(row, today))
+    const sourceIds=[...new Set(evidenceRows.map(row=>row.source_id).filter(Boolean))];
+    const sources=sourceIds.length?await read('knowledge_sources',{select:'id,lifecycle_status,deleted_at,sha256,version_no,review_at,valid_from,valid_to',id:`in.(${sourceIds.join(',')})`,limit:20}):[];
+    const evidence = evidenceRows.map(row=>projectContent(row,'knowledge_items',sources.find(s=>String(s.id)===String(row.source_id)),today)).filter(Boolean).filter(row => validIds.has(String(row.id)) && reliableEvidence(row, today))
       .slice(0, 12).map(row => ({ id: row.id, source_name: clip(row.source, 300),
         source_date: row.source_date || null, content: clip(row.content, 600),
-        confidence: Number(row.confidence), source: { ...SOURCE('knowledge_items'), id: row.id } }));
+        summary:row.metadata?.summary||'',confidence: Number(row.confidence), source: { ...SOURCE('knowledge_items'), id: row.id,...row.contentReference } }));
     const current = itemRows.filter(row => (!row.valid_from || row.valid_from <= today) &&
       (!row.valid_to || row.valid_to >= today));
     const contextItem = row => ({ category: clip(row.category, 80), content: clip(row.content, 400),
@@ -104,7 +107,7 @@ class ConversationPlaybookContextBuilder {
         possible_underlying_reasons: (row.possible_underlying_reasons || []).slice(0, 6).map(v => clip(v, 300)),
         clarifying_questions: (row.clarifying_questions || []).slice(0, 8).map(v => clip(v, 300)),
         response_logic: clip(row.response_logic, 1200), do_not_say: (row.do_not_say || []).slice(0, 6).map(v => clip(v, 300)),
-        next_objective: clip(row.next_objective, 400), source: { ...SOURCE('playbooks'), id: row.id } })),
+        summary:row.metadata?.summary||'',next_objective: clip(row.next_objective, 400), source: { ...SOURCE('playbooks'), id: row.id,...row.contentReference } })),
       reliable_evidence: evidence,
     };
     defaultRegistry.validateContext(SKILL, context);
