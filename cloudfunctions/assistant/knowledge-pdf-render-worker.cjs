@@ -1,6 +1,7 @@
 'use strict';
 
-const MAX_PAGES=40,MAX_IMAGE_BYTES=768*1024,MAX_BATCH=3;
+const {MAX_PAGES}=require('./knowledge-pdf-limits');
+const MAX_IMAGE_BYTES=768*1024,MAX_BATCH=3;
 const respond=value=>{if(process.connected)process.send(value,()=>{});};
 
 process.once('message',message=>(async()=>{
@@ -17,9 +18,9 @@ process.once('message',message=>(async()=>{
   loading.onPassword=()=>{passwordRequested=true;throw Error('PDF_ENCRYPTED');};
   try{
     const document=await loading.promise;
-    if(document.numPages>MAX_PAGES)throw Error('PDF_LIMIT');
+    if(document.numPages>MAX_PAGES)throw Error('PDF_PAGE_LIMIT');
     const startPage=Number(message?.startPage||1),maxPages=Number(message?.maxPages||MAX_PAGES);
-    if(!Number.isSafeInteger(startPage)||startPage<1||!Number.isSafeInteger(maxPages)||maxPages<1||maxPages>MAX_PAGES) throw Error('PDF_LIMIT');
+    if(!Number.isSafeInteger(startPage)||startPage<1||!Number.isSafeInteger(maxPages)||maxPages<1||maxPages>MAX_PAGES) throw Error('PDF_PAGE_LIMIT');
     if(startPage>document.numPages){respond({type:'start',pageCount:document.numPages});respond({type:'done',nextPage:startPage});return;}
     respond({type:'start',pageCount:document.numPages});
     const endPage=Math.min(document.numPages,startPage+maxPages-1);
@@ -62,7 +63,7 @@ process.once('message',message=>(async()=>{
     respond({type:'done',nextPage:endPage+1});
   }catch(error){
     const code=passwordRequested||error.name==='PasswordException'?'PDF_ENCRYPTED':
-      ['PDF_LIMIT','PDF_RENDER_LIMIT','PDF_OCR_FAILED','INVALID_CONTENT'].includes(error.message)?error.message:'INVALID_CONTENT';
+      ['PDF_PAGE_LIMIT','PDF_RENDER_LIMIT','PDF_OCR_FAILED','INVALID_CONTENT'].includes(error.message)?error.message:'INVALID_CONTENT';
     respond({type:'error',error:code});
   }finally{await loading.destroy().catch(()=>{});if(process.connected)process.disconnect();}
-})().catch(error=>respond({type:'error',error:['PDF_LIMIT','PDF_RENDER_LIMIT','PDF_OCR_FAILED'].includes(error?.message)?error.message:'INVALID_CONTENT'})));
+})().catch(error=>respond({type:'error',error:['PDF_PAGE_LIMIT','PDF_RENDER_LIMIT','PDF_OCR_FAILED'].includes(error?.message)?error.message:'INVALID_CONTENT'})));

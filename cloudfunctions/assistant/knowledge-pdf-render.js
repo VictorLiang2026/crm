@@ -2,7 +2,8 @@
 
 const {fork}=require('node:child_process');
 const path=require('node:path');
-const MAX_BYTES=30_000_000,MAX_PAGES=40,TIMEOUT_MS=65000;
+const {MAX_BYTES,MAX_PAGES}=require('./knowledge-pdf-limits');
+const TIMEOUT_MS=65000;
 
 function renderPdfPages(bytes,{onBatch,forkProcess=fork,timeoutMs=TIMEOUT_MS,startPage=1,maxPages=MAX_PAGES}={}){
   if(!Buffer.isBuffer(bytes)||!bytes.subarray(0,5).equals(Buffer.from('%PDF-')))
@@ -30,7 +31,7 @@ function renderPdfPages(bytes,{onBatch,forkProcess=fork,timeoutMs=TIMEOUT_MS,sta
     child.on('message',message=>{
       if(message?.type==='start'){
         pageCount=Number(message.pageCount);
-        if(!Number.isSafeInteger(pageCount)||pageCount<1||pageCount>MAX_PAGES)finish('PDF_LIMIT');
+        if(!Number.isSafeInteger(pageCount)||pageCount<1||pageCount>MAX_PAGES)finish('PDF_PAGE_LIMIT');
         return;
       }
       if(message?.type==='error')return finish(message.error||'PDF_OCR_FAILED');

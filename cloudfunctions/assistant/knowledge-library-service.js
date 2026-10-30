@@ -7,13 +7,12 @@ const { createAIGateway } = require('./ai-gateway');
 const { createSearchData } = require('./search-data');
 const { CONTENT_COLUMNS, projectContent, managementRow, contentVersions } = require('./knowledge-content');
 const { createKnowledgeContentService } = require('./knowledge-content-service');
+const { MAX_BYTES: MAX_PDF_TEXT_BYTES, MAX_PAGES: MAX_PDF_PAGES, MAX_TEXT_CHARS } = require('./knowledge-pdf-limits');
 
 const MAX_FILE_BYTES = 100_000_000;
 const LEGACY_MAX_FILE_BYTES = 6 * 1024 * 1024;
-const MAX_PDF_TEXT_BYTES = 30_000_000;
 const KNOWLEDGE_BUCKET = 'knowledge';
 const UPLOAD_CHUNK_BYTES = 768 * 1024;
-const MAX_TEXT_CHARS = 100000;
 const CATEGORIES = Object.freeze(['on_sale_product','existing_service','recruitment_policy','industry_development',
   'marketing_activity','legal_tax','health_wealth_sharing','top_performer_sharing','customer_case','recruitment_case',
   'conversation_strategy','objection_handling','company_information','other']);
@@ -153,6 +152,11 @@ function extractXlsx(bytes) {
 function boundedText(value) {
   const text=String(value||'').replace(/\r/g,'').trim();
   if (!text || text.length>MAX_TEXT_CHARS || text.includes('\0')) fail('UNSUPPORTED_CONTENT');
+  return text;
+}
+function boundedPdfText(value) {
+  const text=String(value||'').replace(/\r/g,'').trim();
+  if (!text || text.length>MAX_TEXT_CHARS || text.includes('\0')) fail('PDF_TEXT_LIMIT');
   return text;
 }
 function extensionOf(fileName) { const lower=String(fileName||'').toLowerCase(); return lower.slice(lower.lastIndexOf('.')); }
@@ -494,13 +498,13 @@ function createKnowledgeLibrary(options={}) {
       const rendered=await render(bytes,{
         startPage:job.next_page,maxPages:3,timeoutMs:75000,onBatch:async batch=>{images.push(...batch);}
       });
-      if(!Number.isSafeInteger(rendered.pageCount)||rendered.pageCount<1||rendered.pageCount>40)fail('PDF_LIMIT');
+      if(!Number.isSafeInteger(rendered.pageCount)||rendered.pageCount<1||rendered.pageCount>MAX_PDF_PAGES)fail('PDF_PAGE_LIMIT');
       if(job.page_count&&job.page_count!==rendered.pageCount)fail('INVALID_CONTENT');
       const response=options.ocrPdfBatch?{result:{ocrText:await options.ocrPdfBatch(images)}}:
         await callFunction({name:'ai_parse',data:{action:'ocr_knowledge_source',images}});
       const result=response?.result;
       if(!result||result.error||typeof result.ocrText!=='string'||!result.ocrText.trim())fail(result?.error||'OCR_FAILED');
-      job.text=boundedText(String(job.text||'')+(job.text?'\n\n':'')+boundedText(result.ocrText));
+      job.text=boundedPdfText(String(job.text||'')+(job.text?'\n\n':'')+boundedPdfText(result.ocrText));
       job.page_count=rendered.pageCount;job.next_page=rendered.nextPage;
       if(job.next_page>job.page_count)job.stage='summarize';
       Object.assign(job,{lease_until:null,attempts:0,last_error:null});

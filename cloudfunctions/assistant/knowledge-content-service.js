@@ -1,5 +1,6 @@
 'use strict';
 const { isDeepStrictEqual } = require('node:util');
+const { MAX_PAGES } = require('./knowledge-pdf-limits');
 const fail = code => { const error = new Error(code); error.code = code; throw error; };
 const OPS = new Set(['get','preview','apply','approve','reject','command','regenerate','retry']);
 function createKnowledgeContentService({ rpc, request, sourceBytes, extractText, extractPdfText, generateSummary, callFunction, renderPdfPages }) {
@@ -28,7 +29,8 @@ function createKnowledgeContentService({ rpc, request, sourceBytes, extractText,
         if (payload.pdfOcr) {
           const images=[];
           const rendered=await renderPdfPages(bytes,{startPage:payload.nextPage,maxPages:3,timeoutMs:75000,onBatch:async batch=>images.push(...batch)});
-          if (!rendered.pageCount || rendered.pageCount>40 || rendered.nextPage<=payload.nextPage) fail('PDF_LIMIT');
+          if (!rendered.pageCount || rendered.pageCount>MAX_PAGES) fail('PDF_PAGE_LIMIT');
+          if (rendered.nextPage<=payload.nextPage) fail('PDF_EXTRACTION_FAILED');
           const response=await callFunction({name:'ai_parse',data:{action:'ocr_knowledge_source',images}});
           if (!response?.result?.ocrText || response.result.error) fail('OCR_FAILED');
           payload.text=[payload.text,response.result.ocrText].filter(Boolean).join('\n\n');

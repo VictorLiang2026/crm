@@ -4,6 +4,7 @@ const assert=require('node:assert/strict');
 const {downloadKnowledgeObject,MAX_KNOWLEDGE_PDF_BYTES}=require('../../cloudfunctions/person_360/knowledge-storage');
 const {extract}=require('../../cloudfunctions/person_360/knowledge-pdf-service');
 const {extractPdfText,MAX_BYTES}=require('../../cloudfunctions/assistant/knowledge-pdf-text');
+const {MAX_PAGES}=require('../../cloudfunctions/assistant/knowledge-pdf-limits');
 const {createKnowledgeLibrary,extractText}=require('../../cloudfunctions/assistant/knowledge-library-service');
 
 function response(status,bytes=Buffer.from('%PDF-text')){
@@ -114,10 +115,10 @@ function scannedPdf(){
   return Buffer.from(body,'binary');
 }
 
-test('bounded local PDF worker extracts a 30 MB, 40-page text PDF',async()=>{
-  const small=simplePdf(40),size=MAX_BYTES;
+test('bounded local PDF worker extracts a 30 MB, 150-page text PDF',async()=>{
+  const small=simplePdf(150),size=MAX_BYTES;
   const bytes=Buffer.concat([small,Buffer.alloc(size-small.length,0x20)]);
-  assert.equal(await extractPdfText(bytes),Array(40).fill('Knowledge summary smoke test').join('\n\n'));
+  assert.equal(await extractPdfText(bytes),Array(150).fill('Knowledge summary smoke test').join('\n\n'));
 },{timeout:30000});
 
 test('PDF text extraction enforces a 30 MB cap before starting a worker',async()=>{
@@ -125,8 +126,19 @@ test('PDF text extraction enforces a 30 MB cap before starting a worker',async()
   await assert.rejects(extractPdfText(bytes),error=>error.code==='PDF_LIMIT');
 });
 
-test('PDF text extraction rejects the first page above the 40-page cap',async()=>{
-  await assert.rejects(extractPdfText(simplePdf(41)),error=>error.code==='PDF_LIMIT');
+test('PDF text extraction rejects the first page above the 150-page cap',async()=>{
+  assert.equal(MAX_PAGES,150);
+  await assert.rejects(extractPdfText(simplePdf(MAX_PAGES+1)),error=>error.code==='PDF_PAGE_LIMIT');
+});
+
+test('PDF text extraction reports a bounded worker resource failure distinctly',async()=>{
+  const {EventEmitter}=require('node:events');
+  const forkProcess=()=>{
+    const child=new EventEmitter();Object.assign(child,{exitCode:null,signalCode:null,pid:123,
+      send(_message,callback){setImmediate(()=>{child.exitCode=134;child.emit('exit',134,null);});callback?.(null);},
+      kill(){child.exitCode=134;child.emit('exit',134,null);return true;}});return child;
+  };
+  await assert.rejects(extractPdfText(Buffer.from('%PDF-fixture'),{forkProcess}),error=>error.code==='PDF_PROCESS_LIMIT');
 });
 
 test('scanned PDF pages render to bounded JPEG batches without retaining all pages in memory',async()=>{
@@ -144,6 +156,12 @@ test('PDF renderer resumes at a bounded page cursor and preserves the legacy res
   assert.deepEqual(result,{pageCount:1,nextPage:2});
   const legacy=await renderPdfPages(scannedPdf(),{onBatch:async()=>{}});
   assert.deepEqual(legacy,{pageCount:1});
+},{timeout:20000});
+
+test('PDF renderer can resume after the former 40-page boundary',async()=>{
+  const {renderPdfPages}=require('../../cloudfunctions/assistant/knowledge-pdf-render');let received=0;
+  const result=await renderPdfPages(simplePdf(41),{startPage:41,maxPages:1,onBatch:async pages=>{received+=pages.length;}});
+  assert.deepEqual(result,{pageCount:41,nextPage:42});assert.equal(received,1);
 },{timeout:20000});
 
 test('scanned PDF retries route rendered pages through the OCR batch contract',async()=>{

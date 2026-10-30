@@ -2,9 +2,9 @@
 
 const {fork}=require('node:child_process');
 const path=require('node:path');
-const MAX_BYTES=30_000_000;
+const {MAX_BYTES,MAX_PAGES}=require('./knowledge-pdf-limits');
 const TIMEOUT_MS=20000;
-const ERRORS=new Set(['PDF_ENCRYPTED','PDF_NO_TEXT','PDF_LIMIT','PDF_TIMEOUT','INVALID_CONTENT']);
+const ERRORS=new Set(['PDF_ENCRYPTED','PDF_NO_TEXT','PDF_PAGE_LIMIT','PDF_TEXT_LIMIT','PDF_PROCESS_LIMIT','PDF_TIMEOUT','INVALID_CONTENT']);
 
 function extractPdfText(bytes,{forkProcess=fork,timeoutMs=TIMEOUT_MS}={}){
   if(!Buffer.isBuffer(bytes)||!bytes.subarray(0,5).equals(Buffer.from('%PDF-')))
@@ -33,7 +33,7 @@ function extractPdfText(bytes,{forkProcess=fork,timeoutMs=TIMEOUT_MS}={}){
       finish(null,message.text);
     });
     child.once('error',()=>finish('INVALID_CONTENT'));
-    child.once('exit',(code,signal)=>{if(!settled)finish(signal==='SIGABRT'||code===134?'PDF_LIMIT':'INVALID_CONTENT');});
+    child.once('exit',(code,signal)=>{if(!settled)finish(signal==='SIGABRT'||code===134?'PDF_PROCESS_LIMIT':'INVALID_CONTENT');});
     child.send(new Uint8Array(bytes),error=>{if(error)finish('INVALID_CONTENT');});
   });
 }

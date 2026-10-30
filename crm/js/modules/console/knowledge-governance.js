@@ -22,7 +22,11 @@ const summaryOf = row => row.contentManaged ? row.metadata?.summary || '' : row.
   : row.table === 'knowledge_sources' ? (row.ocrProgress ? (row.ocrProgress.stage==='summarize' ? text('ocr_summarizing') : text('ocr_progress').replace('{done}',String(row.ocrProgress.completedPages)).replace('{total}',row.ocrProgress.totalPages?String(row.ocrProgress.totalPages):'…')) : text('source_pending_summary')) : row.metadata?.summary || String(row.content || '').slice(0,220);
 const errorCodeOf = error => String(error?.message||'').match(/^([A-Z][A-Z0-9_]+)(?::|$)/)?.[1]||'';
 const retryErrorText = error => errorCodeOf(error)==='PDF_NO_TEXT'?text('pdf_no_text')
-  : errorCodeOf(error)==='PDF_RENDER_LIMIT'?text('pdf_render_limit'):error?.message||text('retry_failed');
+  : errorCodeOf(error)==='PDF_LIMIT'?text('pdf_file_limit')
+  : errorCodeOf(error)==='PDF_RENDER_LIMIT'?text('pdf_render_limit')
+  : errorCodeOf(error)==='PDF_PAGE_LIMIT'?text('pdf_page_limit')
+  : errorCodeOf(error)==='PDF_TEXT_LIMIT'?text('pdf_text_limit')
+  : errorCodeOf(error)==='PDF_PROCESS_LIMIT'?text('pdf_process_limit'):error?.message||text('retry_failed');
 
 export function renderKnowledgeGovernance(ctx) {
   let pollTimer=null;
@@ -77,7 +81,7 @@ export function renderKnowledgeGovernance(ctx) {
     try{result=await data.knowledgeLibrary(ctx,'retry',{sourceId:row.id});}
     catch(error){
       await load().catch(()=>{});
-      if(['PDF_NO_TEXT','PDF_RENDER_LIMIT'].includes(errorCodeOf(error)))throw new Error(retryErrorText(error));
+      if(['PDF_NO_TEXT','PDF_RENDER_LIMIT','PDF_PAGE_LIMIT','PDF_TEXT_LIMIT','PDF_PROCESS_LIMIT'].includes(errorCodeOf(error)))throw new Error(retryErrorText(error));
       throw error;
     }
     if(!result?.ok){

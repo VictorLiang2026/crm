@@ -1,6 +1,6 @@
 'use strict';
 const path=require('node:path');
-const MAX_PAGES=40,MAX_CHARS=100000;
+const {MAX_PAGES,MAX_TEXT_CHARS}=require('./knowledge-pdf-limits');
 const respond=value=>{if(process.connected)process.send(value,()=>process.disconnect());};
 
 process.once('message',bytes=>(async()=>{
@@ -15,7 +15,7 @@ process.once('message',bytes=>(async()=>{
   try{
     const document=await loading.promise;
     if((await document.getMetadata()).info?.EncryptFilter)throw Error('PDF_ENCRYPTED');
-    if(document.numPages>MAX_PAGES)throw Error('PDF_LIMIT');
+    if(document.numPages>MAX_PAGES)throw Error('PDF_PAGE_LIMIT');
     const pages=[];let length=0;
     for(let i=1;i<=document.numPages;i++){
       const page=await document.getPage(i),stream=page.streamTextContent({disableNormalization:false});
@@ -24,16 +24,16 @@ process.once('message',bytes=>(async()=>{
         for(;;){const {done,value}=await reader.read();if(done)break;
           for(const item of value.items||[]){if(typeof item.str!=='string')continue;
             const part=item.str+(item.hasEOL?'\n':' ');length+=part.length;
-            if(length>MAX_CHARS)throw Error('PDF_LIMIT');text+=part;}
+            if(length>MAX_TEXT_CHARS)throw Error('PDF_TEXT_LIMIT');text+=part;}
         }
       }finally{await reader.cancel().catch(()=>{});reader.releaseLock();page.cleanup();}
       if(!text.trim())throw Error('PDF_NO_TEXT');
-      pages.push(text.trim());length+=2;if(length>MAX_CHARS)throw Error('PDF_LIMIT');
+      pages.push(text.trim());length+=2;if(length>MAX_TEXT_CHARS)throw Error('PDF_TEXT_LIMIT');
     }
     result={text:pages.join('\n\n')};
   }catch(error){
     result={error:passwordRequested||error.name==='PasswordException'?'PDF_ENCRYPTED':
-      ['PDF_LIMIT','PDF_NO_TEXT','PDF_ENCRYPTED'].includes(error.message)?error.message:'INVALID_CONTENT'};
+      ['PDF_PAGE_LIMIT','PDF_TEXT_LIMIT','PDF_NO_TEXT','PDF_ENCRYPTED'].includes(error.message)?error.message:'INVALID_CONTENT'};
   }finally{await loading.destroy().catch(()=>{});}
   respond(result);
 })().catch(()=>respond({error:'INVALID_CONTENT'})));
