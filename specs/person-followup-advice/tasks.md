@@ -1,6 +1,6 @@
 # 人物跟进建议实施任务
 
-状态：实现与 CloudBase 部署完成；GitHub 发布脚本执行中。每项对应 `requirements.md` 同编号或范围。
+状态：实现、CloudBase 部署、GitHub 发布与云端一致性核对均已完成。每项对应 `requirements.md` 同编号或范围。
 
 - [x] 1. 复核发布基线与线上 `public` 数据结构、权限、迁移台账；确认当前 dirty diff 归属和 GitHub master 最新提交。
   - 不清理或覆盖既有 Skill 文档修改。
