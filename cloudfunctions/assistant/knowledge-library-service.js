@@ -322,21 +322,31 @@ function createKnowledgeLibrary(options={}) {
     if(ownerUid&&pathOwner!==ownerUid)fail('SOURCE_UNAVAILABLE');
     return storageRequest(path,'GET');
   }
-  async function sourceRows() {
-    const rows=await request('knowledge_sources','GET',{select:'id,domain,title,publisher,source_uri,published_at,review_at,file_name,file_size_bytes,sha256,extraction_status,lifecycle_status,version_no,created_at,updated_at,deleted_at,metadata',deleted_at:'is.null',order:'updated_at.desc,id.desc',limit:200});
-    return rows.filter(row=>row.metadata?.upload?.phase!=='receiving');
+  async function sourcePage(offset=0,limit=200) {
+    const rows=await request('knowledge_sources','GET',{select:'id,domain,title,publisher,source_uri,published_at,review_at,file_name,file_size_bytes,sha256,extraction_status,lifecycle_status,version_no,created_at,updated_at,deleted_at,metadata',deleted_at:'is.null',order:'updated_at.desc,id.desc',limit,offset});
+    return {rows:rows.filter(row=>row.metadata?.upload?.phase!=='receiving'),rawCount:rows.length};
   }
-  async function list(actorValue) {
+  async function sourceRows() { return (await sourcePage()).rows; }
+  async function list(actorValue,page={}) {
     const actor=actorUid(actorValue);
+    const limit=page.limit===undefined?200:Number(page.limit),playbookLimit=page.limit===undefined?100:limit,
+      sourceOffset=page.sourceOffset===undefined?0:Number(page.sourceOffset),
+      knowledgeOffset=page.knowledgeOffset===undefined?0:Number(page.knowledgeOffset),
+      playbookOffset=page.playbookOffset===undefined?0:Number(page.playbookOffset);
+    if(!Number.isSafeInteger(limit)||limit<1||limit>200||![sourceOffset,knowledgeOffset,playbookOffset].every(n=>Number.isSafeInteger(n)&&n>=0))fail('INVALID_INPUT');
     const [sources,items,playbooks,pendingCommands]=await Promise.all([
-      sourceRows(),request('knowledge_items','GET',{select:'id,source_id,item_type,source,source_date,valid_from,valid_to,verified,lifecycle_status,version_no,supersedes_id,confidence,content,metadata,updated_at,deleted_at,'+CONTENT_COLUMNS,deleted_at:'is.null',order:'updated_at.desc,id.desc',limit:200}),
-      request('playbooks','GET',{select:'id,scenario,objection,possible_underlying_reasons,clarifying_questions,response_logic,evidence_refs,case_refs,story_refs,do_not_say,next_objective,source,confidence,valid_from,valid_to,version_no,supersedes_id,metadata,lifecycle_status,updated_at,deleted_at,'+CONTENT_COLUMNS,deleted_at:'is.null',order:'updated_at.desc,id.desc',limit:100}),
+      sourcePage(sourceOffset,limit),request('knowledge_items','GET',{select:'id,source_id,item_type,source,source_date,valid_from,valid_to,verified,lifecycle_status,version_no,supersedes_id,confidence,content,metadata,updated_at,deleted_at,'+CONTENT_COLUMNS,deleted_at:'is.null',order:'updated_at.desc,id.desc',limit,offset:knowledgeOffset}),
+      request('playbooks','GET',{select:'id,scenario,objection,possible_underlying_reasons,clarifying_questions,response_logic,evidence_refs,case_refs,story_refs,do_not_say,next_objective,source,confidence,valid_from,valid_to,version_no,supersedes_id,metadata,lifecycle_status,updated_at,deleted_at,'+CONTENT_COLUMNS,deleted_at:'is.null',order:'updated_at.desc,id.desc',limit:playbookLimit,offset:playbookOffset}),
       request('knowledge_content_commands','GET',{select:'record_table,record_id,created_at',actor_uid:`eq.${actor}`,status:'eq.pending_review',limit:300}),
     ]);
+    const sourceRows=sources.rows;
     const pendingKeys=new Map(pendingCommands.map(command=>[`${command.record_table}:${command.record_id}`,command.created_at]));
-    return {ok:true,sources:sources.map(metadataForSource),
+    return {ok:true,coverage:{offsets:{sources:sourceOffset,knowledge:knowledgeOffset,playbooks:playbookOffset},limits:{sources:limit,knowledge:limit,playbooks:playbookLimit},
+      hasMore:{sources:sources.rawCount===limit,knowledge:items.length===limit,playbooks:playbooks.length===playbookLimit},
+      nextOffsets:{sources:sourceOffset+sources.rawCount,knowledge:knowledgeOffset+items.length,playbooks:playbookOffset+playbooks.length}},
+      sources:sourceRows.map(metadataForSource),
       knowledge:items.map(row=>{
-        const source=sources.find(s=>String(s.id)===String(row.source_id));
+        const source=sourceRows.find(s=>String(s.id)===String(row.source_id));
         return {...managementRow(row,'knowledge_items',source),sourceUpdatedAt:source?.updated_at||null,
           sourceLifecycleStatus:source?.lifecycle_status||null,sourceExtractionStatus:source?.extraction_status||null,
           contentReviewPending:pendingKeys.has(`knowledge_items:${row.id}`),contentReviewPendingAt:pendingKeys.get(`knowledge_items:${row.id}`)||null};
@@ -1242,7 +1252,7 @@ function createKnowledgeLibrary(options={}) {
   async function run(event,actor,options={}) {
     if(event?.operation==='content')return contentService.run(event.contentOperation,actor,event.data);
     switch(event?.operation){
-      case 'list':return list(actor);
+      case 'list':return list(actor,event.data||{});
       case 'trashList':return trashList();
       case 'save':return saveKnowledge(event.data,actor);
       case 'upload':return upload(event.data,actor);

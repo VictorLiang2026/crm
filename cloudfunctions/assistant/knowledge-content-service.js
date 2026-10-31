@@ -2,7 +2,7 @@
 const { isDeepStrictEqual } = require('node:util');
 const { MAX_PAGES } = require('./knowledge-pdf-limits');
 const fail = code => { const error = new Error(code); error.code = code; throw error; };
-const OPS = new Set(['get','preview','apply','approve','reject','command','regenerate','retry']);
+const OPS = new Set(['get','preview','apply','approve','reject','command','regenerate','retry','queueGpt']);
 function createKnowledgeContentService({ rpc, request, sourceBytes, extractText, extractPdfText, generateSummary, callFunction, renderPdfPages }) {
   async function invoke(operation, actor, data) {
     if (typeof actor !== 'string' || !actor.trim()) fail('UNAUTHORIZED');
@@ -12,6 +12,14 @@ function createKnowledgeContentService({ rpc, request, sourceBytes, extractText,
   }
   async function run(operation, actor, data) {
     if (!OPS.has(operation) || !data || typeof data !== 'object' || Array.isArray(data)) fail('INVALID_INPUT');
+    if (operation === 'queueGpt') {
+      if (data.table!=='knowledge_items' || !/^[1-9][0-9]*$/.test(String(data.id)) ||
+          typeof data.expectedUpdatedAt !== 'string' || !Number.isFinite(Date.parse(data.expectedUpdatedAt))) fail('INVALID_INPUT');
+      const result = await rpc('crm_knowledge_gpt_queue_v1', { p_actor_uid: actor, p_table: data.table,
+        p_id: Number(data.id), p_expected_updated_at: data.expectedUpdatedAt });
+      if (result?.error || !result?.data?.ok) fail('PERSISTENCE_ERROR');
+      return result.data;
+    }
     return invoke(operation, actor, data);
   }
   async function worker() {
@@ -23,6 +31,7 @@ function createKnowledgeContentService({ rpc, request, sourceBytes, extractText,
       const { record } = await invoke('get',actor,{table:job.record_table,id:job.record_id});
       if (!isDeepStrictEqual(record, job.before_state)) fail('CONTENT_STALE');
       if (payload.stage === 'extract') {
+        if(payload.target==='gpt'&&String(record.source?.id||'')!==String(payload.sourceId||''))fail('SOURCE_UNAVAILABLE');
         const source = (await request('knowledge_sources','GET',{select:'*',id:`eq.${record.source?.id}`,deleted_at:'is.null',limit:1}))[0];
         if (!source || ['invalidated','superseded'].includes(source.lifecycle_status)) fail('SOURCE_UNAVAILABLE');
         const bytes = await sourceBytes(source,actor);
@@ -57,8 +66,16 @@ function createKnowledgeContentService({ rpc, request, sourceBytes, extractText,
       }
       const patch={};if(payload.part!=='summary')patch.text=payload.text;if(payload.part!=='text')patch.summary=payload.summary;
       const preview=await invoke('preview',actor,{table:job.record_table,id:job.record_id,
-        expectedUpdatedAt:job.expected_updated_at,action:'edit',target:'original',patch,reviewed:false});
-      payload.previewId=preview.commandId;await save('done');
+        expectedUpdatedAt:job.expected_updated_at,action:'edit',target:payload.target==='gpt'?'gpt':'original',patch,reviewed:false});
+      payload.previewId=preview.commandId;
+      if(payload.target==='gpt'){
+        const applied=await invoke('apply',actor,{commandId:preview.commandId});
+        if(applied.status!=='pending_review')fail('CONTENT_PENDING_VERIFY_FAILED');
+        const verified=await invoke('get',actor,{table:job.record_table,id:job.record_id});
+        if(verified.pending?.commandId!==preview.commandId)fail('CONTENT_PENDING_VERIFY_FAILED');
+        payload.pendingCommandId=preview.commandId;payload.pendingStatus='pending_review';
+      }
+      await save('done');
       return {ok:true,processed:true};
     } catch(error) {
       await save('failed',/^[A-Z][A-Z0-9_]{1,79}$/.test(error?.code||'')?error.code:'CONTENT_GENERATION_FAILED');

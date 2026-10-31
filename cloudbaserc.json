@@ -4,6 +4,13 @@
   "functionRoot": "cloudfunctions",
   "functions": [
     {
+      "name": "knowledge_mcp",
+      "timeout": 180,
+      "runtime": "Nodejs18.15",
+      "memorySize": 256,
+      "type": "HTTP"
+    },
+    {
       "name": "assistant",
       "timeout": 180,
       "runtime": "Nodejs18.15",

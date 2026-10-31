@@ -1,0 +1,28 @@
+# Implementation Plan
+
+- [x] 1. Confirm the OAuth authorization-page login/consent flow and exact CloudBase identity mapping.
+  - Reuse the existing CRM account; never accept a UID from MCP input.
+  - _Requirement: OAuth user story 1; acceptance criteria 1–2_
+- [x] 2. Add public-schema OAuth grant storage with RLS, restricted grants, and rollback migration.
+  - Store hashed one-time authorization codes and rotating refresh-token families only.
+  - _Requirement: acceptance criteria 6–7_
+- [x] 3. Implement isolated OAuth 2.1/PKCE and remote MCP HTTP service.
+  - Add fixed client/redirect allowlisting, metadata, token, revocation, scope checks, and the bounded knowledge tool allowlist.
+  - Keep secrets in function configuration and add documented rotation/revocation steps.
+  - _Requirement: acceptance criteria 1, 3–4, 7–8_
+- [x] 4. Add the CRM bilingual consent route and trusted server-side identity bridge.
+  - Keep `admin.html` login and ordinary CloudBase identity behavior intact.
+  - _Requirement: acceptance criteria 2, 9–10_
+- [x] 5. Add a GPT-only generation-and-pending operation using exact record/source IDs.
+  - Reuse OCR, AI Gateway, GPT-target preview, and pending-review apply; never apply a system-target preview or approve content.
+  - _Requirement: acceptance criteria 5–6, 8_
+- [ ] 6. Verify function and gateway configuration before exposure. **Function configuration is present, but the private assistant bridge runtime probe returns `UNAUTHORIZED`.** The pathful RFC 8414 issuer route works; the root path remains disabled. The fail-closed bug is fixed and deployed; no-write HTTP probes now reject an invalid callback (400), unsupported grant (400), and missing MCP bearer (401 with challenge). A fake-client authorization check also returns 400, while the assistant log shows its signed internal assertion is rejected. The `CRM_KNOWLEDGE_MCP_HMAC_KEY` value must match exactly in both functions; verify/update both function settings, then rerun the no-write bridge probe before enabling business routes.
+  - Confirm route, function security rules, secret placement/rotation, resource/cost, and OAuth metadata URLs.
+  - _Requirement: deployment and identity constraints_
+- [ ] 7. Run focused tests, required cross-module regression, migration/rollback checks, then publish only affected assets/functions. **WP01 is now `PASS_WITH_LIMITATIONS`; MCP 7/7, security 6/6, and knowledge-library 65/65 pass. The corrected `knowledge_mcp` is deployed and no-write HTTP probes pass. Do not finish Git publication or enable business routes until the assistant bridge accepts the signed assertion with a fake nonexistent client and returns the expected invalid-client error.**
+  - WP01: 1,239 catalog checks, anonymous probe 81/81, regression fixture 108 pass/0 fail/5 skip; open limitations remain login, service-runtime, live-writes, and mobile. The service-bridge probe remains a live blocker despite the passing local gate.
+  - The `20261031120000` migration is present in the remote history and public catalog checks confirmed both tables with forced RLS, service-only policies, and both routines. Catalog passes with 1,239 checks (69 tables, 12 views, 39 sequences, 89 routines). Do not run the paired rollback while the release is pending.
+  - The consent page and modules are hosted. Only the protected-resource and pathful authorization-server metadata routes are enabled; all registration, authorization, token, revoke, and MCP routes are disabled. Corrected `knowledge_mcp` is deployed. A read-only fake-client authorization probe reaches `assistant`, but assertion verification returns `UNAUTHORIZED`; the connector is not ready. No OAuth client, token, knowledge, or GPT content was written.
+  - The live `assistant` timer trigger `knowledgeOcrWorker` is present; it will process queued knowledge work only after an authorized request queues a record.
+  - Record tested cases, remaining limits, rollback version, commit/tag, and local/GitHub/CloudBase evidence.
+  - _Requirement: verification and regression_

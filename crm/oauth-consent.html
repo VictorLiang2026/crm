@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta name="referrer" content="no-referrer">
+<title>CRM Knowledge Authorization</title>
+<script src="https://static.cloudbase.net/cloudbase-js-sdk/3.10.1/cloudbase.full.js"></script>
+<style>
+:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;color:#152238;background:#f3f6fb}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:36px}
+main{width:min(760px,100%);background:#fff;border:1px solid #dbe3ef;border-radius:18px;padding:36px;box-shadow:0 18px 52px #15223812}
+h1{font-size:28px;margin:0 0 12px}p{line-height:1.65;color:#536277}.scopes{list-style:none;padding:0;margin:24px 0}.scopes li{padding:13px 16px;border:1px solid #e1e7f0;border-radius:10px;margin:10px 0}
+.notice{padding:14px 16px;background:#f0f7ff;border-radius:10px;color:#274b73}.actions{display:flex;gap:12px;margin-top:24px}.btn{padding:12px 20px;border-radius:9px;border:1px solid #bdc9da;background:white;font:inherit;cursor:pointer}.primary{background:#2563eb;color:white;border-color:#2563eb}.field{display:grid;gap:7px;margin:16px 0}.field input{font:inherit;padding:12px;border:1px solid #bdc9da;border-radius:8px}.error{color:#b42318;min-height:1.5em}.lang{float:right}.hidden{display:none!important}
+</style>
+</head>
+<body>
+<main>
+<button class="btn lang" id="lang" type="button">English</button>
+<h1 id="title"></h1><p id="requester"></p><p id="intro"></p>
+<ul class="scopes"><li id="read"></li><li id="source"></li><li id="write"></li></ul>
+<p class="notice" id="review"></p>
+<form id="login" class="hidden">
+  <h2 id="loginTitle"></h2>
+  <label class="field"><span id="usernameLabel"></span><input id="username" autocomplete="username" required></label>
+  <label class="field"><span id="passwordLabel"></span><input id="password" type="password" autocomplete="current-password" required></label>
+  <div class="error" id="error" role="alert"></div><button class="btn primary" id="signin" type="submit"></button>
+</form>
+<section id="consent" class="hidden">
+  <div class="error" id="consentError" role="alert"></div>
+  <div class="actions"><button class="btn primary" id="allow" type="button"></button><button class="btn" id="deny" type="button"></button></div>
+</section>
+</main>
+<script type="module">
+import { initKnowledgeMcpConsent } from './js/modules/console/knowledge-mcp-consent.js';
+initKnowledgeMcpConsent();
+</script>
+</body></html>

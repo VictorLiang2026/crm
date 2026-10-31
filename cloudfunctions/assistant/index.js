@@ -86,6 +86,38 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
     const error = new Error('Unsupported AI task type'); error.code = 'INVALID_INPUT'; throw error;
   }) {
   const run = async (event, context, callback, earlyResponse) => {
+    if (event?.action === 'knowledgeMcpInternal') {
+      const mcpAuth=require('./knowledge-mcp-auth');
+      const actorUid = mcpAuth.verifyAssertion(event.assertion, process.env.CRM_KNOWLEDGE_MCP_HMAC_KEY,event.input);
+      if (!actorUid) return { ok:false, error:{code:'UNAUTHORIZED',message:'Login required'} };
+      const input = event.input;
+      if (!input || typeof input !== 'object' || Array.isArray(input)) return {ok:false,error:{code:'INVALID_INPUT',message:'Invalid request'} };
+      try {
+        if(input.kind==='oauth'&&Object.keys(input).every(k=>['kind','operation','data'].includes(k))&&typeof input.operation==='string')
+          return {ok:true,...await mcpAuth.runOAuth(input.operation,input.data)};
+        if (input.tool === 'knowledge_records_list' && Object.keys(input).every(k=>['tool','sourceOffset','knowledgeOffset','playbookOffset','limit'].includes(k))) {
+          const page=Object.fromEntries(['sourceOffset','knowledgeOffset','playbookOffset','limit'].filter(k=>Object.hasOwn(input,k)).map(k=>[k,input[k]]));
+          if(Object.values(page).some(v=>!Number.isSafeInteger(v)||v<0)||page.limit!==undefined&&(page.limit<1||page.limit>100))return {ok:false,error:{code:'INVALID_INPUT',message:'Invalid request'}};
+          if(page.limit===undefined)page.limit=100;
+          return await knowledgeLibraryRunner({action:'knowledgeLibrary',operation:'list',data:page},actorUid);
+        }
+        if (input.tool === 'knowledge_record_get' && Object.keys(input).every(k=>['tool','table','id'].includes(k)) &&
+            ['knowledge_items','playbooks'].includes(input.table) && /^[1-9][0-9]*$/.test(String(input.id)))
+          return await knowledgeLibraryRunner({action:'knowledgeLibrary',operation:'content',contentOperation:'get',data:{table:input.table,id:String(input.id)}},actorUid);
+        if (input.tool === 'knowledge_generate_gpt_pending' && Object.keys(input).every(k=>['tool','table','id','expectedUpdatedAt'].includes(k)) &&
+            input.table==='knowledge_items' && /^[1-9][0-9]*$/.test(String(input.id)) &&
+            typeof input.expectedUpdatedAt==='string' && Number.isFinite(Date.parse(input.expectedUpdatedAt)))
+          return await knowledgeLibraryRunner({action:'knowledgeLibrary',operation:'content',contentOperation:'queueGpt',
+            data:{table:input.table,id:String(input.id),expectedUpdatedAt:input.expectedUpdatedAt}},actorUid);
+        if (input.tool === 'knowledge_generation_status' && Object.keys(input).every(k=>['tool','commandId'].includes(k)) &&
+            /^[0-9a-f-]{36}$/i.test(String(input.commandId)))
+          return await knowledgeLibraryRunner({action:'knowledgeLibrary',operation:'content',contentOperation:'command',
+            data:{commandId:input.commandId}},actorUid);
+      } catch (error) {
+        return {ok:false,error:{code:/^[A-Z][A-Z0-9_]{1,79}$/.test(error?.code||'')?error.code:'MCP_OPERATION_FAILED',message:'Knowledge operation could not be completed'}};
+      }
+      return {ok:false,error:{code:'INVALID_INPUT',message:'Unsupported knowledge operation'}};
+    }
     let identity;
     try { identity = await getIdentity(); }
     catch (_) { return { ok: false, error: { code: 'UNAUTHORIZED', message: 'Login required' } }; }
@@ -102,6 +134,10 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
           .filter(key => event[key] !== undefined).map(key => [key,event[key]]))}, identity, {
         allowedUids: String(process.env.CRM_TEST_SEED_UIDS || '').split(',').map(s => s.trim()).filter(Boolean),
       }); } catch (error) { return {ok:false,error:{code:error.code || 'SEED_DENIED',message:'测试场景操作未完成，请核对预览或权限'}}; }
+    }
+    if (event?.action === 'knowledgeMcpAuthorize') {
+      try { return await require('./knowledge-mcp-auth').issueAuthorization(event,identity.uid); }
+      catch (error) { return {ok:false,error:{code:error.code||'OAUTH_FAILED',message:'Authorization could not be completed'}}; }
     }
     if (event?.action === 'quickCaptureV2') {
       try { return await require('./quick-capture-v2-service').runQuickCaptureV2(event,identity); }
