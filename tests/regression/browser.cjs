@@ -41,6 +41,7 @@ class Browser {
       else if (pathname === '/crm/js/modules/person-insights.js') { res.setHeader('Content-Type', 'text/javascript; charset=utf-8'); res.end(fs.readFileSync(path.join(this.root, 'crm/js/modules/person-insights.js'))); }
       else if (pathname === '/crm/js/modules/person-360.js') { res.setHeader('Content-Type', 'text/javascript; charset=utf-8'); res.end(fs.readFileSync(path.join(this.root, 'crm/js/modules/person-360.js'))); }
       else if (pathname === '/crm/js/modules/console/i18n.js') { res.setHeader('Content-Type', 'text/javascript; charset=utf-8'); res.end(fs.readFileSync(path.join(this.root, 'crm/js/modules/console/i18n.js'))); }
+      else if (pathname === '/crm/js/vendor/pdf-lib-1.17.1.min.js') { res.setHeader('Content-Type', 'text/javascript; charset=utf-8'); res.end(fs.readFileSync(path.join(this.root, 'crm/js/vendor/pdf-lib-1.17.1.min.js'))); }
       else if (pathname === '/crm/js/modules/person-profile.js') { res.setHeader('Content-Type', 'text/javascript; charset=utf-8'); res.end(fs.readFileSync(path.join(this.root, 'crm/js/modules/person-profile.js'))); }
       else if (pathname === '/crm/js/modules/phase14-hubs.js') { res.setHeader('Content-Type', 'text/javascript; charset=utf-8'); res.end(fs.readFileSync(path.join(this.root, 'crm/js/modules/phase14-hubs.js'))); }
       else if (pathname === '/crm/js/modules/legacy-customer-route.js') { res.setHeader('Content-Type', 'text/javascript; charset=utf-8'); res.end(fs.readFileSync(path.join(this.root, 'crm/js/modules/legacy-customer-route.js'))); }

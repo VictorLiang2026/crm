@@ -1,10 +1,14 @@
 import { h } from './dom.js';
 import { pageHead, emptyNote } from './ui.js';
-import { t } from './i18n.js';
+import { getLang, t } from './i18n.js';
 import { data } from './data.js';
+import { uploadKnowledgePdfParts, knowledgePdfPartTitle, KNOWLEDGE_PDF_PART_BYTES } from './knowledge-pdf-upload.js';
 
 const text=key=>t(`kg_${key}`);
 const MAX_SOURCE_FILE_BYTES=100_000_000;
+const replaceCount=(value,count)=>value.replaceAll('{count}',String(count));
+const formatText=(value,values)=>Object.entries(values).reduce((text,[key,replacement])=>
+  text.replaceAll(`{${key}}`,String(replacement)),value);
 const CATEGORIES=['on_sale_product','existing_service','recruitment_policy','industry_development',
   'marketing_activity','legal_tax','health_wealth_sharing','top_performer_sharing','customer_case','recruitment_case',
   'conversation_strategy','objection_handling','company_information','other'];
@@ -57,25 +61,64 @@ export function renderKnowledgeEditor(ctx,{mode='new',table='knowledge_items',id
         if(!file.size)throw new Error(text('source_file_required'));
         if(file.size>MAX_SOURCE_FILE_BYTES)throw new Error(text('source_file_too_large'));
         if(!ctx.knowledgeFiles)throw new Error(text('source_upload_failed'));
-        const initialized=await data.knowledgeLibrary(ctx,'uploadPrepare',{data:{...values,fileName:file.name,fileSizeBytes:file.size}});
-        if(!initialized?.ok)throw new Error(initialized?.error?.code||text('source_upload_failed'));
-        const session={sourceId:initialized.sourceId,uploadId:initialized.uploadId};let finalizing=false;
+        const isPdf=/\.pdf$/i.test(file.name)||file.type==='application/pdf';
+        let uploadedParts=0;
+        const uploadPart=async(part,details)=>{
+          if(details.split&&part.size>KNOWLEDGE_PDF_PART_BYTES)throw new Error(text('pdf_part_too_large'));
+          const title=details.split?knowledgePdfPartTitle(values.title,details.index,details.total,
+            details.startPage,details.endPage,getLang()):values.title;
+          const initialized=await data.knowledgeLibrary(ctx,'uploadPrepare',{data:{...values,title,fileName:part.name,fileSizeBytes:part.size}});
+          if(!initialized?.ok)throw new Error(initialized?.error?.code||text('source_upload_failed'));
+          const session={sourceId:initialized.sourceId,uploadId:initialized.uploadId};let finalizing=false;
+          try{
+            if(!details.split)formStatus.textContent=text('source_upload_progress');
+            const stored=await ctx.knowledgeFiles.upload(initialized.storageKey,part,{
+              contentType:part.type||initialized.contentType||'application/octet-stream',upsert:false,
+            });
+            if(stored?.error)throw new Error(stored.error.message||text('source_upload_failed'));
+            finalizing=true;
+            const result=await data.knowledgeLibrary(ctx,'uploadFinalize',{data:session});
+            if(!result?.ok){const code=result?.errorCode||result?.error?.code;
+              throw new Error(code==='PERSONAL_DATA_DETECTED'?text('sensitive_blocked'):
+                code==='VISION_MODEL_NOT_CONFIGURED'?text('ocr_model_not_configured'):
+                code==='OCR_FAILED'?text('ocr_failed'):
+                code==='UNSUPPORTED_TYPE'?text('source_unsupported_type'):
+                ['INVALID_CONTENT','INVALID_IMAGE'].includes(code)?text('source_invalid_content'):text('source_upload_failed'));}
+            queuedUpload=queuedUpload||result.queued===true;
+            uploadedParts++;
+          }catch(error){if(!finalizing)await data.knowledgeLibrary(ctx,'uploadCancel',{data:session}).catch(()=>{});throw error;}
+          return true;
+        };
         try{
-          formStatus.textContent=text('source_upload_progress');
-          const stored=await ctx.knowledgeFiles.upload(initialized.storageKey,file,{
-            contentType:file.type||initialized.contentType||'application/octet-stream',upsert:false,
-          });
-          if(stored?.error)throw new Error(stored.error.message||text('source_upload_failed'));
-          finalizing=true;
-          const result=await data.knowledgeLibrary(ctx,'uploadFinalize',{data:session});
-          if(!result?.ok){const code=result?.errorCode||result?.error?.code;
-            throw new Error(code==='PERSONAL_DATA_DETECTED'?text('sensitive_blocked'):
-              code==='VISION_MODEL_NOT_CONFIGURED'?text('ocr_model_not_configured'):
-              code==='OCR_FAILED'?text('ocr_failed'):
-                  code==='UNSUPPORTED_TYPE'?text('source_unsupported_type'):
-                    ['INVALID_CONTENT','INVALID_IMAGE'].includes(code)?text('source_invalid_content'):text('source_upload_failed'));}
-          queuedUpload=result.queued===true;
-        }catch(error){if(!finalizing)await data.knowledgeLibrary(ctx,'uploadCancel',{data:session}).catch(()=>{});throw error;}
+          if(isPdf){
+            formStatus.textContent=text('pdf_reading_progress');
+            const result=await uploadKnowledgePdfParts(file,{
+              locale:getLang(),
+              onProgress:progress=>{
+                if(progress.stage==='split')formStatus.textContent=replaceCount(text('pdf_split_progress'),progress.total);
+                else if(progress.stage==='upload')formStatus.textContent=formatText(text('pdf_part_upload_progress'),{
+                  count:progress.index,total:progress.total,start:progress.startPage,end:progress.endPage,
+                });
+              },
+              onPart:uploadPart,
+            });
+            uploadedParts=result.uploadedParts;
+            if(result.split){
+              formStatus.textContent=replaceCount(text('pdf_volumes_queued'),result.parts);
+              ctx.toast(replaceCount(text('pdf_volumes_queued'),result.parts),'ok');
+              location.hash='#/knowledge-governance';
+              return;
+            }
+          }else await uploadPart(file,{split:false});
+        }catch(error){
+          const completed=Number(error.uploadedParts)||uploadedParts;
+          const reason=error.message==='PDF_PART_TOO_LARGE'?text('pdf_part_too_large'):
+            error.message==='PDF_PAGE_COUNT_FAILED'?text('pdf_page_count_failed'):
+            error.message==='PDF_SPLIT_FAILED'?text('pdf_split_failed'):
+            error.message||text('source_upload_failed');
+          if(completed>0)throw new Error(`${replaceCount(text('pdf_partial_upload'),completed)} ${reason}`);
+          throw new Error(reason);
+        }
       }else if(isPlaybook){
         for(const key of ['possible_underlying_reasons','clarifying_questions','do_not_say'])
           values[key]=String(values[key]||'').split(/\r?\n/).map(value=>value.trim()).filter(Boolean);

@@ -498,6 +498,11 @@ function installFixtures() {
     }; },
     async callFunction({ name, data }) {
       const key = name + ':' + data.action;
+      if (key === 'assistant:knowledgeLibrary' && data.operation === 'list') {
+        calls.push({ name, action: data.action, operation: data.operation });
+        if (!loggedIn) return fail('CALL_BEFORE_LOGIN: ' + key);
+        return { result: { ok:true, knowledge:[], playbooks:[], sources:[] } };
+      }
       if (key === 'person_360:previewOpportunity' && window.__crmTest.rejectPreview)
         throw {code:'SDK_NETWORK_TEST'};
       if (key === 'person_360:executeWorkItem' && window.__crmTest.rejectWorkItemExecuteOnce) {
