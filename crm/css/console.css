@@ -67,6 +67,10 @@ h1, h2, h3, p, ul { margin: 0; }
 .btn-lg { height: 48px; width: 100%; font-size: 15px; }
 .btn[disabled] { opacity: .55; cursor: not-allowed; }
 .btn:active { transform: scale(.97); }
+button.btn[aria-pressed="true"] { background: var(--red); border-color: var(--red); color: #fff; }
+@media (hover: hover) and (pointer: fine) {
+  button.btn[aria-pressed="true"]:hover { background: var(--red-600); border-color: var(--red-600); color: #fff; }
+}
 
 /* ---------- 顶栏 ---------- */
 .console-topbar {
@@ -95,7 +99,10 @@ h1, h2, h3, p, ul { margin: 0; }
 @media (hover: hover) and (pointer: fine) {
   .nav-item:hover { background: #f1f2f5; color: var(--ink); }
 }
-.nav-item.active { background: var(--red-50); color: var(--red); }
+.nav-item.active { background: var(--red); color: #fff; }
+@media (hover: hover) and (pointer: fine) {
+  .nav-item.active:hover { background: var(--red-600); color: #fff; }
+}
 .topbar-right { display: flex; align-items: center; gap: 12px; margin-left: auto; }
 .avatar {
   width: 34px; height: 34px; border-radius: 50%; background: var(--red-50); color: var(--red);
@@ -283,7 +290,8 @@ h1, h2, h3, p, ul { margin: 0; }
   padding: 13px 14px; font-size: 14px; font-weight: 600; color: var(--muted);
   border-bottom: 2px solid transparent; white-space: nowrap; cursor: pointer;
 }
-.tab.active { color: var(--red); border-bottom-color: var(--red); }
+.tabs .tab.active { color: #fff; background: var(--red); border-bottom-color: var(--red); }
+.tabs .tab.active:hover { color: #fff; background: var(--red-600); border-bottom-color: var(--red-600); }
 
 /* ---------- Person OCR review (PC14) ---------- */
 .ocr-review { gap: 14px; }
@@ -462,7 +470,7 @@ body:has(.login), body.is-login { padding-top: env(safe-area-inset-top); }
 .lang-toggle { display: flex; gap: 8px; flex-wrap: wrap; }
 .lang-toggle .btn { min-width: 110px; }
 .lang-toggle .lang-btn { border: 2px solid var(--line); background: var(--card); color: var(--ink); }
-.lang-toggle .lang-btn.active { border-color: var(--red); background: rgba(211, 17, 69, .08); color: var(--red); font-weight: 600; }
+.lang-toggle .lang-btn.active { border-color: var(--red); background: var(--red); color: #fff; font-weight: 600; }
 
 /* ---------- 弹层 / 提示 ---------- */
 .modal-overlay { position: fixed; inset: 0; background: rgba(24, 27, 33, .45); display: grid; place-items: center; z-index: 70; padding: 20px; }
@@ -645,7 +653,7 @@ body:has(.login), body.is-login { padding-top: env(safe-area-inset-top); }
   display: flex; flex-direction: column; align-items: center; gap: 3px;
   font-size: 10.5px; font-weight: 600; color: var(--muted); text-decoration: none; padding: 8px 0 0;
 }
-.tab-item.active { color: var(--red); }
+.tab-item.active { color: #fff; background: var(--red); }
 .fab-slot { position: relative; }
 .fab {
   position: absolute; left: 50%; top: -24px; transform: translateX(-50%);

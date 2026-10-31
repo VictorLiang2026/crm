@@ -1,7 +1,8 @@
 /* Phase 14 navigation and read-only hubs. Legacy page styles remain in admin.html. */
 header .mod-switch{margin-left:auto;max-width:calc(100vw - 420px);overflow-x:auto;scrollbar-width:thin}
 header .mod-btn{flex:none;padding:8px 12px}
-header .mod-btn.active{background:var(--pri);color:#fff}
+header .mod-btn.active{background:var(--nav-active,#d31145);color:#fff}
+header .mod-btn.active:hover{background:var(--nav-active-hover,#b00e3b);color:#fff}
 .global-capture{flex:none;border:0;border-radius:8px;background:#059669;color:#fff;font-family:inherit;font-size:13px;font-weight:700;padding:9px 13px;cursor:pointer;white-space:nowrap}
 .global-capture:hover{background:#047857}
 .global-capture:focus-visible,.mod-btn:focus-visible,.phase14-page a:focus-visible,.phase14-page button:focus-visible{outline:3px solid #60a5fa;outline-offset:2px}
