@@ -14,10 +14,13 @@
 | `recruit_coach` 2.0 | coaching | candidate + bounded recruit follow-ups | confirm_before_write | standard |
 | `conversation_playbook` | coaching | person | confirm_before_write | standard |
 | `ai_search` | retrieval | search_results | review | standard |
+| `person_followup_advice` 1.0 | coaching | customer snapshot + recent interactions + strategy/product sources | review | standard |
 
 `recruit_coach` 2.0 由 PC20 接入；输入绑定候选人和 Person，输出六维评分及接触建议，来源只取候选人档案和最近 20 条招募跟进。输出不直接写入业务资料；采纳后由人通过现有 Action 预览确认流程另行创建行动，实际跟进结果通过独立预览确认写入 `public.outcomes` 并关联 `ai_result_id` 与可选 Action。
 
 `meeting_prep` 2.0 使用唯一输入 `person_id`。其上下文为 Person、Household、双向 Relationship、最近 Interactions、已确认 Facts、Signals、进行中 Opportunities、未完成 Actions、未完成 Commitments、Insurance Context 与 Relevant Playbook。输出契约要求七项：30 秒人物摘要、最近变化、本次建议目标、建议切入点、可能异议、需要确认的信息、不建议做什么。它是只读建议，`confirmationLevel=review`；原 1.0 契约未接入生产调用。本轮未接入模型或页面，Playbook 因尚无内容源而明确标为不可用。
+
+`person_followup_advice` 1.0 由 `assistant` 的 Skill Registry 驱动 CloudBase 配置的模型，作为一条配对建议的系统侧输出。上下文包含脱敏 Person 摘要、最近互动、策略来源、产品与服务来源及生成边界。输出分为整体跟进策略和产品/服务建议；策略段不得推荐具体产品，产品段只能引用有效知识条目。它是只读建议，保存后供人审阅；模型和供应商仍由 Gateway/CloudBase 配置选择。ChatGPT 侧不由 CRM 调用模型，通过人工运行的 SKILL 任务包、服务端 Preview 和操作者确认分别导入。
 
 `conversation_playbook` 2.0 输入 `person_id` 与客户异议 `objection`，可附场景 `scenario`。只读上下文包含 Person、最近 6 条 Interaction、最多 8 条已确认 Fact、8 条 Signal、5 条开放 Opportunity、3 条匹配 Playbook 与 12 条可靠 Evidence；不得把 Signal 当作 Fact。输出是待确认的潜在原因、澄清问题、响应逻辑、Evidence ID、下一步目标与禁用说法，不包含通用开场白或逐字话术。`cloudfunctions/_shared/conversation-playbook.js` 通过注入已授权的只读请求与 AI Gateway 装配、调用并复核结果；只有已核验、仍在有效期、可信度至少 0.7 且被匹配 Playbook 引用的 `public.knowledge_items` evidence 类型可作为 Evidence。模型引用不在许可清单内的 ID 会被丢弃；无有效引用时结果明确要求人工确认。模块本身没有生产入口、浏览器调用或 CRM 业务写入。
 

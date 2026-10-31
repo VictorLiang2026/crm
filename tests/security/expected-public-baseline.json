@@ -4043,6 +4043,42 @@
         "security_definer": false,
         "authenticated_execute": false
       }
+    },
+    {
+      "kind": "relation",
+      "name": "person_followup_advice",
+      "detail": {
+        "rls": true,
+        "type": "r",
+        "policies": [
+          {
+            "name": "person_followup_advice_service_only",
+            "roles": ["service_role"],
+            "command": "*",
+            "check_hash": "b326b5062b2f0e69046810717534cb09",
+            "permissive": true,
+            "using_hash": "b326b5062b2f0e69046810717534cb09"
+          }
+        ],
+        "force_rls": true,
+        "privileges": {
+          "anon": [],
+          "service_role": ["DELETE", "INSERT", "MAINTAIN", "REFERENCES", "SELECT", "TRIGGER", "TRUNCATE", "UPDATE"],
+          "authenticated": []
+        },
+        "security_invoker": false
+      }
+    },
+    {
+      "kind": "sequence",
+      "name": "person_followup_advice_id_seq",
+      "detail": {
+        "anon_read": false,
+        "anon_usage": false,
+        "service_usage": true,
+        "authenticated_read": false,
+        "authenticated_usage": false
+      }
     }
   ]
 }

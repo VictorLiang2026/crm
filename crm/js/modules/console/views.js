@@ -18,4 +18,4 @@ export { renderSettings } from './pages/settings.js';
 export { renderTestScenario, renderTestAction } from './test-tools.js';
 export { renderKnowledgeGovernance } from './knowledge-governance.js';
 export { renderKnowledgeEditor, renderKnowledgeTrash } from './knowledge-pages.js';
-export { renderDualFollowup } from './dual-followup.js';
+export { renderFollowupAdvice, renderFollowupAdviceTasks } from './followup-advice.js';

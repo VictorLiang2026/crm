@@ -1019,6 +1019,52 @@ body:has(.login), body.is-login { padding-top: env(safe-area-inset-top); }
 @media(max-width:1100px){.kg-layout{grid-template-columns:1fr}}
 @media(max-width:1100px){.df-grid{grid-template-columns:1fr}}
 
+.fa-list{display:grid;gap:14px;margin-top:14px}
+.fa-row,.fa-task-step{min-width:0;background:#fff;border:1px solid var(--line,#e3e5e9);border-radius:12px;padding:16px;display:grid;gap:14px}
+.fa-row-head,.fa-lane-head,.fa-actions,.fa-row-actions{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.fa-row-head h2,.fa-lane-head h3,.fa-task-step h2{margin:0;color:var(--ink,#2e333b)}
+.fa-row-head p,.fa-muted,.fa-page-status{margin:4px 0 0;color:var(--ink-600,#6d7480);font-size:13px}
+.fa-row-actions{justify-content:flex-end}
+.fa-compare{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-items:start}
+.fa-lane{min-width:0;border:1px solid var(--line,#e5e7eb);border-radius:10px;padding:14px;background:#fff;overflow-wrap:anywhere}
+.fa-lane-system{border-top:3px solid #d31145}
+.fa-lane-gpt{border-top:3px solid #3e8067}
+.fa-lane-head{margin-bottom:10px}
+.fa-lane-head h3{font-size:16px}
+.fa-status{display:inline-flex;align-items:center;border-radius:999px;padding:4px 9px;font-size:12px;line-height:1.35;background:#f0f1f3;color:#565e6b}
+.fa-status-ready,.fa-status-manual,.fa-status-kept,.fa-status-saved{background:#e6f5ed;color:#176e4d}
+.fa-status-stale,.fa-status-preview{background:#fff2d8;color:#8a5b08}
+.fa-status-failed{background:#fae9ed;color:#8b2e41}
+.fa-section{border-top:1px solid var(--line,#e5e7eb);padding-top:10px;margin-top:10px}
+.fa-section h4{font-size:13px;color:var(--ink-600,#565e6b);margin:0 0 6px}
+.fa-section>p,.fa-preview-copy p{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.55}
+.fa-section details{margin-top:8px}
+.fa-section summary{cursor:pointer;color:var(--ink-600,#6d7480);font-size:12px}
+.fa-sources{margin:6px 0 0;padding-left:18px;font-size:12px;display:grid;gap:5px}
+.fa-sources a{color:var(--blue,#385d9c);overflow-wrap:anywhere}
+.fa-sources small{display:block;color:var(--ink-600,#6d7480)}
+.fa-empty{padding:22px;text-align:center;color:var(--ink-600,#6d7480);border:1px dashed var(--line,#e3e5e9);border-radius:10px}
+.fa-create-form{margin-top:12px;border:1px solid var(--line,#e3e5e9);border-radius:12px;padding:16px;background:#fff;display:grid;gap:12px}
+.fa-create-form[hidden],.fa-gpt-edit-fields[hidden]{display:none}
+.fa-form-field{display:grid;gap:6px;color:var(--ink-600,#565e6b);font-size:13px}
+.fa-form-field input,.fa-form-field textarea,.fa-form-field select,.fa-json-box{width:100%;min-width:0;padding:10px;border:1px solid #d1d5db;border-radius:8px;color:var(--ink,#2e333b);font:inherit;background:#fff}
+.fa-form-field textarea,.fa-json-box{resize:vertical;white-space:pre-wrap;overflow-wrap:anywhere}
+.fa-json-box{font-family:Consolas,'Courier New',monospace;font-size:12px}
+.fa-modal-overlay{position:fixed;inset:0;z-index:80;background:rgba(24,27,33,.5);display:grid;place-items:center;padding:18px;overflow:auto}
+.fa-modal{width:min(820px,100%);max-height:min(92vh,1000px);overflow:auto;background:#fff;border-radius:14px;padding:20px;display:grid;gap:12px;box-shadow:0 24px 60px rgba(0,0,0,.24)}
+.fa-modal>header,.fa-modal>footer{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.fa-modal h2{margin:0;font-size:19px}
+.fa-gpt-edit-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.fa-task-step>p{margin:0;color:var(--ink-600,#6d7480);font-size:13px}
+.fa-task-step .fa-actions{justify-content:flex-start}
+.fa-preview-copy{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.fa-preview-copy section{min-width:0;border-top:1px solid var(--line,#e5e7eb);padding-top:8px;overflow-wrap:anywhere}
+.fa-preview-copy b{display:block;margin-bottom:5px;color:var(--ink-600,#565e6b);font-size:13px}
+.fa-legacy{margin-top:18px;padding:12px 14px;border:1px solid var(--line,#e3e5e9);border-radius:10px}
+.fa-legacy summary{cursor:pointer;font-weight:600}
+.fa-legacy-row{padding:10px 0;border-top:1px solid var(--line,#e5e7eb);white-space:pre-wrap}
+@media(max-width:900px){.fa-compare{grid-template-columns:minmax(0,1fr)}.fa-preview-copy,.fa-gpt-edit-fields{grid-template-columns:minmax(0,1fr)}}
+
 
 /* L06: personal planning stays folded; keep the assumption editor usable on iPad. */
 .l06-tools { margin-top: 14px; }

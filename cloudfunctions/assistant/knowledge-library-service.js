@@ -24,7 +24,12 @@ const LEGACY_CATEGORY = Object.freeze({product:'on_sale_product',service:'existi
   industry:'industry_development',campaign:'marketing_activity',health_wealth_seminar:'health_wealth_sharing',
   top_performer_sharing:'top_performer_sharing',legal_tax:'legal_tax',case:'customer_case',playbook:'conversation_strategy',
   company:'company_information'});
-const REST_TABLES = new Set(['knowledge_sources','knowledge_items','playbooks','knowledge_content_commands','ai_tasks','ai_results']);
+const REST_TABLES = new Set(['knowledge_sources','knowledge_items','playbooks','knowledge_content_commands',
+  'person_followup_advice','persons','ai_tasks','ai_results']);
+const FOLLOWUP_ADVICE_COLUMNS = 'id,person_id,client_request_id,title,system_status,system_strategy,system_product_advice,'+
+  'system_strategy_sources,system_product_sources,system_version,system_task_id,gpt_strategy,gpt_product_advice,'+
+  'gpt_strategy_sources,gpt_product_sources,gpt_based_on_system_version,gpt_kept_for_system_version,gpt_status,'+
+  'gpt_preview_id,gpt_preview_payload,gpt_preview_actor,gpt_preview_expires_at,created_by,updated_by,created_at,updated_at,deleted_at';
 const EXTENSIONS = Object.freeze({
   '.pdf': 'application/pdf', '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
@@ -49,6 +54,26 @@ function cleanText(value, max, name, required = false) {
   if (value == null && !required) return null;
   if (typeof value !== 'string' || (required && !value.trim()) || value.length > max || /[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(value)) fail('INVALID_INPUT', `Invalid ${name}`);
   return value.trim() || null;
+}
+function redactForTask(value,person={}) {
+  let text=String(value||'').replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi,'[email removed]')
+    .replace(/\+?\d[\d ()-]{8,}\d/g,match=>match.replace(/\D/g,'').length>=10?'[phone removed]':match);
+  for(const candidate of [person.display_name,person.name,person.legal_name]) {
+    const name=String(candidate||'').trim();if(name.length>=2)text=text.split(name).join('[name removed]');
+  }
+  return text;
+}
+function adviceDto(row,personName=null) {
+  return {id:String(row.id),personId:String(row.person_id),personName:personName||null,title:row.title,
+    system:{status:row.system_status,strategy:row.system_strategy||'',productAdvice:row.system_product_advice||'',
+      strategySources:row.system_strategy_sources||[],productSources:row.system_product_sources||[],
+      version:Number(row.system_version||0),taskId:row.system_task_id?String(row.system_task_id):null},
+    gpt:{status:row.gpt_status,strategy:row.gpt_strategy||'',productAdvice:row.gpt_product_advice||'',
+      strategySources:row.gpt_strategy_sources||[],productSources:row.gpt_product_sources||[],
+      basedOnSystemVersion:row.gpt_based_on_system_version==null?null:Number(row.gpt_based_on_system_version),
+      keptForSystemVersion:row.gpt_kept_for_system_version==null?null:Number(row.gpt_kept_for_system_version),
+      hasPendingPreview:Boolean(row.gpt_preview_id)},
+    createdAt:row.created_at,updatedAt:row.updated_at,deletedAt:row.deleted_at||null};
 }
 function normalizeCategories(value, legacyDomain) {
   const raw=Array.isArray(value)?value:(LEGACY_CATEGORY[legacyDomain]?[LEGACY_CATEGORY[legacyDomain]]:[]);
@@ -882,6 +907,269 @@ function createKnowledgeLibrary(options={}) {
       selectionNotice:'选择仅表示采用此建议作为工作参考，不表示已经联系客户或执行任何业务动作。',
       execution:{modelCalled:!task.reused,businessDataRead:true,businessDataWritten:false}};
   }
+  async function followupAdviceContext(personId,focus='') {
+    const response=await callFunction({name:'person_360',data:{action:'getMeetingPrepContext',personId}});
+    const person=response?.result;
+    if(!person||person.error||!object(person)||!person.person)fail('NOT_FOUND');
+    const safePerson={occupation:person.person.occupation||null,customer_stage:person.person.customer_stage||null,
+      customer_level:person.person.customer_level||null,sales_priority:person.person.sales_priority||null,
+      referral_priority:person.person.referral_priority||null,relationship_stage:person.person.relationship_stage||null};
+    const interactions=(person.recent_interactions||[]).slice(0,6).map(row=>({
+      date:row.date||row.interaction_date||row.created_at||null,
+      type:row.type||row.interaction_type||null,
+      summary:redactForTask(row.summary||row.followup_notes||row.notes||row.content||'',person.person),
+    }));
+    const customerSnapshot={person:safePerson,household:person.household||null,relationship:person.relationship||null,
+      facts:(person.facts||[]).slice(0,8),signals:(person.signals||[]).slice(0,8),
+      open_opportunities:(person.open_opportunities||[]).slice(0,5),insurance_context:person.insurance_context||null,
+      relevant_playbook:person.relevant_playbook||null};
+    const query=`${safePerson.occupation||''} ${safePerson.customer_stage||''} ${focus} ${JSON.stringify(customerSnapshot)} ${JSON.stringify(interactions)}`;
+    const strategyEntries=rankEvidence(await activeItems(new Set(['industry','top_performer_sharing','playbook','case','story','evidence'])),query,8);
+    const productEntries=rankEvidence(await activeItems(new Set(['product','company','service','recruitment','campaign',
+      'health_wealth_seminar','legal_tax','case','playbook','regulation','evidence','story','other'])),query,10);
+    const strategy=sourceContext(strategyEntries),products=sourceContext(productEntries);
+    return {customerSnapshot,interactions,strategy,products,context:{customer_snapshot:customerSnapshot,
+      recent_interactions:interactions,strategy_sources:strategy.refs,product_sources:products.refs,
+      generation_rules:'Generate one CloudBase system recommendation as two separate sections. overallStrategy must apply relevant international sales and relationship practices to the stated facts, cover relationship progress, objective, questions and next step, and must not name or recommend a specific product or service. productServiceAdvice must be grounded only in product_sources and may state that no suitable source was found. Use only exact supplied knowledge item IDs in each section sourceRefs. Do not invent person facts, product terms, returns, guarantees, tax or legal conclusions. Keep the advice actionable, concise and tailored to the stated focus.',
+      guardrails:'Industry and strategy sources may support the overall strategy only. Product, company and service claims require current verified product_sources. If there is no valid product source, say that a product/service match could not be verified and list what a person should confirm. Avoid repeating contact details or unnecessarily identifying information.'}};
+  }
+  function keepAllowedSources(value,allowed) {
+    return Array.isArray(value)?[...new Set(value.map(item=>String(typeof item==='object'?item?.id:item)))]
+      .filter(id=>allowed.has(id)).map(id=>allowed.get(id)):[];
+  }
+  async function listFollowupAdvice(personIdValue,actorValue) {
+    actorUid(actorValue);const personId=String(personIdValue||'');if(!positiveId(personId))fail('INVALID_INPUT');
+    const rows=await request('person_followup_advice','GET',{select:FOLLOWUP_ADVICE_COLUMNS,person_id:`eq.${personId}`,
+      deleted_at:'is.null',order:'updated_at.desc.nullslast,id.desc',limit:100});
+    return {ok:true,personId,rows:rows.map(row=>adviceDto(row))};
+  }
+  async function runSystemAdvice(adviceId,personId,focus,options={}) {
+    const row=(await request('person_followup_advice','GET',{select:FOLLOWUP_ADVICE_COLUMNS,id:`eq.${adviceId}`,
+      person_id:`eq.${personId}`,deleted_at:'is.null',limit:1}))[0];
+    if(!row||row.system_status!=='generating')fail('NOT_FOUND');
+    try {
+      const context=await followupAdviceContext(personId,focus);
+      const database=searchDataFactory({env,key,fetchImpl});
+      const gateway=gatewayFactory({app:client,rdb:database.auditRdb,timeoutMs:80000,maxAttempts:1,
+        actorResolver:async()=>({uid:row.created_by,isAnonymous:false})});
+      const task=await gateway.runAITask({taskType:'person_followup_advice',skill:'person_followup_advice',capability:'coaching',
+        subjectType:'person',subjectId:personId,input:{personId,title:row.title,focus:focus||''},context:context.context,
+        contextSnapshot:{...context.context,_context:{recipe:'person_followup_advice',version:'1.0.0',source:'assistant.knowledge-library-service'}},
+        ...(typeof options.onStarted==='function'?{onStarted:async({taskId})=>{
+          await request('person_followup_advice','PATCH',{id:`eq.${adviceId}`,person_id:`eq.${personId}`,
+            system_status:'eq.generating',deleted_at:'is.null'},
+            {system_task_id:String(taskId),updated_at:new Date().toISOString()});
+          await options.onStarted({taskId:String(taskId),personId,adviceId});
+        }}:{})});
+      const result=task.result;
+      if(!object(result)||!object(result.overallStrategy)||!object(result.productServiceAdvice))fail('INVALID_RESULT');
+      const strategyRefs=keepAllowedSources(result.overallStrategy.sourceRefs,context.strategy.allowed);
+      const productRefs=keepAllowedSources(result.productServiceAdvice.sourceRefs,context.products.allowed);
+      const strategyText=[result.overallStrategy.summary,
+        `Objective: ${result.overallStrategy.objective}`,
+        `Next step: ${result.overallStrategy.nextStep}`,
+        ...(result.overallStrategy.clarifyingQuestions||[]).map(question=>`Question to confirm: ${question}`)]
+        .filter(Boolean).join('\n\n');
+      const saved=await request('person_followup_advice','PATCH',{id:`eq.${adviceId}`,person_id:`eq.${personId}`,
+        system_status:'eq.generating',deleted_at:'is.null'},
+        {title:cleanText(result.title,240,'title',true),system_status:'ready',system_strategy:cleanText(strategyText,4000,'strategy',true),
+          system_product_advice:cleanText(result.productServiceAdvice.recommendation,4000,'productAdvice',true),
+          system_strategy_sources:strategyRefs,system_product_sources:productRefs,system_version:1,
+          system_task_id:String(task.taskId),updated_by:row.created_by,updated_at:new Date().toISOString()});
+      if(saved.length!==1)fail('STALE');
+      return {ok:true,status:'completed',taskId:String(task.taskId),personId,adviceId,advice:adviceDto(saved[0]),
+        execution:{modelCalled:true,businessDataWritten:true}};
+    } catch(error) {
+      await request('person_followup_advice','PATCH',{id:`eq.${adviceId}`,person_id:`eq.${personId}`,
+        system_status:'eq.generating',deleted_at:'is.null'},
+        {system_status:'failed',updated_by:row.created_by,updated_at:new Date().toISOString()});
+      throw error;
+    }
+  }
+  async function createFollowupAdvice(input,actorValue,options={}) {
+    const actor=actorUid(actorValue),personId=String(input?.personId||''),requestId=String(input?.clientRequestId||'');
+    const title=cleanText(input?.title,240,'title',true),focus=cleanText(input?.focus,1200,'focus')||'';
+    if(!positiveId(personId)||!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestId))fail('INVALID_INPUT');
+    const existing=(await request('person_followup_advice','GET',{select:FOLLOWUP_ADVICE_COLUMNS,person_id:`eq.${personId}`,
+      client_request_id:`eq.${requestId}`,deleted_at:'is.null',limit:1}))[0];
+    if(existing) {
+      if(existing.title!==title)fail('INVALID_INPUT');
+      if(existing.system_status==='generating')return {ok:true,status:'pending',adviceId:String(existing.id),
+        taskId:existing.system_task_id?String(existing.system_task_id):undefined,personId};
+      if(existing.system_status==='ready')return {ok:true,status:'completed',adviceId:String(existing.id),personId,advice:adviceDto(existing)};
+      const reset=await request('person_followup_advice','PATCH',{id:`eq.${existing.id}`,system_status:'eq.failed',deleted_at:'is.null'},
+        {system_status:'generating',system_task_id:null,updated_by:actor,updated_at:new Date().toISOString()});
+      if(reset.length!==1)fail('STALE');
+      return runSystemAdvice(String(existing.id),personId,focus,options);
+    }
+    let inserted;
+    try { inserted=await request('person_followup_advice','POST',{}, {person_id:personId,client_request_id:requestId,title,
+      system_status:'generating',system_version:0,gpt_status:'pending',created_by:actor,updated_by:actor}); }
+    catch(error) {
+      if(error?.code!=='DUPLICATE_SOURCE')throw error;
+      const duplicate=(await request('person_followup_advice','GET',{select:FOLLOWUP_ADVICE_COLUMNS,person_id:`eq.${personId}`,
+        client_request_id:`eq.${requestId}`,deleted_at:'is.null',limit:1}))[0];
+      if(!duplicate)throw error;
+      return {ok:true,status:'pending',adviceId:String(duplicate.id),personId};
+    }
+    const row=inserted[0];if(!row?.id)fail('PERSISTENCE_ERROR');
+    return runSystemAdvice(String(row.id),personId,focus,options);
+  }
+  async function adviceStatus(input,actorValue) {
+    actorUid(actorValue);const taskId=String(input?.taskId||''),personId=String(input?.personId||'');
+    if(!positiveId(taskId)||!positiveId(personId))fail('INVALID_INPUT');
+    const task=(await request('ai_tasks','GET',{select:'id,status,task_type,subject_type,subject_id',id:`eq.${taskId}`,
+      task_type:'eq.person_followup_advice',subject_type:'eq.person',subject_id:`eq.${personId}`,limit:1}))[0];
+    if(!task)fail('NOT_FOUND');
+    const row=(await request('person_followup_advice','GET',{select:FOLLOWUP_ADVICE_COLUMNS,person_id:`eq.${personId}`,
+      system_task_id:`eq.${taskId}`,deleted_at:'is.null',limit:1}))[0];
+    if(!row)return {ok:true,status:'pending',taskId,personId};
+    if(row.system_status==='failed')return {ok:false,status:'failed',taskId,personId,error:{code:'AI_REQUEST_FAILED'}};
+    if(row.system_status!=='ready')return {ok:true,status:'pending',taskId,personId};
+    return {ok:true,status:'completed',taskId,personId,adviceId:String(row.id),advice:adviceDto(row)};
+  }
+  async function updateFollowupAdvice(input,actorValue) {
+    const actor=actorUid(actorValue),id=String(input?.id||''),personId=String(input?.personId||''),
+      expectedVersion=Number(input?.systemVersion),expectedUpdatedAt=String(input?.updatedAt||'');
+    if(!positiveId(id)||!positiveId(personId)||!Number.isInteger(expectedVersion)||expectedVersion<1||!expectedUpdatedAt)fail('INVALID_INPUT');
+    const current=(await request('person_followup_advice','GET',{select:FOLLOWUP_ADVICE_COLUMNS,id:`eq.${id}`,
+      person_id:`eq.${personId}`,deleted_at:'is.null',limit:1}))[0];
+    if(!current)fail('NOT_FOUND');if(Number(current.system_version)!==expectedVersion||current.updated_at!==expectedUpdatedAt)fail('STALE');
+    const title=cleanText(input.title,240,'title',true),strategy=cleanText(input.systemStrategy,4000,'strategy',true),
+      product=cleanText(input.systemProductAdvice,4000,'productAdvice',true);
+    const systemChanged=title!==current.title||strategy!==current.system_strategy||product!==current.system_product_advice;
+    const nextVersion=Number(current.system_version)+(systemChanged?1:0);
+    const body={title,system_strategy:strategy,system_product_advice:product,system_version:nextVersion,
+      gpt_kept_for_system_version:systemChanged?null:current.gpt_kept_for_system_version,
+      gpt_status:current.gpt_strategy?(systemChanged?'stale':current.gpt_status):'pending',updated_by:actor,
+      updated_at:new Date().toISOString()};
+    const gptAction=input.gptAction;
+    if(gptAction==='delete') {
+      Object.assign(body,{gpt_strategy:null,gpt_product_advice:null,gpt_strategy_sources:[],gpt_product_sources:[],
+        gpt_based_on_system_version:null,gpt_kept_for_system_version:null,gpt_status:'pending'});
+    } else if(gptAction==='edit') {
+      body.gpt_strategy=cleanText(input.gptStrategy,4000,'gptStrategy',true);
+      body.gpt_product_advice=cleanText(input.gptProductAdvice,4000,'gptProductAdvice',true);
+      body.gpt_strategy_sources=current.gpt_strategy_sources;
+      body.gpt_product_sources=current.gpt_product_sources;
+      body.gpt_based_on_system_version=nextVersion;body.gpt_kept_for_system_version=null;body.gpt_status='manual';
+    } else if(gptAction==='keep'&&current.gpt_strategy) {
+      body.gpt_kept_for_system_version=nextVersion;body.gpt_status='kept';
+    } else if(gptAction!=null&&gptAction!=='keep')fail('INVALID_INPUT');
+    const rows=await request('person_followup_advice','PATCH',{id:`eq.${id}`,person_id:`eq.${personId}`,
+      system_version:`eq.${expectedVersion}`,updated_at:`eq.${expectedUpdatedAt}`,deleted_at:'is.null',system_status:'eq.ready'},body);
+    if(rows.length!==1)fail('STALE');return {ok:true,advice:adviceDto(rows[0]),systemChanged};
+  }
+  async function deleteFollowupAdvice(input,actorValue) {
+    const actor=actorUid(actorValue),id=String(input?.id||''),personId=String(input?.personId||''),updatedAt=String(input?.updatedAt||'');
+    if(!positiveId(id)||!positiveId(personId)||!updatedAt)fail('INVALID_INPUT');
+    const rows=await request('person_followup_advice','PATCH',{id:`eq.${id}`,person_id:`eq.${personId}`,
+      updated_at:`eq.${updatedAt}`,deleted_at:'is.null'},
+      {deleted_at:new Date().toISOString(),updated_by:actor,updated_at:new Date().toISOString(),gpt_preview_id:null,
+        gpt_preview_payload:null,gpt_preview_actor:null,gpt_preview_expires_at:null});
+    if(rows.length!==1)fail('STALE');return {ok:true,id};
+  }
+  async function gptTaskPackage(input,actorValue) {
+    actorUid(actorValue);const limit=Math.max(1,Math.min(10,Number(input?.limit)||10));
+    const rows=await request('person_followup_advice','GET',{select:FOLLOWUP_ADVICE_COLUMNS,system_status:'eq.ready',
+      deleted_at:'is.null',order:'id.asc',...(positiveId(input?.afterId)?{id:`gt.${input.afterId}`}:{ }),limit:200});
+    const queued=rows.filter(row=>!row.gpt_strategy||!row.gpt_product_advice||
+      (Number(row.gpt_based_on_system_version)!==Number(row.system_version)&&Number(row.gpt_kept_for_system_version)!==Number(row.system_version)))
+      .slice(0,limit+1);
+    const hasMore=queued.length>limit;
+    const selected=queued.slice(0,limit);
+    const result=[];
+    for(const row of selected) {
+      try {
+        const context=await followupAdviceContext(String(row.person_id),row.title);
+        const safePerson=context.customerSnapshot.person;
+        const safeSnapshot={person:safePerson,
+          facts:context.customerSnapshot.facts.map(item=>({content:redactForTask(item.content||item.summary||''),confidence:item.confidence||null,
+            created_at:item.created_at||null})),
+          signals:context.customerSnapshot.signals.map(item=>({content:redactForTask(item.content||item.summary||''),confidence:item.confidence||null,
+            created_at:item.created_at||null})),
+          open_opportunities:context.customerSnapshot.open_opportunities.map(item=>({type:item.type||item.opportunity_type||null,
+            stage:item.stage||item.status||null,updated_at:item.updated_at||null})),
+          insurance_context:context.customerSnapshot.insurance_context?{status:context.customerSnapshot.insurance_context.status||null,
+            verified_products:context.customerSnapshot.insurance_context.verified_products||[]}:null};
+        const safeSources=refs=>refs.map(ref=>({...ref,title:redactForTask(ref.title),excerpt:redactForTask(ref.excerpt),
+          summary:redactForTask(ref.summary)}));
+        result.push({adviceId:String(row.id),personId:String(row.person_id),title:redactForTask(row.title),systemVersion:Number(row.system_version),
+          currentSystemAdvice:{overallStrategy:redactForTask(row.system_strategy),productServiceAdvice:redactForTask(row.system_product_advice)},
+          customerSnapshot:safeSnapshot,recentInteractions:context.interactions,
+          strategySources:safeSources(context.strategy.refs),productSources:safeSources(context.products.refs),
+          outputContract:{adviceId:'copy exact value',personId:'copy exact value',systemVersion:'copy exact value',
+            gptAdvice:{overallStrategy:'string',productServiceAdvice:'string',strategySourceIds:'integer[]',productSourceIds:'integer[]'}}});
+      } catch(error) {
+        logger.warn('FOLLOWUP_ADVICE_PACKAGE_ITEM_SKIPPED',JSON.stringify({adviceId:String(row.id),code:String(error?.code||'CONTEXT_FAILED')}));
+      }
+    }
+    return {ok:true,packageId:randomUUID(),generatedAt:new Date().toISOString(),count:result.length,rows:result,
+      nextAfterId:hasMore?String(selected.at(-1)?.id||''):null,
+      instructions:'Produce one result for each package row. Keep adviceId, personId and systemVersion unchanged. gptAdvice.overallStrategy must contain only the relationship and next-step strategy; it must not name products or services. gptAdvice.productServiceAdvice may make product/service claims only when supported by productSources. Use only exact supplied source IDs in strategySourceIds and productSourceIds. If no suitable product source exists, clearly say a match could not be verified and leave productSourceIds empty. Do not invent person facts, product terms, returns, guarantees, legal or tax conclusions. Return only JSON shaped as {"rows":[{"adviceId":"...","personId":"...","systemVersion":1,"gptAdvice":{"overallStrategy":"...","productServiceAdvice":"...","strategySourceIds":[],"productSourceIds":[]}}]}.',
+      notice:'The package omits direct contact fields. It is still customer context; review it and use only the approved ChatGPT workspace. CRM validates versions and sources before saving.'};
+  }
+  async function previewGptImport(input,actorValue) {
+    const actor=actorUid(actorValue),items=input?.rows;
+    if(!Array.isArray(items)||!items.length||items.length>10)fail('INVALID_INPUT');
+    const strategyEntries=await activeItems(new Set(['industry','top_performer_sharing','playbook','case','story','evidence']));
+    const productEntries=await activeItems(new Set(['product','company','service','recruitment','campaign',
+      'health_wealth_seminar','legal_tax','case','playbook','regulation','evidence','story','other']));
+    const strategyMap=sourceContext(strategyEntries).allowed,productMap=sourceContext(productEntries).allowed;
+    const previewRows=[];
+    for(const item of items) {
+      if(!object(item)||!positiveId(item.adviceId)||!positiveId(item.personId)||!Number.isInteger(item.systemVersion)||!object(item.gptAdvice))fail('INVALID_INPUT');
+      const row=(await request('person_followup_advice','GET',{select:FOLLOWUP_ADVICE_COLUMNS,id:`eq.${item.adviceId}`,
+        person_id:`eq.${item.personId}`,deleted_at:'is.null',system_status:'eq.ready',limit:1}))[0];
+      if(!row||Number(row.system_version)!==item.systemVersion) {previewRows.push({adviceId:String(item.adviceId),status:'stale'});continue;}
+      const strategy=cleanText(item.gptAdvice.overallStrategy,4000,'overallStrategy',true),
+        product=cleanText(item.gptAdvice.productServiceAdvice,4000,'productServiceAdvice',true),
+        strategySources=keepAllowedSources(item.gptAdvice.strategySourceIds,strategyMap),
+        productSources=keepAllowedSources(item.gptAdvice.productSourceIds,productMap);
+      if(!Array.isArray(item.gptAdvice.strategySourceIds)||!Array.isArray(item.gptAdvice.productSourceIds)||
+          item.gptAdvice.strategySourceIds.length!==strategySources.length||
+          item.gptAdvice.productSourceIds.length!==productSources.length)fail('INVALID_SOURCE');
+      const previewId=randomUUID(),payload={strategy,product,strategySources,productSources,systemVersion:item.systemVersion};
+      const expiresAt=new Date(Date.now()+30*60*1000).toISOString();
+      const saved=await request('person_followup_advice','PATCH',{id:`eq.${item.adviceId}`,system_version:`eq.${item.systemVersion}`,
+        deleted_at:'is.null',system_status:'eq.ready'},
+        {gpt_preview_id:previewId,gpt_preview_payload:payload,gpt_preview_actor:actor,gpt_preview_expires_at:expiresAt,
+          updated_by:actor,updated_at:new Date().toISOString()});
+      if(saved.length!==1) {previewRows.push({adviceId:String(item.adviceId),status:'stale'});continue;}
+      previewRows.push({adviceId:String(item.adviceId),personId:String(item.personId),title:row.title,systemVersion:item.systemVersion,
+        status:'preview',previewId,expiresAt,gptAdvice:{overallStrategy:strategy,productServiceAdvice:product,
+          strategySources,productSources}});
+    }
+    return {ok:true,rows:previewRows};
+  }
+  async function confirmGptImport(input,actorValue) {
+    const actor=actorUid(actorValue),id=String(input?.adviceId||''),personId=String(input?.personId||''),
+      previewId=String(input?.previewId||''),version=Number(input?.systemVersion);
+    if(input?.confirmed!==true||!positiveId(id)||!positiveId(personId)||!Number.isInteger(version)||
+      !/^[0-9a-f-]{36}$/i.test(previewId))fail('INVALID_INPUT');
+    const current=(await request('person_followup_advice','GET',{select:FOLLOWUP_ADVICE_COLUMNS,id:`eq.${id}`,
+      person_id:`eq.${personId}`,gpt_preview_id:`eq.${previewId}`,gpt_preview_actor:`eq.${actor}`,
+      deleted_at:'is.null',limit:1}))[0];
+    if(!current||Number(current.system_version)!==version||Date.parse(current.gpt_preview_expires_at||'')<=Date.now())fail('STALE');
+    const payload=current.gpt_preview_payload;if(!object(payload)||Number(payload.systemVersion)!==version)fail('STALE');
+    const rows=await request('person_followup_advice','PATCH',{id:`eq.${id}`,person_id:`eq.${personId}`,
+      system_version:`eq.${version}`,gpt_preview_id:`eq.${previewId}`,gpt_preview_actor:`eq.${actor}`,
+      deleted_at:'is.null',system_status:'eq.ready'},
+      {gpt_strategy:payload.strategy,gpt_product_advice:payload.product,gpt_strategy_sources:payload.strategySources,
+        gpt_product_sources:payload.productSources,gpt_based_on_system_version:version,gpt_kept_for_system_version:null,
+        gpt_status:'ready',gpt_preview_id:null,gpt_preview_payload:null,gpt_preview_actor:null,gpt_preview_expires_at:null,
+        updated_by:actor,updated_at:new Date().toISOString()});
+    if(rows.length!==1)fail('STALE');return {ok:true,advice:adviceDto(rows[0])};
+  }
+  async function keepGptAdvice(input,actorValue) {
+    const actor=actorUid(actorValue),id=String(input?.adviceId||''),personId=String(input?.personId||''),
+      version=Number(input?.systemVersion),updatedAt=String(input?.updatedAt||'');
+    if(!positiveId(id)||!positiveId(personId)||!Number.isInteger(version)||!updatedAt)fail('INVALID_INPUT');
+    const rows=await request('person_followup_advice','PATCH',{id:`eq.${id}`,person_id:`eq.${personId}`,
+      system_version:`eq.${version}`,updated_at:`eq.${updatedAt}`,deleted_at:'is.null',gpt_strategy:'not.is.null'},
+      {gpt_kept_for_system_version:version,gpt_status:'kept',updated_by:actor,updated_at:new Date().toISOString()});
+    if(rows.length!==1)fail('STALE');return {ok:true,advice:adviceDto(rows[0])};
+  }
   async function dualStatus(input) {
     const taskId=String(input?.taskId||'').trim(),personId=String(input?.personId||'').trim();
     if(!positiveId(personId))fail('INVALID_INPUT');
@@ -976,10 +1264,21 @@ function createKnowledgeLibrary(options={}) {
       case 'dualStatus':return dualStatus(event.data);
       case 'dualSelect':return selectDual(event.data,actor);
       case 'dualHistory':return history(event.personId);
+      case 'adviceList':return listFollowupAdvice(event.personId,actor);
+      case 'adviceGenerate':return createFollowupAdvice(event.data,actor,options);
+      case 'adviceStatus':return adviceStatus(event.data,actor);
+      case 'adviceUpdate':return updateFollowupAdvice(event.data,actor);
+      case 'adviceDelete':return deleteFollowupAdvice(event.data,actor);
+      case 'gptTaskPackage':return gptTaskPackage(event.data,actor);
+      case 'gptImportPreview':return previewGptImport(event.data,actor);
+      case 'gptImportConfirm':return confirmGptImport(event.data,actor);
+      case 'gptKeep':return keepGptAdvice(event.data,actor);
       default:fail('INVALID_OPERATION');
     }
   }
-  return {run,upload,uploadStart,uploadPrepare,uploadChunk,uploadFinalize,uploadCancel,extractText,list,runDual,dualStatus,selectDual,history,processOcrQueue};
+  return {run,upload,uploadStart,uploadPrepare,uploadChunk,uploadFinalize,uploadCancel,extractText,list,runDual,dualStatus,
+    selectDual,history,processOcrQueue,listFollowupAdvice,createFollowupAdvice,adviceStatus,updateFollowupAdvice,
+    deleteFollowupAdvice,gptTaskPackage,previewGptImport,confirmGptImport,keepGptAdvice};
 }
 
 async function handleKnowledgeLibrary(event,actor,options={}) {

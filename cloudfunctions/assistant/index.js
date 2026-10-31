@@ -81,6 +81,8 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
     if (event.taskType === 'person_summary') return require('./summarize-service').getSummaryTaskStatus(event);
     if (event.taskType === 'customer_followup_dual') return require('./knowledge-library-service').handleKnowledgeLibrary(
       { action: 'knowledgeLibrary', operation: 'dualStatus', data: event }, uid);
+    if (event.taskType === 'person_followup_advice') return require('./knowledge-library-service').handleKnowledgeLibrary(
+      { action: 'knowledgeLibrary', operation: 'adviceStatus', data: event }, uid);
     const error = new Error('Unsupported AI task type'); error.code = 'INVALID_INPUT'; throw error;
   }) {
   const run = async (event, context, callback, earlyResponse) => {
@@ -371,7 +373,7 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
       }
     }
     if (event?.action === 'knowledgeLibrary') {
-      const asyncRequested=event.operation==='dualGenerate'&&event.data?.asyncWait===true&&typeof callback==='function';
+      const asyncRequested=['dualGenerate','adviceGenerate'].includes(event.operation)&&event.data?.asyncWait===true&&typeof callback==='function';
       try {
         const result=await knowledgeLibraryRunner(event,identity.uid,{onStarted:asyncRequested?({taskId})=>{
           console.log('AI_TASK_READY_TO_RETURN');
@@ -386,7 +388,7 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
             'FILE_TOO_LARGE','INVALID_FILE','INVALID_CONTENT','INVALID_IMAGE','INVALID_SOURCE',
             'UNSUPPORTED_TYPE','INVALID_INPUT','INVALID_CATEGORIES',
             'PERSONAL_DATA_DETECTED','SHARING_AUTHORIZATION_REQUIRED','SOURCE_METADATA_REQUIRED',
-          'SOURCE_UNAVAILABLE','SOURCE_IN_USE','DRAFT_ALREADY_EXISTS','STALE_SOURCE','UPLOAD_INCOMPLETE',
+          'SOURCE_UNAVAILABLE','SOURCE_IN_USE','DRAFT_ALREADY_EXISTS','STALE_SOURCE','STALE','NOT_FOUND','UPLOAD_INCOMPLETE',
           'UPLOAD_CHUNK_CONFLICT','UPLOAD_CHUNK_ORDER','OCR_FAILED','VISION_MODEL_NOT_CONFIGURED',
           'PDF_SOURCE_UNAVAILABLE','PDF_SOURCE_READ_FAILED','PDF_STORAGE_DENIED','PDF_STORAGE_READ_FAILED',
           'PDF_STORAGE_TIMEOUT','PDF_ENCRYPTED','PDF_NO_TEXT','PDF_LIMIT','PDF_PAGE_LIMIT','PDF_TEXT_LIMIT','PDF_PROCESS_LIMIT',
@@ -416,7 +418,7 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
     }
     const asyncRequested = typeof callback === 'function' &&
       ((event?.action === 'summarize' && event.asyncWait === true) ||
-       (event?.action === 'knowledgeLibrary' && event.operation === 'dualGenerate' && event.data?.asyncWait === true));
+       (event?.action === 'knowledgeLibrary' && ['dualGenerate','adviceGenerate'].includes(event.operation) && event.data?.asyncWait === true));
     const earlyResponse = createEarlyResponse(callback, context, asyncRequested);
     if (asyncRequested) console.log('AI_ASYNC_CALLBACK_MODE');
     const work = run(event, context, callback, earlyResponse);

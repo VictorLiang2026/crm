@@ -6,7 +6,7 @@ import {
   renderKnowledgeGovernance, renderResourceDirectory, renderSpeakerDirectory, renderTopicDirectory,
   renderAnalytics, renderPersonFileImport,
   renderTestScenario, renderTestAction,
-  renderDualFollowup,
+  renderFollowupAdvice, renderFollowupAdviceTasks,
   renderKnowledgeEditor, renderKnowledgeTrash,
 } from './views.js';
 
@@ -26,6 +26,7 @@ const EXACT = new Map([
   ['#/recruit', renderRecruit],
   ['#/recruit/goals', renderRecruitGoals],
   ['#/ai', renderAI],
+  ['#/ai/followup-tasks', renderFollowupAdviceTasks],
   ['#/ai/experience', ctx => renderAiExperience({ root:ctx.main, callFn:ctx.callFn })],
   ['#/more', renderMore],
   ['#/analytics', renderAnalytics],
@@ -46,7 +47,7 @@ const PATTERNS = [
     return renderActivityReport(ctx, 'customer', { startDate: params.get('startDate'), endDate: params.get('endDate') });
   } },
   { re: /^#\/person\/(\d+)(?:\/(timeline|insurance|opportunities|relationships|recruit|care|ocr))?$/, nav: '#/people', render: (ctx, id, section) => renderPerson(ctx, id, section) },
-  { re: /^#\/ai\/followup\/(\d+)$/, nav: '#/people', render: (ctx, id) => renderDualFollowup(ctx, id) },
+  { re: /^#\/ai\/followup\/(\d+)$/, nav: '#/people', render: (ctx, id) => renderFollowupAdvice(ctx, id) },
   { re: /^#\/activity\/(\d+)$/, nav: '#/activities', render: renderActivity },
   { re: /^#\/activity-report\/(customer|recruit)(?:\?(.*))?$/, nav: '#/today', render: (ctx, type, query) => {
     const params = new URLSearchParams(query || '');
