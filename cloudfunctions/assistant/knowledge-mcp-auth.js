@@ -6,22 +6,35 @@ function timingSafeHex(left, right) {
   if (typeof left !== 'string' || typeof right !== 'string' || !/^[a-f0-9]{64}$/.test(left) || !/^[a-f0-9]{64}$/.test(right)) return false;
   return crypto.timingSafeEqual(Buffer.from(left, 'hex'), Buffer.from(right, 'hex'));
 }
-function verifyAssertion(assertion, secret, input, now = Date.now()) {
-  if (!assertion || typeof assertion !== 'object' || typeof secret !== 'string' || secret.length < 32) return null;
-  const { actorUid, scope, audience, issuedAt, nonce, signature } = assertion;
-  if (typeof actorUid !== 'string' || !actorUid.trim() || scope !== 'knowledge:mcp' || audience!=='crm-assistant' ||
-      !Number.isSafeInteger(issuedAt) || Math.abs(now - issuedAt) > 30000 ||
-      typeof nonce !== 'string' || !/^[A-Za-z0-9_-]{20,80}$/.test(nonce)) return null;
-  if(!input||typeof input!=='object'||Array.isArray(input))return null;
-  const payloadHash=crypto.createHash('sha256').update(JSON.stringify(input)).digest('hex');
+function canonicalJson(value) {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
+  if (value && typeof value === 'object') return `{${Object.keys(value).sort()
+    .filter(key => value[key] !== undefined)
+    .map(key => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(',')}}`;
+  return JSON.stringify(value);
+}
+function assertionFailure(assertion, secret, input, now = Date.now()) {
+  if (typeof secret !== 'string' || secret.length < 32) return 'INVALID_SECRET_CONFIG';
+  if (!assertion || typeof assertion !== 'object' || Array.isArray(assertion)) return 'INVALID_ASSERTION';
+  const { actorUid, scope, audience, issuedAt, nonce, payloadHash, signature } = assertion;
+  if (typeof actorUid !== 'string' || !actorUid.trim() || scope !== 'knowledge:mcp' || audience!=='crm-assistant') return 'INVALID_ASSERTION';
+  if (!Number.isSafeInteger(issuedAt) || Math.abs(now - issuedAt) > 30000) return 'ASSERTION_TIME_WINDOW';
+  if (typeof nonce !== 'string' || !/^[A-Za-z0-9_-]{20,80}$/.test(nonce)) return 'INVALID_ASSERTION_NONCE';
+  if(!input||typeof input!=='object'||Array.isArray(input))return 'INVALID_ASSERTION_INPUT';
+  const actualPayloadHash=crypto.createHash('sha256').update(canonicalJson(input)).digest('hex');
+  if(!timingSafeHex(payloadHash,actualPayloadHash))return 'ASSERTION_PAYLOAD_MISMATCH';
   const expected = crypto.createHmac('sha256', secret).update(`${actorUid}\n${scope}\n${audience}\n${issuedAt}\n${nonce}\n${payloadHash}`).digest('hex');
-  return timingSafeHex(signature, expected) ? actorUid : null;
+  return timingSafeHex(signature, expected) ? null : 'ASSERTION_SIGNATURE_MISMATCH';
+}
+function verifyAssertion(assertion, secret, input, now = Date.now()) {
+  return assertionFailure(assertion, secret, input, now) ? null : assertion.actorUid;
 }
 function signAssertion(actorUid, secret, input, now = Date.now()) {
   if (typeof actorUid !== 'string' || !actorUid.trim() || typeof secret !== 'string' || secret.length < 32) throw new Error('INVALID_CONFIG');
   if(!input||typeof input!=='object'||Array.isArray(input))throw new Error('INVALID_INPUT');
   const assertion = { actorUid, scope: 'knowledge:mcp', audience:'crm-assistant', issuedAt: now, nonce: b64url(crypto.randomBytes(24)) };
-  const payloadHash=crypto.createHash('sha256').update(JSON.stringify(input)).digest('hex');
+  const payloadHash=crypto.createHash('sha256').update(canonicalJson(input)).digest('hex');
+  assertion.payloadHash=payloadHash;
   assertion.signature = crypto.createHmac('sha256', secret).update(`${actorUid}\n${assertion.scope}\n${assertion.audience}\n${now}\n${assertion.nonce}\n${payloadHash}`).digest('hex');
   return assertion;
 }
@@ -78,4 +91,4 @@ async function issueAuthorization(event, actorUid) {
   if (result?.error || !result?.data?.ok) { const error = new Error('OAUTH_STORAGE_FAILED'); error.code = 'PERSISTENCE_ERROR'; throw error; }
   return { ok: true, code, state: event.state, redirectUri };
 }
-module.exports = { verifyAssertion, signAssertion, runOAuth, issueAuthorization, expectedKnowledgeMcpIssuer, hash, b64url };
+module.exports = { verifyAssertion, assertionFailure, signAssertion, runOAuth, issueAuthorization, expectedKnowledgeMcpIssuer, hash, b64url, canonicalJson };

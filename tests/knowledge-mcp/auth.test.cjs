@@ -2,7 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { signAssertion, verifyAssertion, expectedKnowledgeMcpIssuer } = require('../../cloudfunctions/assistant/knowledge-mcp-auth');
+const { signAssertion, verifyAssertion, assertionFailure, expectedKnowledgeMcpIssuer } = require('../../cloudfunctions/assistant/knowledge-mcp-auth');
 
 const secret = 'test-only-secret-that-is-at-least-thirty-two-characters';
 
@@ -18,8 +18,11 @@ test('signed internal assertions bind actor, audience, expiry, and complete payl
   const assertion = signAssertion('crm-user-1', secret, input, now);
 
   assert.equal(verifyAssertion(assertion, secret, input, now), 'crm-user-1');
+  assert.equal(verifyAssertion(assertion, secret, { id: '12', table: 'knowledge_items', tool: 'knowledge_record_get' }, now), 'crm-user-1');
+  assert.equal(assertionFailure(assertion, secret, input, now), null);
   assert.equal(verifyAssertion(assertion, secret, input, now + 30_001), null);
   assert.equal(verifyAssertion(assertion, secret, { ...input, id: '13' }, now), null);
+  assert.equal(assertionFailure(assertion, secret, { ...input, id: '13' }, now), 'ASSERTION_PAYLOAD_MISMATCH');
   assert.equal(verifyAssertion({ ...assertion, audience: 'another-service' }, secret, input, now), null);
   assert.equal(verifyAssertion({ ...assertion, actorUid: 'crm-user-2' }, secret, input, now), null);
 });
@@ -28,6 +31,9 @@ test('assertion verification fails closed on missing secret or malformed payload
   const now = 1_800_000_000_000;
   const assertion = signAssertion('crm-user-1', secret, { tool: 'knowledge_records_list' }, now);
   assert.equal(verifyAssertion(assertion, 'short', { tool: 'knowledge_records_list' }, now), null);
+  assert.equal(assertionFailure(assertion, 'short', { tool: 'knowledge_records_list' }, now), 'INVALID_SECRET_CONFIG');
   assert.equal(verifyAssertion(assertion, secret, null, now), null);
+  assert.equal(assertionFailure(assertion, secret, { tool: 'knowledge_records_list' }, now + 30_001), 'ASSERTION_TIME_WINDOW');
   assert.equal(verifyAssertion({ ...assertion, signature: 'not-a-signature' }, secret, { tool: 'knowledge_records_list' }, now), null);
+  assert.equal(assertionFailure({ ...assertion, signature: 'not-a-signature' }, secret, { tool: 'knowledge_records_list' }, now), 'ASSERTION_SIGNATURE_MISMATCH');
 });

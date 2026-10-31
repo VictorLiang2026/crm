@@ -17,6 +17,13 @@ const CHATGPT_REDIRECT = 'https://chatgpt.com/connector_platform_oauth_redirect'
 const CHATGPT_CUSTOM_REDIRECT = /^https:\/\/chatgpt\.com\/connector\/oauth\/[A-Za-z0-9_-]{1,80}$/;
 const b64url = value => Buffer.from(value).toString('base64url');
 const digest = value => crypto.createHash('sha256').update(value).digest('hex');
+function canonicalJson(value) {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
+  if (value && typeof value === 'object') return `{${Object.keys(value).sort()
+    .filter(key => value[key] !== undefined)
+    .map(key => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(',')}}`;
+  return JSON.stringify(value);
+}
 const randomToken = () => b64url(crypto.randomBytes(32));
 const fail = (code, status=400) => { throw Object.assign(new Error(code),{code,status}); };
 let app;
@@ -102,10 +109,10 @@ async function actorFor(headers,scope){
 async function invokeAssistant(actorUid,input){
   const issuedAt=Date.now(),nonce=b64url(crypto.randomBytes(24));
   const scope='knowledge:mcp';
-  const payloadHash=digest(JSON.stringify(input));
+  const payloadHash=digest(canonicalJson(input));
   const audience='crm-assistant';
   const signature=crypto.createHmac('sha256',HMAC_KEY).update(`${actorUid}\n${scope}\n${audience}\n${issuedAt}\n${nonce}\n${payloadHash}`).digest('hex');
-  const result=await appClient().callFunction({name:'assistant',data:{action:'knowledgeMcpInternal',assertion:{actorUid,scope,audience,issuedAt,nonce,signature},input}});
+  const result=await appClient().callFunction({name:'assistant',data:{action:'knowledgeMcpInternal',assertion:{actorUid,scope,audience,issuedAt,nonce,payloadHash,signature},input}});
   if(!result?.result)fail('MCP_UPSTREAM_FAILED',502);
   return result.result;
 }

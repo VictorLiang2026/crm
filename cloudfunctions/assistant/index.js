@@ -88,8 +88,12 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
   const run = async (event, context, callback, earlyResponse) => {
     if (event?.action === 'knowledgeMcpInternal') {
       const mcpAuth=require('./knowledge-mcp-auth');
-      const actorUid = mcpAuth.verifyAssertion(event.assertion, process.env.CRM_KNOWLEDGE_MCP_HMAC_KEY,event.input);
-      if (!actorUid) return { ok:false, error:{code:'UNAUTHORIZED',message:'Login required'} };
+      const assertionFailure=mcpAuth.assertionFailure(event.assertion,process.env.CRM_KNOWLEDGE_MCP_HMAC_KEY,event.input);
+      if (assertionFailure) {
+        console.error('KNOWLEDGE_MCP_ASSERTION_REJECTED',assertionFailure);
+        return { ok:false, error:{code:'UNAUTHORIZED',message:'Login required'} };
+      }
+      const actorUid=event.assertion.actorUid;
       const input = event.input;
       if (!input || typeof input !== 'object' || Array.isArray(input)) return {ok:false,error:{code:'INVALID_INPUT',message:'Invalid request'} };
       try {
