@@ -10,14 +10,15 @@
 
 ## 验证
 
-- `node --check`：assistant 服务、Skill Registry、跟进建议模块、i18n、浏览器回归文件通过。
-- 跟进建议服务端与隔离浏览器用例：4/4 通过；AI skills：11/11；AI Gateway：18/18；PC08：13/13。
-- 知识库全套：59/65。6 项既有 PDF 覆盖在隔离副本遇到 worker `INVALID_CONTENT` 或缺少嵌套 `@napi-rs/canvas`；跟进建议服务/页面相关用例均通过。
-- People pages：4/5。失败项是浏览器在打开 `/admin.html#/more` 时进入 `chrome-error://chromewebdata/`，与本次页面无关。
-- WP01 安全门：阻断。实时 `public` 目录中出现 2 张 MCP 表和 2 个 MCP routine，尚未列入当前 `master` 安全基线。只读检索确认相应迁移和代码存在于另一份未提交 OAuth/MCP 工作区。
-- 只读下载确认线上 `assistant` 与该 OAuth/MCP 工作区源码逐文件一致。直接部署本工作包 assistant 会覆盖该线上功能，因此尚未部署前后端、未提交/推送/打标签。
-- `public.person_followup_advice` migration `20261101090000` 已应用，迁移详情与本地 SQL 一致；schema 已含新字段，表行数为 0。
+- `node --check`：assistant 服务、Skill Registry、跟进建议模块、i18n 和相关回归文件通过。
+- 跟进建议服务端用例 3/3、隔离浏览器/iPad 用例 1/1、AI Skills 11/11、AI Gateway 18/18、PC08 13/13 通过。
+- 知识库完整套件以串行模式运行：68/68 通过。PDF 分卷测试期望已同步为线上实际 30 页分卷；本轮未改 PDF 上传业务代码。
+- WP04 只读身份审计与隔离夹具通过；保留既有 3 条待人工核对例外。WP01 门禁通过：目录 1,239 项、匿名只读探针 81/81、综合隔离回归 108 通过 / 0 失败 / 5 跳过。
+- WP01 状态为 `PASS_WITH_LIMITATIONS`：真实登录、service-role 写入、线上业务写入/AI 生成和移动端验收未执行；未使用真实 Person 触发 AI 或产生业务写入。
+- `public.person_followup_advice` migration `20261101090000` 已在线应用；schema 已含新字段，迁移与 rollback 均在仓库和 `C:\Users\victor\cloudbase\migrations\` 镜像。
+- CloudBase `assistant` 部署成功。无登录、无写入的线上探测调用 `assistant`，得到预期 `UNAUTHORIZED`。
+- 仅上传 `followup-advice.js`、`i18n.js`、`console.css` 三个明确静态资源。部署后核对：96 个页面资源以及 30 个云函数、243 个源码/配置文件与 CloudBase 一致。
 
-## 后续发布条件
+## 发布状态
 
-先将已部署 OAuth/MCP 工作区变为可发布的共享基线，或由用户授权本轮将该工作区改动一并纳入同一发布。完成后在不丢失该工作内容的前提下重新运行 WP01、部署 assistant 及本工作包的三个前端文件，再完成云端/GitHub 一致性核对。
+业务部署和 GitHub 发布已完成；发布后核对 GitHub、CloudBase 与本地基线一致。

@@ -1,6 +1,6 @@
 # 人物跟进建议改造任务
 
-状态：代码改造完成；发布被现有 CloudBase OAuth/MCP 工作区冲突阻断。
+状态：业务代码、CloudBase 部署、GitHub 发布和三端一致性复核完成。
 
 - [x] 1. 复核当前 UI、服务端生成/编辑/删除和线上 `public` 表结构；确认表无业务行。
   - _Requirement: 全部_
@@ -12,14 +12,17 @@
   - _Requirement: 2–5_
 - [x] 5. 改 Console 人物建议页为一键生成、两栏各自编辑/删除、GPT SKILL 空态；旧任务包路由不再显示手工导入 UI。
   - _Requirement: 1–8_
-- [ ] 6. 完成回归与发布门槛。
-  - 改动文件语法检查通过；定向服务/浏览器 4/4、AI skills 11/11、AI Gateway 18/18、PC08 13/13 通过。
-  - 知识库全套 59/65；6 项 PDF 测试在隔离工作副本报 `INVALID_CONTENT` 或缺少嵌套 `@napi-rs/canvas`，与跟进建议修改无关。
-  - People pages 4/5；剩余浏览器用例在打开 `/admin.html#/more` 时出现 `chrome-error://chromewebdata/` 超时。
-  - WP01 发布门槛被线上 `crm_knowledge_mcp_clients`、`crm_knowledge_mcp_grants` 与两项 MCP routine 不在当前安全基线阻断；发现这些变更属于另一份未提交 OAuth/MCP 工作区。
-  - 线上 `assistant` 与 OAuth/MCP 工作区代码逐文件一致；不得用本工作包基线覆盖该已部署功能。
+- [x] 6. 完成回归与发布门槛。
+  - 改动文件语法检查通过；跟进建议服务端 3/3、隔离浏览器/iPad 1/1、AI skills 11/11、AI Gateway 18/18、PC08 13/13 通过。
+  - 知识库完整套件串行执行 68/68 通过；PDF 分卷测试已校正为当前线上实际 30 页分卷，没有修改 PDF 上传业务代码。
+  - WP01：目录 1,239 项通过，匿名只读探针 81/81，WP04 身份审计通过（保留 3 条已声明例外），综合回归 108 通过 / 0 失败 / 5 跳过。
+  - WP01 状态 `PASS_WITH_LIMITATIONS`；登录、service-role 写入、线上业务写入/AI 生成和移动端仍未验证。
   - _Requirement: 全部_
-- [ ] 7. 部署明确文件并完成 GitHub 发布。
-  - `20261101090000` migration 已应用并核对台账/字段，当前表仍为空。
-  - assistant 与页面文件尚未部署，GitHub 尚未提交/推送/打标签；待 OAuth/MCP 工作区完成合并或发布授权后继续。
+- [x] 7. 部署明确文件。
+  - `20261101090000` migration 已应用并核对台账/字段；迁移与 rollback 已在两个本地位置镜像。
+  - `assistant` 已部署并做无登录、无写入的拒绝响应探测；仅上传 3 个明确页面资源。
+  - CloudBase 复核通过：96 个页面资源、30 个函数、243 个源码/配置文件一致。
+  - _Requirement: 全部_
+- [x] 8. 完成 GitHub 发布并复核 GitHub / CloudBase / 本地一致。
+  - 按 `tools/release.ps1` 从 `master` 原子提交并推送发布标签。
   - _Requirement: 全部_
