@@ -9,6 +9,8 @@ const MAX_SOURCE_FILE_BYTES=100_000_000;
 const replaceCount=(value,count)=>value.replaceAll('{count}',String(count));
 const formatText=(value,values)=>Object.entries(values).reduce((text,[key,replacement])=>
   text.replaceAll(`{${key}}`,String(replacement)),value);
+const extractionFailureMessage=code=>code==='TIMEOUT'?text('pdf_extraction_timeout'):
+  code==='AI_RETRY_LATER'?text('pdf_ai_retry_later'):null;
 const CATEGORIES=['on_sale_product','existing_service','recruitment_policy','industry_development',
   'marketing_activity','legal_tax','health_wealth_sharing','top_performer_sharing','customer_case','recruitment_case',
   'conversation_strategy','objection_handling','company_information','other'];
@@ -79,14 +81,19 @@ export function renderKnowledgeEditor(ctx,{mode='new',table='knowledge_items',id
             finalizing=true;
             const result=await data.knowledgeLibrary(ctx,'uploadFinalize',{data:session});
             if(!result?.ok){const code=result?.errorCode||result?.error?.code;
-              throw new Error(code==='PERSONAL_DATA_DETECTED'?text('sensitive_blocked'):
+              throw new Error(extractionFailureMessage(code)|| (code==='PERSONAL_DATA_DETECTED'?text('sensitive_blocked'):
                 code==='VISION_MODEL_NOT_CONFIGURED'?text('ocr_model_not_configured'):
                 code==='OCR_FAILED'?text('ocr_failed'):
                 code==='UNSUPPORTED_TYPE'?text('source_unsupported_type'):
-                ['INVALID_CONTENT','INVALID_IMAGE'].includes(code)?text('source_invalid_content'):text('source_upload_failed'));}
+                ['INVALID_CONTENT','INVALID_IMAGE'].includes(code)?text('source_invalid_content'):text('source_upload_failed')));}
             queuedUpload=queuedUpload||result.queued===true;
             uploadedParts++;
-          }catch(error){if(!finalizing)await data.knowledgeLibrary(ctx,'uploadCancel',{data:session}).catch(()=>{});throw error;}
+          }catch(error){
+            if(!finalizing)await data.knowledgeLibrary(ctx,'uploadCancel',{data:session}).catch(()=>{});
+            const retryMessage=finalizing&&extractionFailureMessage(error?.code||error?.message);
+            if(retryMessage)throw new Error(retryMessage,{cause:error});
+            throw error;
+          }
           return true;
         };
         try{
@@ -116,8 +123,9 @@ export function renderKnowledgeEditor(ctx,{mode='new',table='knowledge_items',id
             error.message==='PDF_PAGE_COUNT_FAILED'?text('pdf_page_count_failed'):
             error.message==='PDF_SPLIT_FAILED'?text('pdf_split_failed'):
             error.message||text('source_upload_failed');
-          if(completed>0)throw new Error(`${replaceCount(text('pdf_partial_upload'),completed)} ${reason}`);
-          throw new Error(reason);
+          const failedPart=error.knowledgePdfPart?formatText(text('pdf_failed_part'),error.knowledgePdfPart):'';
+          if(completed>0)throw new Error(`${replaceCount(text('pdf_partial_upload'),completed)} ${failedPart} ${reason}`.trim());
+          throw new Error(`${failedPart} ${reason}`.trim());
         }
       }else if(isPlaybook){
         for(const key of ['possible_underlying_reasons','clarifying_questions','do_not_say'])

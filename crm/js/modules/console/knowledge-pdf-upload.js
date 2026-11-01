@@ -59,8 +59,17 @@ export async function uploadKnowledgePdfParts(file,{onProgress=()=>{},onPart,loc
           const part=new File([message.buffer],fileName,{type:'application/pdf',lastModified:file.lastModified});
           const titleSuffix=knowledgePdfPartTitle('',index,message.totalParts,message.startPage,message.endPage,locale).trim();
           onProgress({stage:'upload',index,total:message.totalParts,startPage:message.startPage,endPage:message.endPage});
-          const result=await onPart(part,{split:true,pageCount:message.pageCount,index,total:message.totalParts,
-            startPage:message.startPage,endPage:message.endPage,fileName,titleSuffix});
+          let result;
+          try{
+            result=await onPart(part,{split:true,pageCount:message.pageCount,index,total:message.totalParts,
+              startPage:message.startPage,endPage:message.endPage,fileName,titleSuffix});
+          }catch(error){
+            const failure=error instanceof Error?error:new Error(String(error||'PDF_SPLIT_FAILED'));
+            failure.knowledgePdfPart={index:String(index).padStart(2,'0'),
+              total:String(message.totalParts).padStart(2,'0'),
+              start:String(message.startPage).padStart(3,'0'),end:String(message.endPage).padStart(3,'0')};
+            throw failure;
+          }
           if(result!==false)uploadedParts++;
           worker.postMessage({type:'continue'});
           return;
