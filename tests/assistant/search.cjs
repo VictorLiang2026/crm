@@ -70,3 +70,19 @@ test('server adapter allows only audit writes and the fixed public search RPC', 
   assert.equal(calls.some(call => call.url.includes('/persons')), false);
   assert.equal(JSON.stringify(result).includes('test-secret'), false);
 });
+
+test('OAuth adapter preserves only fixed CRM authorization error codes', async () => {
+  const adapter = createSearchData({ env: 'crm-d1gkae8ddc930d151', key: 'test-secret',
+    fetchImpl: async () => ({ ok: false, status: 400,
+      text: async () => JSON.stringify({ code: 'P0001', message: 'MCP_INVALID_CLIENT', details: 'private db detail' }) }) });
+  await assert.rejects(adapter.auditRdb.rpc('crm_knowledge_mcp_oauth_v1', {
+    p_operation: 'validate_client', p_data: { clientId: 'probe', redirectUri: 'https://chatgpt.com/connector/oauth/probe' },
+  }), error => error.code === 'MCP_INVALID_CLIENT' && !error.message.includes('private db detail'));
+
+  const unsafe = createSearchData({ env: 'crm-d1gkae8ddc930d151', key: 'test-secret',
+    fetchImpl: async () => ({ ok: false, status: 400,
+      text: async () => JSON.stringify({ code: '42501', message: 'database role service_role required' }) }) });
+  await assert.rejects(unsafe.auditRdb.rpc('crm_knowledge_mcp_oauth_v1', {
+    p_operation: 'validate_client', p_data: { clientId: 'probe', redirectUri: 'https://chatgpt.com/connector/oauth/probe' },
+  }), error => error.code === 'PERSISTENCE_ERROR' && !error.message.includes('service_role'));
+});

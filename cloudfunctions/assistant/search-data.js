@@ -30,6 +30,17 @@ function createSearchData({ env, key, fetchImpl = fetch } = {}) {
           } catch (_) {}
           const error=new Error(code);error.code=code;throw error;
         }
+        if (path === 'rpc/crm_knowledge_mcp_oauth_v1') {
+          let code = 'PERSISTENCE_ERROR';
+          try {
+            const failure = JSON.parse(await response.text());
+            if (['MCP_ACCESS_DENIED','MCP_INVALID_CLIENT','MCP_INVALID_GRANT',
+              'MCP_INVALID_TOKEN','MCP_INVALID_OPERATION'].includes(failure?.message)) {
+              code = failure.message;
+            }
+          } catch (_) { /* Do not expose database response details. */ }
+          const error = new Error(code); error.code = code; throw error;
+        }
         if (path === 'rpc/crm_ai_claim_v2') {
           let code = 'UNKNOWN';
           let category = 'DB_ERROR_OTHER';

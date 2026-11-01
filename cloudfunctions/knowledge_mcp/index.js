@@ -240,7 +240,7 @@ async function main(event,context){
   }catch(error){
     const status=error.status||400,code=error.code||'MCP_REQUEST_FAILED';
     const oauthError=code==='MCP_INVALID_GRANT'?'invalid_grant':code==='MCP_SERVICE_NOT_CONFIGURED'?'server_error':
-      code==='UNSUPPORTED_GRANT_TYPE'?'unsupported_grant_type':code==='INVALID_CLIENT'?'invalid_client':'invalid_request';
+      code==='UNSUPPORTED_GRANT_TYPE'?'unsupported_grant_type':code==='INVALID_CLIENT'||code==='MCP_INVALID_CLIENT'?'invalid_client':'invalid_request';
     let metadataUrl='';try{const resource=new URL(RESOURCE_URL);metadataUrl=`${resource.origin}/.well-known/oauth-protected-resource${resource.pathname}`;}catch(_){}
     const headers=status===401?{'WWW-Authenticate':`Bearer resource_metadata="${metadataUrl}", error="invalid_token"`}:status===403&&code==='INSUFFICIENT_SCOPE'?
       {'WWW-Authenticate':`Bearer resource_metadata="${metadataUrl}", error="insufficient_scope", scope="knowledge:read knowledge:source:read knowledge:gpt:submit"`}:{};
