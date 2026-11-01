@@ -22,12 +22,13 @@ test('knowledge upload splits long PDFs into sequential, named, independently re
       }});
       return {result,parts};
     })()`);
-    assert.deepEqual(workerResult.result,{split:true,pageCount:141,parts:4,uploadedParts:4});
+    assert.deepEqual(workerResult.result,{split:true,pageCount:141,parts:5,uploadedParts:5});
     assert.deepEqual(workerResult.parts.map(({name,pages,start,end})=>({name,pages,start,end})),[
-      {name:'Policy-part01-of04-pages001-040.pdf',pages:40,start:1,end:40},
-      {name:'Policy-part02-of04-pages041-080.pdf',pages:40,start:41,end:80},
-      {name:'Policy-part03-of04-pages081-120.pdf',pages:40,start:81,end:120},
-      {name:'Policy-part04-of04-pages121-141.pdf',pages:21,start:121,end:141},
+      {name:'Policy-part01-of05-pages001-030.pdf',pages:30,start:1,end:30},
+      {name:'Policy-part02-of05-pages031-060.pdf',pages:30,start:31,end:60},
+      {name:'Policy-part03-of05-pages061-090.pdf',pages:30,start:61,end:90},
+      {name:'Policy-part04-of05-pages091-120.pdf',pages:30,start:91,end:120},
+      {name:'Policy-part05-of05-pages121-141.pdf',pages:21,start:121,end:141},
     ]);
     const boundary=await b.evaluate(`(async()=>{
       const {uploadKnowledgePdfParts}=await import('/crm/js/modules/console/knowledge-pdf-upload.js');
@@ -39,8 +40,11 @@ test('knowledge upload splits long PDFs into sequential, named, independently re
       catch(error){rejected=error.message==='PDF_PAGE_COUNT_FAILED';}
       return {result,seen,rejected,uploads};
     })()`);
-    assert.deepEqual(boundary.result,{split:false,pageCount:40,parts:1,uploadedParts:1});
-    assert.deepEqual(boundary.seen,[{name:'Boundary.pdf',split:false}]);
+    assert.deepEqual(boundary.result,{split:true,pageCount:40,parts:2,uploadedParts:2});
+    assert.deepEqual(boundary.seen,[
+      {name:'Boundary-part01-of02-pages001-030.pdf',split:true},
+      {name:'Boundary-part02-of02-pages031-040.pdf',split:true},
+    ]);
     assert.equal(boundary.rejected,true,'unreadable PDFs fail before any server upload');
     assert.equal(boundary.uploads,0);
     const ui=await b.evaluate(`(async()=>{
@@ -70,11 +74,11 @@ test('knowledge upload splits long PDFs into sequential, named, independently re
     })()`);
     const operations=ui.calls.map(entry=>entry.payload.operation);
     assert.deepEqual(operations,['uploadPrepare','uploadFinalize','uploadPrepare','uploadFinalize']);
-    assert.deepEqual(ui.uploads.map(item=>item.name),['Original-part01-of02-pages001-040.pdf','Original-part02-of02-pages041-041.pdf']);
+    assert.deepEqual(ui.uploads.map(item=>item.name),['Original-part01-of02-pages001-030.pdf','Original-part02-of02-pages031-041.pdf']);
     assert.deepEqual(ui.names,ui.uploads.map(item=>item.name));
-    assert.match(ui.titles[0],/分卷 01\/02，第 001–040 页/);
-    assert.match(ui.titles[1],/分卷 02\/02，第 041–041 页/);
-    assert.match(ui.enHelp,/up to 40 pages/);
+    assert.match(ui.titles[0],/分卷 01\/02，第 001–030 页/);
+    assert.match(ui.titles[1],/分卷 02\/02，第 031–041 页/);
+    assert.match(ui.enHelp,/up to 30 pages/);
     assert.equal(ui.enMarker,'Policy (Part 01 of 02, pages 001–040)');
     await b.healthy();
   }finally{await b.close();}
