@@ -1,6 +1,6 @@
 importScripts('/crm/js/vendor/pdf-lib-1.17.1.min.js');
 
-let sourceDocument=null,pageCount=0,maxPages=40,totalParts=0,nextPart=0;
+let sourceDocument=null,pageCount=0,maxPages=30,totalParts=0,nextPart=0;
 const send=(message,transfer=[])=>self.postMessage(message,transfer);
 
 self.onmessage=async({data:message})=>{

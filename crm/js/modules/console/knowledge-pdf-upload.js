@@ -1,4 +1,4 @@
-export const KNOWLEDGE_PDF_PART_PAGES=40;
+export const KNOWLEDGE_PDF_PART_PAGES=30;
 export const KNOWLEDGE_PDF_PART_BYTES=30_000_000;
 
 export function knowledgePdfPartName(fileName,index,total,startPage,endPage){
