@@ -26,7 +26,7 @@ const LEGACY_CATEGORY = Object.freeze({product:'on_sale_product',service:'existi
   company:'company_information'});
 const REST_TABLES = new Set(['knowledge_sources','knowledge_items','playbooks','knowledge_content_commands',
   'person_followup_advice','persons','ai_tasks','ai_results']);
-const FOLLOWUP_ADVICE_COLUMNS = 'id,person_id,client_request_id,title,system_status,system_strategy,system_product_advice,'+
+const FOLLOWUP_ADVICE_COLUMNS = 'id,person_id,client_request_id,title,system_title,gpt_title,system_status,system_strategy,system_product_advice,'+
   'system_strategy_sources,system_product_sources,system_version,system_task_id,gpt_strategy,gpt_product_advice,'+
   'gpt_strategy_sources,gpt_product_sources,gpt_based_on_system_version,gpt_kept_for_system_version,gpt_status,'+
   'gpt_preview_id,gpt_preview_payload,gpt_preview_actor,gpt_preview_expires_at,created_by,updated_by,created_at,updated_at,deleted_at';
@@ -64,11 +64,12 @@ function redactForTask(value,person={}) {
   return text;
 }
 function adviceDto(row,personName=null) {
-  return {id:String(row.id),personId:String(row.person_id),personName:personName||null,title:row.title,
-    system:{status:row.system_status,strategy:row.system_strategy||'',productAdvice:row.system_product_advice||'',
+  const systemTitle=row.system_title||row.title;
+  return {id:String(row.id),personId:String(row.person_id),personName:personName||null,title:systemTitle,
+    system:{title:systemTitle,status:row.system_status,strategy:row.system_strategy||'',productAdvice:row.system_product_advice||'',
       strategySources:row.system_strategy_sources||[],productSources:row.system_product_sources||[],
       version:Number(row.system_version||0),taskId:row.system_task_id?String(row.system_task_id):null},
-    gpt:{status:row.gpt_status,strategy:row.gpt_strategy||'',productAdvice:row.gpt_product_advice||'',
+    gpt:{title:row.gpt_title||'',status:row.gpt_status,strategy:row.gpt_strategy||'',productAdvice:row.gpt_product_advice||'',
       strategySources:row.gpt_strategy_sources||[],productSources:row.gpt_product_sources||[],
       basedOnSystemVersion:row.gpt_based_on_system_version==null?null:Number(row.gpt_based_on_system_version),
       keptForSystemVersion:row.gpt_kept_for_system_version==null?null:Number(row.gpt_kept_for_system_version),
@@ -940,7 +941,7 @@ function createKnowledgeLibrary(options={}) {
     const strategy=sourceContext(strategyEntries),products=sourceContext(productEntries);
     return {customerSnapshot,interactions,strategy,products,context:{customer_snapshot:customerSnapshot,
       recent_interactions:interactions,strategy_sources:strategy.refs,product_sources:products.refs,
-      generation_rules:'Generate one CloudBase system recommendation as two separate sections. overallStrategy must apply relevant international sales and relationship practices to the stated facts, cover relationship progress, objective, questions and next step, and must not name or recommend a specific product or service. productServiceAdvice must be grounded only in product_sources and may state that no suitable source was found. Use only exact supplied knowledge item IDs in each section sourceRefs. Do not invent person facts, product terms, returns, guarantees, tax or legal conclusions. Keep the advice actionable, concise and tailored to the stated focus.',
+      generation_rules:'Generate one CloudBase system recommendation as two separate sections. overallStrategy must apply relevant international sales and relationship practices to the stated facts, cover relationship progress, objective, questions and next step, and must not name or recommend a specific product or service. productServiceAdvice must be grounded only in product_sources and may state that no suitable source was found. Use only exact supplied knowledge item IDs in each section sourceRefs. Do not invent person facts, product terms, returns, guarantees, tax or legal conclusions. Keep the advice actionable, concise and tailored to the customer facts and recent interactions.',
       guardrails:'Industry and strategy sources may support the overall strategy only. Product, company and service claims require current verified product_sources. If there is no valid product source, say that a product/service match could not be verified and list what a person should confirm. Avoid repeating contact details or unnecessarily identifying information.'}};
   }
   function keepAllowedSources(value,allowed) {
@@ -963,8 +964,8 @@ function createKnowledgeLibrary(options={}) {
       const gateway=gatewayFactory({app:client,rdb:database.auditRdb,timeoutMs:80000,maxAttempts:1,
         actorResolver:async()=>({uid:row.created_by,isAnonymous:false})});
       const task=await gateway.runAITask({taskType:'person_followup_advice',skill:'person_followup_advice',capability:'coaching',
-        subjectType:'person',subjectId:personId,input:{personId,title:row.title,focus:focus||''},context:context.context,
-        contextSnapshot:{...context.context,_context:{recipe:'person_followup_advice',version:'1.0.0',source:'assistant.knowledge-library-service'}},
+        subjectType:'person',subjectId:personId,input:{personId,focus:focus||''},context:context.context,
+        contextSnapshot:{...context.context,_context:{recipe:'person_followup_advice',version:'1.1.0',source:'assistant.knowledge-library-service'}},
         ...(typeof options.onStarted==='function'?{onStarted:async({taskId})=>{
           await request('person_followup_advice','PATCH',{id:`eq.${adviceId}`,person_id:`eq.${personId}`,
             system_status:'eq.generating',deleted_at:'is.null'},
@@ -980,9 +981,10 @@ function createKnowledgeLibrary(options={}) {
         `Next step: ${result.overallStrategy.nextStep}`,
         ...(result.overallStrategy.clarifyingQuestions||[]).map(question=>`Question to confirm: ${question}`)]
         .filter(Boolean).join('\n\n');
+      const generatedTitle=cleanText(result.title,240,'title',true);
       const saved=await request('person_followup_advice','PATCH',{id:`eq.${adviceId}`,person_id:`eq.${personId}`,
         system_status:'eq.generating',deleted_at:'is.null'},
-        {title:cleanText(result.title,240,'title',true),system_status:'ready',system_strategy:cleanText(strategyText,4000,'strategy',true),
+        {title:generatedTitle,system_title:generatedTitle,system_status:'ready',system_strategy:cleanText(strategyText,4000,'strategy',true),
           system_product_advice:cleanText(result.productServiceAdvice.recommendation,4000,'productAdvice',true),
           system_strategy_sources:strategyRefs,system_product_sources:productRefs,system_version:1,
           system_task_id:String(task.taskId),updated_by:row.created_by,updated_at:new Date().toISOString()});
@@ -998,12 +1000,11 @@ function createKnowledgeLibrary(options={}) {
   }
   async function createFollowupAdvice(input,actorValue,options={}) {
     const actor=actorUid(actorValue),personId=String(input?.personId||''),requestId=String(input?.clientRequestId||'');
-    const title=cleanText(input?.title,240,'title',true),focus=cleanText(input?.focus,1200,'focus')||'';
+    const focus=cleanText(input?.focus,1200,'focus')||'';
     if(!positiveId(personId)||!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestId))fail('INVALID_INPUT');
     const existing=(await request('person_followup_advice','GET',{select:FOLLOWUP_ADVICE_COLUMNS,person_id:`eq.${personId}`,
       client_request_id:`eq.${requestId}`,deleted_at:'is.null',limit:1}))[0];
     if(existing) {
-      if(existing.title!==title)fail('INVALID_INPUT');
       if(existing.system_status==='generating')return {ok:true,status:'pending',adviceId:String(existing.id),
         taskId:existing.system_task_id?String(existing.system_task_id):undefined,personId};
       if(existing.system_status==='ready')return {ok:true,status:'completed',adviceId:String(existing.id),personId,advice:adviceDto(existing)};
@@ -1013,7 +1014,8 @@ function createKnowledgeLibrary(options={}) {
       return runSystemAdvice(String(existing.id),personId,focus,options);
     }
     let inserted;
-    try { inserted=await request('person_followup_advice','POST',{}, {person_id:personId,client_request_id:requestId,title,
+    try { inserted=await request('person_followup_advice','POST',{}, {person_id:personId,client_request_id:requestId,
+      title:'跟进建议',system_title:'跟进建议',
       system_status:'generating',system_version:0,gpt_status:'pending',created_by:actor,updated_by:actor}); }
     catch(error) {
       if(error?.code!=='DUPLICATE_SOURCE')throw error;
@@ -1045,11 +1047,42 @@ function createKnowledgeLibrary(options={}) {
     const current=(await request('person_followup_advice','GET',{select:FOLLOWUP_ADVICE_COLUMNS,id:`eq.${id}`,
       person_id:`eq.${personId}`,deleted_at:'is.null',limit:1}))[0];
     if(!current)fail('NOT_FOUND');if(Number(current.system_version)!==expectedVersion||current.updated_at!==expectedUpdatedAt)fail('STALE');
+    if(input.lane==='system'||input.lane==='gpt') {
+      if(current.system_status!=='ready')fail('INVALID_STATE');
+      const now=new Date().toISOString();let body={updated_by:actor,updated_at:now};
+      if(input.lane==='system') {
+        const title=cleanText(input.title,240,'title',true),
+          strategy=cleanText(input.strategy,4000,'strategy',true),
+          product=cleanText(input.productAdvice,4000,'productAdvice',true);
+        const changed=title!==(current.system_title||current.title)||strategy!==current.system_strategy||product!==current.system_product_advice;
+        body={...body,title,system_title:title,system_strategy:strategy,system_product_advice:product,
+          system_version:Number(current.system_version)+(changed?1:0),
+          gpt_kept_for_system_version:changed?null:current.gpt_kept_for_system_version,
+          gpt_status:current.gpt_strategy?(changed?'stale':current.gpt_status):'pending'};
+      } else {
+        if(input.action==='delete') {
+          body={...body,gpt_title:null,gpt_strategy:null,gpt_product_advice:null,gpt_strategy_sources:[],gpt_product_sources:[],
+            gpt_based_on_system_version:null,gpt_kept_for_system_version:null,gpt_status:'pending',
+            gpt_preview_id:null,gpt_preview_payload:null,gpt_preview_actor:null,gpt_preview_expires_at:null};
+        } else if(input.action==='edit') {
+          if(!current.gpt_strategy||!current.gpt_product_advice)fail('NOT_FOUND');
+          body={...body,gpt_title:cleanText(input.title,240,'title',true),
+            gpt_strategy:cleanText(input.strategy,4000,'strategy',true),
+            gpt_product_advice:cleanText(input.productAdvice,4000,'productAdvice',true),
+            gpt_based_on_system_version:Number(current.system_version),gpt_kept_for_system_version:null,gpt_status:'manual',
+            gpt_preview_id:null,gpt_preview_payload:null,gpt_preview_actor:null,gpt_preview_expires_at:null};
+        } else fail('INVALID_INPUT');
+      }
+      const saved=await request('person_followup_advice','PATCH',{id:`eq.${id}`,person_id:`eq.${personId}`,
+        system_version:`eq.${expectedVersion}`,updated_at:`eq.${expectedUpdatedAt}`,deleted_at:'is.null',system_status:'eq.ready'},body);
+      if(saved.length!==1)fail('STALE');return {ok:true,advice:adviceDto(saved[0]),systemChanged:input.lane==='system'};
+    }
+    // Retain the original paired-update contract for older Console clients.
     const title=cleanText(input.title,240,'title',true),strategy=cleanText(input.systemStrategy,4000,'strategy',true),
       product=cleanText(input.systemProductAdvice,4000,'productAdvice',true);
     const systemChanged=title!==current.title||strategy!==current.system_strategy||product!==current.system_product_advice;
     const nextVersion=Number(current.system_version)+(systemChanged?1:0);
-    const body={title,system_strategy:strategy,system_product_advice:product,system_version:nextVersion,
+    const body={title,system_title:title,system_strategy:strategy,system_product_advice:product,system_version:nextVersion,
       gpt_kept_for_system_version:systemChanged?null:current.gpt_kept_for_system_version,
       gpt_status:current.gpt_strategy?(systemChanged?'stale':current.gpt_status):'pending',updated_by:actor,
       updated_at:new Date().toISOString()};
@@ -1105,18 +1138,18 @@ function createKnowledgeLibrary(options={}) {
         const safeSources=refs=>refs.map(ref=>({...ref,title:redactForTask(ref.title),excerpt:redactForTask(ref.excerpt),
           summary:redactForTask(ref.summary)}));
         result.push({adviceId:String(row.id),personId:String(row.person_id),title:redactForTask(row.title),systemVersion:Number(row.system_version),
-          currentSystemAdvice:{overallStrategy:redactForTask(row.system_strategy),productServiceAdvice:redactForTask(row.system_product_advice)},
+          currentSystemAdvice:{title:redactForTask(row.system_title||row.title),overallStrategy:redactForTask(row.system_strategy),productServiceAdvice:redactForTask(row.system_product_advice)},
           customerSnapshot:safeSnapshot,recentInteractions:context.interactions,
           strategySources:safeSources(context.strategy.refs),productSources:safeSources(context.products.refs),
           outputContract:{adviceId:'copy exact value',personId:'copy exact value',systemVersion:'copy exact value',
-            gptAdvice:{overallStrategy:'string',productServiceAdvice:'string',strategySourceIds:'integer[]',productSourceIds:'integer[]'}}});
+            gptAdvice:{title:'string',overallStrategy:'string',productServiceAdvice:'string',strategySourceIds:'integer[]',productSourceIds:'integer[]'}}});
       } catch(error) {
         logger.warn('FOLLOWUP_ADVICE_PACKAGE_ITEM_SKIPPED',JSON.stringify({adviceId:String(row.id),code:String(error?.code||'CONTEXT_FAILED')}));
       }
     }
     return {ok:true,packageId:randomUUID(),generatedAt:new Date().toISOString(),count:result.length,rows:result,
       nextAfterId:hasMore?String(selected.at(-1)?.id||''):null,
-      instructions:'Produce one result for each package row. Keep adviceId, personId and systemVersion unchanged. gptAdvice.overallStrategy must contain only the relationship and next-step strategy; it must not name products or services. gptAdvice.productServiceAdvice may make product/service claims only when supported by productSources. Use only exact supplied source IDs in strategySourceIds and productSourceIds. If no suitable product source exists, clearly say a match could not be verified and leave productSourceIds empty. Do not invent person facts, product terms, returns, guarantees, legal or tax conclusions. Return only JSON shaped as {"rows":[{"adviceId":"...","personId":"...","systemVersion":1,"gptAdvice":{"overallStrategy":"...","productServiceAdvice":"...","strategySourceIds":[],"productSourceIds":[]}}]}.',
+      instructions:'Produce one result for each package row. Keep adviceId, personId and systemVersion unchanged. Generate a concise independent gptAdvice.title. gptAdvice.overallStrategy must contain only the relationship and next-step strategy; it must not name products or services. gptAdvice.productServiceAdvice may make product/service claims only when supported by productSources. Use only exact supplied source IDs in strategySourceIds and productSourceIds. If no suitable product source exists, clearly say a match could not be verified and leave productSourceIds empty. Do not invent person facts, product terms, returns, guarantees, legal or tax conclusions. Return only JSON shaped as {"rows":[{"adviceId":"...","personId":"...","systemVersion":1,"gptAdvice":{"title":"...","overallStrategy":"...","productServiceAdvice":"...","strategySourceIds":[],"productSourceIds":[]}}]}.',
       notice:'The package omits direct contact fields. It is still customer context; review it and use only the approved ChatGPT workspace. CRM validates versions and sources before saving.'};
   }
   async function previewGptImport(input,actorValue) {
@@ -1132,22 +1165,23 @@ function createKnowledgeLibrary(options={}) {
       const row=(await request('person_followup_advice','GET',{select:FOLLOWUP_ADVICE_COLUMNS,id:`eq.${item.adviceId}`,
         person_id:`eq.${item.personId}`,deleted_at:'is.null',system_status:'eq.ready',limit:1}))[0];
       if(!row||Number(row.system_version)!==item.systemVersion) {previewRows.push({adviceId:String(item.adviceId),status:'stale'});continue;}
-      const strategy=cleanText(item.gptAdvice.overallStrategy,4000,'overallStrategy',true),
+      const title=cleanText(item.gptAdvice.title,240,'title',true),
+        strategy=cleanText(item.gptAdvice.overallStrategy,4000,'overallStrategy',true),
         product=cleanText(item.gptAdvice.productServiceAdvice,4000,'productServiceAdvice',true),
         strategySources=keepAllowedSources(item.gptAdvice.strategySourceIds,strategyMap),
         productSources=keepAllowedSources(item.gptAdvice.productSourceIds,productMap);
       if(!Array.isArray(item.gptAdvice.strategySourceIds)||!Array.isArray(item.gptAdvice.productSourceIds)||
           item.gptAdvice.strategySourceIds.length!==strategySources.length||
           item.gptAdvice.productSourceIds.length!==productSources.length)fail('INVALID_SOURCE');
-      const previewId=randomUUID(),payload={strategy,product,strategySources,productSources,systemVersion:item.systemVersion};
+      const previewId=randomUUID(),payload={title,strategy,product,strategySources,productSources,systemVersion:item.systemVersion};
       const expiresAt=new Date(Date.now()+30*60*1000).toISOString();
       const saved=await request('person_followup_advice','PATCH',{id:`eq.${item.adviceId}`,system_version:`eq.${item.systemVersion}`,
         deleted_at:'is.null',system_status:'eq.ready'},
         {gpt_preview_id:previewId,gpt_preview_payload:payload,gpt_preview_actor:actor,gpt_preview_expires_at:expiresAt,
           updated_by:actor,updated_at:new Date().toISOString()});
       if(saved.length!==1) {previewRows.push({adviceId:String(item.adviceId),status:'stale'});continue;}
-      previewRows.push({adviceId:String(item.adviceId),personId:String(item.personId),title:row.title,systemVersion:item.systemVersion,
-        status:'preview',previewId,expiresAt,gptAdvice:{overallStrategy:strategy,productServiceAdvice:product,
+      previewRows.push({adviceId:String(item.adviceId),personId:String(item.personId),title:row.system_title||row.title,systemVersion:item.systemVersion,
+        status:'preview',previewId,expiresAt,gptAdvice:{title,overallStrategy:strategy,productServiceAdvice:product,
           strategySources,productSources}});
     }
     return {ok:true,rows:previewRows};
@@ -1165,7 +1199,7 @@ function createKnowledgeLibrary(options={}) {
     const rows=await request('person_followup_advice','PATCH',{id:`eq.${id}`,person_id:`eq.${personId}`,
       system_version:`eq.${version}`,gpt_preview_id:`eq.${previewId}`,gpt_preview_actor:`eq.${actor}`,
       deleted_at:'is.null',system_status:'eq.ready'},
-      {gpt_strategy:payload.strategy,gpt_product_advice:payload.product,gpt_strategy_sources:payload.strategySources,
+      {gpt_title:payload.title,gpt_strategy:payload.strategy,gpt_product_advice:payload.product,gpt_strategy_sources:payload.strategySources,
         gpt_product_sources:payload.productSources,gpt_based_on_system_version:version,gpt_kept_for_system_version:null,
         gpt_status:'ready',gpt_preview_id:null,gpt_preview_payload:null,gpt_preview_actor:null,gpt_preview_expires_at:null,
         updated_by:actor,updated_at:new Date().toISOString()});

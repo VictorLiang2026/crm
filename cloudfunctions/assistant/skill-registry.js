@@ -225,11 +225,10 @@ const SKILLS = [
     confirmationLevel:'review',timeoutClass:'standard',
   },
   {
-    name:'person_followup_advice',version:'1.0.0',capability:'coaching',
+    name:'person_followup_advice',version:'1.1.0',capability:'coaching',
     contextRecipe:recipe(['customer_snapshot','recent_interactions','strategy_sources','product_sources',
       'generation_rules','guardrails'],[],{recent_interactions:6,strategy_sources:8,product_sources:10}),
-    inputSchema:object({personId:{type:'string',pattern:'^[1-9][0-9]*$',maxLength:16},
-      title:text(240),focus:{type:'string',maxLength:1200}},['personId','title','focus']),
+    inputSchema:object({personId:{type:'string',pattern:'^[1-9][0-9]*$',maxLength:16}},['personId']),
     outputSchema:object({title:text(240),overallStrategy:object({summary:text(1800),objective:text(600),
       nextStep:text(800),clarifyingQuestions:strings(6,300),sourceRefs:{type:'array',maxItems:8,uniqueItems:true,
         items:{type:'string',pattern:'^[1-9][0-9]*$'}}},['summary','objective','nextStep','clarifyingQuestions','sourceRefs']),

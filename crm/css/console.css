@@ -1039,6 +1039,7 @@ body:has(.login), body.is-login { padding-top: env(safe-area-inset-top); }
 .fa-lane-gpt{border-top:3px solid #3e8067}
 .fa-lane-head{margin-bottom:10px}
 .fa-lane-head h3{font-size:16px}
+.fa-lane-title{margin:6px 0 0;color:var(--ink,#2e333b);font-size:14px;font-weight:600}
 .fa-status{display:inline-flex;align-items:center;border-radius:999px;padding:4px 9px;font-size:12px;line-height:1.35;background:#f0f1f3;color:#565e6b}
 .fa-status-ready,.fa-status-manual,.fa-status-kept,.fa-status-saved{background:#e6f5ed;color:#176e4d}
 .fa-status-stale,.fa-status-preview{background:#fff2d8;color:#8a5b08}

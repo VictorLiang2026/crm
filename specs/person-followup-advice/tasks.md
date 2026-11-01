@@ -1,19 +1,25 @@
-# 人物跟进建议实施任务
+# 人物跟进建议改造任务
 
-状态：实现、CloudBase 部署、GitHub 发布与云端一致性核对均已完成。每项对应 `requirements.md` 同编号或范围。
+状态：代码改造完成；发布被现有 CloudBase OAuth/MCP 工作区冲突阻断。
 
-- [x] 1. 复核发布基线与线上 `public` 数据结构、权限、迁移台账；确认当前 dirty diff 归属和 GitHub master 最新提交。
-  - 不清理或覆盖既有 Skill 文档修改。
+- [x] 1. 复核当前 UI、服务端生成/编辑/删除和线上 `public` 表结构；确认表无业务行。
   - _Requirement: 全部_
-- [x] 2. 准备配对建议数据结构及 migration/rollback（仅在 public），加入版本、来源和软删除/审计字段。
-  - _Requirement: 1, 5, 6, 7_
-- [x] 3. 扩展 assistant 服务和 Gateway 合约，生成 CloudBase 单套两段式系统建议；加入 GPT 任务包读取、Preview、确认写回、版本冲突和幂等处理。
-  - _Requirement: 2, 3, 4, 5, 6_
-- [x] 4. 改造 Console 人物建议模块为配对列表、iPad 比较详情及 CRUD；增加跨人物 GPT 待处理任务包入口，完整双语化。
-  - _Requirement: 8, 9_
-- [x] 5. 保留旧 URL/历史和 `ai_recommendations` 行为；记录旧候选历史的查看路径。
-  - _Requirement: 10_
-- [x] 6. 执行语法检查、针对性业务回归及要求的跨模块 regression，整理发布记录和恢复方案。
+- [x] 2. 收敛验收规则：系统 AI 一键生成；GPT SKILL 尚未接入；双侧标题和编辑/删除彼此独立。
+  - _Requirement: 1–8_
+- [x] 3. 准备标题增量 migration/rollback，并保留旧 title 字段和软删除流程。
+  - _Requirement: 2, 3, 7_
+- [x] 4. 更新 CloudBase Skill 输入契约；生成时不要求人工标题/关注点；新增 lane 独立更新分支，兼容旧 paired-update 接口。
+  - _Requirement: 2–5_
+- [x] 5. 改 Console 人物建议页为一键生成、两栏各自编辑/删除、GPT SKILL 空态；旧任务包路由不再显示手工导入 UI。
+  - _Requirement: 1–8_
+- [ ] 6. 完成回归与发布门槛。
+  - 改动文件语法检查通过；定向服务/浏览器 4/4、AI skills 11/11、AI Gateway 18/18、PC08 13/13 通过。
+  - 知识库全套 59/65；6 项 PDF 测试在隔离工作副本报 `INVALID_CONTENT` 或缺少嵌套 `@napi-rs/canvas`，与跟进建议修改无关。
+  - People pages 4/5；剩余浏览器用例在打开 `/admin.html#/more` 时出现 `chrome-error://chromewebdata/` 超时。
+  - WP01 发布门槛被线上 `crm_knowledge_mcp_clients`、`crm_knowledge_mcp_grants` 与两项 MCP routine 不在当前安全基线阻断；发现这些变更属于另一份未提交 OAuth/MCP 工作区。
+  - 线上 `assistant` 与 OAuth/MCP 工作区代码逐文件一致；不得用本工作包基线覆盖该已部署功能。
   - _Requirement: 全部_
-- [x] 7. 按项目发布顺序部署明确产物，提交推送、打标签并核对本地/GitHub/CloudBase 一致。
+- [ ] 7. 部署明确文件并完成 GitHub 发布。
+  - `20261101090000` migration 已应用并核对台账/字段，当前表仍为空。
+  - assistant 与页面文件尚未部署，GitHub 尚未提交/推送/打标签；待 OAuth/MCP 工作区完成合并或发布授权后继续。
   - _Requirement: 全部_
