@@ -132,8 +132,21 @@ function compactList(result){
   }
   const coverage=result?.coverage||{};
   const hasMore=coverage.hasMore||{};
-  return {ok:result?.ok===true,rows,coverage,truncated:Object.values(hasMore).some(Boolean),
+  const safeResult={ok:result?.ok===true,rows,coverage,truncated:Object.values(hasMore).some(Boolean),
     note:'Use nextOffsets and hasMore to finish the scan; the final page is only complete when all hasMore values are false.'};
+  if(result?.ok!==true){
+    const rawCode=result?.error?.code;
+    const code=typeof rawCode==='string'&&/^[A-Z][A-Z0-9_]{1,79}$/.test(rawCode)?rawCode:'MCP_OPERATION_FAILED';
+    const diagnostic=result?.error?.diagnostic;
+    safeResult.error={code,...(diagnostic&&typeof diagnostic==='object'?{
+      diagnostic:{
+        ...(typeof diagnostic.recognizedTool==='boolean'?{recognizedTool:diagnostic.recognizedTool}:{}),
+        ...(typeof diagnostic.toolName==='string'&&/^[A-Za-z0-9_.:-]{1,80}$/.test(diagnostic.toolName)?{toolName:diagnostic.toolName}:{}),
+        ...(Number.isSafeInteger(diagnostic.fieldCount)&&diagnostic.fieldCount>=0?{fieldCount:diagnostic.fieldCount}:{}),
+      }
+    }:{})};
+  }
+  return safeResult;
 }
 const TOOLS=[
  {name:'knowledge_records_list',description:'List one bounded page of CRM knowledge records and GPT coverage. Repeat with returned nextOffsets until all hasMore values are false.',securitySchemes:[{type:'oauth2',scopes:['knowledge:read']}],inputSchema:{type:'object',properties:{sourceOffset:{type:'integer',minimum:0},knowledgeOffset:{type:'integer',minimum:0},playbookOffset:{type:'integer',minimum:0},limit:{type:'integer',minimum:1,maximum:100},},additionalProperties:false}},
@@ -172,7 +185,7 @@ async function mcp(req){
     if(name==='knowledge_record_get'&&(!['knowledge_items','playbooks'].includes(args.table)||!/^[1-9][0-9]*$/.test(String(args.id))))fail('INVALID_ARGUMENTS',400);
     if(name==='knowledge_generate_gpt_pending'&&(!['knowledge_items','playbooks'].includes(args.table)||!/^[1-9][0-9]*$/.test(String(args.id))||typeof args.expectedUpdatedAt!=='string'))fail('INVALID_ARGUMENTS',400);
     if(name==='knowledge_generation_status'&&!/^[0-9a-f-]{36}$/i.test(String(args.commandId)))fail('INVALID_ARGUMENTS',400);
-    const input={tool,...args};
+    const input={tool:name,...args};
     const result=await invokeAssistant(actorUid,input);
     let safeResult=result;
     if(name==='knowledge_records_list')safeResult=compactList(result);

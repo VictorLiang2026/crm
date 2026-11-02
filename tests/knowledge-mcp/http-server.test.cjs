@@ -107,6 +107,23 @@ test('MCP metadata and tool contract expose text-only read and summary-only subm
   assert.doesNotMatch(submit.description,/attachment|file bytes/i);
 });
 
+test('MCP list failures retain only safe error codes and shape diagnostics',async()=>{
+  const resource=process.env.CRM_KNOWLEDGE_MCP_RESOURCE_URL;
+  mockCall=async({data})=>data.input.operation==='access'?{result:{ok:true,actorUid:'crm-user',resource,
+    scopes:['knowledge:read','knowledge:gpt:submit']}}:(assert.equal(data.input.tool,'knowledge_records_list'),{result:{ok:false,error:{code:'INVALID_INPUT',message:'private detail',
+      diagnostic:{recognizedTool:true,toolName:'knowledge_records_list',fieldCount:3,secret:'never expose'}}}});
+  const url=resource,headers={authorization:'Bearer '+'a'.repeat(40),'content-type':'application/json'};
+  const result=await main({httpMethod:'POST',url,headers,body:JSON.stringify({jsonrpc:'2.0',id:3,method:'tools/call',
+    params:{name:'knowledge_records_list',arguments:{limit:50}}})},{httpContext:{httpMethod:'POST',url,headers}});
+  const body=JSON.parse(result.body),safe=JSON.parse(body.result.content[0].text);
+  assert.equal(body.result.isError,true);
+  assert.equal(safe.ok,false);
+  assert.deepEqual(safe.error,{code:'INVALID_INPUT',diagnostic:{recognizedTool:true,toolName:'knowledge_records_list',fieldCount:3}});
+  assert.deepEqual(safe.rows,[]);
+  assert.deepEqual(safe.coverage,{});
+  assert.doesNotMatch(JSON.stringify(safe),/private detail|never expose/);
+});
+
 test('HTTP runtime serves JSON health checks and bounds request bodies', async t => {
   const server = createHttpServer({ port: 0 });
   server.unref();

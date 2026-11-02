@@ -99,7 +99,7 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
       try {
         if(input.kind==='oauth'&&Object.keys(input).every(k=>['kind','operation','data'].includes(k))&&typeof input.operation==='string')
           return {ok:true,...await mcpAuth.runOAuth(input.operation,input.data)};
-        if (input.tool === 'knowledge_records_list' && Object.keys(input).every(k=>['tool','sourceOffset','knowledgeOffset','playbookOffset','limit'].includes(k))) {
+        if (input.tool === 'knowledge_records_list') {
           const page=Object.fromEntries(['sourceOffset','knowledgeOffset','playbookOffset','limit'].filter(k=>Object.hasOwn(input,k)).map(k=>[k,input[k]]));
           if(Object.values(page).some(v=>!Number.isSafeInteger(v)||v<0)||page.limit!==undefined&&(page.limit<1||page.limit>100))return {ok:false,error:{code:'INVALID_INPUT',message:'Invalid request'}};
           if(page.limit===undefined)page.limit=100;
@@ -120,7 +120,11 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
       } catch (error) {
         return {ok:false,error:{code:/^[A-Z][A-Z0-9_]{1,79}$/.test(error?.code||'')?error.code:'MCP_OPERATION_FAILED',message:'Knowledge operation could not be completed'}};
       }
-      return {ok:false,error:{code:'INVALID_INPUT',message:'Unsupported knowledge operation'}};
+      return {ok:false,error:{code:'INVALID_INPUT',message:'Unsupported knowledge operation',diagnostic:{
+        recognizedTool:['knowledge_records_list','knowledge_record_get','knowledge_generate_gpt_pending','knowledge_generation_status'].includes(input.tool),
+        toolName:typeof input.tool==='string'&&/^[A-Za-z0-9_.:-]{1,80}$/.test(input.tool)?input.tool:'unclassified',
+        fieldCount:Object.keys(input).length,
+      }}};
     }
     let identity;
     try { identity = await getIdentity(); }
