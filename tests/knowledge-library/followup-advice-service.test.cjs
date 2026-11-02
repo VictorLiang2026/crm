@@ -55,3 +55,36 @@ test('GPT lane edit leaves the CloudBase lane and system version unchanged',asyn
   assert.equal(result.advice.gpt.basedOnSystemVersion,2);assert.equal(result.advice.system.version,2);
   assert.equal(row.system_title,'系统标题');assert.equal(row.system_strategy,'系统策略');
 });
+
+test('system advice sends only the registered personId input while retaining focus in context retrieval',async()=>{
+  const row={id:81,person_id:42,client_request_id:'c9e53b08-1f81-421e-83b0-8ff01f94adf9',title:'跟进建议',
+    system_title:'跟进建议',system_status:'generating',system_version:0,created_by:'operator',updated_by:'operator',
+    created_at:stamp,updated_at:stamp,deleted_at:null};
+  let gatewayRequest;
+  const fetchImpl=async(url,options={})=>{
+    const method=options.method||'GET',table=new URL(url).pathname.split('/').pop();
+    if(method==='GET'){
+      const query=new URL(url).searchParams;
+      if(table==='person_followup_advice'&&!query.has('client_request_id'))return response([{...row}]);
+      return response([]);
+    }
+    if(method==='POST')return response([{...row}]);
+    if(method==='PATCH'){
+      Object.assign(row,JSON.parse(options.body));
+      return response([{...row}]);
+    }
+    throw new Error(`Unexpected ${method} ${table}`);
+  };
+  const service=createKnowledgeLibrary({env:'crm-test123',key:'test-key',fetchImpl,
+    client:{callFunction:async()=>({result:{person:{occupation:'顾问',customer_stage:'新客'},recent_interactions:[]}})},
+    searchDataFactory:()=>({auditRdb:{}}),
+    gatewayFactory:()=>({runAITask:async request=>{
+      gatewayRequest=request;
+      return {taskId:17,result:{title:'沟通下一步',overallStrategy:{summary:'先了解目标',objective:'确认需求',
+        nextStep:'安排沟通',clarifyingQuestions:[],sourceRefs:[]},productServiceAdvice:{recommendation:'暂无匹配资料',sourceRefs:[]}}};
+    }})});
+  const result=await service.run({operation:'adviceGenerate',data:{personId:'42',clientRequestId:row.client_request_id,focus:'确认家庭保障重点'}},'operator');
+  assert.equal(result.status,'completed');
+  assert.deepEqual(gatewayRequest.input,{personId:'42'});
+  assert.equal(gatewayRequest.context.customer_snapshot.person.customer_stage,'新客');
+});

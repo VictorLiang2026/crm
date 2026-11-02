@@ -964,7 +964,7 @@ function createKnowledgeLibrary(options={}) {
       const gateway=gatewayFactory({app:client,rdb:database.auditRdb,timeoutMs:80000,maxAttempts:1,
         actorResolver:async()=>({uid:row.created_by,isAnonymous:false})});
       const task=await gateway.runAITask({taskType:'person_followup_advice',skill:'person_followup_advice',capability:'coaching',
-        subjectType:'person',subjectId:personId,input:{personId,focus:focus||''},context:context.context,
+        subjectType:'person',subjectId:personId,input:{personId},context:context.context,
         contextSnapshot:{...context.context,_context:{recipe:'person_followup_advice',version:'1.1.0',source:'assistant.knowledge-library-service'}},
         ...(typeof options.onStarted==='function'?{onStarted:async({taskId})=>{
           await request('person_followup_advice','PATCH',{id:`eq.${adviceId}`,person_id:`eq.${personId}`,
