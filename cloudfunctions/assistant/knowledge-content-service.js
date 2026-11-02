@@ -13,12 +13,32 @@ function createKnowledgeContentService({ rpc, request, sourceBytes, extractText,
   async function run(operation, actor, data) {
     if (!OPS.has(operation) || !data || typeof data !== 'object' || Array.isArray(data)) fail('INVALID_INPUT');
     if (operation === 'queueGpt') {
-      if (data.table!=='knowledge_items' || !/^[1-9][0-9]*$/.test(String(data.id)) ||
+      if (!['knowledge_items','playbooks'].includes(data.table) || !/^[1-9][0-9]*$/.test(String(data.id)) ||
           typeof data.expectedUpdatedAt !== 'string' || !Number.isFinite(Date.parse(data.expectedUpdatedAt))) fail('INVALID_INPUT');
-      const result = await rpc('crm_knowledge_gpt_queue_v1', { p_actor_uid: actor, p_table: data.table,
-        p_id: Number(data.id), p_expected_updated_at: data.expectedUpdatedAt });
-      if (result?.error || !result?.data?.ok) fail('PERSISTENCE_ERROR');
-      return result.data;
+      const current = await invoke('get', actor, { table:data.table, id:String(data.id) });
+      const record = current.record;
+      if (!record || record.updatedAt !== data.expectedUpdatedAt) fail('CONTENT_STALE');
+      if (current.pendingReviewExists || current.pending?.commandId) return {ok:true,skipped:true,reason:'PENDING_REVIEW_EXISTS',
+        ...(current.pending?.commandId?{commandId:current.pending.commandId}:{}),status:'pending_review'};
+      if (typeof record.gpt?.summary === 'string' && record.gpt.summary.trim())
+        return {ok:true,skipped:true,reason:'GPT_SUMMARY_EXISTS',status:'existing'};
+      const sourceText = record.original?.text;
+      if (typeof sourceText !== 'string' || !sourceText.trim()) fail('CONTENT_ORIGINAL_REQUIRED');
+      const generated = await generateSummary({domain:'other',title:record.title||'Knowledge',content:sourceText},actor);
+      const afterGeneration = await invoke('get',actor,{table:data.table,id:String(data.id)});
+      if (afterGeneration.record?.updatedAt !== data.expectedUpdatedAt) fail('CONTENT_STALE');
+      if (afterGeneration.pendingReviewExists || afterGeneration.pending?.commandId) return {ok:true,skipped:true,reason:'PENDING_REVIEW_EXISTS',
+        ...(afterGeneration.pending?.commandId?{commandId:afterGeneration.pending.commandId}:{}),status:'pending_review'};
+      if (typeof afterGeneration.record?.gpt?.summary === 'string' && afterGeneration.record.gpt.summary.trim())
+        return {ok:true,skipped:true,reason:'GPT_SUMMARY_EXISTS',status:'existing'};
+      const preview = await invoke('preview',actor,{table:data.table,id:String(data.id),expectedUpdatedAt:data.expectedUpdatedAt,
+        action:'edit',target:'gpt',patch:{summary:generated.summary},reviewed:false});
+      const applied = await invoke('apply',actor,{commandId:preview.commandId});
+      if (applied.status !== 'pending_review') fail('CONTENT_PENDING_VERIFY_FAILED');
+      const verified = await invoke('get',actor,{table:data.table,id:String(data.id)});
+      if (verified.pending?.commandId !== preview.commandId || verified.pending?.after?.gpt?.summary !== generated.summary)
+        fail('CONTENT_PENDING_VERIFY_FAILED');
+      return {ok:true,commandId:preview.commandId,status:'pending_review',taskId:generated.taskId,resultId:generated.resultId};
     }
     return invoke(operation, actor, data);
   }

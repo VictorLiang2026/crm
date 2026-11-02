@@ -5,29 +5,28 @@ const {createKnowledgeContentService}=require('../../cloudfunctions/assistant/kn
 const {KnowledgeGovernanceService}=require('../../cloudfunctions/person_360/knowledge-governance-service');
 const {extractText}=require('../../cloudfunctions/assistant/knowledge-library-service');
 const base={id:1,content:'System text',metadata:{summary:'System summary',secretUnselected:'not for prompt'},lifecycle_status:'verified'};
-function managed(selected='gpt') {return {...base,gpt_original_text:'GPT text',gpt_summary:'GPT summary',selected_content_source:selected,
+function managed(selected='original') {return {...base,gpt_summary:'GPT summary',selected_content_source:selected,
  content_state:{version:2,baseSignature:createHash('md5').update('System text\x1fSystem summary').digest('hex'),
  original:{text:'Edited system',summary:'Edited summary',reviewed:true},gpt:{reviewed:true}}};}
 test('legacy content is compatible; selected pairs never mix and hidden content is excluded',()=>{
  assert.equal(effectiveContent(base).text,'System text');assert.equal(effectiveContent({...base,metadata:{}}).text,'System text');
- const row=projectContent(managed(),'knowledge_items');assert.equal(row.content,'GPT text');assert.equal(row.metadata.summary,'GPT summary');
- assert.equal(row.content_state,undefined);assert.equal(row.gpt_original_text,undefined);assert.equal(row.metadata.secretUnselected,undefined);
- assert.deepEqual(row.contentReference,{contentSource:'gpt',contentVersion:2});
- const missing=managed();missing.gpt_summary=null;assert.equal(effectiveContent(missing),null);
- missing.selected_content_source='original';assert.equal(effectiveContent(missing).text,'Edited system');
+ const row=projectContent(managed(),'knowledge_items');assert.equal(row.content,'Edited system');assert.equal(row.metadata.summary,'Edited summary');
+ assert.equal(row.content_state,undefined);assert.equal(row.metadata.secretUnselected,undefined);
+ assert.deepEqual(row.contentReference,{contentSource:'original',contentVersion:2});
+ const missing=managed();missing.metadata={};missing.content_state.original.summary=null;assert.equal(effectiveContent(missing),null);
 });
 test('manual clears, unreviewed edits, stale sources and source invalidity pause selected use',()=>{
  const row=managed('original');row.content_state.original.text=null;assert.equal(effectiveContent(row),null);
- const unreviewed=managed();unreviewed.content_state.gpt.reviewed=false;assert.equal(effectiveContent(unreviewed),null);
+ const unreviewed=managed();unreviewed.content_state.gpt.reviewed=false;assert.equal(effectiveContent(unreviewed).text,'Edited system');
  const attached=managed();attached.source_id=3;attached.content_state.sourceFingerprint='sha:1';
  assert.equal(effectiveContent(attached,'knowledge_items',{sha256:'sha',version_no:2,lifecycle_status:'verified'}),null);
  assert.equal(effectiveContent(attached,'knowledge_items',{sha256:'sha',version_no:1,lifecycle_status:'invalidated'}),null);
  assert.equal(effectiveContent(attached),null);
 });
 test('management previews stay bounded and do not disguise cleared system text with fallback',()=>{
- const row=managed();row.content_state.original.text=null;row.gpt_original_text='x'.repeat(1000);
- const display=managementRow(row,'knowledge_items');assert.equal(display.content,null);assert.equal(display.gpt_original_preview.length,180);
- assert.equal(display.gpt_original_text,undefined);assert.equal(display.content_state,undefined);
+ const row=managed();row.content_state.original.text=null;
+ const display=managementRow(row,'knowledge_items');assert.equal(display.content,null);assert.equal(display.gpt_summary_preview,'GPT summary');
+ assert.equal(display.gpt_original_preview,undefined);assert.equal(display.content_state,undefined);
 });
 test('playbook response text is not treated as a saved system summary; deployed resolver copies agree',()=>{
  const {contentVersions}=require('../../cloudfunctions/_shared/knowledge-content');

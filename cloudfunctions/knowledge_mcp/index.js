@@ -8,13 +8,20 @@ const HMAC_KEY = process.env.CRM_KNOWLEDGE_MCP_HMAC_KEY;
 const CONSENT_URI = process.env.CRM_KNOWLEDGE_MCP_CONSENT_URI;
 const RESOURCE_URL = process.env.CRM_KNOWLEDGE_MCP_RESOURCE_URL;
 const ISSUER_ORIGIN = process.env.CRM_KNOWLEDGE_MCP_ISSUER_URL;
-const SCOPES = ['knowledge:read','knowledge:source:read','knowledge:gpt:submit'];
+const SCOPES = ['knowledge:read','knowledge:gpt:submit'];
 const MCP_PATH = '/mcp/knowledge';
 const OAUTH_PATH = '/oauth';
 const ISSUER_PATH = '/knowledge-mcp';
 const ISSUER_URL = (() => { try { return new URL(ISSUER_ORIGIN).origin + ISSUER_PATH; } catch (_) { return ''; } })();
 const CHATGPT_REDIRECT = 'https://chatgpt.com/connector_platform_oauth_redirect';
 const CHATGPT_CUSTOM_REDIRECT = /^https:\/\/chatgpt\.com\/connector\/oauth\/[A-Za-z0-9_-]{1,80}$/;
+const CODEX_LOOPBACK_REDIRECT = /^http:\/\/127\.0\.0\.1(?::([1-9][0-9]{0,4}))?\/callback$/;
+function isAllowedRedirectUri(uri) {
+  if (uri === CHATGPT_REDIRECT || CHATGPT_CUSTOM_REDIRECT.test(uri)) return true;
+  const match = typeof uri === 'string' && uri.match(CODEX_LOOPBACK_REDIRECT);
+  if (!match) return false;
+  return !match[1] || Number(match[1]) <= 65535;
+}
 const b64url = value => Buffer.from(value).toString('base64url');
 const digest = value => crypto.createHash('sha256').update(value).digest('hex');
 function canonicalJson(value) {
@@ -119,11 +126,9 @@ async function invokeAssistant(actorUid,input){
 function compactList(result){
   const rows=[];
   for(const [table,key] of [['knowledge_items','knowledge'],['playbooks','playbooks']])for(const row of result?.[key]||[]){
-    const source=table==='knowledge_items'?(row.sourceId||row.source_id||row.source?.id||null):null;
-    rows.push({table,id:String(row.id),title:String(row.title||row.source||row.scenario||''),sourceId:source==null?null:String(source),
-      updatedAt:row.updatedAt||row.updated_at||null,gptTextPresent:Boolean(row.gpt_original_preview),
-      gptSummaryPresent:Boolean(row.gpt_summary_preview),fileName:row.fileName||null,
-      sourceAssociationClear:table==='knowledge_items'&&source!=null,gptGenerationSupported:table==='knowledge_items'&&source!=null});
+    rows.push({table,id:String(row.id),title:String(row.title||row.source||row.scenario||''),
+      updatedAt:row.updatedAt||row.updated_at||null,systemOriginalPresent:Boolean((row.content||row.response_logic||'').trim()),
+      gptSummaryPresent:Boolean(row.gpt_summary_preview),pendingReview:row.contentReviewPending===true});
   }
   const coverage=result?.coverage||{};
   const hasMore=coverage.hasMore||{};
@@ -132,8 +137,8 @@ function compactList(result){
 }
 const TOOLS=[
  {name:'knowledge_records_list',description:'List one bounded page of CRM knowledge records and GPT coverage. Repeat with returned nextOffsets until all hasMore values are false.',securitySchemes:[{type:'oauth2',scopes:['knowledge:read']}],inputSchema:{type:'object',properties:{sourceOffset:{type:'integer',minimum:0},knowledgeOffset:{type:'integer',minimum:0},playbookOffset:{type:'integer',minimum:0},limit:{type:'integer',minimum:1,maximum:100},},additionalProperties:false}},
- {name:'knowledge_record_get',description:'Read one knowledge record by its exact table and record ID, including linked source identity and current content.',securitySchemes:[{type:'oauth2',scopes:['knowledge:read','knowledge:source:read']}],inputSchema:{type:'object',properties:{table:{type:'string',enum:['knowledge_items','playbooks']},id:{type:'string',pattern:'^[1-9][0-9]*$'}},required:['table','id'],additionalProperties:false}},
- {name:'knowledge_generate_gpt_pending',description:'For knowledge_items with an explicit linked source only: read the exact attachment, extract text if needed, generate only missing GPT fields, and queue a version-checked pending-review candidate. Playbooks without a single direct source are not eligible. Never approves or publishes.',securitySchemes:[{type:'oauth2',scopes:['knowledge:read','knowledge:source:read','knowledge:gpt:submit']}],inputSchema:{type:'object',properties:{table:{type:'string',enum:['knowledge_items']},id:{type:'string',pattern:'^[1-9][0-9]*$'},expectedUpdatedAt:{type:'string',format:'date-time'}},required:['table','id','expectedUpdatedAt'],additionalProperties:false}},
+ {name:'knowledge_record_get',description:'Read text fields for one CRM knowledge record selected by exact table and record ID. Returns the stored system original and GPT summary only; it never reads linked files.',securitySchemes:[{type:'oauth2',scopes:['knowledge:read']}],inputSchema:{type:'object',properties:{table:{type:'string',enum:['knowledge_items','playbooks']},id:{type:'string',pattern:'^[1-9][0-9]*$'}},required:['table','id'],additionalProperties:false}},
+ {name:'knowledge_generate_gpt_pending',description:'Generate a GPT summary only from the stored system original text for the exact record ID and submit it as pending review. Does not read files or images, generate GPT original text, approve, or publish.',securitySchemes:[{type:'oauth2',scopes:['knowledge:read','knowledge:gpt:submit']}],inputSchema:{type:'object',properties:{table:{type:'string',enum:['knowledge_items','playbooks']},id:{type:'string',pattern:'^[1-9][0-9]*$'},expectedUpdatedAt:{type:'string',format:'date-time'}},required:['table','id','expectedUpdatedAt'],additionalProperties:false}},
  {name:'knowledge_generation_status',description:'Check a GPT generation command by its exact command ID.',securitySchemes:[{type:'oauth2',scopes:['knowledge:read']}],inputSchema:{type:'object',properties:{commandId:{type:'string',format:'uuid'}},required:['commandId'],additionalProperties:false}},
 ];
 async function mcp(req){
@@ -162,16 +167,22 @@ async function mcp(req){
     const name=rpcMsg.params?.name,args=rpcMsg.params?.arguments||{};
     const tool=TOOLS.find(t=>t.name===name);
     if(!tool)return response(200,{jsonrpc:'2.0',id,error:{code:-32602,message:'Unknown tool'}});
-    if(name==='knowledge_record_get'&&!scopes.includes('knowledge:source:read'))return toolAuthError(id,'INSUFFICIENT_SCOPE',['knowledge:read','knowledge:source:read']);
-    if(name==='knowledge_generate_gpt_pending'&&!scopes.includes('knowledge:gpt:submit'))return toolAuthError(id,'INSUFFICIENT_SCOPE',['knowledge:read','knowledge:source:read','knowledge:gpt:submit']);
-    if(name==='knowledge_generate_gpt_pending'&&!scopes.includes('knowledge:source:read'))return toolAuthError(id,'INSUFFICIENT_SCOPE',['knowledge:read','knowledge:source:read']);
+    if(name==='knowledge_generate_gpt_pending'&&!scopes.includes('knowledge:gpt:submit'))return toolAuthError(id,'INSUFFICIENT_SCOPE',['knowledge:read','knowledge:gpt:submit']);
     if(name==='knowledge_records_list'&&Object.entries(args).some(([k,v])=>!['sourceOffset','knowledgeOffset','playbookOffset','limit'].includes(k)||!Number.isSafeInteger(v)||v<0||(k==='limit'&&(v<1||v>100))))fail('INVALID_ARGUMENTS',400);
     if(name==='knowledge_record_get'&&(!['knowledge_items','playbooks'].includes(args.table)||!/^[1-9][0-9]*$/.test(String(args.id))))fail('INVALID_ARGUMENTS',400);
-    if(name==='knowledge_generate_gpt_pending'&&(args.table!=='knowledge_items'||!/^[1-9][0-9]*$/.test(String(args.id))||typeof args.expectedUpdatedAt!=='string'))fail('INVALID_ARGUMENTS',400);
+    if(name==='knowledge_generate_gpt_pending'&&(!['knowledge_items','playbooks'].includes(args.table)||!/^[1-9][0-9]*$/.test(String(args.id))||typeof args.expectedUpdatedAt!=='string'))fail('INVALID_ARGUMENTS',400);
     if(name==='knowledge_generation_status'&&!/^[0-9a-f-]{36}$/i.test(String(args.commandId)))fail('INVALID_ARGUMENTS',400);
     const input={tool,...args};
     const result=await invokeAssistant(actorUid,input);
-    const safeResult=name==='knowledge_records_list'?compactList(result):result;
+    let safeResult=result;
+    if(name==='knowledge_records_list')safeResult=compactList(result);
+    if(name==='knowledge_record_get'&&result?.record){
+      const record=result.record;
+      safeResult={ok:result.ok===true,record:{table:record.table,id:String(record.id),title:record.title||'',updatedAt:record.updatedAt,
+        systemOriginalText:record.original?.text||'',gptSummary:record.gpt?.summary||null,summaryReviewed:record.gpt?.reviewed===true,
+        selected:record.selected,version:record.version,lifecycleStatus:record.lifecycleStatus},
+        hasPendingReview:result.pendingReviewExists===true||!!result.pending?.commandId};
+    }
     return response(200,{jsonrpc:'2.0',id,result:{content:[{type:'text',text:JSON.stringify(safeResult)}],isError:safeResult?.ok===false},
       ...(modern?{_meta:{'io.modelcontextprotocol/serverInfo':{name:'crm-knowledge',version:'1.0.0'}}}:{})});
   }
@@ -201,7 +212,7 @@ async function main(event,context){
         !Array.isArray(req.body.response_types)||req.body.response_types.length!==1||!req.body.response_types.includes('code')||
         (req.body.token_endpoint_auth_method&&req.body.token_endpoint_auth_method!=='none'))fail('INVALID_CLIENT_METADATA');
       const redirectUri=req.body.redirect_uris[0];
-      if(typeof redirectUri!=='string'||(redirectUri!==CHATGPT_REDIRECT&&!CHATGPT_CUSTOM_REDIRECT.test(redirectUri)))fail('INVALID_CLIENT_METADATA');
+      if(!isAllowedRedirectUri(redirectUri))fail('INVALID_CLIENT_METADATA');
       const clientId=`crmkmcp_${b64url(crypto.randomBytes(18))}`;
       const created=await rpc('register',{clientId,clientName:String(req.body.client_name||'CRM Knowledge MCP').slice(0,100),redirectUris:[redirectUri]});
       if(created.clientId!==clientId||created.redirectUri!==redirectUri)fail('MCP_REGISTRATION_FAILED',502);
@@ -214,8 +225,7 @@ async function main(event,context){
       const state=req.url.searchParams.get('state'),challenge=req.url.searchParams.get('code_challenge'),scope=(req.url.searchParams.get('scope')||'').split(/\s+/).filter(Boolean);
       if(!clientId||!redirectUri||resource!==RESOURCE_URL||req.url.searchParams.get('response_type')!=='code'||
          req.url.searchParams.get('code_challenge_method')!=='S256'||!(state&&state.length<=1024)||
-         !/^[A-Za-z0-9_-]{43}$/.test(challenge||'')||!scope.includes('knowledge:read')||scope.some(s=>!SCOPES.includes(s))||new Set(scope).size!==scope.length||
-         scope.includes('knowledge:gpt:submit')&&!scope.includes('knowledge:source:read'))fail('INVALID_OAUTH_REQUEST');
+         !/^[A-Za-z0-9_-]{43}$/.test(challenge||'')||!scope.includes('knowledge:read')||scope.some(s=>!SCOPES.includes(s))||new Set(scope).size!==scope.length)fail('INVALID_OAUTH_REQUEST');
       await rpc('validate_client',{clientId,redirectUri});
       const redirect=new URL(CONSENT_URI);
       for(const [k,v]of req.url.searchParams)redirect.searchParams.set(k,v);
@@ -243,7 +253,7 @@ async function main(event,context){
       code==='UNSUPPORTED_GRANT_TYPE'?'unsupported_grant_type':code==='INVALID_CLIENT'||code==='MCP_INVALID_CLIENT'?'invalid_client':'invalid_request';
     let metadataUrl='';try{const resource=new URL(RESOURCE_URL);metadataUrl=`${resource.origin}/.well-known/oauth-protected-resource${resource.pathname}`;}catch(_){}
     const headers=status===401?{'WWW-Authenticate':`Bearer resource_metadata="${metadataUrl}", error="invalid_token"`}:status===403&&code==='INSUFFICIENT_SCOPE'?
-      {'WWW-Authenticate':`Bearer resource_metadata="${metadataUrl}", error="insufficient_scope", scope="knowledge:read knowledge:source:read knowledge:gpt:submit"`}:{};
+      {'WWW-Authenticate':`Bearer resource_metadata="${metadataUrl}", error="insufficient_scope", scope="knowledge:read knowledge:gpt:submit"`}:{};
     return response(status,{error:path.startsWith(`${OAUTH_PATH}/`)?oauthError:code},headers);
   }
 }
@@ -280,3 +290,4 @@ function createHttpServer({port=9000}={}) {
 if(require.main===module)createHttpServer();
 exports.main=main;
 exports.createHttpServer=createHttpServer;
+exports.isAllowedRedirectUri=isAllowedRedirectUri;

@@ -27,7 +27,7 @@ function response(value){return {ok:true,text:async()=>JSON.stringify(value)};}
 test('managed knowledge keeps metadata edits while refusing legacy content overwrite',async()=>{
   const sig=require('node:crypto').createHash('md5').update('Base text\x1fBase summary').digest('hex');
   const current={id:7,item_type:'evidence',source:'Old title',content:'Base text',metadata:{summary:'Base summary'},verified:true,
-    lifecycle_status:'verified',updated_at:'stamp',gpt_original_text:'GPT',gpt_summary:'Summary',selected_content_source:'gpt',
+    lifecycle_status:'verified',updated_at:'stamp',gpt_summary:'Summary',selected_content_source:'original',
     content_state:{baseSignature:sig,original:{text:'Managed text',summary:'Managed summary',reviewed:true},gpt:{reviewed:true}}};
   const {service,writes,gatewayCalls,rpcCalls}=setup({current});
   const data={id:7,title:'New title',categories:['other'],content:'Managed text',summary:'Managed summary',expectedUpdatedAt:'stamp',confidence:.9};

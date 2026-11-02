@@ -1,6 +1,16 @@
 {
   "routines": [
     {
+      "id": "routine:crm_knowledge_gpt_queue_v1(p_actor_uid text, p_table text, p_id bigint, p_expected_updated_at timestamp with time zone)",
+      "expectedDetail": {
+        "anon_execute": false,
+        "service_execute": false,
+        "security_definer": false,
+        "authenticated_execute": false
+      },
+      "reason": "Revoked 2026-11-02 after the summary-only knowledge flow replaced this queue RPC. The function remains for compatibility but is absent from the assistant RPC allowlist and has no service_role execute grant."
+    },
+    {
       "id": "routine:crm_knowledge_ocr_input_v1(p_source_id bigint, p_upload_id uuid)",
       "expectedDetail": {
         "anon_execute": true,

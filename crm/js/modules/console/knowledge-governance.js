@@ -97,7 +97,7 @@ export function renderKnowledgeGovernance(ctx) {
     const key=contentKey(row),historical=row.lifecycle_status==='superseded';
     if(!contentCache.has(key))contentCache.set(key,{summary:false,text:false,status:'idle',record:null});
     const entry=contentCache.get(key),parts=[];
-    const needsDetail=!!(row.gpt_original_preview||row.gpt_summary_preview)&&!historical;
+    const needsDetail=!!row.gpt_summary_preview&&!historical;
     const requestDetail=async()=>{
       if(!needsDetail||entry.status==='loading'||entry.status==='ready')return;
       entry.status='loading';entry.refresh();
@@ -109,7 +109,7 @@ export function renderKnowledgeGovernance(ctx) {
       entry.refresh();
     };
     const cells=['original','gpt'].map(pair=>h('td',{class:'kg-summary-cell kg-content-cell','data-kg-pair':pair},
-      ['summary','text'].map(part=>{
+      (pair==='gpt'?['summary']:['summary','text']).map(part=>{
         const id=`kg-content-${row.table}-${row.id}-${pair}-${part}`;
         const body=h('div',{id,class:'kg-content-body',hidden:true});
         const toggle=h('button',{class:'kg-content-toggle',type:'button','data-kg-part':part,
@@ -133,7 +133,7 @@ export function renderKnowledgeGovernance(ctx) {
         // never masquerade as full text. Historical rows keep their read-only preview.
         const value=entry.record?entry.record[pair][part]:pair==='original'
           ?(part==='summary'?row.metadata?.summary:row.table==='playbooks'?row.response_logic:row.content)
-          :(part==='summary'?row.gpt_summary_preview:row.gpt_original_preview);
+          :row.gpt_summary_preview;
         body.replaceChildren(h('div',{class:'kg-full-content',tabindex:'0'},value?.trim()?value:t('kc_empty')));
         if(pair==='gpt'&&historical&&value)body.append(h('small',{class:'kg-summary-note'},text('historical_preview')));
       }

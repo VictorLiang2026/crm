@@ -53,6 +53,19 @@ test('the PM18 routine exception is exact and cannot authorize other anon routin
   assert.match(evaluate(anotherAnonRoutine).failures.join('\n'), /Service routine execution missing: routine:quick_capture_v2_command_v1/);
 });
 
+test('the retired GPT queue has an exact service-role deny exception', () => {
+  const id='routine:crm_knowledge_gpt_queue_v1(p_actor_uid text, p_table text, p_id bigint, p_expected_updated_at timestamp with time zone)';
+  const exception=require('./routine-execution-exceptions.json').routines.find(item=>item.id===id);
+  assert.ok(exception);
+  const source=copy();
+  const routine=source.objects.find(item=>item.kind==='routine'&&item.name===id.slice('routine:'.length));
+  assert.ok(routine);
+  routine.detail={...exception.expectedDetail};
+  assert.deepEqual(evaluate(source).failures,[]);
+  routine.detail.service_execute=true;
+  assert.match(evaluate(source).failures.join('\n'),/Routine permission exception mismatch/);
+});
+
 test('anonymous gateway checks reject visible rows and nonzero aggregate facts', () => {
   assert.equal(classify(200, '*/0', true), true);
   assert.equal(classify(206, '0-0/1', true), false);

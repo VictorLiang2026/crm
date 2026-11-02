@@ -1,6 +1,6 @@
 'use strict';
 const { createHash } = require('node:crypto');
-const CONTENT_COLUMNS = 'gpt_original_text,gpt_summary,selected_content_source,content_state';
+const CONTENT_COLUMNS = 'gpt_summary,selected_content_source,content_state';
 const nonempty = value => typeof value === 'string' && !!value.trim();
 function contentVersions(row, table = 'knowledge_items', source = null) {
   const st = row.content_state || {};
@@ -9,7 +9,7 @@ function contentVersions(row, table = 'knowledge_items', source = null) {
   const sig = createHash('md5').update(`${base.text || ''}\x1f${base.summary || ''}`).digest('hex');
   const managed = !!st.original;
   const original = { ...(managed && st.baseSignature === sig ? st.original : base) };
-  const gpt = { text: row.gpt_original_text, summary: row.gpt_summary, reviewed: st.gpt?.reviewed === true };
+  const gpt = { summary: row.gpt_summary, reviewed: st.gpt?.reviewed === true };
   const fingerprint = source ? `${source.sha256 || ''}:${source.version_no || ''}` : null;
   if (managed && ((source && st.sourceFingerprint !== fingerprint) || (!source && st.baseSignature !== sig))) {
     gpt.reviewed = false;
@@ -32,7 +32,7 @@ function projectContent(row, table, source, today) {
   const content = effectiveContent(row, table, source, today);
   if (!content) return null;
   // Do not carry unselected text or metadata summaries into AI prompts/ranking.
-  const { gpt_original_text, gpt_summary, content_state, ...safe } = row;
+  const { gpt_summary, content_state, ...safe } = row;
   return { ...safe, [table === 'playbooks' ? 'response_logic' : 'content']: content.text,
     metadata: { categories: row.metadata?.categories, domain: row.metadata?.domain,
       published_at: row.metadata?.published_at, locator: row.metadata?.locator, summary: content.summary },
@@ -40,11 +40,11 @@ function projectContent(row, table, source, today) {
 }
 function managementRow(row, table, source) {
   const versions = contentVersions(row, table, source);
-  const { content_state, gpt_original_text, gpt_summary, ...safe } = row;
+  const { content_state, gpt_summary, ...safe } = row;
   return { ...safe, [table === 'playbooks' ? 'response_logic' : 'content']: versions.original.text,
     metadata: { ...row.metadata, summary: versions.original.summary }, contentManaged: versions.managed,
     contentVersion: versions.version, selected_content_source: versions.selected,
     contentPaused: !effectiveContent(row, table, source),
-    gpt_original_preview: (gpt_original_text || '').slice(0,180), gpt_summary_preview: (gpt_summary || '').slice(0,180) };
+    gpt_summary_preview: (gpt_summary || '').slice(0,180) };
 }
 module.exports = { CONTENT_COLUMNS, contentVersions, effectiveContent, projectContent, managementRow };

@@ -77,9 +77,8 @@ async function issueAuthorization(event, actorUid) {
     const error = new Error('INVALID_OAUTH_REQUEST'); error.code = 'INVALID_INPUT'; throw error;
   }
   const requested = String(event.scope || '').split(/\s+/).filter(Boolean);
-  const allowed = new Set(['knowledge:read', 'knowledge:source:read', 'knowledge:gpt:submit']);
-  if (!requested.includes('knowledge:read') || requested.some(scope => !allowed.has(scope)) || new Set(requested).size!==requested.length ||
-      requested.includes('knowledge:gpt:submit')&&!requested.includes('knowledge:source:read')) {
+  const allowed = new Set(['knowledge:read', 'knowledge:gpt:submit']);
+  if (!requested.includes('knowledge:read') || requested.some(scope => !allowed.has(scope)) || new Set(requested).size!==requested.length) {
     const error = new Error('INVALID_SCOPE'); error.code = 'INVALID_INPUT'; throw error;
   }
   const code = b64url(crypto.randomBytes(32));

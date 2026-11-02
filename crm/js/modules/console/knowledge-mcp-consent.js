@@ -4,20 +4,31 @@ const SESSION_TIMEOUT = 5 * 60 * 1000;
 const CONFIG = { envId: 'crm-d1gkae8ddc930d151' };
 const byId = id => document.getElementById(id);
 
+export function isAllowedAuthorizationCallback(uri) {
+  if (typeof uri !== 'string') return false;
+  try {
+    const target = new URL(uri);
+    const chatgpt = target.protocol === 'https:' && target.hostname === 'chatgpt.com' &&
+      (target.pathname === '/connector_platform_oauth_redirect' || /^\/connector\/oauth\/[A-Za-z0-9_-]{1,80}$/.test(target.pathname));
+    if (chatgpt) return true;
+  } catch (_) { return false; }
+  const match = uri.match(/^http:\/\/127\.0\.0\.1(?::([1-9][0-9]{0,4}))?\/callback$/);
+  return !!match && (!match[1] || Number(match[1]) <= 65535);
+}
+
 export async function initKnowledgeMcpConsent() {
   const params = new URLSearchParams(location.search);
   const state = { app: null, auth: null, ready: false, lastActivity: 0, locked: false };
   function paint() {
     document.documentElement.lang = getLang() === 'en' ? 'en' : 'zh-CN';
     document.title = t('kmcp_title');
-    for (const [id, key] of [['title','kmcp_title'],['requester','kmcp_requester'],['intro','kmcp_intro'],['read','kmcp_read'],['source','kmcp_source'],
+    for (const [id, key] of [['title','kmcp_title'],['requester','kmcp_requester'],['intro','kmcp_intro'],['read','kmcp_read'],
       ['write','kmcp_write'],['review','kmcp_review'],['loginTitle','kmcp_login'],['usernameLabel','kmcp_username'],
       ['passwordLabel','kmcp_password'],['signin','kmcp_signin'],['allow','kmcp_allow'],['deny','kmcp_deny'],['lang','kmcp_lang_toggle']]) {
       byId(id).textContent = t(key);
     }
     const requested = new Set((params.get('scope') || '').split(/\s+/));
     byId('read').classList.toggle('hidden', !requested.has('knowledge:read'));
-    byId('source').classList.toggle('hidden', !requested.has('knowledge:source:read'));
     byId('write').classList.toggle('hidden', !requested.has('knowledge:gpt:submit'));
   }
   function validRequest() {
@@ -26,11 +37,9 @@ export async function initKnowledgeMcpConsent() {
         params.get('state') && params.get('code_challenge') && params.get('oauth_issuer'));
   }
   function callback(values) {
-    const target = new URL(params.get('redirect_uri'));
-    if (target.protocol !== 'https:' || target.hostname !== 'chatgpt.com' ||
-      !(target.pathname === '/connector_platform_oauth_redirect' || /^\/connector\/oauth\/[A-Za-z0-9_-]{1,80}$/.test(target.pathname))) {
-      throw new Error('Invalid callback');
-    }
+    const uri = params.get('redirect_uri');
+    if (!isAllowedAuthorizationCallback(uri)) throw new Error('Invalid callback');
+    const target = new URL(uri);
     for (const [key, value] of Object.entries(values)) target.searchParams.set(key, value);
     location.replace(target.toString());
   }

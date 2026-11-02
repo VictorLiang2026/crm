@@ -11,6 +11,8 @@ const targetUp=fs.readFileSync(path.join(root,'cloudbase/migrations/202610301430
 const targetDown=fs.readFileSync(path.join(root,'cloudbase/migrations/20261030143000_knowledge_review_target.rollback.sql'),'utf8');
 const invalidateUp=fs.readFileSync(path.join(root,'cloudbase/migrations/20261030144000_knowledge_summary_review_invalidation.sql'),'utf8');
 const invalidateDown=fs.readFileSync(path.join(root,'cloudbase/migrations/20261030144000_knowledge_summary_review_invalidation.rollback.sql'),'utf8');
+const summaryOnly=fs.readFileSync(path.join(root,'cloudbase/migrations/20261102100000_knowledge_summary_only.sql'),'utf8');
+const summaryOnlyDown=fs.readFileSync(path.join(root,'cloudbase/migrations/20261102100000_knowledge_summary_only.rollback.sql'),'utf8');
 
 test('generated-content review migration stays additive, public-only, and has a paired rollback',()=>{
   assert.match(up,/ALTER TABLE public\.knowledge_content_commands/);
@@ -42,4 +44,29 @@ test('bilingual knowledge UI exposes a separate pending approval step',()=>{
   for(const key of ['kc_pending_title','kc_pending_note','kc_approve','kc_reject','kg_status_pending_review','kg_review_activate']){
     assert.match(i18n,new RegExp(`['"]?${key}['"]?\\s*:`));
   }
+});
+
+test('summary-only migration guards data, removes GPT-original fields and narrows OAuth scopes',()=>{
+  assert.match(summaryOnly,/KNOWLEDGE_GPT_ORIGINAL_DATA_PRESENT/);
+  assert.match(summaryOnly,/SET before_state=before_state#-'\{gpt,text\}',after_state=after_state#-'\{gpt,text\}'/);
+  assert.match(summaryOnly,/ALTER TABLE public\.knowledge_items DROP COLUMN gpt_original_text/);
+  assert.match(summaryOnly,/ALTER TABLE public\.playbooks DROP COLUMN gpt_original_text/);
+  assert.match(summaryOnly,/SET gpt_summary=\$1,selected_content_source=\$2/);
+  assert.match(summaryOnly,/dest='gpt' AND k<>'summary'/);
+  assert.match(summaryOnly,/pendingReviewExists',has_pending/);
+  assert.doesNotMatch(summaryOnly,/record_table=tbl AND record_id=rid AND actor_uid=p_actor_uid AND status='pending_review'\) THEN RAISE EXCEPTION 'CONTENT_PENDING_EXISTS'/);
+  assert.match(summaryOnly,/array_remove\(scopes,'knowledge:source:read'\)/);
+  assert.match(summaryOnly,/ARRAY\['knowledge:read','knowledge:gpt:submit'\]/);
+  assert.ok(summaryOnly.indexOf("array_remove(scopes,'knowledge:source:read')")<summaryOnly.indexOf('ADD CONSTRAINT crm_knowledge_mcp_grants_scopes_check'),'active grants must be narrowed before the new scope constraint is installed');
+  assert.match(summaryOnly,/SET before_state=before_state#-'\{gpt,text\}',after_state=after_state#-'\{gpt,text\}'[\s\S]*?status='pending_review'/);
+  assert.doesNotMatch(summaryOnly,/\b(?:DROP TABLE|DROP FUNCTION|CASCADE)\b/i);
+  assert.doesNotMatch(summaryOnly,/\bpr\./i);
+  assert.match(summaryOnlyDown,/ALTER TABLE public\.knowledge_items ADD COLUMN gpt_original_text text/);
+  assert.match(summaryOnlyDown,/CREATE OR REPLACE FUNCTION public\.crm_knowledge_content_v1/);
+  assert.match(summaryOnlyDown,/ARRAY\['knowledge:read','knowledge:source:read','knowledge:gpt:submit'\]/);
+  const service=fs.readFileSync(path.join(root,'cloudfunctions/assistant/knowledge-content-service.js'),'utf8');
+  assert.match(service,/record\.original\?\.text/);assert.match(service,/sourceBytes\(source/,'background OCR may still read attachments outside MCP summary generation');
+  const mcp=fs.readFileSync(path.join(root,'cloudfunctions/knowledge_mcp/index.js'),'utf8');
+  assert.doesNotMatch(mcp,/knowledge:source:read/);assert.doesNotMatch(mcp,/gpt_original_text/);
+  assert.match(mcp,/systemOriginalText:record\.original\?\.text/);
 });

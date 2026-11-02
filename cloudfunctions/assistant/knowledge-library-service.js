@@ -338,7 +338,7 @@ function createKnowledgeLibrary(options={}) {
     const [sources,items,playbooks,pendingCommands]=await Promise.all([
       sourcePage(sourceOffset,limit),request('knowledge_items','GET',{select:'id,source_id,item_type,source,source_date,valid_from,valid_to,verified,lifecycle_status,version_no,supersedes_id,confidence,content,metadata,updated_at,deleted_at,'+CONTENT_COLUMNS,deleted_at:'is.null',order:'updated_at.desc,id.desc',limit,offset:knowledgeOffset}),
       request('playbooks','GET',{select:'id,scenario,objection,possible_underlying_reasons,clarifying_questions,response_logic,evidence_refs,case_refs,story_refs,do_not_say,next_objective,source,confidence,valid_from,valid_to,version_no,supersedes_id,metadata,lifecycle_status,updated_at,deleted_at,'+CONTENT_COLUMNS,deleted_at:'is.null',order:'updated_at.desc,id.desc',limit:playbookLimit,offset:playbookOffset}),
-      request('knowledge_content_commands','GET',{select:'record_table,record_id,created_at',actor_uid:`eq.${actor}`,status:'eq.pending_review',limit:300}),
+      request('knowledge_content_commands','GET',{select:'record_table,record_id,created_at',status:'eq.pending_review',limit:300}),
     ]);
     const sourceRows=sources.rows;
     const pendingKeys=new Map(pendingCommands.map(command=>[`${command.record_table}:${command.record_id}`,command.created_at]));

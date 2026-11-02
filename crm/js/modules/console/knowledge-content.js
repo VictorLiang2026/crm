@@ -16,7 +16,7 @@ export async function openKnowledgeContent(ctx,row,onSaved=()=>{}) {
     try{await fn();}catch(error){errorBox.textContent=errorText(error);}finally{busy=false;body.querySelectorAll('button').forEach(b=>b.disabled=false);}};
   const button=(label,fn,cls='btn btn-ghost')=>h('button',{type:'button',class:cls,onclick:()=>act(fn)},tr(label));
   const pairView=(name,pair)=>h('section',{class:'kc-pair-preview'},[
-    h('b',{},tr(name)),h('details',{open:true},[h('summary',{},tr('text')),h('pre',{},pair?.text||tr('empty'))]),
+    h('b',{},tr(name)),name==='original'?h('details',{open:true},[h('summary',{},tr('text')),h('pre',{},pair?.text||tr('empty'))]):null,
     h('details',{open:true},[h('summary',{},tr('summary')),h('pre',{},pair?.summary||tr('empty'))]),
   ]);
   const showPreview=preview=>{
@@ -80,14 +80,14 @@ export async function openKnowledgeContent(ctx,row,onSaved=()=>{}) {
       const panel=h('section',{class:'kc-editor','data-content-target':target},[
         h('h3',{},tr(target)),target==='gpt'?h('p',{},tr('gpt_note')):null,
         candidate[target]?h('p',{class:'kc-candidate-note'},tr('candidate_note')):null,
-        h('label',{},[tr('text'),txt]),h('label',{},[tr('summary'),summary]),
+        target==='original'?h('label',{},[tr('text'),txt]):null,h('label',{},[tr('summary'),summary]),
         h('label',{class:'kc-review'},[reviewed,tr('reviewed')]),
         h('div',{class:'kg-form-actions'},[
-          button('save_preview',async()=>preview({action:'edit',target,patch:{text:txt.value,summary:summary.value},reviewed:reviewed.checked}),'btn btn-primary'),
-          button('clear_text',async()=>preview({action:'edit',target,patch:{text:null},reviewed:false})),
+          button('save_preview',async()=>preview({action:'edit',target,patch:target==='original'?{text:txt.value,summary:summary.value}:{summary:summary.value},reviewed:reviewed.checked}),'btn btn-primary'),
+          ...(target==='original'?[button('clear_text',async()=>preview({action:'edit',target,patch:{text:null},reviewed:false}))]:[]),
           button('clear_summary',async()=>preview({action:'edit',target,patch:{summary:null},reviewed:false})),
-          button('clear_pair',async()=>preview({action:'edit',target,patch:{text:null,summary:null},reviewed:false})),
-          button('select',async()=>preview({action:'select',selected:target})),
+          ...(target==='original'?[button('clear_pair',async()=>preview({action:'edit',target,patch:{text:null,summary:null},reviewed:false})),
+            button('select',async()=>preview({action:'select',selected:target}))]:[]),
         ]),
       ]);
       if(target==='original')panel.append(h('div',{class:'kg-form-actions'},['text','summary','both'].map(part=>button(`regenerate_${part}`,async()=>{

@@ -109,7 +109,7 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
             ['knowledge_items','playbooks'].includes(input.table) && /^[1-9][0-9]*$/.test(String(input.id)))
           return await knowledgeLibraryRunner({action:'knowledgeLibrary',operation:'content',contentOperation:'get',data:{table:input.table,id:String(input.id)}},actorUid);
         if (input.tool === 'knowledge_generate_gpt_pending' && Object.keys(input).every(k=>['tool','table','id','expectedUpdatedAt'].includes(k)) &&
-            input.table==='knowledge_items' && /^[1-9][0-9]*$/.test(String(input.id)) &&
+            ['knowledge_items','playbooks'].includes(input.table) && /^[1-9][0-9]*$/.test(String(input.id)) &&
             typeof input.expectedUpdatedAt==='string' && Number.isFinite(Date.parse(input.expectedUpdatedAt)))
           return await knowledgeLibraryRunner({action:'knowledgeLibrary',operation:'content',contentOperation:'queueGpt',
             data:{table:input.table,id:String(input.id),expectedUpdatedAt:input.expectedUpdatedAt}},actorUid);

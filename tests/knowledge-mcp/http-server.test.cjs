@@ -4,9 +4,41 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const http = require('node:http');
 const { once } = require('node:events');
-const { createHttpServer } = require('../../cloudfunctions/knowledge_mcp');
+const Module = require('node:module');
+process.env.TCB_ENV='crm-d1gkae8ddc930d151';
+process.env.CRM_KNOWLEDGE_MCP_CLOUDBASE_API_KEY='test-api-key';
+process.env.CRM_KNOWLEDGE_MCP_HMAC_KEY='test-only-hmac-secret-with-at-least-32-characters';
+process.env.CRM_KNOWLEDGE_MCP_CONSENT_URI='https://crm.example/crm/oauth-consent.html';
+process.env.CRM_KNOWLEDGE_MCP_ISSUER_URL='https://crm.example';
+process.env.CRM_KNOWLEDGE_MCP_RESOURCE_URL='https://crm.example/mcp/knowledge';
+let mockCall=async()=>({result:{ok:true}});
+const originalLoad = Module._load;
+Module._load = function(request,parent,isMain) {
+  if(request==='@cloudbase/node-sdk')return {init:()=>({callFunction:args=>mockCall(args)})};
+  return originalLoad.call(this,request,parent,isMain);
+};
+const { createHttpServer,main } = require('../../cloudfunctions/knowledge_mcp');
 
-test('dynamic registration rejects callbacks outside the ChatGPT allowlist before database access', async () => {
+test('redirect allowlist permits Codex loopback callbacks and rejects untrusted callback targets', () => {
+  const {isAllowedRedirectUri}=require('../../cloudfunctions/knowledge_mcp');
+  assert.equal(isAllowedRedirectUri('https://chatgpt.com/connector_platform_oauth_redirect'),true);
+  assert.equal(isAllowedRedirectUri('https://chatgpt.com/connector/oauth/callback_123'),true);
+  assert.equal(isAllowedRedirectUri('http://127.0.0.1/callback'),true);
+  assert.equal(isAllowedRedirectUri('http://127.0.0.1:49152/callback'),true);
+  assert.equal(isAllowedRedirectUri('http://127.0.0.1:65535/callback'),true);
+  for(const uri of [
+    'http://127.0.0.1:65536/callback',
+    'http://127.0.0.1:0/callback',
+    'http://127.0.0.1.evil.test/callback',
+    'http://localhost/callback',
+    'https://127.0.0.1/callback',
+    'http://127.0.0.1/other',
+    'http://127.0.0.1/callback?next=https://evil.test',
+    'https://example.org/callback',
+  ]) assert.equal(isAllowedRedirectUri(uri),false,uri);
+});
+
+test('dynamic registration rejects callbacks outside the ChatGPT and Codex loopback allowlists before database access', async () => {
   const keys=['TCB_ENV','CRM_KNOWLEDGE_MCP_HMAC_KEY','CRM_KNOWLEDGE_MCP_CONSENT_URI',
     'CRM_KNOWLEDGE_MCP_RESOURCE_URL','CRM_KNOWLEDGE_MCP_ISSUER_URL'];
   const saved=Object.fromEntries(keys.map(key=>[key,process.env[key]]));
@@ -52,6 +84,27 @@ test('dynamic registration rejects callbacks outside the ChatGPT allowlist befor
     delete require.cache[modulePath];
     require('../../cloudfunctions/knowledge_mcp');
   }
+});
+
+test('MCP metadata and tool contract expose text-only read and summary-only submit scopes',async()=>{
+  const resource=process.env.CRM_KNOWLEDGE_MCP_RESOURCE_URL;
+  const metadataUrl='https://crm.example/.well-known/oauth-protected-resource/mcp/knowledge';
+  const metadata=await main({httpMethod:'GET',url:metadataUrl,headers:{}},{httpContext:{httpMethod:'GET',url:metadataUrl,headers:{}}});
+  assert.deepEqual(JSON.parse(metadata.body).scopes_supported,['knowledge:read','knowledge:gpt:submit']);
+  mockCall=async({data})=>({result:data.input.operation==='access'?{ok:true,actorUid:'crm-user',resource,
+    scopes:['knowledge:read','knowledge:gpt:submit']}:{ok:true,record:{}}});
+  const url=resource;
+  const result=await main({httpMethod:'POST',url,headers:{authorization:'Bearer '+'a'.repeat(40),'content-type':'application/json'},
+    body:JSON.stringify({jsonrpc:'2.0',id:2,method:'tools/list'})},
+  {httpContext:{httpMethod:'POST',url,headers:{authorization:'Bearer '+'a'.repeat(40),'content-type':'application/json'}}});
+  assert.equal(result.statusCode,200);
+  assert.ok(Array.isArray(JSON.parse(result.body).result.tools));
+  const listed=JSON.parse(result.body).result.tools;
+  assert.equal(listed.some(tool=>tool.securitySchemes?.some(s=>s.scopes?.includes('knowledge:source:read'))),false);
+  const submit=listed.find(tool=>tool.name==='knowledge_generate_gpt_pending');
+  assert.deepEqual(submit.inputSchema.properties.table.enum,['knowledge_items','playbooks']);
+  assert.match(submit.description,/stored system original text/);
+  assert.doesNotMatch(submit.description,/attachment|file bytes/i);
 });
 
 test('HTTP runtime serves JSON health checks and bounds request bodies', async t => {
