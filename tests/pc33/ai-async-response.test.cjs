@@ -83,3 +83,14 @@ test('AI task status route authenticates first and only accepts supported task t
   const anonymous=createMain(()=>({uid:'anon',isAnonymous:true}),...Array(12).fill(undefined));
   assert.equal((await anonymous({action:'aiTaskStatus',taskId:'9',personId:'783',taskType:'person_summary'})).error.code,'UNAUTHORIZED');
 });
+
+test('AI task status route accepts follow-up advice and preserves startup recovery fields',async()=>{
+  let seen;
+  const main=createMain(()=>({uid:'test-operator',isAnonymous:false}),...Array(12).fill(undefined),undefined,
+    undefined,async input=>{seen=input;return {ok:true,status:'pending',taskId:input.taskId||''};});
+  const response=await main({action:'aiTaskStatus',personId:'783',taskType:'person_followup_advice',
+    startedAt:'2026-11-04T01:00:00.000Z'});
+  assert.deepEqual(response,{ok:true,status:'pending',taskId:''});
+  assert.deepEqual(seen,{taskId:undefined,personId:'783',taskType:'person_followup_advice',
+    startedAt:'2026-11-04T01:00:00.000Z'});
+});

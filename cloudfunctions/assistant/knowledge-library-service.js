@@ -1024,15 +1024,28 @@ function createKnowledgeLibrary(options={}) {
     return runSystemAdvice(String(row.id),personId,focus,options);
   }
   async function adviceStatus(input,actorValue) {
-    actorUid(actorValue);const taskId=String(input?.taskId||''),personId=String(input?.personId||'');
-    if(!positiveId(taskId)||!positiveId(personId))fail('INVALID_INPUT');
-    const task=(await request('ai_tasks','GET',{select:'id,status,task_type,subject_type,subject_id',id:`eq.${taskId}`,
-      task_type:'eq.person_followup_advice',subject_type:'eq.person',subject_id:`eq.${personId}`,limit:1}))[0];
-    if(!task)fail('NOT_FOUND');
+    actorUid(actorValue);let taskId=String(input?.taskId||'').trim();const personId=String(input?.personId||'').trim();
+    if(!positiveId(personId))fail('INVALID_INPUT');
+    let task;
+    if(taskId){
+      if(!positiveId(taskId))fail('INVALID_INPUT');
+      task=(await request('ai_tasks','GET',{select:'id,status,task_type,subject_type,subject_id',id:`eq.${taskId}`,
+        task_type:'eq.person_followup_advice',subject_type:'eq.person',subject_id:`eq.${personId}`,limit:1}))[0];
+      if(!task)fail('NOT_FOUND');
+    }else{
+      const startedAt=String(input?.startedAt||'').trim(),startedMs=Date.parse(startedAt);
+      if(!startedAt||!Number.isFinite(startedMs))fail('INVALID_INPUT');
+      const tasks=await request('ai_tasks','GET',{select:'id,status,task_type,subject_type,subject_id,created_at',
+        task_type:'eq.person_followup_advice',subject_type:'eq.person',subject_id:`eq.${personId}`,
+        order:'created_at.desc,id.desc',limit:20});
+      task=tasks.find(row=>row.status==='running'||Date.parse(row.created_at)>=startedMs);
+      if(!task)return {ok:true,status:'pending',taskId:'',personId};
+      taskId=String(task.id);
+    }
     const row=(await request('person_followup_advice','GET',{select:FOLLOWUP_ADVICE_COLUMNS,person_id:`eq.${personId}`,
       system_task_id:`eq.${taskId}`,deleted_at:'is.null',limit:1}))[0];
     if(!row)return {ok:true,status:'pending',taskId,personId};
-    if(row.system_status==='failed')return {ok:false,status:'failed',taskId,personId,error:{code:'AI_REQUEST_FAILED'}};
+    if(task.status==='failed'||row.system_status==='failed')return {ok:false,status:'failed',taskId,personId,error:{code:'AI_REQUEST_FAILED'}};
     if(row.system_status!=='ready')return {ok:true,status:'pending',taskId,personId};
     return {ok:true,status:'completed',taskId,personId,adviceId:String(row.id),advice:adviceDto(row)};
   }

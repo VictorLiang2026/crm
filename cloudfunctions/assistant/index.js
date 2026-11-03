@@ -336,7 +336,7 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
     }
     if (event?.action === 'aiTaskStatus') {
       try {
-        if (!['person_summary','customer_followup_dual'].includes(event.taskType)) {
+        if (!['person_summary','customer_followup_dual','person_followup_advice'].includes(event.taskType)) {
           return {ok:false,error:{code:'INVALID_INPUT',message:'AI task status request is invalid'}};
         }
         return await aiTaskStatusRunner({taskId:event.taskId,personId:event.personId,taskType:event.taskType,

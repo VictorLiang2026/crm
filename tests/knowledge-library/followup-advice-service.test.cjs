@@ -95,6 +95,43 @@ test('system advice sends only the registered personId input while retaining foc
   assert.equal(gatewayRequest.context.customer_snapshot.person.customer_stage,'新客');
 });
 
+test('follow-up advice status recovers a task ID after the async startup response is delayed',async()=>{
+  const stamp='2026-11-04T01:00:00.000Z';
+  const advice={id:81,person_id:42,client_request_id:'c9e53b08-1f81-421e-83b0-8ff01f94adf9',title:'跟进建议',
+    system_title:'跟进建议',system_status:'ready',system_strategy:'沟通策略',system_product_advice:'产品建议',
+    system_strategy_sources:[],system_product_sources:[],system_version:1,system_task_id:17,gpt_title:null,
+    gpt_strategy:null,gpt_product_advice:null,gpt_strategy_sources:[],gpt_product_sources:[],gpt_status:'pending',
+    created_by:'operator',updated_by:'operator',created_at:stamp,updated_at:stamp,deleted_at:null};
+  const requests=[];
+  const fetchImpl=async(url)=>{
+    const parsed=new URL(url),table=parsed.pathname.split('/').pop();requests.push({table,filters:parsed.searchParams});
+    if(table==='ai_tasks')return response([{id:17,status:'completed',task_type:'person_followup_advice',
+      subject_type:'person',subject_id:'42',created_at:'2026-11-04T01:00:01.000Z'}]);
+    if(table==='person_followup_advice')return response([{...advice}]);
+    throw new Error(`Unexpected GET ${table}`);
+  };
+  const service=createKnowledgeLibrary({env:'crm-test123',key:'test-key',fetchImpl,
+    client:{callFunction:async()=>({result:{}})}});
+  const result=await service.run({operation:'adviceStatus',data:{personId:'42',startedAt:'2026-11-04T01:00:00.000Z'}},'operator');
+  assert.equal(result.status,'completed');assert.equal(result.taskId,'17');assert.equal(result.adviceId,'81');
+  assert.equal(requests[0].table,'ai_tasks');assert.equal(requests[0].filters.get('task_type'),'eq.person_followup_advice');
+  assert.equal(requests[1].filters.get('system_task_id'),'eq.17');
+});
+
+test('follow-up advice status stays pending while a slow startup has not created an AI task yet',async()=>{
+  let adviceQueries=0;
+  const fetchImpl=async(url)=>{
+    const table=new URL(url).pathname.split('/').pop();
+    if(table==='ai_tasks')return response([]);
+    if(table==='person_followup_advice'){adviceQueries++;return response([]);}
+    throw new Error(`Unexpected GET ${table}`);
+  };
+  const service=createKnowledgeLibrary({env:'crm-test123',key:'test-key',fetchImpl,
+    client:{callFunction:async()=>({result:{}})}});
+  const result=await service.run({operation:'adviceStatus',data:{personId:'42',startedAt:'2026-11-04T01:00:00.000Z'}},'operator');
+  assert.deepEqual(result,{ok:true,status:'pending',taskId:'',personId:'42'});assert.equal(adviceQueries,0);
+});
+
 test('paired row edit updates both lanes atomically and leaves unchanged GPT marked stale after a system change',async()=>{
   const {service,row,writes}=setup();
   const result=await service.run({operation:'adviceUpdate',data:{id:'81',personId:'42',lane:'pair',gptAction:'keep',
