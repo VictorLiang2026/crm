@@ -22,8 +22,8 @@ const categoriesOf=row=>Array.isArray(row?.metadata?.categories)&&row.metadata.c
   :Array.isArray(row?.categories)&&row.categories.length?row.categories
     :[LEGACY[row?.metadata?.domain]||(row?.table==='playbooks'?'conversation_strategy':'other')];
 const field=(key,control)=>h('label',{class:'kg-field'},[h('span',{},text(key)),control]);
-const readonlyContent=(label,value)=>h('div',{class:'kg-readonly-field'},[
-  h('span',{},text(label)),h('pre',{},value||text('not_set')),
+const readonlyContent=(label,value)=>h('section',{class:`kg-readonly-field kg-readonly-${label}`},[
+  h('h3',{},text(label)),h('pre',{},value||text('not_set')),
 ]);
 const todayLocal=()=>{const date=new Date();return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;};
 const textInput=(name,{value='',required=false,type='text',max=500,min=null,step=null,placeholder=''}={})=>h('input',
@@ -53,7 +53,8 @@ export function renderKnowledgeEditor(ctx,{mode='new',table='knowledge_items',id
   const isUpload=mode==='upload',isPlaybook=mode==='playbook'||table==='playbooks';
   const formStatus=h('p',{class:'foot-note',role:'status'});
   const categoryNode=categoryChooser(isPlaybook?['conversation_strategy']:[]);
-  const form=h('form',{class:'kg-form kg-page-form',onsubmit:async event=>{
+  const basicInfoEdit=mode==='edit'&&!isPlaybook;
+  const form=h('form',{class:`kg-form kg-page-form${basicInfoEdit?' kg-basic-info-form':''}`,onsubmit:async event=>{
     event.preventDefault();const current=event.currentTarget,values=Object.fromEntries(new FormData(current).entries());
     values.categories=selectedCategories(current);
     if(!values.categories.length){formStatus.textContent=text('category_required');return;}
@@ -170,17 +171,33 @@ export function renderKnowledgeEditor(ctx,{mode='new',table='knowledge_items',id
       field('confidence',textInput('confidence',{type:'number',min:0,max:1,step:0.01,value:'0.8'})),
     );
   }else{
-    elements.push(
-      field('item_title',textInput('title',{required:true,max:500})),
-      categoryNode,
-      field('source_publisher',textInput('publisher',{max:500})),
-      field('summary',area('summary',{rows:2,max:1200,placeholder:'summary_ai_hint'})),
-      field('content',area('content',{required:true,rows:8,max:8000})),
-      field('source_uri',textInput('sourceUri',{type:'url',max:2000,placeholder:'source_uri_hint'})),
-      field('source_published_at',textInput('publishedAt',{type:'date',value:todayLocal()})),
-      field('source_review_at',textInput('reviewAt',{type:'date'})),
-      field('confidence',textInput('confidence',{type:'number',min:0,max:1,step:0.01,value:'0.8'})),
-    );
+    if(basicInfoEdit){
+      elements.push(
+        field('item_title',textInput('title',{required:true,max:500})),
+        categoryNode,
+        h('div',{class:'kg-basic-info-grid'},[
+          field('source_publisher',textInput('publisher',{max:500})),
+          field('source_uri',textInput('sourceUri',{type:'url',max:2000,placeholder:'source_uri_hint'})),
+          field('source_published_at',textInput('publishedAt',{type:'date'})),
+          field('source_review_at',textInput('reviewAt',{type:'date'})),
+          field('confidence',textInput('confidence',{type:'number',min:0,max:1,step:0.01,value:'0.8'})),
+        ]),
+        h('input',{type:'hidden',name:'summary',value:''}),
+        h('input',{type:'hidden',name:'content',value:''}),
+      );
+    }else{
+      elements.push(
+        field('item_title',textInput('title',{required:true,max:500})),
+        categoryNode,
+        field('source_publisher',textInput('publisher',{max:500})),
+        field('summary',area('summary',{rows:2,max:1200,placeholder:'summary_ai_hint'})),
+        field('content',area('content',{required:true,rows:8,max:8000})),
+        field('source_uri',textInput('sourceUri',{type:'url',max:2000,placeholder:'source_uri_hint'})),
+        field('source_published_at',textInput('publishedAt',{type:'date',value:todayLocal()})),
+        field('source_review_at',textInput('reviewAt',{type:'date'})),
+        field('confidence',textInput('confidence',{type:'number',min:0,max:1,step:0.01,value:'0.8'})),
+      );
+    }
   }
   if(mode==='edit')elements.push(h('input',{type:'hidden',name:'expectedUpdatedAt',value:''}));
   form.replaceChildren(...elements,h('div',{class:'kg-form-actions'},[
@@ -199,8 +216,10 @@ export function renderKnowledgeEditor(ctx,{mode='new',table='knowledge_items',id
       if(table!=='playbooks'){
         for(const name of ['content','summary'])if(form.elements[name]){
           const input=form.elements[name];input.required=false;
-          const hidden=h('input',{type:'hidden',name,value:input.value||''});
-          input.closest('.kg-field')?.remove();form.append(hidden);
+          if(input.type!=='hidden'){
+            const hidden=h('input',{type:'hidden',name,value:input.value||''});
+            input.closest('.kg-field')?.remove();form.append(hidden);
+          }
         }
       }
       form.elements.expectedUpdatedAt.value=source.updated_at||'';
@@ -223,14 +242,15 @@ export function renderKnowledgeEditor(ctx,{mode='new',table='knowledge_items',id
         assign('reviewAt',Object.hasOwn(metadata,'review_at')?(metadata.review_at||''):(linkedSource?.review_at||''));
         assign('confidence',source.confidence??0.8);
         const previews=h('section',{class:'kg-content-readonly'},[
+          h('h2',{},text('content_preview_title')),
           readonlyContent('system_summary',contentRecord.original?.summary),
           readonlyContent('system_original',contentRecord.original?.text),
           readonlyContent('gpt_summary',contentRecord.gpt?.summary),
           h('p',{class:'foot-note'},text('content_edit_in_confirm')),
           h('button',{type:'button',class:'btn btn-primary',onclick:()=>openKnowledgeContent(ctx,{...source,table},()=>{location.hash='#/knowledge-governance';})},t('kc_title')),
         ]);
-        const confidenceField=form.querySelector('[name="confidence"]')?.closest('.kg-field');
-        if(confidenceField)confidenceField.after(previews);
+        const metadataGrid=form.querySelector('.kg-basic-info-grid');
+        if(metadataGrid)metadataGrid.after(previews);
       }
     }).catch(error=>{formStatus.textContent=error.message||text('edit_not_found');});
   }

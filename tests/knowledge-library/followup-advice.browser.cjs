@@ -64,6 +64,15 @@ test('follow-up advice generates one CloudBase lane and manages each model indep
   await b.wait("document.querySelectorAll('.fa-lane').length===2");
   assert.deepEqual(await b.evaluate("[...document.querySelectorAll('.fa-section h4')].map(x=>x.textContent)"),
     ['Overall Follow-up Strategy','Product and Service Advice','Overall Follow-up Strategy','Product and Service Advice']);
+  await b.evaluate("window.faAdvice.system.status='failed';window.faRender()");
+  await b.wait("document.querySelector('.fa-status-failed')");
+  assert.equal(await b.evaluate("document.querySelectorAll('.fa-row-head .fa-row-delete').length"),1,
+    'failed generated advice has a delete action');
+  assert.equal(await b.evaluate("document.querySelectorAll('.fa-row-head .fa-row-edit').length"),0,
+    'failed advice cannot be edited as generated content');
+  await b.evaluate("document.querySelector('.fa-row-delete').click()");
+  await b.wait("window.faCalls.some(x=>x.delete)");
+  assert.equal(await b.evaluate("window.faCalls.find(x=>x.delete).delete.updatedAt"),'2026-10-31T01:00:00.000Z');
   await b.healthy();
  }finally{await b.close();}
 });

@@ -73,10 +73,14 @@ export async function openKnowledgeContent(ctx,row,onSaved=()=>{}) {
       const txt=h('textarea',{rows:7,maxlength:'120000','aria-label':`${tr(target)} ${tr('text')}`},pair.text||'');
       const summary=h('textarea',{rows:4,maxlength:'12000','aria-label':`${tr(target)} ${tr('summary')}`},pair.summary||'');
       const reviewed=h('input',{type:'checkbox'});
+      const fields=h('div',{class:'kc-editor-fields'},[
+        target==='original'?h('label',{},[tr('text'),txt]):null,
+        h('label',{},[tr('summary'),summary]),
+      ]);
       const panel=h('section',{class:'kc-editor','data-content-target':target},[
         h('h3',{},tr(target)),target==='gpt'?h('p',{},tr('gpt_note')):null,
         candidate[target]?h('p',{class:'kc-candidate-note'},tr('candidate_note')):null,
-        target==='original'?h('label',{},[tr('text'),txt]):null,h('label',{},[tr('summary'),summary]),
+        fields,
         h('label',{class:'kc-review'},[reviewed,tr('reviewed')]),
         h('div',{class:'kg-form-actions'},[
           button('save_preview',async()=>preview({action:'edit',target,patch:target==='original'?{text:txt.value,summary:summary.value}:{summary:summary.value},reviewed:reviewed.checked}),'btn btn-primary'),

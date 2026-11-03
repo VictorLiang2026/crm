@@ -116,9 +116,9 @@ export function renderFollowupAdvice(ctx, personId) {
     listRoot.replaceChildren(...(rows.length ? rows.map(row => h('article', { class: 'fa-row' }, [
       h('header', { class: 'fa-row-head' }, [h('div', {}, [h('h2', {}, row.title || row.system.title || '—'),
         h('p', {}, `${text('system_version')} ${row.system.version} · ${new Date(row.updatedAt).toLocaleString()}`)]),
-        row.system.status === 'ready' ? h('div', { class: 'fa-row-actions' }, [
-          h('button', { class: 'btn btn-ghost btn-sm fa-row-edit', type: 'button', onclick: () => edit(row) },
-            [ic('edit'), text('edit')]),
+        ['ready', 'failed'].includes(row.system.status) ? h('div', { class: 'fa-row-actions' }, [
+          row.system.status === 'ready' ? h('button', { class: 'btn btn-ghost btn-sm fa-row-edit', type: 'button', onclick: () => edit(row) },
+            [ic('edit'), text('edit')]) : null,
           h('button', { class: 'btn btn-ghost btn-sm fa-row-delete', type: 'button', onclick: () => remove(row) },
             [ic('trash'), text('delete')]),
         ]) : null]),
