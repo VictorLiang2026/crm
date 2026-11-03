@@ -1047,10 +1047,10 @@ function createKnowledgeLibrary(options={}) {
     const current=(await request('person_followup_advice','GET',{select:FOLLOWUP_ADVICE_COLUMNS,id:`eq.${id}`,
       person_id:`eq.${personId}`,deleted_at:'is.null',limit:1}))[0];
     if(!current)fail('NOT_FOUND');if(Number(current.system_version)!==expectedVersion||current.updated_at!==expectedUpdatedAt)fail('STALE');
-    if(input.lane==='system'||input.lane==='gpt') {
+    if(input.lane==='system'||input.lane==='gpt'||input.lane==='pair') {
       if(current.system_status!=='ready')fail('INVALID_STATE');
       const now=new Date().toISOString();let body={updated_by:actor,updated_at:now};
-      if(input.lane==='system') {
+      if(input.lane==='system'||input.lane==='pair') {
         const title=cleanText(input.title,240,'title',true),
           strategy=cleanText(input.strategy,4000,'strategy',true),
           product=cleanText(input.productAdvice,4000,'productAdvice',true);
@@ -1058,7 +1058,25 @@ function createKnowledgeLibrary(options={}) {
         body={...body,title,system_title:title,system_strategy:strategy,system_product_advice:product,
           system_version:Number(current.system_version)+(changed?1:0),
           gpt_kept_for_system_version:changed?null:current.gpt_kept_for_system_version,
-          gpt_status:current.gpt_strategy?(changed?'stale':current.gpt_status):'pending'};
+          gpt_status:current.gpt_strategy?(changed?'stale':current.gpt_status):'pending',
+          gpt_preview_id:null,gpt_preview_payload:null,gpt_preview_actor:null,gpt_preview_expires_at:null};
+        if(input.lane==='pair') {
+          const gptExists=Boolean(current.gpt_strategy||current.gpt_product_advice);
+          const gptAction=input.gptAction||'keep';
+          if(gptAction==='edit') {
+            if(!gptExists)fail('INVALID_STATE');
+            body.gpt_title=cleanText(input.gptTitle,240,'gptTitle',true);
+            body.gpt_strategy=cleanText(input.gptStrategy,4000,'gptStrategy',true);
+            body.gpt_product_advice=cleanText(input.gptProductAdvice,4000,'gptProductAdvice',true);
+            body.gpt_based_on_system_version=Number(current.system_version)+(changed?1:0);
+            body.gpt_kept_for_system_version=null;body.gpt_status='manual';
+            Object.assign(body,{gpt_preview_id:null,gpt_preview_payload:null,gpt_preview_actor:null,gpt_preview_expires_at:null});
+          } else if(gptAction==='delete') {
+            Object.assign(body,{gpt_title:null,gpt_strategy:null,gpt_product_advice:null,gpt_strategy_sources:[],gpt_product_sources:[],
+              gpt_based_on_system_version:null,gpt_kept_for_system_version:null,gpt_status:'pending',gpt_preview_id:null,
+              gpt_preview_payload:null,gpt_preview_actor:null,gpt_preview_expires_at:null});
+          } else if(gptAction!=='keep')fail('INVALID_INPUT');
+        }
       } else {
         if(input.action==='delete') {
           body={...body,gpt_title:null,gpt_strategy:null,gpt_product_advice:null,gpt_strategy_sources:[],gpt_product_sources:[],
@@ -1075,7 +1093,7 @@ function createKnowledgeLibrary(options={}) {
       }
       const saved=await request('person_followup_advice','PATCH',{id:`eq.${id}`,person_id:`eq.${personId}`,
         system_version:`eq.${expectedVersion}`,updated_at:`eq.${expectedUpdatedAt}`,deleted_at:'is.null',system_status:'eq.ready'},body);
-      if(saved.length!==1)fail('STALE');return {ok:true,advice:adviceDto(saved[0]),systemChanged:input.lane==='system'};
+      if(saved.length!==1)fail('STALE');return {ok:true,advice:adviceDto(saved[0]),systemChanged:input.lane==='system'||input.lane==='pair'};
     }
     // Retain the original paired-update contract for older Console clients.
     const title=cleanText(input.title,240,'title',true),strategy=cleanText(input.systemStrategy,4000,'strategy',true),
@@ -1116,8 +1134,7 @@ function createKnowledgeLibrary(options={}) {
     actorUid(actorValue);const limit=Math.max(1,Math.min(10,Number(input?.limit)||10));
     const rows=await request('person_followup_advice','GET',{select:FOLLOWUP_ADVICE_COLUMNS,system_status:'eq.ready',
       deleted_at:'is.null',order:'id.asc',...(positiveId(input?.afterId)?{id:`gt.${input.afterId}`}:{ }),limit:200});
-    const queued=rows.filter(row=>!row.gpt_strategy||!row.gpt_product_advice||
-      (Number(row.gpt_based_on_system_version)!==Number(row.system_version)&&Number(row.gpt_kept_for_system_version)!==Number(row.system_version)))
+    const queued=rows.filter(row=>!row.gpt_strategy&&!row.gpt_product_advice)
       .slice(0,limit+1);
     const hasMore=queued.length>limit;
     const selected=queued.slice(0,limit);
@@ -1165,6 +1182,7 @@ function createKnowledgeLibrary(options={}) {
       const row=(await request('person_followup_advice','GET',{select:FOLLOWUP_ADVICE_COLUMNS,id:`eq.${item.adviceId}`,
         person_id:`eq.${item.personId}`,deleted_at:'is.null',system_status:'eq.ready',limit:1}))[0];
       if(!row||Number(row.system_version)!==item.systemVersion) {previewRows.push({adviceId:String(item.adviceId),status:'stale'});continue;}
+      if(row.gpt_strategy||row.gpt_product_advice) {previewRows.push({adviceId:String(item.adviceId),status:'not_empty'});continue;}
       const title=cleanText(item.gptAdvice.title,240,'title',true),
         strategy=cleanText(item.gptAdvice.overallStrategy,4000,'overallStrategy',true),
         product=cleanText(item.gptAdvice.productServiceAdvice,4000,'productServiceAdvice',true),
@@ -1176,7 +1194,7 @@ function createKnowledgeLibrary(options={}) {
       const previewId=randomUUID(),payload={title,strategy,product,strategySources,productSources,systemVersion:item.systemVersion};
       const expiresAt=new Date(Date.now()+30*60*1000).toISOString();
       const saved=await request('person_followup_advice','PATCH',{id:`eq.${item.adviceId}`,system_version:`eq.${item.systemVersion}`,
-        deleted_at:'is.null',system_status:'eq.ready'},
+        deleted_at:'is.null',system_status:'eq.ready',gpt_strategy:'is.null',gpt_product_advice:'is.null'},
         {gpt_preview_id:previewId,gpt_preview_payload:payload,gpt_preview_actor:actor,gpt_preview_expires_at:expiresAt,
           updated_by:actor,updated_at:new Date().toISOString()});
       if(saved.length!==1) {previewRows.push({adviceId:String(item.adviceId),status:'stale'});continue;}
@@ -1193,12 +1211,12 @@ function createKnowledgeLibrary(options={}) {
       !/^[0-9a-f-]{36}$/i.test(previewId))fail('INVALID_INPUT');
     const current=(await request('person_followup_advice','GET',{select:FOLLOWUP_ADVICE_COLUMNS,id:`eq.${id}`,
       person_id:`eq.${personId}`,gpt_preview_id:`eq.${previewId}`,gpt_preview_actor:`eq.${actor}`,
-      deleted_at:'is.null',limit:1}))[0];
+      deleted_at:'is.null',gpt_strategy:'is.null',gpt_product_advice:'is.null',limit:1}))[0];
     if(!current||Number(current.system_version)!==version||Date.parse(current.gpt_preview_expires_at||'')<=Date.now())fail('STALE');
     const payload=current.gpt_preview_payload;if(!object(payload)||Number(payload.systemVersion)!==version)fail('STALE');
     const rows=await request('person_followup_advice','PATCH',{id:`eq.${id}`,person_id:`eq.${personId}`,
       system_version:`eq.${version}`,gpt_preview_id:`eq.${previewId}`,gpt_preview_actor:`eq.${actor}`,
-      deleted_at:'is.null',system_status:'eq.ready'},
+      deleted_at:'is.null',system_status:'eq.ready',gpt_strategy:'is.null',gpt_product_advice:'is.null'},
       {gpt_title:payload.title,gpt_strategy:payload.strategy,gpt_product_advice:payload.product,gpt_strategy_sources:payload.strategySources,
         gpt_product_sources:payload.productSources,gpt_based_on_system_version:version,gpt_kept_for_system_version:null,
         gpt_status:'ready',gpt_preview_id:null,gpt_preview_payload:null,gpt_preview_actor:null,gpt_preview_expires_at:null,

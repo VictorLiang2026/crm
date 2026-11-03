@@ -13,7 +13,13 @@ function setup(){
   const writes=[];
   const fetchImpl=async(url,options={})=>{
     const method=options.method||'GET',parsed=new URL(url);
-    if(method==='GET')return response([{...row}]);
+    if(method==='GET'){
+      const table=parsed.pathname.split('/').pop(),query=parsed.searchParams;
+      if(table!=='person_followup_advice')return response([]);
+      if(query.has('gpt_strategy')&&query.get('gpt_strategy')==='is.null'&&row.gpt_strategy)return response([]);
+      if(query.has('gpt_product_advice')&&query.get('gpt_product_advice')==='is.null'&&row.gpt_product_advice)return response([]);
+      return response([{...row}]);
+    }
     if(method==='PATCH'){
       const body=JSON.parse(options.body);writes.push({filters:parsed.searchParams,body});
       Object.assign(row,body);return response([{...row}]);
@@ -21,7 +27,7 @@ function setup(){
     throw new Error(`Unexpected method ${method}`);
   };
   const service=createKnowledgeLibrary({env:'crm-test123',key:'test-key',fetchImpl,
-    client:{callFunction:async()=>({result:{}})}});
+    client:{callFunction:async()=>({result:{person:{occupation:'顾问',customer_stage:'新客'},recent_interactions:[]}})}});
   return {service,row,writes};
 }
 function response(value){return {ok:true,text:async()=>JSON.stringify(value)};}
@@ -87,4 +93,63 @@ test('system advice sends only the registered personId input while retaining foc
   assert.equal(result.status,'completed');
   assert.deepEqual(gatewayRequest.input,{personId:'42'});
   assert.equal(gatewayRequest.context.customer_snapshot.person.customer_stage,'新客');
+});
+
+test('paired row edit updates both lanes atomically and leaves unchanged GPT marked stale after a system change',async()=>{
+  const {service,row,writes}=setup();
+  const result=await service.run({operation:'adviceUpdate',data:{id:'81',personId:'42',lane:'pair',gptAction:'keep',
+    systemVersion:2,updatedAt:stamp,title:'系统新标题',strategy:'系统新策略',productAdvice:'系统新产品建议'}},'operator');
+  assert.equal(writes.length,1);
+  assert.equal(writes[0].body.system_version,3);
+  assert.equal(writes[0].body.gpt_status,'stale');
+  assert.equal(result.advice.gpt.strategy,'GPT 策略');
+  assert.equal(row.gpt_strategy,'GPT 策略');
+});
+
+test('paired row edit can clear GPT content for the next empty-only skill package',async()=>{
+  const {service,row,writes}=setup();
+  const result=await service.run({operation:'adviceUpdate',data:{id:'81',personId:'42',lane:'pair',gptAction:'delete',
+    systemVersion:2,updatedAt:stamp,title:'系统标题',strategy:'系统策略',productAdvice:'系统产品建议'}},'operator');
+  assert.equal(writes.length,1);
+  assert.equal(row.gpt_strategy,null);assert.equal(row.gpt_product_advice,null);
+  assert.equal(result.advice.gpt.status,'pending');
+  assert.deepEqual(writes[0].body.gpt_strategy_sources,[]);
+});
+
+test('paired row edit changes existing GPT content without changing the CloudBase lane',async()=>{
+  const {service,row,writes}=setup();
+  const result=await service.run({operation:'adviceUpdate',data:{id:'81',personId:'42',lane:'pair',gptAction:'edit',
+    systemVersion:2,updatedAt:stamp,title:'系统标题',strategy:'系统策略',productAdvice:'系统产品建议',
+    gptTitle:'GPT 新标题',gptStrategy:'GPT 新策略',gptProductAdvice:'GPT 新产品建议'}},'operator');
+  assert.equal(writes.length,1);assert.equal(row.system_strategy,'系统策略');
+  assert.equal(row.gpt_title,'GPT 新标题');assert.equal(row.gpt_strategy,'GPT 新策略');
+  assert.equal(row.gpt_status,'manual');assert.equal(row.gpt_based_on_system_version,2);
+  assert.equal(result.advice.system.strategy,'系统策略');assert.equal(result.advice.gpt.productAdvice,'GPT 新产品建议');
+});
+
+test('GPT task package selects empty GPT lanes and excludes non-empty stale advice',async()=>{
+  const {service,row}=setup();
+  let result=await service.run({operation:'gptTaskPackage',data:{limit:10}},'operator');
+  assert.equal(result.count,0);
+  row.gpt_title=null;row.gpt_strategy=null;row.gpt_product_advice=null;
+  row.gpt_status='pending';row.gpt_based_on_system_version=null;
+  result=await service.run({operation:'gptTaskPackage',data:{limit:10}},'operator');
+  assert.equal(result.count,1);assert.equal(result.rows[0].adviceId,'81');
+});
+
+test('GPT import preview refuses to overwrite a non-empty GPT lane',async()=>{
+  const {service,writes}=setup();
+  const result=await service.run({operation:'gptImportPreview',data:{rows:[{adviceId:'81',personId:'42',systemVersion:2,
+    gptAdvice:{title:'GPT 新标题',overallStrategy:'GPT 新策略',productServiceAdvice:'GPT 新产品建议',
+      strategySourceIds:[],productSourceIds:[]}}]}},'operator');
+  assert.equal(result.rows[0].status,'not_empty');assert.equal(writes.length,0);
+});
+
+test('GPT import confirmation cannot write over content filled after preview',async()=>{
+  const {service,row,writes}=setup();row.gpt_preview_id='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  row.gpt_preview_actor='operator';row.gpt_preview_expires_at='2999-01-01T00:00:00.000Z';
+  row.gpt_preview_payload={title:'覆盖标题',strategy:'覆盖策略',product:'覆盖产品',strategySources:[],productSources:[],systemVersion:2};
+  await assert.rejects(service.run({operation:'gptImportConfirm',data:{confirmed:true,adviceId:'81',personId:'42',
+    systemVersion:2,previewId:row.gpt_preview_id}},'operator'),error=>error.code==='STALE');
+  assert.equal(writes.length,0);assert.equal(row.gpt_strategy,'GPT 策略');
 });

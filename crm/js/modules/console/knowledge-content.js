@@ -6,8 +6,9 @@ const tr=key=>t(`kc_${key}`);
 const codeOf=error=>String(error?.message||'').match(/CONTENT_[A-Z_]+/)?.[0];
 export async function openKnowledgeContent(ctx,row,onSaved=()=>{}) {
   const body=h('div',{class:'kc-panel'}),sheet=openSheet({title:tr('title'),sub:tr('intro'),body});
+  sheet.overlay.classList.add('kc-sheet-overlay');
   (document.getElementById('sheet-root')||document.body).appendChild(sheet.overlay);
-  let record,history=[],pending=null,job=null,busy=false;
+  let record,pending=null,job=null,busy=false;
   const call=(op,value)=>data.knowledgeLibrary(ctx,'content',{contentOperation:op,data:value});
   const identity=()=>({table:row.table,id:row.id,expectedUpdatedAt:record.updatedAt});
   const errorBox=h('p',{class:'sheet-err',role:'alert'});
@@ -35,15 +36,10 @@ export async function openKnowledgeContent(ctx,row,onSaved=()=>{}) {
     body.replaceChildren(panel,errorBox);
   };
   const preview=async input=>showPreview(await call('preview',{...identity(),...input}));
-  const load=async()=>{const result=await call('get',{table:row.table,id:row.id});record=result.record;history=result.history||[];pending=result.pending||null;job=result.job||job;draw();};
-  const historyView=()=>h('details',{},[h('summary',{},tr('history')),h('p',{},tr('history_note')),
-    ...history.map(item=>h('div',{class:'kg-form-actions'},[
-      h('span',{},String(item.applied_at||'').replace('T',' ').slice(0,19)),
-      button('restore',async()=>preview({action:'restore',historyId:item.id})),
-    ]))]);
+  const load=async()=>{const result=await call('get',{table:row.table,id:row.id});record=result.record;pending=result.pending||null;job=result.job||job;draw();};
   const drawPending=()=>{
     const candidate=pending.after;
-    body.replaceChildren(h('p',{},`${record.title||''} · ${tr('selected')}: ${tr(record.selected)} · v${record.version}`),
+    body.replaceChildren(h('p',{},`${record.title||''} · ${tr('selected')}: ${tr(record.selected)}`),
       h('section',{class:'kc-pending'},[
         h('h3',{},tr('pending_title')),h('p',{},tr('pending_note')),
         h('p',{},`${tr('created_at')}: ${String(pending.createdAt||'').replace('T',' ').slice(0,19)}`),
@@ -53,7 +49,7 @@ export async function openKnowledgeContent(ctx,row,onSaved=()=>{}) {
           button('reject',async()=>{await call('reject',{commandId:pending.commandId});await load();await onSaved();ctx.toast(tr('rejected'),'ok');}),
           button('continue_edit',async()=>{const next=pending.after;await call('reject',{commandId:pending.commandId});pending=null;await onSaved();draw({original:next.original,gpt:next.gpt});}),
         ]),
-      ]),historyView(),errorBox);
+      ]),errorBox);
   };
   const drawJob=()=>{
     const node=h('section',{class:'kc-job'});
@@ -88,17 +84,18 @@ export async function openKnowledgeContent(ctx,row,onSaved=()=>{}) {
           button('clear_summary',async()=>preview({action:'edit',target,patch:{summary:null},reviewed:false})),
           ...(target==='original'?[button('clear_pair',async()=>preview({action:'edit',target,patch:{text:null,summary:null},reviewed:false})),
             button('select',async()=>preview({action:'select',selected:target}))]:[]),
+          ...(target==='gpt'&&pair.summary?[button('select',async()=>preview({action:'edit',target:'original',patch:{summary:pair.summary},reviewed:true}))]:[]),
         ]),
       ]);
-      if(target==='original')panel.append(h('div',{class:'kg-form-actions'},['text','summary','both'].map(part=>button(`regenerate_${part}`,async()=>{
+      if(target==='original')panel.append(h('div',{class:'kg-form-actions'},['text','summary'].map(part=>button(`regenerate_${part}`,async()=>{
         if(!window.confirm(tr('regenerate_confirm')))return;
         job=await call('regenerate',{...identity(),part});draw();
       }))));
       return panel;
     });
-    body.replaceChildren(h('p',{},`${record.title||''} · ${tr('selected')}: ${tr(record.selected)} · v${record.version}`),
+    body.replaceChildren(h('p',{},`${record.title||''} · ${tr('selected')}: ${tr(record.selected)}`),
       record.paused?h('p',{class:'kc-candidate-note'},tr('paused')):h('span'),
-      ...pairEditors,drawJob(),historyView(),errorBox);
+      ...pairEditors,drawJob(),errorBox);
   };
   try{await load();}catch(error){body.replaceChildren(errorBox);errorBox.textContent=errorText(error);}
   return sheet;

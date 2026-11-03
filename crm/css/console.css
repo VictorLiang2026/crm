@@ -1063,7 +1063,10 @@ body:has(.login), body.is-login { padding-top: env(safe-area-inset-top); }
 .fa-modal{width:min(820px,100%);max-height:min(92vh,1000px);overflow:auto;background:#fff;border-radius:14px;padding:20px;display:grid;gap:12px;box-shadow:0 24px 60px rgba(0,0,0,.24)}
 .fa-modal>header,.fa-modal>footer{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
 .fa-modal h2{margin:0;font-size:19px}
-.fa-gpt-edit-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.fa-edit-group{min-width:0;border:1px solid var(--line,#e5e7eb);border-radius:10px;padding:14px;display:grid;gap:12px}
+.fa-edit-group h3{margin:0;color:var(--ink,#2e333b);font-size:15px}
+.fa-edit-fields{display:grid;grid-template-columns:minmax(0,1fr);gap:12px}
+.fa-edit-policy-select{width:100%;min-width:0;padding:10px;border:1px solid #d1d5db;border-radius:8px;color:var(--ink,#2e333b);font:inherit;background:#fff}
 .fa-task-step>p{margin:0;color:var(--ink-600,#6d7480);font-size:13px}
 .fa-task-step .fa-actions{justify-content:flex-start}
 .fa-preview-copy{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
@@ -1072,7 +1075,7 @@ body:has(.login), body.is-login { padding-top: env(safe-area-inset-top); }
 .fa-legacy{margin-top:18px;padding:12px 14px;border:1px solid var(--line,#e3e5e9);border-radius:10px}
 .fa-legacy summary{cursor:pointer;font-weight:600}
 .fa-legacy-row{padding:10px 0;border-top:1px solid var(--line,#e5e7eb);white-space:pre-wrap}
-@media(max-width:900px){.fa-compare{grid-template-columns:minmax(0,1fr)}.fa-preview-copy,.fa-gpt-edit-fields{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:900px){.fa-compare{grid-template-columns:minmax(0,1fr)}.fa-preview-copy{grid-template-columns:minmax(0,1fr)}}
 
 
 /* L06: personal planning stays folded; keep the assumption editor usable on iPad. */

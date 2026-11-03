@@ -169,7 +169,7 @@ export function renderKnowledgeGovernance(ctx) {
         const editHref=isSource?'':`#/knowledge/edit/${row.table}/${row.id}`;
         const actions=[
           !isSource&&!superseded?h('button',{class:'btn btn-ghost btn-sm kg-action-content',type:'button',onclick:()=>openKnowledgeContent(ctx,row,load).catch(error=>ctx.toast(error.message,'error'))},t('kc_title')):null,
-          !isSource&&!superseded?h('a',{class:'btn btn-ghost btn-sm kg-action-edit',href:editHref},text('edit')):null,
+          !isSource&&!superseded?h('a',{class:'btn btn-ghost btn-sm kg-action-edit',href:editHref},text(isPlaybook?'edit':'basic_info')):null,
           isSource&&row.extractionStatus==='failed'?h('button',{class:'btn btn-ghost btn-sm kg-action-retry',type:'button',
             onclick:()=>retry(row).catch(error=>ctx.toast(error.message,'error'))},text('retry')):null,
           !isSource&&!superseded?h('button',{class:`btn btn-ghost btn-sm kg-action-status ${live?'kg-action-invalidate':'kg-action-activate'}`,type:'button',onclick:()=>setStatus(row).catch(error=>ctx.toast(error.message,'error'))},text(live?'mark_invalid':pending?'review_activate':'mark_valid')):null,

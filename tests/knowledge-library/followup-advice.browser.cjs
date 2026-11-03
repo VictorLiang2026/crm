@@ -12,7 +12,7 @@ test('follow-up advice generates one CloudBase lane and manages each model indep
    const advice={id:'81',personId:'42',title:'退休规划回访',updatedAt:'2026-10-31T01:00:00.000Z',
     system:{title:'退休规划回访',status:'ready',version:2,strategy:'先确认客户近期目标，再约定复盘。',productAdvice:'核实需求后再介绍适配服务。',strategySources:[],productSources:[]},
     gpt:{title:'退休准备复盘',status:'stale',basedOnSystemVersion:1,strategy:'先确认目标。',productAdvice:'待进一步核实。',strategySources:[],productSources:[]}};
-   window.faCalls=[];
+   window.faAdvice=advice;window.faCalls=[];
    window.confirm=()=>true;
    data.followupAdviceList=async()=>({rows:[advice]});data.dualFollowupHistory=async()=>({rows:[]});
    data.updateFollowupAdvice=async(_ctx,payload)=>{window.faCalls.push({update:payload});return {ok:true};};
@@ -29,17 +29,34 @@ test('follow-up advice generates one CloudBase lane and manages each model indep
   assert.deepEqual(parallel.sections,['整体跟进策略','产品与服务建议','整体跟进策略','产品与服务建议']);
   assert.deepEqual(parallel.titles,['退休规划回访','退休准备复盘']);
   assert.match(parallel.gptStatus,/系统版已更新/);
-  await b.evaluate("document.querySelector('.fa-lane-system .fa-row-actions .btn-ghost').click()");
+  assert.equal(await b.evaluate("document.querySelectorAll('.fa-row-head .fa-row-actions button').length"),2);
+  assert.equal(await b.evaluate("document.querySelectorAll('.fa-lane .fa-row-actions').length"),0);
+  await b.evaluate("document.querySelector('.fa-row-edit').click()");
   await b.wait("document.querySelector('.fa-modal input')");
-  await b.evaluate("document.querySelector('.fa-modal input').value='更新后的系统标题';document.querySelector('.fa-modal .btn-primary').click()");
-  await b.wait("window.faCalls.some(x=>x.update?.lane==='system')");
+  await b.evaluate("document.querySelector('.fa-modal input').value='更新后的系统标题';document.querySelector('.fa-modal .fa-edit-policy-select').value='edit';document.querySelector('.fa-modal .fa-edit-policy-select').dispatchEvent(new Event('change',{bubbles:true}));document.querySelector('.fa-modal .fa-edit-policy-select').value='keep';document.querySelector('.fa-modal .fa-edit-policy-select').dispatchEvent(new Event('change',{bubbles:true}));document.querySelector('.fa-modal .btn-primary').click()");
+  await b.wait("window.faCalls.some(x=>x.update?.lane==='pair')");
   assert.equal(await b.evaluate("window.faCalls.find(x=>x.update)?.update.title"),'更新后的系统标题');
-  await b.evaluate("document.querySelectorAll('.fa-lane-gpt .fa-row-actions .btn-ghost')[1].click()");
-  await b.wait("window.faCalls.some(x=>x.update?.lane==='gpt'&&x.update.action==='delete')");
+  assert.equal(await b.evaluate("window.faCalls.find(x=>x.update)?.update.gptAction"),'keep');
+  await b.evaluate("document.querySelector('.fa-row-edit').click()");
+  await b.wait("document.querySelector('.fa-modal .fa-edit-policy-select')");
+  await b.evaluate("document.querySelector('.fa-modal .fa-edit-policy-select').value='delete';document.querySelector('.fa-modal .btn-primary').click()");
+  await b.wait("window.faCalls.filter(x=>x.update?.lane==='pair').length===2");
+  assert.equal(await b.evaluate("window.faCalls.filter(x=>x.update?.lane==='pair')[1].update.gptAction"),'delete');
+  await b.evaluate("document.querySelector('.fa-row-delete').click()");
+  await b.wait("window.faCalls.some(x=>x.delete)");
+  assert.equal(await b.evaluate("window.faCalls.find(x=>x.delete).delete.id"),'81');
   await b.evaluate("document.querySelector('.page-head .btn-primary').click()");
   await b.wait("window.faCalls.some(x=>x.generate)");
   const generate=await b.evaluate("window.faCalls.find(x=>x.generate).generate");
   assert.equal(generate.personId,'42');assert.equal('title' in generate,false);assert.equal('focus' in generate,false);
+  await b.evaluate("window.faAdvice.gpt={title:'',status:'pending',basedOnSystemVersion:null,strategy:'',productAdvice:'',strategySources:[],productSources:[]};window.faRender()");
+  await b.wait("document.querySelector('.fa-lane-gpt .fa-lane-empty')");
+  await b.evaluate("document.querySelector('.fa-row-edit').click()");
+  await b.wait("document.querySelector('.fa-modal')");
+  assert.equal(await b.evaluate("document.querySelectorAll('.fa-modal .fa-edit-fields').length"),0);
+  assert.match(await b.evaluate("document.querySelector('.fa-modal').textContent"),/GPT.*SKILL/);
+  await b.evaluate("document.querySelector('.fa-modal .btn-ghost').click()");
+  await b.evaluate("window.faAdvice.gpt={title:'GPT 英文标题',status:'stale',basedOnSystemVersion:1,strategy:'先确认目标。',productAdvice:'待进一步核实。',strategySources:[],productSources:[]}");
   await b.evaluate('window.faRenderTasks()');
   await b.wait("document.querySelector('.fa-empty')");
   assert.match(await b.evaluate("document.querySelector('.fa-empty').textContent"),/SKILL 尚未接入/);

@@ -21,8 +21,9 @@ function effectiveContent(row, table = 'knowledge_items', source = null, today =
   const v = contentVersions(row, table, source), pair = v[v.selected];
   if (row.deleted_at || ['invalidated','superseded'].includes(row.lifecycle_status)) return null;
   // Current library validity is manual. Do not revive retired date-based expiration rules.
+  const reviewAt=Object.hasOwn(row.metadata||{},'review_at')?row.metadata.review_at:source?.review_at;
   if (row.source_id && (!source || source.deleted_at || source.lifecycle_status !== 'verified' ||
-      source.review_at && source.review_at < today || source.valid_from && source.valid_from > today || source.valid_to && source.valid_to < today)) return null;
+      reviewAt && reviewAt < today || source.valid_from && source.valid_from > today || source.valid_to && source.valid_to < today)) return null;
   if (!pair || !nonempty(pair.text)) return null;
   // Untouched legacy text-only rows retain their original eligibility. Managed pairs never mix/fallback.
   if ((v.managed || v.selected === 'gpt') && (!nonempty(pair.summary) || !pair.reviewed || row.content_state?.paused)) return null;

@@ -22,6 +22,9 @@ const categoriesOf=row=>Array.isArray(row?.metadata?.categories)&&row.metadata.c
   :Array.isArray(row?.categories)&&row.categories.length?row.categories
     :[LEGACY[row?.metadata?.domain]||(row?.table==='playbooks'?'conversation_strategy':'other')];
 const field=(key,control)=>h('label',{class:'kg-field'},[h('span',{},text(key)),control]);
+const readonlyContent=(label,value)=>h('div',{class:'kg-readonly-field'},[
+  h('span',{},text(label)),h('pre',{},value||text('not_set')),
+]);
 const todayLocal=()=>{const date=new Date();return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;};
 const textInput=(name,{value='',required=false,type='text',max=500,min=null,step=null,placeholder=''}={})=>h('input',
   {name,type,value,required,...(type==='number'?{max:String(max),...(min==null?{}:{min:String(min)}),...(step==null?{}:{step:String(step)})}:{maxlength:String(max)}),
@@ -135,6 +138,7 @@ export function renderKnowledgeEditor(ctx,{mode='new',table='knowledge_items',id
           confidence:values.confidence===''?0.8:Number(values.confidence)});
       }else{
         const result=await data.knowledgeLibrary(ctx,'save',{data:{...values,
+          ...(mode==='edit'?{basicInfoOnly:true}:{}),
           id:mode==='edit'?id:undefined,expectedUpdatedAt:current.elements.expectedUpdatedAt?.value,
           confidence:values.confidence===''?0.8:Number(values.confidence)}});
         if(!result?.ok)throw new Error(result?.error?.message||text('save_failed'));
@@ -167,12 +171,14 @@ export function renderKnowledgeEditor(ctx,{mode='new',table='knowledge_items',id
     );
   }else{
     elements.push(
-      categoryNode,
       field('item_title',textInput('title',{required:true,max:500})),
+      categoryNode,
+      field('source_publisher',textInput('publisher',{max:500})),
       field('summary',area('summary',{rows:2,max:1200,placeholder:'summary_ai_hint'})),
       field('content',area('content',{required:true,rows:8,max:8000})),
       field('source_uri',textInput('sourceUri',{type:'url',max:2000,placeholder:'source_uri_hint'})),
       field('source_published_at',textInput('publishedAt',{type:'date',value:todayLocal()})),
+      field('source_review_at',textInput('reviewAt',{type:'date'})),
       field('confidence',textInput('confidence',{type:'number',min:0,max:1,step:0.01,value:'0.8'})),
     );
   }
@@ -182,20 +188,20 @@ export function renderKnowledgeEditor(ctx,{mode='new',table='knowledge_items',id
     h('button',{class:'btn btn-primary',type:'submit'},text(isUpload?'upload_button':mode==='edit'?'save_changes':'save_knowledge')),
   ]),formStatus);
   const pageTitle=isUpload?'upload_page_title':isPlaybook?(mode==='edit'?'edit_playbook':'new_playbook_button'):
-    mode==='edit'?'edit_knowledge':'new_knowledge_button';
+    mode==='edit'?'basic_info':'new_knowledge_button';
   ctx.main.replaceChildren(pageHead({kicker:text('kicker'),title:text(pageTitle),sub:text(isUpload?'upload_page_note':'editor_page_note'),actions:[backLink()]}),
     h('section',{class:'card'},[h('div',{class:'card-body'},form)]));
   if(mode==='edit'){
-    data.knowledgeLibrary(ctx,'list').then(result=>{
+    data.knowledgeLibrary(ctx,'list').then(async result=>{
       const source=table==='playbooks'?result.playbooks?.find(row=>String(row.id)===String(id)):
         result.knowledge?.find(row=>String(row.id)===String(id));
       if(!source)throw new Error(text('edit_not_found'));
-      if(source.contentManaged){
-        for(const name of ['content','summary','response_logic'])if(form.elements[name]){
-          form.elements[name].readOnly=true;form.elements[name].required=false;
+      if(table!=='playbooks'){
+        for(const name of ['content','summary'])if(form.elements[name]){
+          const input=form.elements[name];input.required=false;
+          const hidden=h('input',{type:'hidden',name,value:input.value||''});
+          input.closest('.kg-field')?.remove();form.append(hidden);
         }
-        formStatus.replaceChildren(h('p',{},t('kc_managed_edit')),h('button',{type:'button',class:'btn btn-primary',
-          onclick:()=>openKnowledgeContent(ctx,{...source,table},()=>{location.hash='#/knowledge-governance';})},t('kc_title')));
       }
       form.elements.expectedUpdatedAt.value=source.updated_at||'';
       setCategories(form,categoriesOf({...source,table}));
@@ -206,10 +212,25 @@ export function renderKnowledgeEditor(ctx,{mode='new',table='knowledge_items',id
         assign('possible_underlying_reasons',(source.possible_underlying_reasons||[]).join('\n'));
         assign('clarifying_questions',(source.clarifying_questions||[]).join('\n'));assign('do_not_say',(source.do_not_say||[]).join('\n'));
       }else{
-        assign('title',source.source);assign('summary',source.metadata?.summary||'');assign('content',source.content);
-        assign('sourceUri',source.metadata?.source_uri||'');
-        assign('publishedAt',source.metadata?.published_at||'');
+        const linkedSource=(result.sources||[]).find(item=>String(item.id)===String(source.source_id));
+        const metadata=source.metadata||{};
+        const contentResult=await data.knowledgeLibrary(ctx,'content',{contentOperation:'get',data:{table,id}});
+        const contentRecord=contentResult.record||{};
+        assign('title',source.source);assign('summary',contentRecord.original?.summary||'');assign('content',contentRecord.original?.text||'');
+        assign('publisher',Object.hasOwn(metadata,'publisher')?metadata.publisher:(linkedSource?.publisher||''));
+        assign('sourceUri',Object.hasOwn(metadata,'source_uri')?metadata.source_uri:(linkedSource?.source_uri||''));
+        assign('publishedAt',metadata.published_at||linkedSource?.published_at||'');
+        assign('reviewAt',Object.hasOwn(metadata,'review_at')?(metadata.review_at||''):(linkedSource?.review_at||''));
         assign('confidence',source.confidence??0.8);
+        const previews=h('section',{class:'kg-content-readonly'},[
+          readonlyContent('system_summary',contentRecord.original?.summary),
+          readonlyContent('system_original',contentRecord.original?.text),
+          readonlyContent('gpt_summary',contentRecord.gpt?.summary),
+          h('p',{class:'foot-note'},text('content_edit_in_confirm')),
+          h('button',{type:'button',class:'btn btn-primary',onclick:()=>openKnowledgeContent(ctx,{...source,table},()=>{location.hash='#/knowledge-governance';})},t('kc_title')),
+        ]);
+        const confidenceField=form.querySelector('[name="confidence"]')?.closest('.kg-field');
+        if(confidenceField)confidenceField.after(previews);
       }
     }).catch(error=>{formStatus.textContent=error.message||text('edit_not_found');});
   }

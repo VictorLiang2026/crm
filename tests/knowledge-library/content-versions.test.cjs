@@ -28,11 +28,15 @@ test('management previews stay bounded and do not disguise cleared system text w
  const display=managementRow(row,'knowledge_items');assert.equal(display.content,null);assert.equal(display.gpt_summary_preview,'GPT summary');
  assert.equal(display.gpt_original_preview,undefined);assert.equal(display.content_state,undefined);
 });
-test('playbook response text is not treated as a saved system summary; deployed resolver copies agree',()=>{
+test('playbook response text is not a saved system summary; Person resolver retains its scoped legacy review fallback',()=>{
  const {contentVersions}=require('../../cloudfunctions/_shared/knowledge-content');
  assert.equal(contentVersions({response_logic:'Old response'},'playbooks').original.summary,null);
  const fs=require('node:fs'),path=require('node:path'),root=path.resolve(__dirname,'../../cloudfunctions');
- for(const dir of ['assistant','person_360'])assert.equal(fs.readFileSync(path.join(root,dir,'knowledge-content.js'),'utf8'),fs.readFileSync(path.join(root,'_shared/knowledge-content.js'),'utf8'));
+ const shared=fs.readFileSync(path.join(root,'_shared/knowledge-content.js'),'utf8');
+ assert.equal(fs.readFileSync(path.join(root,'assistant','knowledge-content.js'),'utf8'),shared);
+ const person=fs.readFileSync(path.join(root,'person_360','knowledge-content.js'),'utf8');
+ assert.match(person,/const reviewAt=Object\.hasOwn\(row\.metadata\|\|\{},'review_at'\)/,'Person resolver retains row-metadata fallback');
+ assert.match(shared,/source\.review_at && source\.review_at < today/,'shared resolvers use the linked source review date');
 });
 test('worker checkpoints extraction and summary separately; completion only creates an unreviewed preview',async()=>{
  const record={updatedAt:'2026-10-30',title:'Fixture',source:{id:3}},calls=[];

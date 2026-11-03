@@ -33,6 +33,11 @@ test('iPad knowledge governance displays stored system text and GPT summary only
       state.render=()=>renderKnowledgeGovernance(ctx);state.i18n=i18n;state.render();
     })()`);
     await b.wait("document.querySelector('.kg-table [data-kg-pair]')");
+    assert.equal(await text(`${row(1)} .kg-action-edit`),'基本信息','knowledge edit action uses the localized basic-info label');
+    await b.evaluate("window.kd.i18n.setLang('en');window.kd.render()");
+    await b.wait("document.querySelector('.kg-action-edit').innerText==='Basic information'");
+    assert.equal(await text(`${row(1)} .kg-action-edit`),'Basic information','English label is localized too');
+    await b.evaluate("window.kd.i18n.setLang('zh-CN');window.kd.render()");
     assert.equal(await b.evaluate("document.querySelectorAll('.kg-content-toggle[data-kg-pair=\\\"gpt\\\"][data-kg-part=\\\"text\\\"]').length"),0,'no GPT-original control remains');
     assert.equal(await b.evaluate("window.kd.calls.filter(x=>x.contentOperation==='get').length"),0,'list stays compact');
     await click(button(1,'gpt','summary'));

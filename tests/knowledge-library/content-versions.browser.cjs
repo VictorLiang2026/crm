@@ -13,7 +13,7 @@ test('iPad bilingual manual GPT editor requires server preview and explicit conf
     original:{text:'System text',summary:'System summary',reviewed:true},gpt:{summary:null,reviewed:false},selected:'original',version:0};
    const ctx={toast:()=>{},api:{call:async(name,event)=>{
     window.kcCalls.push(event);const d=event.data;
-    if(event.contentOperation==='get')return {ok:true,record:window.kcRecord,history:[],pending:window.kcPending};
+    if(event.contentOperation==='get')return {ok:true,record:window.kcRecord,history:[{id:9,applied_at:'2026-10-29T00:00:00Z'}],pending:window.kcPending};
     if(event.contentOperation==='preview'){const after=structuredClone(window.kcRecord);Object.assign(after[d.target],d.patch,{reviewed:d.reviewed});
      window.kcAfter=after;return {ok:true,commandId:'server-preview',before:window.kcRecord,after};}
     if(event.contentOperation==='apply'){window.kcPending={commandId:'pending-command',after:window.kcAfter,createdAt:'2026-10-30T00:00:00Z'};return {status:'pending_review'};}
@@ -23,6 +23,9 @@ test('iPad bilingual manual GPT editor requires server preview and explicit conf
    window.kcOpen=()=>openKnowledgeContent(ctx,{id:1,table:'knowledge_items'});await window.kcOpen();
   })()`);
   assert.equal(await b.evaluate("document.querySelectorAll('.kc-editor').length"),2,await b.evaluate("document.body.innerText.slice(-1800)"));
+  assert.equal(await b.evaluate("document.querySelector('.kc-sheet-overlay')!==null"),true,'the live overlay receives its knowledge-specific class');
+  assert.equal(await b.evaluate("!document.querySelector('.kc-panel').innerText.includes('变更历史')"),true,'the live editor omits history restore controls');
+  assert.equal(await b.evaluate("![...document.querySelectorAll('.kc-editor button')].some(x=>x.textContent.includes('重新生成系统原文和摘要'))"),true,'the live editor exposes separate bounded regeneration actions');
   assert.equal(await b.evaluate("document.querySelector('[data-content-target=\\\"gpt\\\"] textarea').getAttribute('aria-label').endsWith('摘要')"),true);
   await b.evaluate(`(()=>{const panel=document.querySelector('[data-content-target="gpt"]');panel.querySelector('textarea').value='<img src=x onerror="window.kcXss=1">';
    panel.querySelector('input').checked=true;panel.querySelector('button').click();})()`);
@@ -36,6 +39,11 @@ test('iPad bilingual manual GPT editor requires server preview and explicit conf
   await b.click('.kc-pending button','审核通过并生效');
   await b.wait("document.querySelectorAll('.kc-editor').length===2");
   assert.equal(await b.evaluate("window.kcCalls.some(e=>e.contentOperation==='approve')"),true);
+  await b.evaluate("document.querySelectorAll('[data-content-target=\"gpt\"] button')[2].click()");
+  await b.wait("document.querySelector('.kc-preview')");
+  assert.deepEqual(await b.evaluate("window.kcCalls.at(-1).data"),{table:'knowledge_items',id:1,expectedUpdatedAt:'2026-10-30T00:00:00Z',
+    action:'edit',target:'original',patch:{summary:'<img src=x onerror=\"window.kcXss=1\">'},reviewed:true});
+  await b.click('.kc-preview button','取消');
   await b.click('[data-content-target="gpt"] button','清空摘要');
   await b.wait("document.querySelector('.kc-preview')");
   assert.equal(await b.evaluate("window.kcCalls.at(-1).data.patch.summary"),null);
