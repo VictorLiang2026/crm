@@ -1,0 +1,25 @@
+# Implementation Plan
+
+- [x] 1. Scope and migration
+  - Add paired public-only migration and rollback for the two follow-up OAuth scopes.
+  - Preserve all existing client/grant rows and verify rollback preconditions.
+  - _Requirement: 6, 7, 8_
+- [x] 2. Narrow service integration
+  - Add optional exact Person ID filtering to the GPT task package while preserving the current default scan and maximum batch size.
+  - Add strict assistant bridge dispatch for task package, preview, and confirm with exact allowed fields.
+  - _Requirement: 1, 3, 4, 5_
+- [x] 3. OAuth/MCP tools and consent
+  - Publish the three follow-up tools with per-tool OAuth scopes and server-side argument checks.
+  - Require follow-up read plus submit scopes for preview/confirm; preserve Knowledge MCP scope behavior.
+  - Add bilingual consent text for the new independent permissions.
+  - _Requirement: 1, 2, 6, 7_
+- [x] 4. Skill and safety flow
+  - Update the Skill to call the dedicated tools, present each server-verified preview, and wait for explicit per-row user confirmation before the confirm call.
+  - Verify after confirmation and report saved/skipped/failed rows accurately.
+  - _Requirement: 3, 4, 5, 6_
+- [x] 5. Regression and publish
+  - Run focused MCP, assistant bridge, follow-up service and bilingual consent checks plus required adjacent regression.
+  - Apply the public migration; deploy only `assistant`, `knowledge_mcp` and consent assets.
+  - Complete release script, tag, GitHub synchronization and CloudBase sync-check.
+  - Online metadata exposes both new scopes; authenticated tool discovery and a real save remain pending until the user reconnects through CRM consent and confirms a specific preview.
+  - _Requirement: 1–8_

@@ -65,6 +65,17 @@ async function runOAuth(operation,data) {
   }
   return result.data;
 }
+function validateScopes(scopeValue) {
+  const requested=String(scopeValue||'').split(/\s+/).filter(Boolean),allowed=new Set([
+    'knowledge:read','knowledge:gpt:submit','followup:read','followup:gpt:submit']);
+  const hasRead=requested.includes('knowledge:read')||requested.includes('followup:read');
+  if(!hasRead||requested.some(scope=>!allowed.has(scope))||new Set(requested).size!==requested.length||
+    requested.includes('knowledge:gpt:submit')&&!requested.includes('knowledge:read')||
+    requested.includes('followup:gpt:submit')&&!requested.includes('followup:read')) {
+    const error=new Error('INVALID_SCOPE');error.code='INVALID_INPUT';throw error;
+  }
+  return requested;
+}
 async function issueAuthorization(event, actorUid) {
   const resource = process.env.CRM_KNOWLEDGE_MCP_RESOURCE_URL;
   const expectedIssuer=expectedKnowledgeMcpIssuer(process.env.CRM_KNOWLEDGE_MCP_ISSUER_URL);
@@ -76,11 +87,7 @@ async function issueAuthorization(event, actorUid) {
       typeof event.state !== 'string' || event.state.length < 1 || event.state.length > 1024) {
     const error = new Error('INVALID_OAUTH_REQUEST'); error.code = 'INVALID_INPUT'; throw error;
   }
-  const requested = String(event.scope || '').split(/\s+/).filter(Boolean);
-  const allowed = new Set(['knowledge:read', 'knowledge:gpt:submit']);
-  if (!requested.includes('knowledge:read') || requested.some(scope => !allowed.has(scope)) || new Set(requested).size!==requested.length) {
-    const error = new Error('INVALID_SCOPE'); error.code = 'INVALID_INPUT'; throw error;
-  }
+  const requested=validateScopes(event.scope);
   const code = b64url(crypto.randomBytes(32));
   const data = require('./search-data').createSearchData({ env: process.env.TCB_ENV, key: process.env.CRM_ASSISTANT_DB_API_KEY });
   const result = await data.auditRdb.rpc('crm_knowledge_mcp_oauth_v1', { p_operation: 'issue', p_data: {
@@ -90,4 +97,5 @@ async function issueAuthorization(event, actorUid) {
   if (result?.error || !result?.data?.ok) { const error = new Error('OAUTH_STORAGE_FAILED'); error.code = 'PERSISTENCE_ERROR'; throw error; }
   return { ok: true, code, state: event.state, redirectUri };
 }
-module.exports = { verifyAssertion, assertionFailure, signAssertion, runOAuth, issueAuthorization, expectedKnowledgeMcpIssuer, hash, b64url, canonicalJson };
+module.exports = { verifyAssertion, assertionFailure, signAssertion, runOAuth, issueAuthorization, validateScopes,
+  expectedKnowledgeMcpIssuer, hash, b64url, canonicalJson };

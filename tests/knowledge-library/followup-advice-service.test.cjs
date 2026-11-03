@@ -10,12 +10,13 @@ function setup(){
     system_version:2,system_task_id:12,gpt_strategy:'GPT 策略',gpt_product_advice:'GPT 产品建议',gpt_strategy_sources:[15],gpt_product_sources:[16],
     gpt_based_on_system_version:1,gpt_kept_for_system_version:null,gpt_status:'stale',gpt_preview_id:null,gpt_preview_payload:null,
     gpt_preview_actor:null,gpt_preview_expires_at:null,created_by:'operator',updated_by:'operator',created_at:stamp,updated_at:stamp,deleted_at:null};
-  const writes=[];
+  const writes=[],reads=[];
   const fetchImpl=async(url,options={})=>{
     const method=options.method||'GET',parsed=new URL(url);
     if(method==='GET'){
       const table=parsed.pathname.split('/').pop(),query=parsed.searchParams;
       if(table!=='person_followup_advice')return response([]);
+      reads.push(query);
       if(query.has('gpt_strategy')&&query.get('gpt_strategy')==='is.null'&&row.gpt_strategy)return response([]);
       if(query.has('gpt_product_advice')&&query.get('gpt_product_advice')==='is.null'&&row.gpt_product_advice)return response([]);
       return response([{...row}]);
@@ -27,8 +28,12 @@ function setup(){
     throw new Error(`Unexpected method ${method}`);
   };
   const service=createKnowledgeLibrary({env:'crm-test123',key:'test-key',fetchImpl,
-    client:{callFunction:async()=>({result:{person:{occupation:'顾问',customer_stage:'新客'},recent_interactions:[]}})}});
-  return {service,row,writes};
+    client:{callFunction:async()=>({result:{person:{display_name:'测试客户',occupation:'顾问',customer_stage:'新客'},
+      household:{important_facts:'测试客户的家庭情况',members:[{name:'家属姓名',role:'配偶',phone:'13800138000'}]},
+      relationship:[{other_person_id:91,other_name:'关联人物姓名',type:'合作关系',stage:'建立联系'}],
+      recent_interactions:[],open_actions:[{title:'确认安排',owner_name:'测试客户'}],commitments:[{content:'回传材料',email:'test@example.com'}],
+      relevant_playbook:{status:'available',content:{relevant_playbooks:[{scenario:'初次沟通',response_logic:'先确认关注点'}]}}}})}});
+  return {service,row,writes,reads};
 }
 function response(value){return {ok:true,text:async()=>JSON.stringify(value)};}
 
@@ -165,13 +170,25 @@ test('paired row edit changes existing GPT content without changing the CloudBas
 });
 
 test('GPT task package selects empty GPT lanes and excludes non-empty stale advice',async()=>{
-  const {service,row}=setup();
+  const {service,row,reads}=setup();
   let result=await service.run({operation:'gptTaskPackage',data:{limit:10}},'operator');
   assert.equal(result.count,0);
   row.gpt_title=null;row.gpt_strategy=null;row.gpt_product_advice=null;
   row.gpt_status='pending';row.gpt_based_on_system_version=null;
-  result=await service.run({operation:'gptTaskPackage',data:{limit:10}},'operator');
+  result=await service.run({operation:'gptTaskPackage',data:{personId:'42',limit:10}},'operator');
   assert.equal(result.count,1);assert.equal(result.rows[0].adviceId,'81');
+  assert.equal(reads.at(-1).get('person_id'),'eq.42');
+  assert.equal(result.rows[0].customerSnapshot.household.members[0].role,'配偶');
+  assert.doesNotMatch(JSON.stringify(result.rows[0]),/家属姓名|关联人物姓名|13800138000|test@example\.com|91/);
+  assert.deepEqual(result.rows[0].customerSnapshot.open_actions,[{title:'确认安排'}]);
+  assert.equal(result.rows[0].customerSnapshot.relevant_playbook.content.relevant_playbooks[0].scenario,'初次沟通');
+});
+
+test('GPT task package rejects invalid IDs and paging limits instead of broadening scope',async()=>{
+  const {service,reads}=setup();
+  await assert.rejects(service.run({operation:'gptTaskPackage',data:{personId:'0'}},'operator'),error=>error.code==='INVALID_INPUT');
+  await assert.rejects(service.run({operation:'gptTaskPackage',data:{limit:11}},'operator'),error=>error.code==='INVALID_INPUT');
+  assert.equal(reads.length,0);
 });
 
 test('GPT import preview refuses to overwrite a non-empty GPT lane',async()=>{
@@ -180,6 +197,26 @@ test('GPT import preview refuses to overwrite a non-empty GPT lane',async()=>{
     gptAdvice:{title:'GPT 新标题',overallStrategy:'GPT 新策略',productServiceAdvice:'GPT 新产品建议',
       strategySourceIds:[],productSourceIds:[]}}]}},'operator');
   assert.equal(result.rows[0].status,'not_empty');assert.equal(writes.length,0);
+});
+
+test('GPT import preview and confirmed save update only the empty GPT lane',async()=>{
+  const {service,row,writes}=setup();
+  row.gpt_title=null;row.gpt_strategy=null;row.gpt_product_advice=null;row.gpt_status='pending';
+  const preview=await service.run({operation:'gptImportPreview',data:{rows:[{adviceId:'81',personId:'42',systemVersion:2,
+    gptAdvice:{title:'GPT 建议',overallStrategy:'先确认当前关注点，再约定下一步沟通。',
+      productServiceAdvice:'当前资料不足以核实产品匹配，应先确认保障需求。',strategySourceIds:[],productSourceIds:[]}}]}},'operator');
+  assert.equal(preview.rows[0].status,'preview');
+  const confirmed=await service.run({operation:'gptImportConfirm',data:{confirmed:true,adviceId:'81',personId:'42',
+    systemVersion:2,previewId:preview.rows[0].previewId}},'operator');
+  assert.equal(confirmed.ok,true);
+  assert.equal(confirmed.advice.gpt.strategy,'先确认当前关注点，再约定下一步沟通。');
+  assert.equal(confirmed.advice.gpt.productAdvice,'当前资料不足以核实产品匹配，应先确认保障需求。');
+  assert.equal(confirmed.advice.system.strategy,'系统策略');
+  assert.equal(confirmed.advice.system.productAdvice,'系统产品建议');
+  assert.equal(row.gpt_based_on_system_version,2);
+  assert.equal(row.gpt_status,'ready');
+  assert.equal(row.gpt_preview_id,null);
+  assert.equal(writes.length,2);
 });
 
 test('GPT import confirmation cannot write over content filled after preview',async()=>{

@@ -8,7 +8,7 @@ const HMAC_KEY = process.env.CRM_KNOWLEDGE_MCP_HMAC_KEY;
 const CONSENT_URI = process.env.CRM_KNOWLEDGE_MCP_CONSENT_URI;
 const RESOURCE_URL = process.env.CRM_KNOWLEDGE_MCP_RESOURCE_URL;
 const ISSUER_ORIGIN = process.env.CRM_KNOWLEDGE_MCP_ISSUER_URL;
-const SCOPES = ['knowledge:read','knowledge:gpt:submit'];
+const SCOPES = ['knowledge:read','knowledge:gpt:submit','followup:read','followup:gpt:submit'];
 const MCP_PATH = '/mcp/knowledge';
 const OAUTH_PATH = '/oauth';
 const ISSUER_PATH = '/knowledge-mcp';
@@ -110,7 +110,8 @@ async function actorFor(headers,scope){
   if(!match)fail('MCP_AUTH_REQUIRED',401);
   const grant=await rpc('access',{accessHash:digest(match[1])});
   if(grant.resource!==RESOURCE_URL)fail('INVALID_AUDIENCE',401);
-  if(!Array.isArray(grant.scopes)||!grant.scopes.includes(scope))fail('INSUFFICIENT_SCOPE',403);
+  if(!Array.isArray(grant.scopes)||scope&&!grant.scopes.includes(scope)||scope==null&&
+      !grant.scopes.some(value=>value==='knowledge:read'||value==='followup:read'))fail('INSUFFICIENT_SCOPE',403);
   return {actorUid:grant.actorUid,scopes:grant.scopes};
 }
 async function invokeAssistant(actorUid,input){
@@ -152,6 +153,9 @@ const TOOLS=[
  {name:'knowledge_records_list',description:'List one bounded page of CRM knowledge records and GPT coverage. Repeat with returned nextOffsets until all hasMore values are false.',securitySchemes:[{type:'oauth2',scopes:['knowledge:read']}],inputSchema:{type:'object',properties:{sourceOffset:{type:'integer',minimum:0},knowledgeOffset:{type:'integer',minimum:0},playbookOffset:{type:'integer',minimum:0},limit:{type:'integer',minimum:1,maximum:100},},additionalProperties:false}},
  {name:'knowledge_record_get',description:'Read text fields for one CRM knowledge record selected by exact table and record ID. Returns the stored system original and GPT summary only; it never reads linked files.',securitySchemes:[{type:'oauth2',scopes:['knowledge:read']}],inputSchema:{type:'object',properties:{table:{type:'string',enum:['knowledge_items','playbooks']},id:{type:'string',pattern:'^[1-9][0-9]*$'}},required:['table','id'],additionalProperties:false}},
  {name:'knowledge_generate_gpt_pending',description:'Generate a GPT summary only from stored system original text and save it directly to the exact record ID. Does not read files or images, generate GPT original text, or alter system content.',securitySchemes:[{type:'oauth2',scopes:['knowledge:read','knowledge:gpt:submit']}],inputSchema:{type:'object',properties:{table:{type:'string',enum:['knowledge_items','playbooks']},id:{type:'string',pattern:'^[1-9][0-9]*$'},expectedUpdatedAt:{type:'string',format:'date-time'}},required:['table','id','expectedUpdatedAt'],additionalProperties:false}},
+ {name:'followup_gpt_task_package',description:'Read CRM-verified, redacted Person context and ready CloudBase follow-up recommendations whose GPT strategy and product/service advice are both empty. Optionally filter by exact Person ID; pages contain at most 10 rows.',securitySchemes:[{type:'oauth2',scopes:['followup:read']}],inputSchema:{type:'object',properties:{personId:{type:'string',pattern:'^[1-9][0-9]*$'},afterId:{type:'string',pattern:'^[1-9][0-9]*$'},limit:{type:'integer',minimum:1,maximum:10}},additionalProperties:false}},
+ {name:'followup_gpt_import_preview',description:'Ask CRM to verify GPT follow-up advice against the current Person, system version, empty GPT fields and approved knowledge sources. Creates a short-lived, operator-bound preview; this does not save the advice.',securitySchemes:[{type:'oauth2',scopes:['followup:read','followup:gpt:submit']}],inputSchema:{type:'object',properties:{rows:{type:'array',minItems:1,maxItems:10,items:{type:'object',properties:{adviceId:{type:'string',pattern:'^[1-9][0-9]*$'},personId:{type:'string',pattern:'^[1-9][0-9]*$'},systemVersion:{type:'integer',minimum:1},gptAdvice:{type:'object',properties:{title:{type:'string',maxLength:240},overallStrategy:{type:'string',maxLength:4000},productServiceAdvice:{type:'string',maxLength:4000},strategySourceIds:{type:'array',items:{type:'integer',minimum:1}},productSourceIds:{type:'array',items:{type:'integer',minimum:1}}},required:['title','overallStrategy','productServiceAdvice','strategySourceIds','productSourceIds'],additionalProperties:false}},required:['adviceId','personId','systemVersion','gptAdvice'],additionalProperties:false}}},required:['rows'],additionalProperties:false}},
+ {name:'followup_gpt_import_confirm',description:'Save exactly one advice row from its current CRM-verified preview. Call only after the user has reviewed that preview and explicitly confirmed this Person and advice; the server rechecks operator, preview, version, expiry and empty GPT fields.',securitySchemes:[{type:'oauth2',scopes:['followup:read','followup:gpt:submit']}],inputSchema:{type:'object',properties:{adviceId:{type:'string',pattern:'^[1-9][0-9]*$'},personId:{type:'string',pattern:'^[1-9][0-9]*$'},systemVersion:{type:'integer',minimum:1},previewId:{type:'string',format:'uuid'}},required:['adviceId','personId','systemVersion','previewId'],additionalProperties:false}},
 ];
 async function mcp(req){
   const rpcMsg=req.body;
@@ -164,7 +168,7 @@ async function mcp(req){
     if(req.headers['mcp-protocol-version']!=='2026-07-28'||req.headers['mcp-method']!==rpcMsg.method)fail('MCP_PROTOCOL_MISMATCH',400);
     if(rpcMsg.method==='tools/call'&&req.headers['mcp-name']!==rpcMsg.params?.name)fail('MCP_PROTOCOL_MISMATCH',400);
   }
-  const {actorUid,scopes}=await actorFor(req.headers,'knowledge:read');
+  const {actorUid,scopes}=await actorFor(req.headers,null);
   if(rpcMsg.method==='notifications/initialized')return response(202,'',{'Content-Type':'application/json'});
   if(rpcMsg.method==='initialize'){
     const supported=['2025-11-25','2025-06-18','2025-03-26'];
@@ -179,11 +183,18 @@ async function mcp(req){
     const name=rpcMsg.params?.name,args=rpcMsg.params?.arguments||{};
     const tool=TOOLS.find(t=>t.name===name);
     if(!tool)return response(200,{jsonrpc:'2.0',id,error:{code:-32602,message:'Unknown tool'}});
-    if(name==='knowledge_generate_gpt_pending'&&!scopes.includes('knowledge:gpt:submit'))return toolAuthError(id,'INSUFFICIENT_SCOPE',['knowledge:read','knowledge:gpt:submit']);
+    const requiredScopes=tool.securitySchemes?.[0]?.scopes||[];
+    if(requiredScopes.some(scope=>!scopes.includes(scope)))return toolAuthError(id,'INSUFFICIENT_SCOPE',requiredScopes);
     if(name==='knowledge_records_list'&&Object.entries(args).some(([k,v])=>!['sourceOffset','knowledgeOffset','playbookOffset','limit'].includes(k)||!Number.isSafeInteger(v)||v<0||(k==='limit'&&(v<1||v>100))))fail('INVALID_ARGUMENTS',400);
     if(name==='knowledge_record_get'&&(!['knowledge_items','playbooks'].includes(args.table)||!/^[1-9][0-9]*$/.test(String(args.id))))fail('INVALID_ARGUMENTS',400);
     if(name==='knowledge_generate_gpt_pending'&&(!['knowledge_items','playbooks'].includes(args.table)||!/^[1-9][0-9]*$/.test(String(args.id))||typeof args.expectedUpdatedAt!=='string'))fail('INVALID_ARGUMENTS',400);
     if(name==='knowledge_generation_status'&&!/^[0-9a-f-]{36}$/i.test(String(args.commandId)))fail('INVALID_ARGUMENTS',400);
+    if(name==='followup_gpt_task_package'&&Object.entries(args).some(([k,v])=>!['personId','afterId','limit'].includes(k)||
+      (k==='personId'||k==='afterId')&&!/^[1-9][0-9]*$/.test(String(v))||k==='limit'&&(!Number.isSafeInteger(v)||v<1||v>10)))fail('INVALID_ARGUMENTS',400);
+    if(name==='followup_gpt_import_preview'&&(!Array.isArray(args.rows)||args.rows.length<1||args.rows.length>10))fail('INVALID_ARGUMENTS',400);
+    if(name==='followup_gpt_import_confirm'&&(!/^[1-9][0-9]*$/.test(String(args.adviceId))||
+      !/^[1-9][0-9]*$/.test(String(args.personId))||!Number.isSafeInteger(args.systemVersion)||args.systemVersion<1||
+      !/^[0-9a-f-]{36}$/i.test(String(args.previewId))))fail('INVALID_ARGUMENTS',400);
     const input={tool:name,...args};
     const result=await invokeAssistant(actorUid,input);
     let safeResult=result;
@@ -235,9 +246,12 @@ async function main(event,context){
       requiredConfig();
       const clientId=req.url.searchParams.get('client_id'),redirectUri=req.url.searchParams.get('redirect_uri'),resource=req.url.searchParams.get('resource');
       const state=req.url.searchParams.get('state'),challenge=req.url.searchParams.get('code_challenge'),scope=(req.url.searchParams.get('scope')||'').split(/\s+/).filter(Boolean);
+      const hasRead=scope.includes('knowledge:read')||scope.includes('followup:read');
       if(!clientId||!redirectUri||resource!==RESOURCE_URL||req.url.searchParams.get('response_type')!=='code'||
          req.url.searchParams.get('code_challenge_method')!=='S256'||!(state&&state.length<=1024)||
-         !/^[A-Za-z0-9_-]{43}$/.test(challenge||'')||!scope.includes('knowledge:read')||scope.some(s=>!SCOPES.includes(s))||new Set(scope).size!==scope.length)fail('INVALID_OAUTH_REQUEST');
+         !/^[A-Za-z0-9_-]{43}$/.test(challenge||'')||!hasRead||scope.some(s=>!SCOPES.includes(s))||new Set(scope).size!==scope.length||
+         scope.includes('knowledge:gpt:submit')&&!scope.includes('knowledge:read')||
+         scope.includes('followup:gpt:submit')&&!scope.includes('followup:read'))fail('INVALID_OAUTH_REQUEST');
       await rpc('validate_client',{clientId,redirectUri});
       const redirect=new URL(CONSENT_URI);
       for(const [k,v]of req.url.searchParams)redirect.searchParams.set(k,v);

@@ -113,6 +113,25 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
             typeof input.expectedUpdatedAt==='string' && Number.isFinite(Date.parse(input.expectedUpdatedAt)))
           return await knowledgeLibraryRunner({action:'knowledgeLibrary',operation:'content',contentOperation:'queueGpt',
             data:{table:input.table,id:String(input.id),expectedUpdatedAt:input.expectedUpdatedAt}},actorUid);
+        if (input.tool === 'followup_gpt_task_package' && Object.keys(input).every(k=>['tool','personId','afterId','limit'].includes(k)) &&
+            (input.personId===undefined||/^[1-9][0-9]*$/.test(String(input.personId))) &&
+            (input.afterId===undefined||/^[1-9][0-9]*$/.test(String(input.afterId))) &&
+            (input.limit===undefined||Number.isInteger(input.limit)&&input.limit>=1&&input.limit<=10))
+          return await knowledgeLibraryRunner({action:'knowledgeLibrary',operation:'gptTaskPackage',data:{
+            ...(input.personId===undefined?{}:{personId:String(input.personId)}),
+            ...(input.afterId===undefined?{}:{afterId:String(input.afterId)}),
+            ...(input.limit===undefined?{}:{limit:input.limit}),
+          }},actorUid);
+        if (input.tool === 'followup_gpt_import_preview' && Object.keys(input).every(k=>['tool','rows'].includes(k)) &&
+            Array.isArray(input.rows)&&input.rows.length>=1&&input.rows.length<=10)
+          return await knowledgeLibraryRunner({action:'knowledgeLibrary',operation:'gptImportPreview',data:{rows:input.rows}},actorUid);
+        if (input.tool === 'followup_gpt_import_confirm' && Object.keys(input).every(k=>['tool','adviceId','personId','systemVersion','previewId'].includes(k)) &&
+            /^[1-9][0-9]*$/.test(String(input.adviceId))&&/^[1-9][0-9]*$/.test(String(input.personId))&&
+            Number.isInteger(input.systemVersion)&&input.systemVersion>=1&&/^[0-9a-f-]{36}$/i.test(String(input.previewId)))
+          return await knowledgeLibraryRunner({action:'knowledgeLibrary',operation:'gptImportConfirm',data:{
+            adviceId:String(input.adviceId),personId:String(input.personId),systemVersion:input.systemVersion,
+            previewId:String(input.previewId),confirmed:true,
+          }},actorUid);
         if (input.tool === 'knowledge_generation_status' && Object.keys(input).every(k=>['tool','commandId'].includes(k)) &&
             /^[0-9a-f-]{36}$/i.test(String(input.commandId)))
           return {ok:false,error:{code:'CONTENT_STATUS_REMOVED',message:'Generation status lookup is no longer exposed; saved content can be read from its record.'}};
@@ -120,7 +139,8 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
         return {ok:false,error:{code:/^[A-Z][A-Z0-9_]{1,79}$/.test(error?.code||'')?error.code:'MCP_OPERATION_FAILED',message:'Knowledge operation could not be completed'}};
       }
       return {ok:false,error:{code:'INVALID_INPUT',message:'Unsupported knowledge operation',diagnostic:{
-        recognizedTool:['knowledge_records_list','knowledge_record_get','knowledge_generate_gpt_pending','knowledge_generation_status'].includes(input.tool),
+        recognizedTool:['knowledge_records_list','knowledge_record_get','knowledge_generate_gpt_pending','knowledge_generation_status',
+          'followup_gpt_task_package','followup_gpt_import_preview','followup_gpt_import_confirm'].includes(input.tool),
         toolName:typeof input.tool==='string'&&/^[A-Za-z0-9_.:-]{1,80}$/.test(input.tool)?input.tool:'unclassified',
         fieldCount:Object.keys(input).length,
       }}};

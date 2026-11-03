@@ -31,3 +31,36 @@ test('unsupported MCP operations report shape only without echoing caller values
     diagnostic:{recognizedTool:false,toolName:'unknown_tool',fieldCount:2}});
   assert.doesNotMatch(JSON.stringify(result),/do-not-return/);
 });
+
+test('follow-up task package dispatch keeps the exact Person filter and bounded page',async()=>{
+  let captured;
+  const result=await invoke({tool:'followup_gpt_task_package',personId:'42',afterId:'80',limit:5},
+    async(event,actor)=>{captured={event,actor};return {ok:true,count:0,rows:[]};});
+  assert.equal(result.ok,true);
+  assert.deepEqual(captured,{event:{action:'knowledgeLibrary',operation:'gptTaskPackage',data:{personId:'42',afterId:'80',limit:5}},actor:'crm-test-user'});
+  const extra=await invoke({tool:'followup_gpt_task_package',personId:'42',limit:5,allPeople:true},
+    async()=>{throw Error('must reject extra fields');});
+  assert.equal(extra.error.code,'INVALID_INPUT');
+});
+
+test('follow-up preview dispatch is narrow and confirm flag is server-owned',async()=>{
+  const rows=[{adviceId:'81',personId:'42',systemVersion:2,gptAdvice:{title:'标题',overallStrategy:'策略',
+    productServiceAdvice:'产品建议',strategySourceIds:[],productSourceIds:[]}}];
+  let captured;
+  const preview=await invoke({tool:'followup_gpt_import_preview',rows},async(event,actor)=>{
+    captured={event,actor};return {ok:true,rows:[{adviceId:'81',personId:'42',status:'preview',previewId:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'}]};
+  });
+  assert.equal(preview.ok,true);
+  assert.deepEqual(captured.event,{action:'knowledgeLibrary',operation:'gptImportPreview',data:{rows}});
+  captured=null;
+  const confirmed=await invoke({tool:'followup_gpt_import_confirm',adviceId:'81',personId:'42',systemVersion:2,
+    previewId:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'},async(event,actor)=>{
+    captured={event,actor};return {ok:true};
+  });
+  assert.equal(confirmed.ok,true);
+  assert.equal(captured.event.data.confirmed,true);
+  assert.equal(captured.actor,'crm-test-user');
+  const forged=await invoke({tool:'followup_gpt_import_confirm',adviceId:'81',personId:'42',systemVersion:2,
+    previewId:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',confirmed:true},async()=>{throw Error('client confirmation flag must not be accepted');});
+  assert.equal(forged.error.code,'INVALID_INPUT');
+});

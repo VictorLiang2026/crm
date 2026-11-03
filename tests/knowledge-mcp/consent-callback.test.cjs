@@ -28,3 +28,15 @@ test('CRM consent page returns only ChatGPT or exact Codex loopback callbacks',a
     'http://127.0.0.1:48294/callback?next=https://evil.test',
   ]) assert.equal(isAllowedAuthorizationCallback(uri),false,uri);
 });
+
+test('follow-up OAuth consent explains its separate read, submit, and human-review permissions bilingually',()=>{
+  const dictionary=fs.readFileSync(path.join(__dirname,'../../crm/js/modules/console/i18n.js'),'utf8');
+  const consent=fs.readFileSync(path.join(__dirname,'../../crm/js/modules/console/knowledge-mcp-consent.js'),'utf8');
+  for(const key of ['kmcp_followup_read','kmcp_followup_write','kmcp_followup_review']) {
+    assert.match(dictionary,new RegExp(`${key}: \\{'zh-CN':`));
+    assert.match(dictionary,new RegExp(`${key}: \\{[^\\n]*'en':`));
+  }
+  assert.match(consent,/requested\.has\('followup:read'\)/);
+  assert.match(consent,/requested\.has\('followup:gpt:submit'\)/);
+  assert.match(consent,/followupReview/);
+});

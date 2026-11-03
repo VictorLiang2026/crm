@@ -2,15 +2,18 @@
 const DEFAULT = 'zh-CN';
 
 const DICT = {
-  kmcp_title: {'zh-CN':'授权 CRM 知识库连接','en':'Authorize CRM Knowledge Connection'},
+  kmcp_title: {'zh-CN':'授权 CRM 连接','en':'Authorize CRM Connection'},
   kmcp_login: {'zh-CN':'使用 CRM 账号登录','en':'Sign in with your CRM account'},
   kmcp_username: {'zh-CN':'用户名','en':'Username'}, kmcp_password: {'zh-CN':'密码','en':'Password'},
   kmcp_signin: {'zh-CN':'登录并继续','en':'Sign in and continue'},
-  kmcp_intro: {'zh-CN':'Codex 请求访问 CRM 知识库，用于读取记录中的系统原文并生成 GPT 摘要草稿。','en':'Codex requests access to read stored system text and prepare GPT summary drafts.'},
+  kmcp_intro: {'zh-CN':'请核对下方本次请求的权限。CRM 仅授予你明确同意的权限。','en':'Review the permissions requested below. CRM grants only the permissions you approve.'},
   kmcp_requester: {'zh-CN':'请求连接：Codex / ChatGPT','en':'Requesting connection: Codex / ChatGPT'},
   kmcp_read: {'zh-CN':'读取知识库记录和内容','en':'Read knowledge records and content'},
   kmcp_write: {'zh-CN':'直接保存 GPT 摘要','en':'Save GPT summaries directly'},
   kmcp_review: {'zh-CN':'GPT 摘要直接保存到对应记录，可继续编辑。','en':'GPT summaries are saved directly to the matching record and remain editable.'},
+  kmcp_followup_read: {'zh-CN':'读取 CRM 筛选并脱敏的人物跟进上下文、系统建议和相关知识资料','en':'Read CRM-filtered, redacted Person context, system advice, and related knowledge'},
+  kmcp_followup_write: {'zh-CN':'提交 GPT 跟进建议；仅限系统建议已就绪且两段 GPT 内容均为空的记录','en':'Submit GPT follow-up advice only when the system advice is ready and both GPT sections are empty'},
+  kmcp_followup_review: {'zh-CN':'跟进建议必须先显示 CRM 服务端核实的预览。只有你逐条检查并确认后，CRM 才会写入 GPT 栏位。','en':'Follow-up advice is saved only after you review each CRM-verified preview and explicitly confirm it.'},
   kmcp_allow: {'zh-CN':'授权连接','en':'Authorize connection'}, kmcp_deny: {'zh-CN':'拒绝','en':'Deny'},
   kmcp_error: {'zh-CN':'无法完成授权，请返回 Codex 重试，或联系 CRM 管理员。','en':'Could not complete authorization. Return to Codex and retry, or contact your CRM administrator.'},
   kmcp_signin_error: {'zh-CN':'登录失败，请检查账号后重试。','en':'Sign-in failed. Check your credentials and try again.'},

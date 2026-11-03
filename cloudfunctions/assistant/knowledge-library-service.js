@@ -63,6 +63,19 @@ function redactForTask(value,person={}) {
   }
   return text;
 }
+function redactTaskData(value,person={},depth=0) {
+  if(depth>8)return null;
+  if(typeof value==='string')return redactForTask(value,person);
+  if(value==null||typeof value==='number'||typeof value==='boolean')return value;
+  if(Array.isArray(value))return value.slice(0,30).map(item=>redactTaskData(item,person,depth+1));
+  if(!object(value))return null;
+  const safe={};
+  for(const [key,item] of Object.entries(value)) {
+    if(key==='source'||/(?:^|_)(?:id|name)(?:$|_)/i.test(key)||/(?:email|phone|mobile|contact|wechat)/i.test(key)||/id$/i.test(key))continue;
+    safe[key]=redactTaskData(item,person,depth+1);
+  }
+  return safe;
+}
 function adviceDto(row,personName=null) {
   const systemTitle=row.system_title||row.title;
   return {id:String(row.id),personId:String(row.person_id),personName:personName||null,title:systemTitle,
@@ -929,6 +942,7 @@ function createKnowledgeLibrary(options={}) {
     const customerSnapshot={person:safePerson,household:person.household||null,relationship:person.relationship||null,
       facts:(person.facts||[]).slice(0,8),signals:(person.signals||[]).slice(0,8),
       open_opportunities:(person.open_opportunities||[]).slice(0,5),insurance_context:person.insurance_context||null,
+      open_actions:(person.open_actions||[]).slice(0,5),commitments:(person.commitments||[]).slice(0,5),
       relevant_playbook:person.relevant_playbook||null};
     const query=`${safePerson.occupation||''} ${safePerson.customer_stage||''} ${focus} ${JSON.stringify(customerSnapshot)} ${JSON.stringify(interactions)}`;
     const strategyEntries=rankEvidence(await activeItems(new Set(['industry','top_performer_sharing','playbook','case','story','evidence'])),query,8);
@@ -938,7 +952,8 @@ function createKnowledgeLibrary(options={}) {
     return {customerSnapshot,interactions,strategy,products,context:{customer_snapshot:customerSnapshot,
       recent_interactions:interactions,strategy_sources:strategy.refs,product_sources:products.refs,
       generation_rules:'Generate one CloudBase system recommendation as two separate sections. overallStrategy must apply relevant international sales and relationship practices to the stated facts, cover relationship progress, objective, questions and next step, and must not name or recommend a specific product or service. productServiceAdvice must be grounded only in product_sources and may state that no suitable source was found. Use only exact supplied knowledge item IDs in each section sourceRefs. Do not invent person facts, product terms, returns, guarantees, tax or legal conclusions. Keep the advice actionable, concise and tailored to the customer facts and recent interactions.',
-      guardrails:'Industry and strategy sources may support the overall strategy only. Product, company and service claims require current verified product_sources. If there is no valid product source, say that a product/service match could not be verified and list what a person should confirm. Avoid repeating contact details or unnecessarily identifying information.'}};
+      guardrails:'Industry and strategy sources may support the overall strategy only. Product, company and service claims require current verified product_sources. If there is no valid product source, say that a product/service match could not be verified and list what a person should confirm. Avoid repeating contact details or unnecessarily identifying information.'},
+      redactionPerson:person.person};
   }
   function keepAllowedSources(value,allowed) {
     return Array.isArray(value)?[...new Set(value.map(item=>String(typeof item==='object'?item?.id:item)))]
@@ -1140,31 +1155,39 @@ function createKnowledgeLibrary(options={}) {
     if(rows.length!==1)fail('STALE');return {ok:true,id};
   }
   async function gptTaskPackage(input,actorValue) {
-    actorUid(actorValue);const limit=Math.max(1,Math.min(10,Number(input?.limit)||10));
+    actorUid(actorValue);
+    const personId=input?.personId===undefined?null:String(input.personId),afterId=input?.afterId===undefined?null:String(input.afterId),
+      limit=input?.limit===undefined?10:Number(input.limit);
+    if(personId!==null&&!positiveId(personId)||afterId!==null&&!positiveId(afterId)||!Number.isInteger(limit)||limit<1||limit>10)fail('INVALID_INPUT');
     const rows=await request('person_followup_advice','GET',{select:FOLLOWUP_ADVICE_COLUMNS,system_status:'eq.ready',
-      deleted_at:'is.null',order:'id.asc',...(positiveId(input?.afterId)?{id:`gt.${input.afterId}`}:{ }),limit:200});
-    const queued=rows.filter(row=>!row.gpt_strategy&&!row.gpt_product_advice)
-      .slice(0,limit+1);
-    const hasMore=queued.length>limit;
-    const selected=queued.slice(0,limit);
+      gpt_strategy:'is.null',gpt_product_advice:'is.null',deleted_at:'is.null',order:'id.asc',
+      ...(personId?{person_id:`eq.${personId}`}:{ }),...(afterId?{id:`gt.${afterId}`}:{ }),limit:limit+1});
+    const hasMore=rows.length>limit;
+    const selected=rows.slice(0,limit);
     const result=[];
     for(const row of selected) {
       try {
         const context=await followupAdviceContext(String(row.person_id),row.title);
         const safePerson=context.customerSnapshot.person;
         const safeSnapshot={person:safePerson,
-          facts:context.customerSnapshot.facts.map(item=>({content:redactForTask(item.content||item.summary||''),confidence:item.confidence||null,
+          household:redactTaskData(context.customerSnapshot.household,context.redactionPerson),
+          relationship:redactTaskData(context.customerSnapshot.relationship,context.redactionPerson),
+          facts:context.customerSnapshot.facts.map(item=>({content:redactForTask(item.content||item.summary||'',context.redactionPerson),confidence:item.confidence||null,
             created_at:item.created_at||null})),
-          signals:context.customerSnapshot.signals.map(item=>({content:redactForTask(item.content||item.summary||''),confidence:item.confidence||null,
+          signals:context.customerSnapshot.signals.map(item=>({content:redactForTask(item.content||item.summary||'',context.redactionPerson),confidence:item.confidence||null,
             created_at:item.created_at||null})),
           open_opportunities:context.customerSnapshot.open_opportunities.map(item=>({type:item.type||item.opportunity_type||null,
             stage:item.stage||item.status||null,updated_at:item.updated_at||null})),
           insurance_context:context.customerSnapshot.insurance_context?{status:context.customerSnapshot.insurance_context.status||null,
-            verified_products:context.customerSnapshot.insurance_context.verified_products||[]}:null};
-        const safeSources=refs=>refs.map(ref=>({...ref,title:redactForTask(ref.title),excerpt:redactForTask(ref.excerpt),
-          summary:redactForTask(ref.summary)}));
-        result.push({adviceId:String(row.id),personId:String(row.person_id),title:redactForTask(row.title),systemVersion:Number(row.system_version),
-          currentSystemAdvice:{title:redactForTask(row.system_title||row.title),overallStrategy:redactForTask(row.system_strategy),productServiceAdvice:redactForTask(row.system_product_advice)},
+            verified_products:redactTaskData(context.customerSnapshot.insurance_context.verified_products||[])}:null,
+          open_actions:redactTaskData(context.customerSnapshot.open_actions||[]),
+          commitments:redactTaskData(context.customerSnapshot.commitments||[]),
+          relevant_playbook:redactTaskData(context.customerSnapshot.relevant_playbook)};
+        const safeSources=refs=>refs.map(ref=>({...ref,title:redactForTask(ref.title,context.redactionPerson),excerpt:redactForTask(ref.excerpt,context.redactionPerson),
+          summary:redactForTask(ref.summary,context.redactionPerson)}));
+        result.push({adviceId:String(row.id),personId:String(row.person_id),title:redactForTask(row.title,context.redactionPerson),systemVersion:Number(row.system_version),
+          currentSystemAdvice:{title:redactForTask(row.system_title||row.title,context.redactionPerson),overallStrategy:redactForTask(row.system_strategy,context.redactionPerson),
+            productServiceAdvice:redactForTask(row.system_product_advice,context.redactionPerson)},
           customerSnapshot:safeSnapshot,recentInteractions:context.interactions,
           strategySources:safeSources(context.strategy.refs),productSources:safeSources(context.products.refs),
           outputContract:{adviceId:'copy exact value',personId:'copy exact value',systemVersion:'copy exact value',

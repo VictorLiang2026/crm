@@ -2,7 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { signAssertion, verifyAssertion, assertionFailure, expectedKnowledgeMcpIssuer } = require('../../cloudfunctions/assistant/knowledge-mcp-auth');
+const { signAssertion, verifyAssertion, assertionFailure, expectedKnowledgeMcpIssuer, validateScopes } = require('../../cloudfunctions/assistant/knowledge-mcp-auth');
 
 const secret = 'test-only-secret-that-is-at-least-thirty-two-characters';
 
@@ -10,6 +10,15 @@ test('pathful OAuth issuer is derived from the configured HTTPS origin', () => {
   assert.equal(expectedKnowledgeMcpIssuer('https://crm.example'), 'https://crm.example/knowledge-mcp');
   assert.equal(expectedKnowledgeMcpIssuer('http://crm.example'), '');
   assert.equal(expectedKnowledgeMcpIssuer('https://crm.example/other'), '');
+});
+
+test('follow-up OAuth scopes stay separate and submit scopes require their matching read scope',()=>{
+  assert.deepEqual(validateScopes('followup:read followup:gpt:submit'),['followup:read','followup:gpt:submit']);
+  assert.deepEqual(validateScopes('knowledge:read knowledge:gpt:submit'),['knowledge:read','knowledge:gpt:submit']);
+  assert.throws(()=>validateScopes('followup:gpt:submit'),error=>error.code==='INVALID_INPUT');
+  assert.throws(()=>validateScopes('knowledge:read followup:gpt:submit'),error=>error.code==='INVALID_INPUT');
+  assert.throws(()=>validateScopes('knowledge:read knowledge:read'),error=>error.code==='INVALID_INPUT');
+  assert.throws(()=>validateScopes('knowledge:read followup:admin'),error=>error.code==='INVALID_INPUT');
 });
 
 test('signed internal assertions bind actor, audience, expiry, and complete payload', () => {
