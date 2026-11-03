@@ -38,21 +38,22 @@ test('playbook response text is not a saved system summary; Person resolver reta
  assert.match(person,/const reviewAt=Object\.hasOwn\(row\.metadata\|\|\{},'review_at'\)/,'Person resolver retains row-metadata fallback');
  assert.match(shared,/source\.review_at && source\.review_at < today/,'shared resolvers use the linked source review date');
 });
-test('worker checkpoints extraction and summary separately; completion only creates an unreviewed preview',async()=>{
- const record={updatedAt:'2026-10-30',title:'Fixture',source:{id:3}},calls=[];
+test('worker checkpoints extraction and summary separately; final content is saved directly',async()=>{
+ const record={updatedAt:'2026-10-30',title:'Fixture',source:{id:3},version:2,sourceFingerprint:'sha:1'},calls=[];
  const job={id:'job',actor_uid:'actor',record_table:'knowledge_items',record_id:1,expected_updated_at:record.updatedAt,
  before_state:record,lease_token:'lease',payload:{stage:'extract',part:'both',nextPage:1}};
  const service=createKnowledgeContentService({rpc:async(name,args)=>{calls.push(args);
   if(args.p_operation==='claim')return {data:{ok:true,job}};
-  if(args.p_operation==='get')return {data:{ok:true,record:{source:{id:3},title:'Fixture',updatedAt:'2026-10-30'}}};
+  if(args.p_operation==='get')return {data:{ok:true,record}};
   if(args.p_operation==='progress'){job.payload=args.p_data.payload;return {data:{ok:true}};}
-  if(args.p_operation==='preview')return {data:{ok:true,commandId:'candidate'}};
+  if(args.p_operation==='save')return {data:{ok:true,record}};
   throw Error('Unexpected operation');},request:async()=>[{file_name:'file.txt',content_type:'text/plain',lifecycle_status:'verified'}],
   sourceBytes:async()=>Buffer.from('source'),extractText:async()=> 'Extracted',generateSummary:async()=>({summary:'Summary',taskId:'t',resultId:'r'})});
  await service.worker();assert.equal(job.payload.stage,'summary');assert.equal(job.payload.text,'Extracted');
- await service.worker();assert.equal(job.payload.stage,'preview');assert.equal(job.payload.summary,'Summary');
- await service.worker();assert.equal(job.payload.previewId,'candidate');assert.equal(calls.find(c=>c.p_operation==='preview').p_data.reviewed,false);
- assert.equal(calls.some(c=>c.p_operation==='apply'),false);
+ await service.worker();assert.equal(job.payload.stage,'save');assert.equal(job.payload.summary,'Summary');
+ await service.worker();assert.equal(calls.find(c=>c.p_operation==='save').p_data.target,'original');
+ assert.deepEqual(calls.find(c=>c.p_operation==='save').p_data.patch,{text:'Extracted',summary:'Summary'});
+ assert.equal(calls.some(c=>['preview','apply','approve'].includes(c.p_operation)),false);
  await assert.rejects(()=>service.run('claim','actor',{}),e=>e.code==='INVALID_INPUT');
  await assert.rejects(()=>service.run('get','',{}),e=>e.code==='UNAUTHORIZED');
 });
@@ -76,8 +77,8 @@ test('managed playbooks retain legacy metadata editing without overwriting eithe
  await assert.rejects(()=>service.save({id:1,table:'playbooks',scenario:'Renamed',response_logic:'Attempt overwrite',next_objective:'Confirm',confidence:0.9,
   categories:['conversation_strategy'],expectedUpdatedAt:'stamp'},'actor'),/CONTENT_USE_VERSION_EDITOR/);
 });
-test('PDF OCR regeneration resumes three-page batches and waits for a separate summary tick',async()=>{
- const record={updatedAt:'stamp',source:{id:3}},job={id:'job',actor_uid:'actor',record_table:'knowledge_items',record_id:1,before_state:record,
+test('PDF OCR regeneration resumes three-page batches then directly saves generated content',async()=>{
+ const record={updatedAt:'stamp',source:{id:3},version:1,sourceFingerprint:'sha:1'},job={id:'job',actor_uid:'actor',record_table:'knowledge_items',record_id:1,before_state:record,
   payload:{stage:'extract',part:'both',nextPage:1,pdfOcr:true}};
  const starts=[];let generated=0;
  const service=createKnowledgeContentService({rpc:async(name,args)=>({data:args.p_operation==='claim'?{ok:true,job}:args.p_operation==='get'?{ok:true,record}:
@@ -87,10 +88,11 @@ test('PDF OCR regeneration resumes three-page batches and waits for a separate s
   callFunction:async()=>({result:{ocrText:'Batch text'}}),generateSummary:async()=>{generated++;return {summary:'Summary'};}});
  await service.worker();assert.equal(job.payload.stage,'extract');assert.equal(job.payload.nextPage,4);
  await service.worker();assert.equal(job.payload.stage,'summary');assert.equal(generated,0);assert.deepEqual(starts,[1,4]);
- await service.worker();assert.equal(generated,1);
+ await service.worker();assert.equal(generated,1);assert.equal(job.payload.stage,'save');
+ await service.worker();assert.equal(job.payload.saved,true);
 });
-test('large image regeneration reuses private source capability instead of sending image bytes through callFunction',async()=>{
- const record={updatedAt:'stamp',source:{id:3}},job={id:'job',actor_uid:'actor',record_table:'knowledge_items',record_id:1,before_state:record,
+test('large image regeneration reuses private source capability and then saves extracted text',async()=>{
+ const record={updatedAt:'stamp',source:{id:3},version:1,sourceFingerprint:'sha:1'},job={id:'job',actor_uid:'actor',record_table:'knowledge_items',record_id:1,before_state:record,
   payload:{stage:'extract',part:'both',nextPage:1}};
  const image=Buffer.alloc(7*1024*1024);Buffer.from([137,80,78,71,13,10,26,10]).copy(image);let ocrRequest;
  const service=createKnowledgeContentService({rpc:async(name,args)=>({data:args.p_operation==='claim'?{ok:true,job}:args.p_operation==='get'?{ok:true,record}:

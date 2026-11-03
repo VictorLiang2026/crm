@@ -6,7 +6,7 @@ test('iPad knowledge basic info and content confirmation are readable in both la
  const b=new Browser(path.resolve(__dirname,'../..'));
  try{
   await b.start();
-  await b.send('Emulation.setDeviceMetricsOverride',{width:1024,height:768,deviceScaleFactor:1,mobile:false});
+  await b.send('Emulation.setDeviceMetricsOverride',{width:1366,height:1024,deviceScaleFactor:1,mobile:false});
   await b.openConsole('#/more','authCase=1');
   await b.wait("document.querySelector('.console-main')");
   await b.evaluate(`(async()=>{
@@ -20,14 +20,15 @@ test('iPad knowledge basic info and content confirmation are readable in both la
     gpt:{summary:'GPT summary',reviewed:true}};
    data.knowledgeLibrary=async(_ctx,operation,options={})=>operation==='list'
     ?{knowledge:[source],sources:[{id:'5',publisher:'Regulator',source_uri:'https://example.invalid/policy',published_at:'2026-05-01',review_at:'2027-05-01'}]}
-    :operation==='content'?{record,pending:null,history:[]}:(()=>{throw Error('unexpected operation '+operation)})();
+   :operation==='content'?{record}:(()=>{throw Error('unexpected operation '+operation)})();
    const ctx={main:document.querySelector('.console-main'),toast:()=>{}};
    window.kgBasic={ctx,source,render:()=>renderKnowledgeEditor(ctx,{mode:'edit',table:'knowledge_items',id:'71'}),i18n};
    window.kgBasic.render();
   })()`);
   await b.wait("document.querySelector('.kg-readonly-gpt_summary pre')?.textContent==='GPT summary'");
   assert.equal(await b.evaluate("document.querySelector('.page-title').textContent"),'基本信息');
-  assert.deepEqual(await b.evaluate("[...document.querySelectorAll('.kg-readonly-field h3')].map(x=>x.textContent)"),['系统摘要','系统原文','GPT摘要']);
+  assert.deepEqual(await b.evaluate("[...document.querySelectorAll('.kg-readonly-field h3')].map(x=>x.textContent)"),['系统摘要','GPT摘要','系统原文']);
+  assert.equal(await b.evaluate("getComputedStyle(document.querySelector('.kg-content-summary-grid')).gridTemplateColumns.split(' ').length"),2);
   assert.equal(await b.evaluate("[...document.querySelectorAll('.kg-basic-info-grid .kg-field > span')].map(x=>x.textContent).join('|')"),
    '发布机构|公开来源链接（如有）|发布日期|下次复核日期|置信度（0 至 1）');
   assert.equal(await b.evaluate("document.querySelector('.kg-basic-info-form [name=content]').type"),'hidden');
@@ -38,14 +39,14 @@ test('iPad knowledge basic info and content confirmation are readable in both la
   fs.mkdirSync(path.dirname(basicInfoEvidence),{recursive:true});
   fs.writeFileSync(basicInfoEvidence,Buffer.from(basicInfoShot.data,'base64'));
   await b.evaluate("document.querySelector('.kg-content-readonly .btn-primary').click()");
-  await b.wait("document.querySelector('.kc-editor[data-content-target=original] textarea')");
+  await b.wait("document.querySelector('.kc-original textarea')");
   assert.equal(await b.evaluate("document.querySelector('.sheet-title').textContent"),'内容确认');
-  assert.ok(await b.evaluate("document.querySelector('.kc-sheet-overlay .sheet').getBoundingClientRect().width")>=900);
-  assert.ok(await b.evaluate("document.querySelector('.kc-editor[data-content-target=original] textarea').getBoundingClientRect().width")>400);
+  assert.equal(await b.evaluate("document.querySelector('.kc-sheet-overlay .sheet').getBoundingClientRect().width"),1128);
+  assert.ok(await b.evaluate("document.querySelector('.kc-original textarea').getBoundingClientRect().width")>800,await b.evaluate("JSON.stringify({width:document.querySelector('.kc-original textarea').getBoundingClientRect().width,sheet:document.querySelector('.kc-sheet-overlay .sheet').getBoundingClientRect().width,grid:getComputedStyle(document.querySelector('.kc-edit-grid')).gridTemplateColumns})"));
   await b.evaluate("document.querySelector('.sheet-head button').click();window.kgBasic.i18n.setLang('en');window.kgBasic.render()");
   await b.wait("document.querySelector('.page-title').textContent==='Basic information'");
   assert.equal(await b.evaluate("[...document.querySelectorAll('.kg-readonly-field h3')].map(x=>x.textContent).join('|')"),
-   'System summary|System original|GPT summary');
+   'System summary|GPT summary|System original');
   await b.evaluate("document.querySelector('.kg-content-readonly .btn-primary').click()");
   await b.wait("document.querySelector('.sheet-title').textContent==='Content confirmation'");
   assert.equal(await b.evaluate("document.querySelector('.kc-panel').innerText.includes('kc_')"),false);

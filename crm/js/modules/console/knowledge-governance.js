@@ -177,7 +177,7 @@ export function renderKnowledgeGovernance(ctx) {
         ].filter(Boolean);
         return h('tr',{'data-kg-id':String(row.id)},[
           h('td',{class:'kg-number-cell'},`${row.table==='knowledge_items'?'K':isPlaybook?'P':'S'}-${row.id}`),
-          h('td',{},[h('b',{},titleOf(row)||'—'),row.contentReviewPending?h('small',{class:'kg-table-meta kg-review-pending'},text('content_pending_review')):null,
+          h('td',{},[h('b',{},titleOf(row)||'—'),
             isPlaybook?h('small',{class:'kg-table-meta'},text('playbook')):null,
             !isSource?h('small',{class:'kg-table-meta'},`${t('kc_selected')}: ${t(row.selected_content_source==='gpt'?'kc_gpt':'kc_original')}${row.contentPaused?' · '+t('kc_paused'):''}`):null]),
           h('td',{class:'kg-category-tags'},categoriesOf(row).map(category=>h('span',{class:'kg-category-chip'},text(`category_${category}`)))),

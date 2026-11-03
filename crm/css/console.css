@@ -1174,13 +1174,23 @@ body:has(.login), body.is-login { padding-top: env(safe-area-inset-top); }
 .kg-readonly-field h3 { margin: 0; color: var(--ink-2); font-size: 13px; font-weight: 700; }
 .kg-readonly-field pre { max-height: 180px; overflow: auto; margin: 7px 0 0; color: var(--ink); font: inherit; white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; }
 .kg-readonly-system_original pre { max-height: 300px; }
-.kc-editor-fields { display: grid; grid-template-columns: minmax(0,1.6fr) minmax(250px,1fr); gap: 14px; }
-.kc-editor-fields > label { min-width: 0; }
-.kc-editor-fields textarea { min-height: 150px; }
+.kc-edit-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; }
+.kc-field-card { min-width: 0; padding: 14px; border: 1px solid #e7e9ee; border-radius: 12px; background: #fff; }
+.kc-field-card.kc-original { grid-column: 1 / -1; }
+.kc-field-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+.kc-field-heading h3 { margin: 0; color: #2e333b; font-size: 15px; }
+.kc-field-heading small { color: #6b7280; font-size: 12px; }
+.kc-field-card textarea { display: block; width: 100%; box-sizing: border-box; min-height: 140px; }
+.kc-original textarea { min-height: 250px; }
+.kc-card-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 10px; }
+.kg-content-summary-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
+.kg-content-original-wide { grid-column: 1 / -1; }
+.kc-panel .kg-form-actions { flex-wrap: wrap; gap: 8px; }
 @media (min-width: 821px) {
   .kc-sheet-overlay { align-items: center; }
-  .kc-sheet-overlay .sheet { width: min(940px,calc(100vw - 48px)); max-width: calc(100vw - 48px); max-height: 90vh; padding: 18px 24px 24px; border-radius: 16px; }
+  .kc-sheet-overlay .sheet { width: min(1128px,calc(100vw - 48px)); max-width: calc(100vw - 48px); max-height: 90vh; padding: 18px 24px 24px; border-radius: 16px; }
 }
-@media (max-width: 999px) {
-  .kc-editor-fields { grid-template-columns: minmax(0,1fr); }
+@media (max-width: 767px) {
+  .kc-edit-grid, .kg-content-summary-grid { grid-template-columns: minmax(0,1fr); }
+  .kc-field-card.kc-original, .kg-content-original-wide { grid-column: auto; }
 }

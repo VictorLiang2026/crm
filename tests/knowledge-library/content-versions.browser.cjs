@@ -1,59 +1,55 @@
 'use strict';
-const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path'),fs=require('node:fs');
+const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
 const {Browser}=require('../regression/browser.cjs');
-test('iPad bilingual manual GPT editor requires server preview and explicit confirmation; hostile text remains text',async()=>{
+
+test('iPad content confirmation directly saves GPT and system fields without review or progress controls',async()=>{
  const b=new Browser(path.resolve(__dirname,'../..'));
  try{
-  await b.start();await b.send('Emulation.setDeviceMetricsOverride',{width:1024,height:768,deviceScaleFactor:1,mobile:false});
+  await b.start();await b.send('Emulation.setDeviceMetricsOverride',{width:1366,height:1024,deviceScaleFactor:1,mobile:false});
   await b.openConsole('#/more','authCase=1');await b.wait("document.querySelector('.console-main')");
   await b.evaluate(`(async()=>{
    const {openKnowledgeContent}=await import('/crm/js/modules/console/knowledge-content.js');
-   window.kcI18n=await import('/crm/js/modules/console/i18n.js');
-   window.kcCalls=[];window.kcPending=null;window.kcRecord={id:1,table:'knowledge_items',title:'Synthetic fixture',updatedAt:'2026-10-30T00:00:00Z',
-    original:{text:'System text',summary:'System summary',reviewed:true},gpt:{summary:null,reviewed:false},selected:'original',version:0};
-   const ctx={toast:()=>{},api:{call:async(name,event)=>{
-    window.kcCalls.push(event);const d=event.data;
-    if(event.contentOperation==='get')return {ok:true,record:window.kcRecord,history:[{id:9,applied_at:'2026-10-29T00:00:00Z'}],pending:window.kcPending};
-    if(event.contentOperation==='preview'){const after=structuredClone(window.kcRecord);Object.assign(after[d.target],d.patch,{reviewed:d.reviewed});
-     window.kcAfter=after;return {ok:true,commandId:'server-preview',before:window.kcRecord,after};}
-    if(event.contentOperation==='apply'){window.kcPending={commandId:'pending-command',after:window.kcAfter,createdAt:'2026-10-30T00:00:00Z'};return {status:'pending_review'};}
-    if(event.contentOperation==='approve'){window.kcRecord=window.kcPending.after;window.kcPending=null;return {ok:true};}
-    if(event.contentOperation==='reject'){window.kcPending=null;return {ok:true};}
-    throw Error('unexpected call');}}};
-   window.kcOpen=()=>openKnowledgeContent(ctx,{id:1,table:'knowledge_items'});await window.kcOpen();
+   const {data}=await import('/crm/js/modules/console/data.js');window.kcI18n=await import('/crm/js/modules/console/i18n.js');
+   window.kcCalls=[];window.kcRecord={id:1,table:'knowledge_items',title:'Synthetic fixture',updatedAt:'2026-10-30T00:00:00Z',
+    sourceFingerprint:null,version:2,original:{text:'System text',summary:'System summary'},gpt:{summary:null,reviewed:false},selected:'original'};
+   data.knowledgeLibrary=async(_ctx,_operation,options)=>{
+    const op=options.contentOperation,d=options.data;window.kcCalls.push({contentOperation:op,data:d});
+    if(op==='get')return {ok:true,record:structuredClone(window.kcRecord)};
+    if(op==='save'){
+     if(d.target==='gpt')Object.assign(window.kcRecord.gpt,d.patch);
+     else Object.assign(window.kcRecord.original,d.patch);
+     window.kcRecord.version++;window.kcRecord.updatedAt='2026-10-30T00:00:0'+window.kcRecord.version+'Z';
+     return {ok:true,record:structuredClone(window.kcRecord)};
+    }
+    if(op==='regenerate')return {ok:true,status:'queued'};
+    throw Error('Unexpected operation '+op);
+   };
+   const ctx={toast:()=>{}};window.kcOpen=()=>openKnowledgeContent(ctx,{id:1,table:'knowledge_items'});await window.kcOpen();
   })()`);
-  assert.equal(await b.evaluate("document.querySelectorAll('.kc-editor').length"),2,await b.evaluate("document.body.innerText.slice(-1800)"));
-  assert.equal(await b.evaluate("document.querySelector('.kc-sheet-overlay')!==null"),true,'the live overlay receives its knowledge-specific class');
-  assert.equal(await b.evaluate("!document.querySelector('.kc-panel').innerText.includes('变更历史')"),true,'the live editor omits history restore controls');
-  assert.equal(await b.evaluate("![...document.querySelectorAll('.kc-editor button')].some(x=>x.textContent.includes('重新生成系统原文和摘要'))"),true,'the live editor exposes separate bounded regeneration actions');
-  assert.equal(await b.evaluate("document.querySelector('[data-content-target=\\\"gpt\\\"] textarea').getAttribute('aria-label').endsWith('摘要')"),true);
-  await b.evaluate(`(()=>{const panel=document.querySelector('[data-content-target="gpt"]');panel.querySelector('textarea').value='<img src=x onerror="window.kcXss=1">';
-   panel.querySelector('input').checked=true;panel.querySelector('button').click();})()`);
-  await b.wait("document.querySelector('.kc-preview')");
-  assert.equal(await b.evaluate("window.kcCalls.some(e=>e.contentOperation==='apply')"),false);
-  assert.equal(await b.evaluate("document.querySelector('.kc-preview img')===null && !window.kcXss"),true);
-  await b.click('.kc-preview button','确认执行');
-  await b.wait("document.querySelector('.kc-pending')");
-  assert.deepEqual(await b.evaluate("window.kcCalls.filter(e=>e.contentOperation==='apply').map(e=>e.data)"),[{commandId:'server-preview'}]);
-  assert.equal(await b.evaluate("!Object.hasOwn(window.kcRecord.gpt,'text') && !Object.hasOwn(window.kcPending.after.gpt,'text') && window.kcPending.after.gpt.summary.includes('<img')"),true);
-  await b.click('.kc-pending button','审核通过并生效');
-  await b.wait("document.querySelectorAll('.kc-editor').length===2");
-  assert.equal(await b.evaluate("window.kcCalls.some(e=>e.contentOperation==='approve')"),true);
-  await b.evaluate("document.querySelectorAll('[data-content-target=\"gpt\"] button')[2].click()");
-  await b.wait("document.querySelector('.kc-preview')");
-  assert.deepEqual(await b.evaluate("window.kcCalls.at(-1).data"),{table:'knowledge_items',id:1,expectedUpdatedAt:'2026-10-30T00:00:00Z',
-    action:'edit',target:'original',patch:{summary:'<img src=x onerror=\"window.kcXss=1\">'},reviewed:true});
-  await b.click('.kc-preview button','取消');
-  await b.click('[data-content-target="gpt"] button','清空摘要');
-  await b.wait("document.querySelector('.kc-preview')");
-  assert.equal(await b.evaluate("window.kcCalls.at(-1).data.patch.summary"),null);
-  await b.click('.kc-preview button','取消');
+  await b.wait("document.querySelector('.kc-field-card.kc-original textarea')");
+  assert.equal(await b.evaluate("document.querySelectorAll('.kc-field-card').length"),3);
+  assert.equal(await b.evaluate("document.querySelector('.kc-sheet-overlay .sheet').getBoundingClientRect().width"),1128);
+  assert.equal(await b.evaluate("document.querySelector('.kc-panel').innerText.includes('预览并送审')||document.querySelector('.kc-panel').innerText.includes('待审核')"),false);
+  assert.equal(await b.evaluate("/刷新进度|重新预览|候选内容/.test(document.querySelector('.kc-panel').innerText)"),false);
+  assert.equal(await b.evaluate("getComputedStyle(document.querySelector('.kc-edit-grid')).gridTemplateColumns.split(' ').length"),2);
+  await b.evaluate(`(()=>{const card=document.querySelector('.kc-gpt-summary textarea');card.value='<img src=x onerror="window.kcXss=1"> summary';
+   [...document.querySelectorAll('.kc-gpt-summary button')].find(x=>x.textContent==='保存').click();})()`);
+  await b.wait("window.kcRecord.gpt.summary?.includes('<img')");
+  assert.deepEqual(await b.evaluate("window.kcCalls.filter(x=>x.contentOperation==='save').at(-1).data"),{
+   table:'knowledge_items',id:1,expectedUpdatedAt:'2026-10-30T00:00:00Z',expectedVersion:2,expectedSourceFingerprint:null,
+   target:'gpt',patch:{summary:'<img src=x onerror="window.kcXss=1"> summary'}});
+  assert.equal(await b.evaluate("window.kcRecord.original.text==='System text'&&window.kcRecord.original.summary==='System summary'&&!window.kcXss"),true);
+  await b.evaluate(`(()=>{const original=document.querySelector('.kc-original textarea');original.value='Edited original';
+   document.querySelector('.kc-system-summary textarea').value='Edited system summary';
+   [...document.querySelectorAll('.kc-original button')].find(x=>x.textContent==='保存').click();})()`);
+  await b.wait("window.kcRecord.original.text==='Edited original'");
+  assert.deepEqual(await b.evaluate("window.kcCalls.filter(x=>x.contentOperation==='save').at(-1).data.patch"),
+   {text:'Edited original',summary:'Edited system summary'});
+  assert.equal(await b.evaluate("window.kcCalls.some(x=>['preview','apply','approve','reject','command','retry'].includes(x.contentOperation))"),false);
   await b.evaluate("document.querySelector('.sheet-head button').click();window.kcI18n.setLang('en');window.kcOpen()");
   await b.wait("document.querySelector('.kc-panel')?.innerText.includes('GPT summary')");
-  assert.equal(await b.evaluate("document.querySelector('.kc-panel').innerText.includes('kc_')"),false);
-  const image=await b.send('Page.captureScreenshot',{format:'png'});
-  const evidenceDir=path.join(__dirname,'../regression/.results');
-  fs.mkdirSync(evidenceDir,{recursive:true});fs.writeFileSync(path.join(evidenceDir,'knowledge-content-ipad-en.png'),Buffer.from(image.data,'base64'));
+  assert.equal(await b.evaluate("document.querySelector('.kc-panel').innerText.includes('kc_')"),false,await b.evaluate("document.querySelector('.kc-panel').innerText"));
+  assert.equal(await b.evaluate("document.querySelector('.kc-panel').innerText.includes('Save')"),true);
   await b.healthy();
  }finally{await b.close();}
 });

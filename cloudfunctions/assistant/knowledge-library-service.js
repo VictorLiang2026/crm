@@ -335,13 +335,11 @@ function createKnowledgeLibrary(options={}) {
       knowledgeOffset=page.knowledgeOffset===undefined?0:Number(page.knowledgeOffset),
       playbookOffset=page.playbookOffset===undefined?0:Number(page.playbookOffset);
     if(!Number.isSafeInteger(limit)||limit<1||limit>200||![sourceOffset,knowledgeOffset,playbookOffset].every(n=>Number.isSafeInteger(n)&&n>=0))fail('INVALID_INPUT');
-    const [sources,items,playbooks,pendingCommands]=await Promise.all([
+    const [sources,items,playbooks]=await Promise.all([
       sourcePage(sourceOffset,limit),request('knowledge_items','GET',{select:'id,source_id,item_type,source,source_date,valid_from,valid_to,verified,lifecycle_status,version_no,supersedes_id,confidence,content,metadata,updated_at,deleted_at,'+CONTENT_COLUMNS,deleted_at:'is.null',order:'updated_at.desc,id.desc',limit,offset:knowledgeOffset}),
       request('playbooks','GET',{select:'id,scenario,objection,possible_underlying_reasons,clarifying_questions,response_logic,evidence_refs,case_refs,story_refs,do_not_say,next_objective,source,confidence,valid_from,valid_to,version_no,supersedes_id,metadata,lifecycle_status,updated_at,deleted_at,'+CONTENT_COLUMNS,deleted_at:'is.null',order:'updated_at.desc,id.desc',limit:playbookLimit,offset:playbookOffset}),
-      request('knowledge_content_commands','GET',{select:'record_table,record_id,created_at',status:'eq.pending_review',limit:300}),
     ]);
     const sourceRows=sources.rows;
-    const pendingKeys=new Map(pendingCommands.map(command=>[`${command.record_table}:${command.record_id}`,command.created_at]));
     return {ok:true,coverage:{offsets:{sources:sourceOffset,knowledge:knowledgeOffset,playbooks:playbookOffset},limits:{sources:limit,knowledge:limit,playbooks:playbookLimit},
       hasMore:{sources:sources.rawCount===limit,knowledge:items.length===limit,playbooks:playbooks.length===playbookLimit},
       nextOffsets:{sources:sourceOffset+sources.rawCount,knowledge:knowledgeOffset+items.length,playbooks:playbookOffset+playbooks.length}},
@@ -349,11 +347,9 @@ function createKnowledgeLibrary(options={}) {
       knowledge:items.map(row=>{
         const source=sourceRows.find(s=>String(s.id)===String(row.source_id));
         return {...managementRow(row,'knowledge_items',source),sourceUpdatedAt:source?.updated_at||null,
-          sourceLifecycleStatus:source?.lifecycle_status||null,sourceExtractionStatus:source?.extraction_status||null,
-          contentReviewPending:pendingKeys.has(`knowledge_items:${row.id}`),contentReviewPendingAt:pendingKeys.get(`knowledge_items:${row.id}`)||null};
+          sourceLifecycleStatus:source?.lifecycle_status||null,sourceExtractionStatus:source?.extraction_status||null};
       }),
-      playbooks:playbooks.map(row=>({...managementRow(row,'playbooks'),contentReviewPending:pendingKeys.has(`playbooks:${row.id}`),
-        contentReviewPendingAt:pendingKeys.get(`playbooks:${row.id}`)||null}))};
+      playbooks:playbooks.map(row=>managementRow(row,'playbooks'))};
   }
   async function trashList() {
     const [sources,items,playbooks]=await Promise.all([

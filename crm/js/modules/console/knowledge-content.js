@@ -2,105 +2,81 @@ import { h } from './dom.js';
 import { t } from './i18n.js';
 import { data } from './data.js';
 import { openSheet } from './write.js';
+
 const tr=key=>t(`kc_${key}`);
 const codeOf=error=>String(error?.message||'').match(/CONTENT_[A-Z_]+/)?.[0];
+
 export async function openKnowledgeContent(ctx,row,onSaved=()=>{}) {
   const body=h('div',{class:'kc-panel'}),sheet=openSheet({title:tr('title'),sub:tr('intro'),body});
   sheet.overlay.classList.add('kc-sheet-overlay');
   (document.getElementById('sheet-root')||document.body).appendChild(sheet.overlay);
-  let record,pending=null,job=null,busy=false;
-  const call=(op,value)=>data.knowledgeLibrary(ctx,'content',{contentOperation:op,data:value});
-  const identity=()=>({table:row.table,id:row.id,expectedUpdatedAt:record.updatedAt});
+  let record,busy=false;
+  const call=(operation,value)=>data.knowledgeLibrary(ctx,'content',{contentOperation:operation,data:value});
+  const identity=()=>({table:row.table,id:row.id,expectedUpdatedAt:record.updatedAt,
+    expectedVersion:record.version,expectedSourceFingerprint:record.sourceFingerprint});
   const errorBox=h('p',{class:'sheet-err',role:'alert'});
   const errorText=error=>{const code=codeOf(error);const key=`kc_${code}`;const value=t(key);return code&&value!==key?value:tr('failed');};
-  const act=async fn=>{if(busy)return;busy=true;errorBox.textContent='';body.querySelectorAll('button').forEach(b=>b.disabled=true);
-    try{await fn();}catch(error){errorBox.textContent=errorText(error);}finally{busy=false;body.querySelectorAll('button').forEach(b=>b.disabled=false);}};
+  const act=async fn=>{
+    if(busy)return;
+    busy=true;errorBox.textContent='';body.querySelectorAll('button').forEach(button=>button.disabled=true);
+    try{await fn();}catch(error){errorBox.textContent=errorText(error);}
+    finally{busy=false;body.querySelectorAll('button').forEach(button=>button.disabled=false);}
+  };
   const button=(label,fn,cls='btn btn-ghost')=>h('button',{type:'button',class:cls,onclick:()=>act(fn)},tr(label));
-  const pairView=(name,pair)=>h('section',{class:'kc-pair-preview'},[
-    h('b',{},tr(name)),name==='original'?h('details',{open:true},[h('summary',{},tr('text')),h('pre',{},pair?.text||tr('empty'))]):null,
-    h('details',{open:true},[h('summary',{},tr('summary')),h('pre',{},pair?.summary||tr('empty'))]),
-  ]);
-  const showPreview=preview=>{
-    const panel=h('section',{class:'kc-preview'},[
-      h('h3',{},tr('preview')),h('p',{},tr('preview_note')),
-      h('div',{class:'kc-compare'},[
-        h('div',{},[h('h4',{},tr('before')),pairView('original',preview.before.original),pairView('gpt',preview.before.gpt)]),
-        h('div',{},[h('h4',{},tr('after')),pairView('original',preview.after.original),pairView('gpt',preview.after.gpt)]),
-      ]),
-      h('p',{},`${tr('selected')}: ${tr(preview.after.selected)}${preview.after.paused?` · ${tr('paused')}`:''}`),
-      h('div',{class:'kg-form-actions'},[
-        button('confirm',async()=>{const result=await call('apply',{commandId:preview.commandId});await load();await onSaved();ctx.toast(result.status==='pending_review'?tr('pending_title'):tr('saved'),'ok');},'btn btn-primary'),
-        button('cancel',async()=>draw()),
+  const field=(name,value,rows)=>{
+    const input=h('textarea',{rows,maxlength:rows>5?'120000':'12000','aria-label':tr(name)});
+    input.value=value||'';
+    return input;
+  };
+  const saved=async result=>{
+    record=result.record;
+    await onSaved();
+    ctx.toast(tr('saved'),'ok');
+    draw();
+  };
+  const save=async(target,patch)=>saved(await call('save',{...identity(),target,patch}));
+  const clear=async(target,patch)=>save(target,patch);
+  const regenerate=async part=>{
+    if(!window.confirm(tr('regenerate_confirm')))return;
+    const result=await call('regenerate',{...identity(),part});
+    ctx.toast(tr(result.status==='queued'?'generation_started':'saved'),'ok');
+  };
+  const load=async()=>{const result=await call('get',{table:row.table,id:row.id});record=result.record;draw();};
+
+  const draw=()=>{
+    if(!record)return;
+    const systemSummary=field('system_summary',record.original?.summary,5);
+    const gptSummary=field('gpt_summary',record.gpt?.summary,5);
+    const originalText=field('system_original',record.original?.text,10);
+    const systemSummaryCard=h('section',{class:'kc-field-card kc-system-summary'},[
+      h('div',{class:'kc-field-heading'},[h('h3',{},tr('system_summary')),h('small',{},tr('system_ready_note'))]),
+      systemSummary,
+      h('div',{class:'kc-card-actions'},[
+        button('clear_summary',()=>clear('original',{summary:null})),
+        button('regenerate_summary',()=>regenerate('summary')),
       ]),
     ]);
-    body.replaceChildren(panel,errorBox);
+    const gptSummaryCard=h('section',{class:'kc-field-card kc-gpt-summary'},[
+      h('div',{class:'kc-field-heading'},[h('h3',{},tr('gpt_summary')),h('small',{},tr('gpt_note'))]),
+      gptSummary,
+      h('div',{class:'kc-card-actions'},[
+        button('clear_summary',()=>clear('gpt',{summary:null})),
+        button('save',()=>save('gpt',{summary:gptSummary.value}),'btn btn-primary'),
+      ]),
+    ]);
+    const originalCard=h('section',{class:'kc-field-card kc-original'},[
+      h('div',{class:'kc-field-heading'},[h('h3',{},tr('system_original')),h('small',{},tr('original_note'))]),
+      originalText,
+      h('div',{class:'kc-card-actions'},[
+        button('clear_text',()=>clear('original',{text:null})),
+        button('clear_pair',()=>clear('original',{text:null,summary:null})),
+        button('regenerate_text',()=>regenerate('text')),
+        button('save',()=>save('original',{text:originalText.value,summary:systemSummary.value}),'btn btn-primary'),
+      ]),
+    ]);
+    body.replaceChildren(h('div',{class:'kc-edit-grid'},[systemSummaryCard,gptSummaryCard,originalCard]),errorBox);
   };
-  const preview=async input=>showPreview(await call('preview',{...identity(),...input}));
-  const load=async()=>{const result=await call('get',{table:row.table,id:row.id});record=result.record;pending=result.pending||null;job=result.job||job;draw();};
-  const drawPending=()=>{
-    const candidate=pending.after;
-    body.replaceChildren(h('p',{},`${record.title||''} · ${tr('selected')}: ${tr(record.selected)}`),
-      h('section',{class:'kc-pending'},[
-        h('h3',{},tr('pending_title')),h('p',{},tr('pending_note')),
-        h('p',{},`${tr('created_at')}: ${String(pending.createdAt||'').replace('T',' ').slice(0,19)}`),
-        h('div',{class:'kc-compare'},[pairView('original',candidate.original),pairView('gpt',candidate.gpt)]),
-        h('div',{class:'kg-form-actions'},[
-          button('approve',async()=>{await call('approve',{commandId:pending.commandId});await load();await onSaved();ctx.toast(tr('saved'),'ok');},'btn btn-primary'),
-          button('reject',async()=>{await call('reject',{commandId:pending.commandId});await load();await onSaved();ctx.toast(tr('rejected'),'ok');}),
-          button('continue_edit',async()=>{const next=pending.after;await call('reject',{commandId:pending.commandId});pending=null;await onSaved();draw({original:next.original,gpt:next.gpt});}),
-        ]),
-      ]),errorBox);
-  };
-  const drawJob=()=>{
-    const node=h('section',{class:'kc-job'});
-    if(!job)return node;
-    node.append(h('p',{},`${tr('generation')}: ${tr(job.status||'queued')}`));
-    if(job.progress?.totalPages)node.append(h('p',{},`${Math.max(0,job.progress.nextPage-1)} / ${job.progress.totalPages}`));
-    if(job.errorCode)node.append(h('p',{},`${tr('failed')}: ${job.errorCode}`));
-    node.append(button('refresh',async()=>{job=await call('command',{commandId:job.commandId});draw();}));
-    if(job.status==='failed'||job.status==='done')node.append(button('retry',async()=>{job=await call('retry',{commandId:job.commandId});draw();}));
-    if(job.status==='done'&&job.progress?.previewId)node.append(button('candidate',async()=>{
-      const candidate=await call('command',{commandId:job.progress.previewId});
-      if(candidate.before.updatedAt!==record.updatedAt)throw new Error('CONTENT_STALE');
-      draw({original:candidate.after.original});
-    }));
-    return node;
-  };
-  const draw=(candidate={})=>{
-    if(pending){drawPending();return;}
-    const pairEditors=['original','gpt'].map(target=>{
-      const pair=candidate[target]||record[target];
-      const txt=h('textarea',{rows:7,maxlength:'120000','aria-label':`${tr(target)} ${tr('text')}`},pair.text||'');
-      const summary=h('textarea',{rows:4,maxlength:'12000','aria-label':`${tr(target)} ${tr('summary')}`},pair.summary||'');
-      const reviewed=h('input',{type:'checkbox'});
-      const fields=h('div',{class:'kc-editor-fields'},[
-        target==='original'?h('label',{},[tr('text'),txt]):null,
-        h('label',{},[tr('summary'),summary]),
-      ]);
-      const panel=h('section',{class:'kc-editor','data-content-target':target},[
-        h('h3',{},tr(target)),target==='gpt'?h('p',{},tr('gpt_note')):null,
-        candidate[target]?h('p',{class:'kc-candidate-note'},tr('candidate_note')):null,
-        fields,
-        h('label',{class:'kc-review'},[reviewed,tr('reviewed')]),
-        h('div',{class:'kg-form-actions'},[
-          button('save_preview',async()=>preview({action:'edit',target,patch:target==='original'?{text:txt.value,summary:summary.value}:{summary:summary.value},reviewed:reviewed.checked}),'btn btn-primary'),
-          ...(target==='original'?[button('clear_text',async()=>preview({action:'edit',target,patch:{text:null},reviewed:false}))]:[]),
-          button('clear_summary',async()=>preview({action:'edit',target,patch:{summary:null},reviewed:false})),
-          ...(target==='original'?[button('clear_pair',async()=>preview({action:'edit',target,patch:{text:null,summary:null},reviewed:false})),
-            button('select',async()=>preview({action:'select',selected:target}))]:[]),
-          ...(target==='gpt'&&pair.summary?[button('select',async()=>preview({action:'edit',target:'original',patch:{summary:pair.summary},reviewed:true}))]:[]),
-        ]),
-      ]);
-      if(target==='original')panel.append(h('div',{class:'kg-form-actions'},['text','summary'].map(part=>button(`regenerate_${part}`,async()=>{
-        if(!window.confirm(tr('regenerate_confirm')))return;
-        job=await call('regenerate',{...identity(),part});draw();
-      }))));
-      return panel;
-    });
-    body.replaceChildren(h('p',{},`${record.title||''} · ${tr('selected')}: ${tr(record.selected)}`),
-      record.paused?h('p',{class:'kc-candidate-note'},tr('paused')):h('span'),
-      ...pairEditors,drawJob(),errorBox);
-  };
+
   try{await load();}catch(error){body.replaceChildren(errorBox);errorBox.textContent=errorText(error);}
   return sheet;
 }

@@ -243,9 +243,11 @@ export function renderKnowledgeEditor(ctx,{mode='new',table='knowledge_items',id
         assign('confidence',source.confidence??0.8);
         const previews=h('section',{class:'kg-content-readonly'},[
           h('h2',{},text('content_preview_title')),
-          readonlyContent('system_summary',contentRecord.original?.summary),
-          readonlyContent('system_original',contentRecord.original?.text),
-          readonlyContent('gpt_summary',contentRecord.gpt?.summary),
+          h('div',{class:'kg-content-summary-grid'},[
+            readonlyContent('system_summary',contentRecord.original?.summary),
+            readonlyContent('gpt_summary',contentRecord.gpt?.summary),
+          ]),
+          h('div',{class:'kg-content-original-wide'},readonlyContent('system_original',contentRecord.original?.text)),
           h('p',{class:'foot-note'},text('content_edit_in_confirm')),
           h('button',{type:'button',class:'btn btn-primary',onclick:()=>openKnowledgeContent(ctx,{...source,table},()=>{location.hash='#/knowledge-governance';})},t('kc_title')),
         ]);

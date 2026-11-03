@@ -13,6 +13,8 @@ const invalidateUp=fs.readFileSync(path.join(root,'cloudbase/migrations/20261030
 const invalidateDown=fs.readFileSync(path.join(root,'cloudbase/migrations/20261030144000_knowledge_summary_review_invalidation.rollback.sql'),'utf8');
 const summaryOnly=fs.readFileSync(path.join(root,'cloudbase/migrations/20261102100000_knowledge_summary_only.sql'),'utf8');
 const summaryOnlyDown=fs.readFileSync(path.join(root,'cloudbase/migrations/20261102100000_knowledge_summary_only.rollback.sql'),'utf8');
+const directSave=fs.readFileSync(path.join(root,'cloudbase/migrations/20261103160000_knowledge_content_direct_save.sql'),'utf8');
+const directSaveDown=fs.readFileSync(path.join(root,'cloudbase/migrations/20261103160000_knowledge_content_direct_save.rollback.sql'),'utf8');
 
 test('generated-content review migration stays additive, public-only, and has a paired rollback',()=>{
   assert.match(up,/ALTER TABLE public\.knowledge_content_commands/);
@@ -35,15 +37,34 @@ test('generated-content review migration stays additive, public-only, and has a 
   assert.doesNotMatch(invalidateDown,/pair->>'summary' IS DISTINCT FROM old#>>'\{original,summary\}'/);
 });
 
-test('bilingual knowledge UI exposes a separate pending approval step',()=>{
+test('knowledge editor uses direct saving and exposes no review or manual progress UI',()=>{
   const ui=fs.readFileSync(path.join(root,'crm/js/modules/console/knowledge-content.js'),'utf8');
   const governance=fs.readFileSync(path.join(root,'crm/js/modules/console/knowledge-governance.js'),'utf8');
   const i18n=fs.readFileSync(path.join(root,'crm/js/modules/console/i18n.js'),'utf8');
-  assert.match(ui,/call\('approve'/);assert.match(ui,/call\('reject'/);assert.match(ui,/pending\.after/);
+  assert.match(ui,/call\('save'/);assert.match(ui,/kc-edit-grid/);
+  assert.doesNotMatch(ui,/call\('(approve|reject|preview|apply|command|retry)'/);
+  assert.doesNotMatch(ui,/pending|history|candidate|refresh/i);
   assert.match(governance,/sourceExtractionStatus==='draft'/);assert.match(governance,/knowledgeLibrary\(ctx,'review'/);
-  for(const key of ['kc_pending_title','kc_pending_note','kc_approve','kc_reject','kg_status_pending_review','kg_review_activate']){
-    assert.match(i18n,new RegExp(`['"]?${key}['"]?\\s*:`));
-  }
+  assert.doesNotMatch(governance,/contentReviewPending/);
+  for(const key of ['kc_save','kc_system_summary','kc_gpt_summary','kc_regenerate_text','kc_regenerate_summary'])assert.match(i18n,new RegExp(key+'\\s*:'));
+  for(const key of ['kc_save_preview','kc_approve','kc_reject','kc_refresh','kc_candidate'])assert.doesNotMatch(i18n,new RegExp(key+'\\s*:'));
+});
+
+test('direct-save migration keeps rollback and validates record version while bypassing legacy pending rows',()=>{
+  assert.match(directSave,/p_operation NOT IN \('get','save','regenerate'\)/);assert.match(directSave,/Direct save/);
+  assert.match(directSave,/expectedUpdatedAt/);assert.match(directSave,/expectedVersion/);
+  assert.match(directSave,/expectedSourceFingerprint/);assert.match(directSave,/UPDATE public\.knowledge_items SET content=base_text,metadata=meta,gpt_summary/);
+  assert.match(directSave,/UPDATE public\.playbooks SET response_logic=base_text,metadata=meta,gpt_summary/);
+  assert.match(directSave,/CONTENT_OPERATION_REMOVED/);assert.match(directSave,/p_operation='get' THEN[\s\S]*?RETURN jsonb_build_object\('ok',true,'record',old\)/);
+  const regenerateBranch=directSave.slice(directSave.indexOf("IF p_operation='regenerate' THEN"),directSave.indexOf("IF p_data->>'expectedUpdatedAt'"));
+  assert.doesNotMatch(regenerateBranch,/CONTENT_PENDING_EXISTS/);
+  assert.match(directSave,/SET status=p_data->>'status',payload=p_data->'payload'/,'worker queue progress remains internal');
+  assert.doesNotMatch(directSave,/\b(?:DROP TABLE|DROP FUNCTION|CASCADE)\b/i);assert.doesNotMatch(directSave,/\bpr\./i);
+  assert.match(directSaveDown,/CREATE OR REPLACE FUNCTION public\.crm_knowledge_content_v1/);
+  assert.doesNotMatch(directSaveDown,/p_operation='save'/);
+  const integration=fs.readFileSync(path.join(root,'tests/knowledge-library/direct-save.sql'),'utf8');
+  assert.match(integration,/STALE_SAVE_WAS_ACCEPTED/);assert.match(integration,/CLEAR_SYSTEM_PAIR_DID_NOT_APPLY/);
+  assert.match(integration,/ROLLBACK/);
 });
 
 test('summary-only migration guards data, removes GPT-original fields and narrows OAuth scopes',()=>{

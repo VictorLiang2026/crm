@@ -115,8 +115,7 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
             data:{table:input.table,id:String(input.id),expectedUpdatedAt:input.expectedUpdatedAt}},actorUid);
         if (input.tool === 'knowledge_generation_status' && Object.keys(input).every(k=>['tool','commandId'].includes(k)) &&
             /^[0-9a-f-]{36}$/i.test(String(input.commandId)))
-          return await knowledgeLibraryRunner({action:'knowledgeLibrary',operation:'content',contentOperation:'command',
-            data:{commandId:input.commandId}},actorUid);
+          return {ok:false,error:{code:'CONTENT_STATUS_REMOVED',message:'Generation status lookup is no longer exposed; saved content can be read from its record.'}};
       } catch (error) {
         return {ok:false,error:{code:/^[A-Z][A-Z0-9_]{1,79}$/.test(error?.code||'')?error.code:'MCP_OPERATION_FAILED',message:'Knowledge operation could not be completed'}};
       }

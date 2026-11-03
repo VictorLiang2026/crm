@@ -128,7 +128,7 @@ function compactList(result){
   for(const [table,key] of [['knowledge_items','knowledge'],['playbooks','playbooks']])for(const row of result?.[key]||[]){
     rows.push({table,id:String(row.id),title:String(row.title||row.source||row.scenario||''),
       updatedAt:row.updatedAt||row.updated_at||null,systemOriginalPresent:Boolean((row.content||row.response_logic||'').trim()),
-      gptSummaryPresent:Boolean(row.gpt_summary_preview),pendingReview:row.contentReviewPending===true});
+      gptSummaryPresent:Boolean(row.gpt_summary_preview)});
   }
   const coverage=result?.coverage||{};
   const hasMore=coverage.hasMore||{};
@@ -151,8 +151,7 @@ function compactList(result){
 const TOOLS=[
  {name:'knowledge_records_list',description:'List one bounded page of CRM knowledge records and GPT coverage. Repeat with returned nextOffsets until all hasMore values are false.',securitySchemes:[{type:'oauth2',scopes:['knowledge:read']}],inputSchema:{type:'object',properties:{sourceOffset:{type:'integer',minimum:0},knowledgeOffset:{type:'integer',minimum:0},playbookOffset:{type:'integer',minimum:0},limit:{type:'integer',minimum:1,maximum:100},},additionalProperties:false}},
  {name:'knowledge_record_get',description:'Read text fields for one CRM knowledge record selected by exact table and record ID. Returns the stored system original and GPT summary only; it never reads linked files.',securitySchemes:[{type:'oauth2',scopes:['knowledge:read']}],inputSchema:{type:'object',properties:{table:{type:'string',enum:['knowledge_items','playbooks']},id:{type:'string',pattern:'^[1-9][0-9]*$'}},required:['table','id'],additionalProperties:false}},
- {name:'knowledge_generate_gpt_pending',description:'Generate a GPT summary only from the stored system original text for the exact record ID and submit it as pending review. Does not read files or images, generate GPT original text, approve, or publish.',securitySchemes:[{type:'oauth2',scopes:['knowledge:read','knowledge:gpt:submit']}],inputSchema:{type:'object',properties:{table:{type:'string',enum:['knowledge_items','playbooks']},id:{type:'string',pattern:'^[1-9][0-9]*$'},expectedUpdatedAt:{type:'string',format:'date-time'}},required:['table','id','expectedUpdatedAt'],additionalProperties:false}},
- {name:'knowledge_generation_status',description:'Check a GPT generation command by its exact command ID.',securitySchemes:[{type:'oauth2',scopes:['knowledge:read']}],inputSchema:{type:'object',properties:{commandId:{type:'string',format:'uuid'}},required:['commandId'],additionalProperties:false}},
+ {name:'knowledge_generate_gpt_pending',description:'Generate a GPT summary only from stored system original text and save it directly to the exact record ID. Does not read files or images, generate GPT original text, or alter system content.',securitySchemes:[{type:'oauth2',scopes:['knowledge:read','knowledge:gpt:submit']}],inputSchema:{type:'object',properties:{table:{type:'string',enum:['knowledge_items','playbooks']},id:{type:'string',pattern:'^[1-9][0-9]*$'},expectedUpdatedAt:{type:'string',format:'date-time'}},required:['table','id','expectedUpdatedAt'],additionalProperties:false}},
 ];
 async function mcp(req){
   const rpcMsg=req.body;
@@ -192,9 +191,9 @@ async function mcp(req){
     if(name==='knowledge_record_get'&&result?.record){
       const record=result.record;
       safeResult={ok:result.ok===true,record:{table:record.table,id:String(record.id),title:record.title||'',updatedAt:record.updatedAt,
-        systemOriginalText:record.original?.text||'',gptSummary:record.gpt?.summary||null,summaryReviewed:record.gpt?.reviewed===true,
+        systemOriginalText:record.original?.text||'',gptSummary:record.gpt?.summary||null,
         selected:record.selected,version:record.version,lifecycleStatus:record.lifecycleStatus},
-        hasPendingReview:result.pendingReviewExists===true||!!result.pending?.commandId};
+        };
     }
     return response(200,{jsonrpc:'2.0',id,result:{content:[{type:'text',text:JSON.stringify(safeResult)}],isError:safeResult?.ok===false},
       ...(modern?{_meta:{'io.modelcontextprotocol/serverInfo':{name:'crm-knowledge',version:'1.0.0'}}}:{})});
