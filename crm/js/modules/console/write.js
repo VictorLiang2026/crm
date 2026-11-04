@@ -1515,6 +1515,40 @@ export function openPersonRoleConversion(ctx, { person, kind, onDone } = {}) {
   }
 }
 
+export function openReferrerRoleAction(ctx, { personId, displayName, enabled, onDone } = {}) {
+  if (!personId || typeof enabled !== 'boolean') return;
+  const nextEnabled = !enabled;
+  const sheet = openSheet({
+    title: t(nextEnabled ? 'referrer_mark_title' : 'referrer_unmark_title'),
+    sub: displayName || `#${personId}`,
+    body: h('div', {}, [
+      h('p', { class: 'sheet-note' }, t('referrer_role_explain')),
+      h('p', { class: 'sheet-note' }, t(nextEnabled ? 'referrer_mark_review' : 'referrer_unmark_review')),
+      h('div', { class: 'sheet-actions' }, [
+        h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => sheet.overlay.remove() }, t('cancel')),
+        h('button', { class: 'btn btn-primary', type: 'button', onclick: async (event) => {
+          const button = event.currentTarget;
+          busy(button, true, t('saving'));
+          try {
+            const result = await data.setReferrerRole(ctx, {
+              personId: String(personId), enabled: nextEnabled, expectedEnabled: enabled,
+            });
+            if (result?.role !== 'referrer' || result.enabled !== nextEnabled) throw new Error('Unconfirmed role change');
+            sheet.overlay.remove();
+            ctx.toast(t(nextEnabled ? 'referrer_mark_done' : 'referrer_unmark_done'), 'ok');
+            onDone?.();
+          } catch (error) {
+            sheet.showErr(error?.message === 'Person role changed; reload and retry'
+              ? t('referrer_role_changed') : t('referrer_change_failed'));
+            busy(button, false, t('btn_confirm'));
+          }
+        } }, t('btn_confirm')),
+      ]),
+    ]),
+  });
+  document.body.appendChild(sheet.overlay);
+}
+
 export function openPersonCustomerRemove(ctx, { customerId, onDone } = {}) {
   const id = Number(customerId);
   if (!Number.isSafeInteger(id) || id < 1) return;

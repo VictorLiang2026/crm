@@ -105,7 +105,10 @@ async function pgRequest(table, method, filters = {}, body, { timeoutMs = 8000 }
     throw new Error('Invalid source operation');
   }
   if (INSURANCE_READ_TABLES.has(table) && method !== 'GET') throw new Error('Invalid source operation');
-  if (RELATIONSHIP_READ_TABLES.has(table) && method !== 'GET') throw new Error('Invalid source operation');
+  if (RELATIONSHIP_READ_TABLES.has(table) && method !== 'GET' &&
+      !(table === 'person_roles' && (method === 'POST' || method === 'DELETE'))) {
+    throw new Error('Invalid source operation');
+  }
   if (RECRUIT_READ_TABLES.has(table) && method !== 'GET') throw new Error('Invalid source operation');
   if (OPPORTUNITY_READ_TABLES.has(table) && method !== 'GET') throw new Error('Invalid source operation');
   if (OCR_REVIEW_READ_TABLES.has(table) && method !== 'GET') throw new Error('Invalid source operation');
@@ -403,6 +406,36 @@ function createService({ request = pgRequest, rpc = pgRpc, disclosure = disclose
       }, includeCustomerStage);
     }
     return addCustomerStages(result, includeCustomerStage);
+  }
+
+  async function setReferrerRole(data, uid) {
+    if (typeof uid !== 'string' || !uid.trim() || !data ||
+        typeof data.enabled !== 'boolean' || typeof data.expectedEnabled !== 'boolean' ||
+        data.enabled === data.expectedEnabled) throw new Error('Invalid referrer role request');
+    const personId = idOf(data.personId);
+    const [person, roles] = await Promise.all([
+      request('persons', 'GET', { select: 'id', id: `eq.${personId}`, deleted_at: 'is.null', limit: 1 }),
+      request('person_roles', 'GET', {
+        select: 'id,role,origin', person_id: `eq.${personId}`, role: 'eq.referrer', limit: 1,
+      }),
+    ]);
+    if (!one(person)) throw new Error('Person not found');
+    const existing = one(roles);
+    if (!!existing !== data.expectedEnabled) throw new Error('Person role changed; reload and retry');
+    if (data.enabled) {
+      await request('person_roles', 'POST', {}, {
+        person_id: Number(personId), role: 'referrer', origin: 'manual',
+      });
+    } else {
+      await request('person_roles', 'DELETE', {
+        id: `eq.${idOf(existing.id)}`, person_id: `eq.${personId}`, role: 'eq.referrer',
+      });
+    }
+    const current = await request('person_roles', 'GET', {
+      select: 'id', person_id: `eq.${personId}`, role: 'eq.referrer', limit: 1,
+    });
+    if (!!one(current) !== data.enabled) throw new Error('Person role change not confirmed');
+    return { personId, role: 'referrer', enabled: data.enabled };
   }
 
   async function resolveIdentity(name) {
@@ -969,6 +1002,7 @@ function createService({ request = pgRequest, rpc = pgRpc, disclosure = disclose
     updatePerson, previewPersonDelete, executePersonDelete, restorePerson, listPersonTrash,
     listPersonOnlyRecruits,
     listRecruitDirectory: event => new RecruitDirectoryService({ request }).list(event),
+    setReferrerRole,
     getPersonOnlyRecruit, listPersonOnlyRecruitTrash,
     changePersonOnlyRecruit,
     resolveRecruitCandidateName: name => recruitCandidateService.resolveRecruitName(name),
@@ -1036,6 +1070,7 @@ exports.main = async event => {
       case 'executeRelationship':
         return await new RelationshipService({request:pgRequest,rpc:pgRpc}).execute(event.previewId,uid);
       case 'getCustomerProfile': return await getCustomerProfile(event.personId, { request: pgRequest });
+      case 'setReferrerRole': return await service.setReferrerRole(event.data, uid);
       case 'lookupCustomer': return await service.lookupCustomer(event.customerId);
       case 'listPeople': return await service.listPeople(event);
       case 'listPersonOnlyRecruits': return await service.listPersonOnlyRecruits();

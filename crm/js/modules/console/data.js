@@ -112,6 +112,7 @@ export const data = {
   previewRelationship: (ctx, personId, operation, payload) => p360(ctx, 'previewRelationship', { personId, operation, data: payload }),
   executeRelationship: (ctx, previewId) => p360(ctx, 'executeRelationship', { previewId }),
   customerProfile: (ctx, personId) => p360(ctx, 'getCustomerProfile', { personId }),
+  setReferrerRole: (ctx, payload) => p360(ctx, 'setReferrerRole', { data: payload }),
   resolvePersonName: (ctx, name) => p360(ctx, 'resolveIdentity', { name }),
   ocrRecords: (ctx, customerId) => call(ctx, 'ocr_records', {
     action: 'list', customer_id: Number(customerId),

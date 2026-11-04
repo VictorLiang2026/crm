@@ -17,7 +17,7 @@ import { renderOcrReview } from '../ocr-review.js';
 import { renderInsuranceEditor } from '../insurance-editor.js';
 import { renderInsuranceReports } from '../insurance-reports.js';
 import { openWorkItemEditor, openWorkItemTransition, openOpportunityAdvance, openQuickCapture, openPersonEdit, openPersonDelete,
-  openPersonInteraction, openPersonFollowup, openPersonCustomerRemove } from '../write.js';
+  openPersonInteraction, openPersonFollowup, openPersonCustomerRemove, openReferrerRoleAction } from '../write.js';
 import {
   wpTag, pageHead, emptyNote, loadInto, bdg, kvGrid, sectionTitle,
   fmtDate, weekdayCN, dueLabel, toneByDue, textOf,
@@ -119,6 +119,7 @@ function overviewNode(ctx, id, setName) {
     const name = profile.fields?.customer_name || home.person?.display_name || `Person #${id}`;
     setName(name);
     const f = profile.fields || {};
+    const isReferrer = (profile.roles || []).some(role => role.role === 'referrer');
     const infoPairs = [
       [t('field_phone'), f.phone], [t('field_gender'), translateEnum('gender', f.gender)], [t('field_birthday'), f.birthday],
       [t('field_occupation'), f.occupation], [t('field_organization'), f.organization], [t('field_education'), f.education],
@@ -151,6 +152,18 @@ function overviewNode(ctx, id, setName) {
           : bdg(t('badge_customer_linked'), 'jade'),
       ]),
       kvGrid(infoPairs),
+      h('div', { class: 'summary-section' }, [
+        h('div', { class: 'stack-head' }, [
+          sectionTitle(t('referrer_role_section')),
+          bdg(t(isReferrer ? 'referrer_role_marked' : 'referrer_role_unmarked'), isReferrer ? 'jade' : 'gray'),
+          h('button', { class: 'btn btn-soft btn-sm', type: 'button',
+            onclick: () => openReferrerRoleAction(ctx, {
+              personId: String(id), displayName: name, enabled: isReferrer, onDone: ctx.onWriteDone,
+            }),
+          }, t(isReferrer ? 'referrer_unmark_button' : 'referrer_mark_button')),
+        ]),
+        h('p', { class: 'foot-note' }, t('referrer_role_explain')),
+      ]),
       personCadence(ctx, id),
       profile.status === 'linked' ? h('div', { class: 'tab-stack' }, [
         h('div', { class: 'stack-head' }, [

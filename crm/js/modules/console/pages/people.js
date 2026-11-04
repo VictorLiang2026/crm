@@ -117,7 +117,9 @@ export function renderPeople(ctx) {
       prevBtn.disabled = res.page <= 1;
       nextBtn.disabled = !res.hasMore;
       if (!rows.length) {
-        return h('div', { class: 'card-body' }, [emptyNote(t('empty_no_people'), state.keyword ? t('empty_people_hint') : t('empty_people_note'))]);
+        const referrerOnly = state.filters.roles.length === 1 && state.filters.roles[0] === 'referrer';
+        return h('div', { class: 'card-body' }, [emptyNote(t('empty_no_people'), referrerOnly
+          ? t('referrer_filter_empty') : state.keyword ? t('empty_people_hint') : t('empty_people_note'))]);
       }
       const columns = SORT_COLUMNS(customerView, showConversions);
       const thead = h('thead', {}, h('tr', {}, columns.map((col) => {
@@ -285,6 +287,7 @@ export function renderPeople(ctx) {
     filterPanel.replaceChildren(
       h('div', { class: 'people-filter-title' }, t('filter_role')),
       roleFilters,
+      h('p', { class: 'foot-note', title: t('referrer_role_explain') }, t('referrer_filter_explain')),
       priorityFilters,
       h('div', { class: 'people-filter-actions' }, [reset, apply]),
     );
