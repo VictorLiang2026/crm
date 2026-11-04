@@ -861,6 +861,51 @@ export function openQuickCapture(ctx, { personId, onDone } = {}) {
       : canCreate ? (candidates.length ? t('identity_confirm_new') : t('no_same_name'))
       : candidates.length ? t('select_confirmed') : t('many_names');
     const candBox = h('div', {});
+    const personSearchInput = h('input', { class: 'sheet-input', type: 'search', maxlength: 80,
+      placeholder: t('capture_person_search_placeholder'), 'aria-label': t('capture_person_search_placeholder'),
+      ...(fixed ? { hidden: true } : {}) });
+    const personSearchResults = h('div', { class: 'sheet-stack' });
+    const personSearchButton = h('button', { class: 'btn btn-ghost btn-sm', type: 'button',
+      ...(fixed ? { hidden: true } : {}),
+      onclick: async (e) => {
+        const button = e.currentTarget, keyword = personSearchInput.value.trim();
+        if (!keyword) { sheet.showErr(t('capture_person_search_required')); return; }
+        busy(button, true, t('capture_person_searching'));
+        personSearchResults.replaceChildren();
+        try {
+          const result = await data.listPeople(ctx, { keyword, page: 1, pageSize: 20,
+            sortField: 'display_name', sortDir: 'asc' });
+          const rows = Array.isArray(result?.rows) ? result.rows : [];
+          if (!rows.length) {
+            personSearchResults.appendChild(h('div', { class: 'sheet-note' }, t('capture_person_search_empty')));
+          } else {
+            rows.forEach((row) => {
+              const candidate = { id: String(row.id), displayName: row.display_name,
+                occupation: row.occupation || '', organization: row.organization || '' };
+              personSearchResults.appendChild(h('button', { class: 'btn btn-ghost btn-sm', type: 'button',
+                onclick: async (event) => {
+                  picked = candidate;
+                  candBox.querySelectorAll('.cand').forEach((n) => n.classList.remove('active'));
+                  event.currentTarget.classList.add('active');
+                  personSearchResults.replaceChildren(h('div', { class: 'sheet-note' },
+                    `${t('capture_person_selected')} ${candidate.displayName} · #${candidate.id}`));
+                  status.textContent = t('capture_person_selected_status');
+                },
+              }, `${candidate.displayName}${candidate.organization ? ` · ${candidate.organization}` : ''}${candidate.occupation ? ` · ${candidate.occupation}` : ''} · #${candidate.id}`));
+            });
+            if (result.hasMore) personSearchResults.appendChild(h('div', { class: 'sheet-note' }, t('capture_person_search_more')));
+          }
+        } catch (error) {
+          personSearchResults.replaceChildren(h('div', { class: 'sheet-err' }, error.message || t('capture_person_search_failed')));
+        } finally { busy(button, false, t('capture_person_search_button')); }
+      },
+    }, t('capture_person_search_button'));
+    personSearchInput.addEventListener('input', () => {
+      picked = null;
+      status.textContent = t(p.contextChecked ? (p.contextLimited ? 'capture_history_limited' : 'capture_history_checked') : 'capture_history_hint');
+      personSearchResults.replaceChildren();
+      candBox.querySelectorAll('.cand').forEach((n) => n.classList.remove('active'));
+    });
     let picked = reviewedPerson || fixed || null;
     let refining = false;
     const markActive = (node) => {
@@ -1022,7 +1067,7 @@ export function openQuickCapture(ctx, { personId, onDone } = {}) {
     let existingCaptureKey = '';
     let existingCaptureShape = '';
     const sheetBody = h('div', {}, [
-      fieldRow(t('link_person'), candBox, hint),
+      fieldRow(t('link_person'), h('div', {}, [personSearchInput, personSearchButton, personSearchResults, candBox]), hint),
       h('div', { style: 'display:flex;gap:10px' }, [
         h('div', { class: 'sheet-field', style: 'flex:1' }, [h('label', {}, t('method')), typeSel]),
         h('div', { class: 'sheet-field', style: 'width:170px' }, [h('label', {}, t('date')), dateInput]),

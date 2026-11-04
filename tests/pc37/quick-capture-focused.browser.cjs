@@ -24,6 +24,7 @@ async function setup(b, recordOnly = false, multipleItems = false) {
           evidence:'我答应下周确认保费预算',commitmentType:'I_PROMISED'}]) : '[]'}}};
       if(args.action==='resolveQuickCaptureName')return {displayName:'虚构甲',status:'confirm_existing',
         candidates:[{id:783,displayName:'虚构甲'}]};
+      if(args.action==='listPeople')return {rows:[{id:784,display_name:'正确人物',occupation:'顾问',organization:'测试机构'}],hasMore:false};
       if(args.action==='listPersonWorkItems')return {personId:783,rows:[
         {id:7,kind:'action',person_id:783,title:'原有发资料任务',status:'open'}]};
       if(args.action==='getContextGroups')return {groups:{fact:[]}};
@@ -106,6 +107,32 @@ test('history is read only after person selection; existing tasks open for separ
       await b.send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false });
       assert.equal(await b.evaluate("document.documentElement.scrollWidth<=innerWidth+1"), true);
     }
+    await b.healthy();
+  } finally { await b.close(); }
+});
+test('manual Person search selects the corrected identity and preserves edited capture fields', async () => {
+  const b = new Browser(path.resolve(__dirname, '../..'));
+  try {
+    await setup(b);
+    await b.evaluate(`(()=>{
+      [...document.querySelectorAll('.sheet-overlay textarea.sheet-textarea')][0].value='人工修正后的摘要';
+      const input=document.querySelector('.sheet-overlay input[type="search"]');
+      input.value='正确人物';input.dispatchEvent(new Event('input',{bubbles:true}));
+      [...document.querySelectorAll('.sheet-overlay button')].find(x=>x.textContent.includes('搜索人物')).click();
+    })()`);
+    await b.wait("document.querySelector('.sheet-overlay')?.innerText.includes('正确人物') || document.querySelector('.sheet-overlay .sheet-err')");
+    assert.equal(await b.evaluate("document.querySelector('.sheet-overlay .sheet-err')?.innerText || ''"), '');
+    await b.evaluate("[...document.querySelectorAll('.sheet-overlay button')].find(x=>x.textContent.includes('正确人物')).click()");
+    const parseCount = await b.evaluate("window.focus.calls.filter(c=>c.api==='ai_parse').length");
+    assert.equal(parseCount, 2, 'search selection should not reparse and overwrite the reviewed draft');
+    await b.evaluate("[...document.querySelectorAll('.sheet-overlay .sheet-actions button')].at(-1).click()");
+    await b.wait("window.focus.calls.some(c=>c.args.action==='previewIdentity')");
+    const command = await b.evaluate("window.focus.calls.find(c=>c.args.action==='previewIdentity').args.data");
+    assert.equal(command.kind, 'capture_v2_existing');
+    assert.equal(command.personId, '784');
+    assert.equal(command.displayName, '正确人物');
+    assert.equal(command.interaction.summary, '人工修正后的摘要');
+    assert.equal(await b.evaluate("window.focus.calls.some(c=>c.args.action==='executeIdentity')"), false);
     await b.healthy();
   } finally { await b.close(); }
 });

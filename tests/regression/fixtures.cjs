@@ -377,7 +377,10 @@ function installFixtures() {
       facts: [marker + '明确事实'], signals: [marker + '观察线索'],
       opportunityCandidates: [marker + '机会推断'], actionCandidates: [marker + '下一步建议'],
       commitmentCandidates: [marker + '明确约定'], evidence: [marker + '原话依据'],
-    } }) : fail('UNEXPECTED_LEGACY_AI_PARSE'),
+    } }) : mode === 'quick-capture-search' ? ({today:'2026-11-04',parsed:{
+      person_name:'【CRM_TEST_ONLY】错误识别名',interaction_type:'微信',interaction_date:'2026-11-04',
+      facts:['【CRM_TEST_ONLY】人工核实摘要']},match:{status:'none',candidates:[]}})
+      : fail('UNEXPECTED_LEGACY_AI_PARSE'),
     'customers:trashList': () => ({ ...rows([{ ...customer, Id: 910099, customer_name: marker + '已删除客户', deleted_at: '2026-09-20T01:00:00Z', legacy_delete:true }]), counts: {}, recoverable_counts:{910099:{}} }),
     'customers:restore': () => ({legacy_restored:[910099],restored:[910099],skipped:[]}),
     'ai_recommendations:listAll': () => rows([]),

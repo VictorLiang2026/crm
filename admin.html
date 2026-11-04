@@ -8622,6 +8622,7 @@ function renderQuickCapture(container, r, text, preset){
   var personLine = el('div', {style:'background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:10px;margin-bottom:10px;'}, []);
   personLine.appendChild(el('div', {style:'font-weight:700;margin-bottom:6px;'}, [qcTag('人物','#059669'), '这次交流的对象']));
   var personSel = el('select', {style:'width:100%;padding:6px;border:1px solid #d1d5db;border-radius:6px;box-sizing:border-box;'});
+  var searchedPerson = null;
   var newNameWrap = el('div', {style:'margin-top:6px;display:none;'}, []);
   var newNameInput = el('input', {type:'text', placeholder:'新人物姓名（先核对 Person）', style:'width:100%;padding:6px;border:1px solid #d1d5db;border-radius:6px;box-sizing:border-box;'});
   newNameWrap.appendChild(newNameInput);
@@ -8648,7 +8649,53 @@ function renderQuickCapture(container, r, text, preset){
     });
     addOpt('__new__', '＋ 新建人…');
     addOpt('__new_speaker__', '＋ 新建嘉宾…');
+    var personSearchWrap = el('div', {style:'display:flex;flex-direction:column;gap:6px;margin-top:8px;'}, []);
+    var personSearchInput = el('input', {type:'search', maxlength:'80', style:'width:100%;padding:8px;border:1px solid #d1d5db;border-radius:6px;box-sizing:border-box;'});
+    var personSearchButton = el('button', {type:'button', class:'btn btn-secondary', style:'align-self:flex-start;'}, '');
+    var personSearchResults = el('div', {style:'display:flex;flex-direction:column;gap:6px;'}, []);
+    personSearchWrap.append(personSearchInput, personSearchButton, personSearchResults);
+    personLine.appendChild(personSearchWrap);
+    var personSearchI18n = import('/crm/js/modules/console/i18n.js').then(function(i18n){
+      personSearchInput.placeholder = i18n.t('capture_person_search_placeholder');
+      personSearchInput.setAttribute('aria-label', i18n.t('capture_person_search_placeholder'));
+      personSearchButton.textContent = i18n.t('capture_person_search_button');
+      return i18n;
+    });
+    personSearchButton.addEventListener('click', async function(){
+      var i18n = await personSearchI18n;
+      var keyword = personSearchInput.value.trim();
+      searchedPerson = null;
+      personSearchResults.replaceChildren();
+      if(!keyword){ personSearchResults.appendChild(el('div', {style:'font-size:12px;color:#e11d48;'}, i18n.t('capture_person_search_required'))); return; }
+      personSearchButton.disabled = true;
+      personSearchButton.textContent = i18n.t('capture_person_searching');
+      try{
+        var result = await callFn('person_360', {action:'listPeople', keyword:keyword, page:1, pageSize:20, sortField:'display_name', sortDir:'asc'});
+        if(result && result.error) throw new Error(result.error);
+        var rows = Array.isArray(result && result.rows) ? result.rows : [];
+        if(!rows.length){ personSearchResults.appendChild(el('div', {style:'font-size:12px;color:#6b7280;'}, i18n.t('capture_person_search_empty'))); return; }
+        rows.forEach(function(row){
+          var label = [row.display_name, row.organization, row.occupation, '#' + row.id].filter(Boolean).join(' · ');
+          var choose = el('button', {type:'button', class:'btn btn-secondary', style:'text-align:left;'}, label);
+          choose.addEventListener('click', function(){
+            searchedPerson = {id:String(row.id), display_name:String(row.display_name || '')};
+            personSel.value = '';
+            personSearchResults.replaceChildren(el('div', {style:'font-size:12px;color:#047857;'},
+              i18n.t('capture_person_selected') + searchedPerson.display_name + ' · #' + searchedPerson.id));
+          });
+          personSearchResults.appendChild(choose);
+        });
+        if(result.hasMore) personSearchResults.appendChild(el('div', {style:'font-size:12px;color:#6b7280;'}, i18n.t('capture_person_search_more')));
+      }catch(error){
+        personSearchResults.appendChild(el('div', {style:'font-size:12px;color:#e11d48;'}, i18n.t('capture_person_search_failed') + ' ' + (error.message || '')));
+      }finally{
+        personSearchButton.disabled = false;
+        personSearchButton.textContent = i18n.t('capture_person_search_button');
+      }
+    });
+    personSearchInput.addEventListener('input', function(){ searchedPerson = null; personSearchResults.replaceChildren(); });
     personSel.addEventListener('change', function(){
+      searchedPerson = null;
       newNameWrap.style.display = (personSel.value === '__new__' || personSel.value === '__new_speaker__') ? 'block' : 'none';
       if(personSel.value === '__new_speaker__'){
         newNameInput.placeholder = '新嘉宾姓名（保存时创建到嘉宾资源池）';
@@ -8734,6 +8781,29 @@ function renderQuickCapture(container, r, text, preset){
   // —— 确认并保存 ——
   var saveBtn = el('button', {class:'btn btn-primary', style:'width:100%;'}, '✓ 确认并保存');
   saveBtn.onclick = async function(){
+    if(searchedPerson){
+      var searchedI18n = await personSearchI18n;
+      if(!searchedPerson.display_name){ toast(searchedI18n.t('capture_person_selected_incomplete'), 'err'); return; }
+      saveBtn.disabled = true; saveBtn.textContent = '保存中…';
+      try{
+        var searchedIdentityModule = await import('/crm/js/modules/phase14-hubs.js');
+        var searchedSummary = (p.facts || []).join('；');
+        searchedIdentityModule.openPersonCommand({callFn:callFn, kind:'capture',
+          person:searchedPerson,
+          prefill:{displayName:searchedPerson.display_name, note:text, summary:searchedSummary || text, speaker:false},
+          onDone:function(personId){
+            var searchedOverlay = saveBtn.closest ? saveBtn.closest('.modal-overlay') : null;
+            if(searchedOverlay) searchedOverlay.remove();
+            toast(searchedI18n.t('capture_person_capture_saved'), 'ok');
+            location.hash='#/person/'+personId;
+          }});
+        saveBtn.disabled = false; saveBtn.textContent = '✓ 确认并保存';
+      }catch(error){
+        toast(searchedI18n.t('capture_person_confirm_open_failed') + error.message, 'err');
+        saveBtn.disabled = false; saveBtn.textContent = '✓ 确认并保存';
+      }
+      return;
+    }
     var target = personSel.value;
     var isNewCustomer = (target === '__new__');
     var isNewSpeaker = (target === '__new_speaker__');

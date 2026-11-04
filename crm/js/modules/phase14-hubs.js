@@ -183,7 +183,11 @@ export function openPersonCommand({ callFn, kind = 'person', person = null, pref
         '客户角色会建立旧客户详情所需的兼容档案。' :
         kind === 'recruit' ? '增员角色可独立于客户；不会自动创建客户。' :
           '嘉宾角色不要求客户档案。'));
-    content.append(button('生成服务端预览', () => preview({ personId: person.id, displayName: person.display_name })));
+    content.append(button('生成服务端预览', () => preview({ personId: person.id, displayName: person.display_name,
+      ...(kind === 'capture' ? { note: prefill.note, summary: prefill.summary,
+        customer: prefill.customer === true, speaker: prefill.speaker === true,
+        ...(prefill.speakerId ? { speakerId: prefill.speakerId } : {}),
+        ...(prefill.nextDate ? { nextDate: prefill.nextDate } : {}) } : {}) })));
   } else {
     const fields = [['姓名（可加括号限定）', 'displayName'], ['职业', 'occupation'],
       ['机构', 'organization'], ['教育', 'education']];
