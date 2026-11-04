@@ -880,6 +880,16 @@ function createKnowledgeLibrary(options={}) {
     if(disclosure?.status!=='verified'||typeof disclosure.containsTestData!=='boolean')fail('TEST_DATA_SCOPE_UNVERIFIED');
     if(disclosure.containsTestData)fail('TEST_DATA_BLOCKED');
   }
+  async function excludeTestKnowledgeEntries(entries) {
+    if(!entries.length)return [];
+    const refs=entries.map(({row})=>({schema:'public',table:'knowledge_items',id:String(row.id)}));
+    const summary=await testDataReader(refs);
+    if(summary?.status!=='verified'||typeof summary.containsTestData!=='boolean')fail('TEST_DATA_SCOPE_UNVERIFIED');
+    if(!summary.containsTestData)return entries;
+    const checks=await Promise.all(refs.map(ref=>testDataReader([ref])));
+    if(checks.some(item=>item?.status!=='verified'||typeof item.containsTestData!=='boolean'))fail('TEST_DATA_SCOPE_UNVERIFIED');
+    return entries.filter((_,index)=>!checks[index].containsTestData);
+  }
   function followupSourceRefs(items) {
     return items.flatMap(item=>['strategySourceIds','productSourceIds']
       .flatMap(key=>Array.isArray(item?.gptAdvice?.[key])?item.gptAdvice[key]:[])
@@ -960,11 +970,11 @@ function createKnowledgeLibrary(options={}) {
       open_actions:(person.open_actions||[]).slice(0,5),commitments:(person.commitments||[]).slice(0,5),
       relevant_playbook:person.relevant_playbook||null};
     const query=`${safePerson.occupation||''} ${safePerson.customer_stage||''} ${focus} ${JSON.stringify(customerSnapshot)} ${JSON.stringify(interactions)}`;
-    const strategyEntries=rankEvidence(await activeItems(new Set(['industry','top_performer_sharing','playbook','case','story','evidence'])),query,8);
-    const productEntries=rankEvidence(await activeItems(new Set(['product','company','service','recruitment','campaign',
-      'health_wealth_seminar','legal_tax','case','playbook','regulation','evidence','story','other'])),query,10);
-    await rejectTestKnowledgeRefs([...strategyEntries,...productEntries].map(({row})=>
-      ({schema:'public',table:'knowledge_items',id:String(row.id)})));
+    const strategyEntries=await excludeTestKnowledgeEntries(rankEvidence(
+      await activeItems(new Set(['industry','top_performer_sharing','playbook','case','story','evidence'])),query,8));
+    const productEntries=await excludeTestKnowledgeEntries(rankEvidence(
+      await activeItems(new Set(['product','company','service','recruitment','campaign',
+        'health_wealth_seminar','legal_tax','case','playbook','regulation','evidence','story','other'])),query,10));
     const strategy=sourceContext(strategyEntries),products=sourceContext(productEntries);
     return {customerSnapshot,interactions,strategy,products,context:{customer_snapshot:customerSnapshot,
       recent_interactions:interactions,strategy_sources:strategy.refs,product_sources:products.refs,
@@ -1072,7 +1082,17 @@ function createKnowledgeLibrary(options={}) {
         task_type:'eq.person_followup_advice',subject_type:'eq.person',subject_id:`eq.${personId}`,
         order:'created_at.desc,id.desc',limit:20});
       task=tasks.find(row=>row.status==='running'||Date.parse(row.created_at)>=startedMs);
-      if(!task)return {ok:true,status:'pending',taskId:'',personId};
+      if(!task){
+        const adviceRows=await request('person_followup_advice','GET',{select:FOLLOWUP_ADVICE_COLUMNS,
+          person_id:`eq.${personId}`,created_at:`gte.${new Date(startedMs).toISOString()}`,
+          deleted_at:'is.null',order:'created_at.desc.nullslast,id.desc',limit:5});
+        const advice=adviceRows[0];
+        if(advice?.system_status==='failed')return {ok:false,status:'failed',taskId:'',personId,
+          adviceId:String(advice.id),error:{code:'AI_REQUEST_FAILED'}};
+        if(advice?.system_status==='ready')return {ok:true,status:'completed',taskId:'',personId,
+          adviceId:String(advice.id),advice:adviceDto(advice)};
+        return {ok:true,status:'pending',taskId:'',personId,...(advice?.id?{adviceId:String(advice.id)}:{})};
+      }
       taskId=String(task.id);
     }
     const row=(await request('person_followup_advice','GET',{select:FOLLOWUP_ADVICE_COLUMNS,person_id:`eq.${personId}`,

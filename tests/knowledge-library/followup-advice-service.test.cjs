@@ -123,18 +123,25 @@ test('follow-up advice status recovers a task ID after the async startup respons
   assert.equal(requests[1].filters.get('system_task_id'),'eq.17');
 });
 
-test('system advice fails closed before the model call when a selected knowledge source is test data',async()=>{
+test('system advice excludes confirmed test sources and continues with clean knowledge',async()=>{
   const row={id:82,person_id:42,client_request_id:'d9e53b08-1f81-421e-83b0-8ff01f94adf9',title:'跟进建议',
     system_title:'跟进建议',system_status:'generating',system_version:0,created_by:'operator',updated_by:'operator',
     created_at:stamp,updated_at:stamp,deleted_at:null};
-  let gatewayCalls=0;
-  const item={id:3,source_id:null,item_type:'story',source:'行业分享',source_date:'2026-10-26',verified:true,
-    lifecycle_status:'verified',version_no:1,content:'测试客户虚构样本',metadata:{domain:'industry',categories:['industry_development']},
-    deleted_at:null,valid_from:null,valid_to:null};
+  let gatewayRequest;const items=[
+    {id:3,source_id:null,item_type:'story',source:'行业分享',source_date:'2026-10-26',verified:true,
+      lifecycle_status:'verified',version_no:1,content:'家庭财富规划沟通经验',metadata:{domain:'top_performer_sharing',categories:['top_performer_sharing']},
+      deleted_at:null,valid_from:null,valid_to:null},
+    {id:4,source_id:null,item_type:'evidence',source:'一般行业经验',source_date:'2026-10-26',verified:true,
+      lifecycle_status:'verified',version_no:1,content:'以客户明确目标为基础，逐步沟通',metadata:{domain:'industry',categories:['industry_development']},
+      deleted_at:null,valid_from:null,valid_to:null},
+    {id:5,source_id:null,item_type:'company',source:'已核实公司服务',source_date:'2026-10-26',verified:true,
+      lifecycle_status:'verified',version_no:1,content:'提供养老规划咨询服务',metadata:{domain:'company',categories:['company_information']},
+      deleted_at:null,valid_from:null,valid_to:null},
+  ];
   const fetchImpl=async(url,options={})=>{
     const method=options.method||'GET',parsed=new URL(url),table=parsed.pathname.split('/').pop(),query=parsed.searchParams;
     if(method==='GET'){
-      if(table==='knowledge_items')return response([{...item}]);
+      if(table==='knowledge_items')return response(items.map(item=>({...item})));
       if(table==='knowledge_sources')return response([]);
       if(table==='person_followup_advice')return response(query.has('client_request_id')?[]:[{...row}]);
       return response([]);
@@ -145,12 +152,18 @@ test('system advice fails closed before the model call when a selected knowledge
   };
   const service=createKnowledgeLibrary({env:'crm-test123',key:'test-key',fetchImpl,
     client:{callFunction:async()=>({result:{person:{occupation:'顾问',customer_stage:'新客'},recent_interactions:[]}})},
-    testDataReader:async refs=>({status:'verified',containsTestData:refs.some(ref=>ref.id==='3'),recordCount:1,
-      sources:[{batchKey:'crm_test_fixture',table:'knowledge_items',count:1}]}),
-    searchDataFactory:()=>({auditRdb:{}}),gatewayFactory:()=>({runAITask:async()=>{gatewayCalls++;throw new Error('must not call model');}})});
-  await assert.rejects(service.run({operation:'adviceGenerate',data:{personId:'42',clientRequestId:row.client_request_id}},'operator'),
-    error=>error.code==='TEST_DATA_BLOCKED');
-  assert.equal(gatewayCalls,0);assert.equal(row.system_status,'failed');
+    testDataReader:async refs=>{const contains=refs.some(ref=>ref.id==='3');return {status:'verified',containsTestData:contains,
+      recordCount:contains?1:0,sources:contains?[{batchKey:'crm_test_fixture',table:'knowledge_items',count:1}]:[]};},
+    searchDataFactory:()=>({auditRdb:{}}),gatewayFactory:()=>({runAITask:async request=>{
+      gatewayRequest=request;
+      return {taskId:27,result:{title:'沟通下一步',overallStrategy:{summary:'先确认客户目标',objective:'核实需求',
+        nextStep:'预约沟通',clarifyingQuestions:[],sourceRefs:['4']},
+        productServiceAdvice:{recommendation:'结合已核实资料介绍适用服务',sourceRefs:['5']}}};
+    }})});
+  const result=await service.run({operation:'adviceGenerate',data:{personId:'42',clientRequestId:row.client_request_id}},'operator');
+  assert.equal(result.status,'completed');assert.equal(row.system_status,'ready');
+  assert.deepEqual(gatewayRequest.context.strategy_sources.map(ref=>ref.id),['4']);
+  assert.deepEqual(gatewayRequest.context.product_sources.map(ref=>ref.id),['5']);
 });
 
 test('system advice fails closed when test-data provenance cannot be verified',async()=>{
@@ -231,7 +244,7 @@ test('GPT import preview refuses registered test knowledge references before pre
   assert.equal(writes.length,0);
 });
 
-test('follow-up advice status stays pending while a slow startup has not created an AI task yet',async()=>{
+test('follow-up advice status stays pending while startup has no task or advice row yet',async()=>{
   let adviceQueries=0;
   const fetchImpl=async(url)=>{
     const table=new URL(url).pathname.split('/').pop();
@@ -242,7 +255,25 @@ test('follow-up advice status stays pending while a slow startup has not created
   const service=createKnowledgeLibrary({env:'crm-test123',key:'test-key',fetchImpl,
     client:{callFunction:async()=>({result:{}})}});
   const result=await service.run({operation:'adviceStatus',data:{personId:'42',startedAt:'2026-11-04T01:00:00.000Z'}},'operator');
-  assert.deepEqual(result,{ok:true,status:'pending',taskId:'',personId:'42'});assert.equal(adviceQueries,0);
+  assert.deepEqual(result,{ok:true,status:'pending',taskId:'',personId:'42'});assert.equal(adviceQueries,1);
+});
+
+test('follow-up advice status reports a pre-task failure instead of polling forever',async()=>{
+  let adviceFilter;
+  const fetchImpl=async(url)=>{
+    const parsed=new URL(url),table=parsed.pathname.split('/').pop();
+    if(table==='ai_tasks')return response([]);
+    if(table==='person_followup_advice'){
+      adviceFilter=parsed.searchParams;
+      return response([{id:91,person_id:42,system_status:'failed',created_at:'2026-11-04T01:00:01.000Z'}]);
+    }
+    throw new Error(`Unexpected GET ${table}`);
+  };
+  const service=createKnowledgeLibrary({env:'crm-test123',key:'test-key',fetchImpl,
+    client:{callFunction:async()=>({result:{}})}});
+  const result=await service.run({operation:'adviceStatus',data:{personId:'42',startedAt:'2026-11-04T01:00:00.000Z'}},'operator');
+  assert.deepEqual(result,{ok:false,status:'failed',taskId:'',personId:'42',adviceId:'91',error:{code:'AI_REQUEST_FAILED'}});
+  assert.equal(adviceFilter.get('created_at'),'gte.2026-11-04T01:00:00.000Z');
 });
 
 test('paired row edit updates both lanes atomically and leaves unchanged GPT marked stale after a system change',async()=>{

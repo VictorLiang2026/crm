@@ -73,6 +73,32 @@ test('follow-up advice generates one CloudBase lane and manages each model indep
   await b.evaluate("document.querySelector('.fa-row-delete').click()");
   await b.wait("window.faCalls.some(x=>x.delete)");
   assert.equal(await b.evaluate("window.faCalls.find(x=>x.delete).delete.updatedAt"),'2026-10-31T01:00:00.000Z');
+  await b.evaluate(`(async()=>{
+   const error=new Error('TEST_DATA_SCOPE_UNVERIFIED');error.code='TEST_DATA_SCOPE_UNVERIFIED';
+   window.faData.generateFollowupAdvice=async()=>{window.faErrorCalled=true;throw error};window.faRender();
+   document.querySelector('.page-head .btn-primary').click();
+  })()`);
+  await b.wait("window.faErrorCalled===true");
+  await b.wait("document.querySelectorAll('.fa-page-status')[1]?.textContent.includes('Knowledge source safety')");
+  assert.match(await b.evaluate("document.querySelectorAll('.fa-page-status')[1].textContent"),/Knowledge source safety/);
+  await b.evaluate(`(async()=>{
+   const {setLang}=await import('/crm/js/modules/console/i18n.js');setLang('zh-CN');
+   window.faRender();document.querySelector('.page-head .btn-primary').click();
+  })()`);
+  await b.wait("document.querySelectorAll('.fa-page-status')[1]?.textContent.includes('知识来源安全状态')");
+  assert.match(await b.evaluate("document.querySelectorAll('.fa-page-status')[1].textContent"),/知识来源安全状态/);
+  await b.evaluate(`(async()=>{
+   const {setLang}=await import('/crm/js/modules/console/i18n.js');setLang('en');
+   window.faRender();document.querySelector('.page-head .btn-primary').click();
+  })()`);
+  await b.wait("document.querySelectorAll('.fa-page-status')[1]?.textContent.includes('could not be verified')");
+  assert.match(await b.evaluate("document.querySelectorAll('.fa-page-status')[1].textContent"),/could not be verified/);
+  const apiCode=await b.evaluate(`(async()=>{
+   const {data}=await import('/crm/js/modules/console/data.js');
+   try{await data.knowledgeLibrary({api:{call:async()=>({error:{code:'TEST_DATA_SCOPE_UNVERIFIED',message:'safe'}})}},'list')}
+   catch(error){return error.code||''}return '';
+  })()`);
+  assert.equal(apiCode,'TEST_DATA_SCOPE_UNVERIFIED','API error code reaches UI error handler');
   await b.healthy();
  }finally{await b.close();}
 });

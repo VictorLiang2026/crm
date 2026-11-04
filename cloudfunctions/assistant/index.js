@@ -492,7 +492,11 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
     work.then(result => {
       if (!earlyResponse.sent) earlyResponse.send(result);
     }, error => {
-      if (!earlyResponse.sent) earlyResponse.send({ok:false,error:{code:'AI_BACKGROUND_FAILED',
+      const code=['INVALID_INPUT','NOT_FOUND','PERSISTENCE_ERROR','STALE','TIMEOUT','UPSTREAM_UNAVAILABLE',
+        'AI_TASK_TIMEOUT','AI_AUDIT_UNKNOWN','AI_REQUEST_FAILED','TEST_DATA_BLOCKED',
+        'TEST_DATA_SCOPE_UNVERIFIED','TEST_DATA_OUTPUT_BLOCKED']
+        .includes(error?.code)?error.code:'AI_BACKGROUND_FAILED';
+      if (!earlyResponse.sent) earlyResponse.send({ok:false,error:{code,
         message:'AI request could not be completed'}});
       else console.error('AI_BACKGROUND_FAILED',String(error?.code||'ASSISTANT_FAILED'));
     });

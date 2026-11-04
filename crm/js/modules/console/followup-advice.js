@@ -5,6 +5,14 @@ import { data } from './data.js';
 import { t } from './i18n.js';
 
 const text = key => t(`fa_${key}`);
+const generationErrorKey = code => ({
+  TEST_DATA_BLOCKED: 'generation_test_blocked',
+  TEST_DATA_SCOPE_UNVERIFIED: 'generation_source_unverified',
+  TEST_DATA_OUTPUT_BLOCKED: 'generation_output_blocked',
+  AI_TASK_TIMEOUT: 'generation_timeout',
+  AI_AUDIT_UNKNOWN: 'generation_status_unknown',
+  AI_REQUEST_FAILED: 'generate_failed',
+}[code] || 'generate_failed');
 const sourceList = (items = []) => items.length ? h('ul', { class: 'fa-sources' }, items.map(source =>
   h('li', {}, [h('a', { href: `#/knowledge-governance?item=${encodeURIComponent(source.id)}`,
     title: `${source.title || text('knowledge_source')} · ${text('source_id')} ${source.id}` },
@@ -87,7 +95,7 @@ export function renderFollowupAdvice(ctx, personId) {
     try {
       await data.generateFollowupAdvice(ctx, { personId: String(personId), clientRequestId });
       await load(); status.textContent = text('generated');
-    } catch (_) { status.textContent = text('generate_failed'); }
+    } catch (error) { status.textContent = text(generationErrorKey(error?.code)); }
     finally { busy = false; createButton.disabled = false; }
   } }, [ic('sparkle'), text('generate_system')]);
   async function load() {

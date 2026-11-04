@@ -9,7 +9,9 @@ async function call(ctx, name, params) {
     const e = res.error;
     const msg = typeof e === 'string' ? e :
       [e.code, e.message].filter(Boolean).join(': ') || '请求失败';
-    throw new Error(msg);
+    const error = new Error(msg);
+    if (typeof e === 'object' && typeof e.code === 'string') error.code = e.code;
+    throw error;
   }
   return res;
 }
