@@ -21,10 +21,11 @@
 - `node --test tests/knowledge-library/followup-advice-service.test.cjs`：18/18 通过。
 - `npm run test:knowledge-library`：86/86 通过。
 - `npm run test:wp01`：15/15 通过。
-- CloudBase AI 配置预检显示当前环境没有有效 Token Credits 包；未执行真实模型调用。CloudBase PostgreSQL 查询工具角色不能直接执行受限的 `crm_test_disclosure_v1`，已用测试登记表直接读回核实恢复的关系。
+- 计费核对更正（2026-11-04）：生产环境为个人版，`BillingInfo.EnvDeductionMode=credits`，使用套餐资源点抵扣 AI Token。旧式 Token Credits 包列表为空不代表 AI 不可用；之前据此判断额度不足是错误的。`public` 数据库查询工具角色不能直接执行受限的 `crm_test_disclosure_v1`，已用测试登记表直接读回核实恢复的关系。
+- 模型配置核对：`cloudbase` 托管组启用 `hy3`，跟进建议函数 `AI_GATEWAY_MODEL` 已配置为 `hy3`，与启用模型一致。通过生产 `ai_parse` 的 Quick Capture V2 只读入口提交虚构文本，实际 AI 调用成功返回预览；该入口不选择人物、不写 CRM 业务数据。Token 用量报表按周期汇总且可能延迟，未把累计用量误认为本次请求的单次扣费。
 - 生产跟进建议行软删除已通过只读查询确认。部署 `assistant` 函数后，CloudBase 源码核对通过：30 个函数的 243 个源码/配置文件与本地一致，96 个静态资源与线上一致。
 - 首次核对发现既有 `knowledge_mcp/scf_bootstrap` 仅有 CRLF/LF 差异。发布检查器原先未将无扩展名启动脚本按文本规范化，已针对该文件补充换行比较，未改动或重新部署该函数。
-- `assistant` 只读调用验证因云函数管理端不携带登录态返回 `UNAUTHORIZED`，未能以真实用户身份核实页面/API 结果；无登录授权注入或生产业务写入。
+- `assistant` 只读调用验证因云函数管理端不携带登录态返回 `UNAUTHORIZED`，因此跟进建议专属接口仍需通过真实登录会话做最终页面/API 冒烟；没有注入登录身份或写入生产业务数据。
 
 ## 回滚
 
