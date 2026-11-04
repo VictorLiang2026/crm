@@ -98,6 +98,8 @@ test('system advice sends only the registered personId input while retaining foc
   assert.equal(result.status,'completed');
   assert.deepEqual(gatewayRequest.input,{personId:'42'});
   assert.equal(gatewayRequest.context.customer_snapshot.person.customer_stage,'新客');
+  assert.match(gatewayRequest.context.generation_rules,/Simplified Chinese \(zh-CN\)/);
+  assert.match(gatewayRequest.context.generation_rules,/title and every user-facing text field in both sections/);
 });
 
 test('follow-up advice status recovers a task ID after the async startup response is delayed',async()=>{
