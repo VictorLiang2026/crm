@@ -83,7 +83,7 @@ async function loadAll() {
       'Id, customer_id, followup_date, next_followup_date, followup_notes, activity_id, recommendation_id, updated_at'
     ).is('deleted_at', null),
     rdb.from('recruit_candidates').select(
-      'id, customer_id, stage, stage_changed_at, next_action_date, next_action, potential_score, created_at, updated_at'
+      'id, customer_id, person_id, stage, stage_changed_at, next_action_date, next_action, potential_score, created_at, updated_at'
     ).is('deleted_at', null),
     rdb.from('recruit_followups').select(
       'id, candidate_id, followup_date, followup_notes, interest_level, next_followup_date, updated_at'

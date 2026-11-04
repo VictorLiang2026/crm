@@ -5,7 +5,9 @@ const { readMorningFacts, buildMorningSections, enhanceGuidance } =
   require('../../cloudfunctions/today_coach/morning-brief');
 
 const today = '2026-10-01';
-const data = { customers: [{ Id: 10, customer_name: '[CRM_TEST_ONLY]客户甲' }],
+const data = { customers: [{ Id: 10, person_id: 99, customer_name: '[CRM_TEST_ONLY]客户甲' },
+  { Id: 11, person_id: null }],
+  candidates: [{ id: 30, customer_id: 10, person_id: null }, { id: 31, customer_id: 11, person_id: 101 }],
   activities: [{ id: 40, name: '[CRM_TEST_ONLY]近期活动', activity_date: '2026-10-03', status: 'preparing' },
     { id: 41, name: '已取消活动', activity_date: '2026-10-03', status: 'cancelled' }] };
 const actions = [{ action_id: 'action-5', person_type: 'person', person_id: 99,
@@ -39,6 +41,23 @@ test('all seven sections use bounded database facts and keep candidates separate
   assert.equal(result.needConfirmation[0].source, 'public.opportunity_candidates#70');
   assert.equal(result.opportunities.length, 1);
   assert.equal(result.risk.length, 2);
+});
+
+test('legacy customer and recruit actions resolve to Person routes and all action links use supported routes', () => {
+  const legacyActions = [
+    { action_id: 'customer-10', person_type: 'customer', person_id: 10, title: '客户行动' },
+    { action_id: 'recruit-30', person_type: 'recruit', person_id: 30, title: '候选人行动' },
+    { action_id: 'recruit-31', person_type: 'recruit', person_id: 31, title: '候选人关联 Person' },
+    { action_id: 'activity-40', person_type: 'activity', person_id: 40, title: '活动行动' },
+    { action_id: 'orphan-11', person_type: 'customer', person_id: 11, title: '无关联客户行动' },
+    { action_id: 'unknown-1', person_type: 'unknown', person_id: 1, title: '未知来源行动' },
+  ];
+  const result = buildMorningSections({ data, actions: legacyActions, facts, today });
+  assert.deepEqual(result.topActions.map(action => action.target), [
+    '#/person/99', '#/person/99', '#/person/101', '#/activity/40', '#/people',
+  ]);
+  assert.equal(result.upcoming.every(action => action.target.startsWith('#/person/') ||
+    action.target.startsWith('#/activity/')), true);
 });
 
 test('AI output can only select a preapproved advisory and cannot alter facts', async () => {

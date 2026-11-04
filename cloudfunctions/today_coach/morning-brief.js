@@ -29,13 +29,28 @@ function dueTime(value) {
   const raw = String(value || '');
   return Date.parse(/^\d{4}-\d{2}-\d{2}$/.test(raw) ? `${raw}T00:00:00+08:00` : raw) || 0;
 }
-function targetFor(action) {
+function targetFor(action, data) {
   const type = action.person_type;
   if (type === 'activity') return '#/activity/' + action.person_id;
-  if (type === 'recruit') return '#/recruit/' + action.person_id;
-  if (type === 'customer') return '#/customer/' + action.person_id;
-  if (type === 'person') return '#/person/' + action.person_id;
-  return '#/today';
+  if (type === 'person') return Number.isSafeInteger(Number(action.person_id)) && Number(action.person_id) > 0
+    ? '#/person/' + action.person_id : '#/people';
+  const customers = data.customers || [];
+  const customerPersonId = customerId => {
+    const row = customers.find(c => Number(c.Id) === Number(customerId));
+    return row && Number.isSafeInteger(Number(row.person_id)) && Number(row.person_id) > 0
+      ? Number(row.person_id) : null;
+  };
+  if (type === 'customer') {
+    const personId = customerPersonId(action.person_id);
+    return personId ? '#/person/' + personId : '#/people';
+  }
+  if (type === 'recruit') {
+    const candidate = (data.candidates || []).find(c => Number(c.id) === Number(action.person_id));
+    const personId = candidate && Number.isSafeInteger(Number(candidate.person_id)) && Number(candidate.person_id) > 0
+      ? Number(candidate.person_id) : candidate ? customerPersonId(candidate.customer_id) : null;
+    return personId ? '#/person/' + personId : '#/people';
+  }
+  return '#/people';
 }
 
 async function readMorningFacts({ env, key, today, now = new Date().toISOString(), fetchImpl = fetch }) {
@@ -112,7 +127,7 @@ function buildMorningSections({ data, actions, facts, today, now = new Date().to
       a.status === 'overdue' ? '已超过记录的截止日期' :
       a.status === 'today' ? '今天到期' : a.action_date ? '已记录截止日期' : '尚未记录截止日期',
     focus: a.canonical ? `action:${String(a.action_id).replace(/^action-/, '')}` : null,
-    target: targetFor(a), source: a.canonical ? `public.actions#${String(a.action_id).replace(/^action-/, '')}` :
+    target: targetFor(a, data), source: a.canonical ? `public.actions#${String(a.action_id).replace(/^action-/, '')}` :
       `public.v_action_center#${a.action_id}`,
   }));
   const upcoming = [
@@ -125,7 +140,7 @@ function buildMorningSections({ data, actions, facts, today, now = new Date().to
     ...uniqueActions.filter(a => a.action_date && a.action_date >= today &&
       a.action_date <= addDays(today, 7)).slice(0, 20).map(a => ({
       title: short(a.title || a.next_action, 120), date: a.due_at || a.action_date,
-      kind: 'action', target: targetFor(a),
+      kind: 'action', target: targetFor(a, data),
       focus: a.canonical ? `action:${String(a.action_id).replace(/^action-/, '')}` : null,
       source: a.canonical ?
         `public.actions#${String(a.action_id).replace(/^action-/, '')}` : `public.v_action_center#${a.action_id}` })),
@@ -136,7 +151,7 @@ function buildMorningSections({ data, actions, facts, today, now = new Date().to
     ...uniqueActions.filter(a => a.status === 'overdue' ||
       (a.due_at && Date.parse(a.due_at) < Date.parse(now))).slice(0, 5).map(a => ({
       title: `逾期行动：${short(a.person_name, 60)} · ${short(a.title || a.next_action, 100)}`,
-      target: targetFor(a), focus: a.canonical ? `action:${String(a.action_id).replace(/^action-/, '')}` : null,
+      target: targetFor(a, data), focus: a.canonical ? `action:${String(a.action_id).replace(/^action-/, '')}` : null,
       source: a.canonical ?
         `public.actions#${String(a.action_id).replace(/^action-/, '')}` : `public.v_action_center#${a.action_id}` })),
   ].slice(0, 10);
