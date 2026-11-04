@@ -5,6 +5,7 @@ const { createHash, randomUUID } = require('node:crypto');
 const { inflateRawSync } = require('node:zlib');
 const { createAIGateway } = require('./ai-gateway');
 const { createSearchData } = require('./search-data');
+const testData = require('./test-data');
 const { CONTENT_COLUMNS, projectContent, managementRow, contentVersions } = require('./knowledge-content');
 const { createKnowledgeContentService } = require('./knowledge-content-service');
 const { MAX_BYTES: MAX_PDF_TEXT_BYTES, MAX_PAGES: MAX_PDF_PAGES, MAX_TEXT_CHARS } = require('./knowledge-pdf-limits');
@@ -40,6 +41,9 @@ const EXTENSIONS = Object.freeze({
 
 function fail(code, message = code) { const error = new Error(message); error.code = code; throw error; }
 function object(value) { return value && typeof value === 'object' && !Array.isArray(value); }
+function hasExplicitTestMarker(value) {
+  return /(?:虚构测试|测试客户|测试样本|虚构样本|系统测试[·・]勿联系)/.test(JSON.stringify(value ?? ''));
+}
 function positiveId(value) { return /^[1-9][0-9]*$/.test(String(value ?? '')); }
 function actorUid(value) {
   if (typeof value !== 'string' || !value.trim() || value.length > 256) fail('UNAUTHORIZED');
@@ -278,6 +282,7 @@ function createKnowledgeLibrary(options={}) {
   const fetchImpl=options.fetchImpl||fetch,client=options.client||require('./db').app;
   const gatewayFactory=options.gatewayFactory||createAIGateway;
   const searchDataFactory=options.searchDataFactory||createSearchData;
+  const testDataReader=options.testDataReader||testData.disclose;
   const logger=options.logger||console;
   const callFunction=options.callFunction||client.callFunction.bind(client);
   const contentService=createKnowledgeContentService({
@@ -870,6 +875,16 @@ function createKnowledgeLibrary(options={}) {
     }
     return {refs,allowed};
   }
+  async function rejectTestKnowledgeRefs(refs) {
+    const disclosure=await testDataReader(refs);
+    if(disclosure?.status!=='verified'||typeof disclosure.containsTestData!=='boolean')fail('TEST_DATA_SCOPE_UNVERIFIED');
+    if(disclosure.containsTestData)fail('TEST_DATA_BLOCKED');
+  }
+  function followupSourceRefs(items) {
+    return items.flatMap(item=>['strategySourceIds','productSourceIds']
+      .flatMap(key=>Array.isArray(item?.gptAdvice?.[key])?item.gptAdvice[key]:[])
+      .filter(positiveId).map(id=>({schema:'public',table:'knowledge_items',id:String(id)})));
+  }
   async function runDual(input,actorValue,options={}) {
     const actor=actorUid(actorValue),personId=String(input?.personId||'').trim();
     if(!positiveId(personId))fail('INVALID_INPUT');
@@ -948,6 +963,8 @@ function createKnowledgeLibrary(options={}) {
     const strategyEntries=rankEvidence(await activeItems(new Set(['industry','top_performer_sharing','playbook','case','story','evidence'])),query,8);
     const productEntries=rankEvidence(await activeItems(new Set(['product','company','service','recruitment','campaign',
       'health_wealth_seminar','legal_tax','case','playbook','regulation','evidence','story','other'])),query,10);
+    await rejectTestKnowledgeRefs([...strategyEntries,...productEntries].map(({row})=>
+      ({schema:'public',table:'knowledge_items',id:String(row.id)})));
     const strategy=sourceContext(strategyEntries),products=sourceContext(productEntries);
     return {customerSnapshot,interactions,strategy,products,context:{customer_snapshot:customerSnapshot,
       recent_interactions:interactions,strategy_sources:strategy.refs,product_sources:products.refs,
@@ -985,6 +1002,7 @@ function createKnowledgeLibrary(options={}) {
         }}:{})});
       const result=task.result;
       if(!object(result)||!object(result.overallStrategy)||!object(result.productServiceAdvice))fail('INVALID_RESULT');
+      if(hasExplicitTestMarker(result))fail('TEST_DATA_OUTPUT_BLOCKED');
       const strategyRefs=keepAllowedSources(result.overallStrategy.sourceRefs,context.strategy.allowed);
       const productRefs=keepAllowedSources(result.productServiceAdvice.sourceRefs,context.products.allowed);
       const strategyText=[result.overallStrategy.summary,
@@ -1204,6 +1222,7 @@ function createKnowledgeLibrary(options={}) {
   async function previewGptImport(input,actorValue) {
     const actor=actorUid(actorValue),items=input?.rows;
     if(!Array.isArray(items)||!items.length||items.length>10)fail('INVALID_INPUT');
+    await rejectTestKnowledgeRefs(followupSourceRefs(items));
     const strategyEntries=await activeItems(new Set(['industry','top_performer_sharing','playbook','case','story','evidence']));
     const productEntries=await activeItems(new Set(['product','company','service','recruitment','campaign',
       'health_wealth_seminar','legal_tax','case','playbook','regulation','evidence','story','other']));
@@ -1220,6 +1239,7 @@ function createKnowledgeLibrary(options={}) {
         product=cleanText(item.gptAdvice.productServiceAdvice,4000,'productServiceAdvice',true),
         strategySources=keepAllowedSources(item.gptAdvice.strategySourceIds,strategyMap),
         productSources=keepAllowedSources(item.gptAdvice.productSourceIds,productMap);
+      if(hasExplicitTestMarker({title,strategy,product}))fail('TEST_DATA_OUTPUT_BLOCKED');
       if(!Array.isArray(item.gptAdvice.strategySourceIds)||!Array.isArray(item.gptAdvice.productSourceIds)||
           item.gptAdvice.strategySourceIds.length!==strategySources.length||
           item.gptAdvice.productSourceIds.length!==productSources.length)fail('INVALID_SOURCE');

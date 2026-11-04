@@ -123,6 +123,114 @@ test('follow-up advice status recovers a task ID after the async startup respons
   assert.equal(requests[1].filters.get('system_task_id'),'eq.17');
 });
 
+test('system advice fails closed before the model call when a selected knowledge source is test data',async()=>{
+  const row={id:82,person_id:42,client_request_id:'d9e53b08-1f81-421e-83b0-8ff01f94adf9',title:'跟进建议',
+    system_title:'跟进建议',system_status:'generating',system_version:0,created_by:'operator',updated_by:'operator',
+    created_at:stamp,updated_at:stamp,deleted_at:null};
+  let gatewayCalls=0;
+  const item={id:3,source_id:null,item_type:'story',source:'行业分享',source_date:'2026-10-26',verified:true,
+    lifecycle_status:'verified',version_no:1,content:'测试客户虚构样本',metadata:{domain:'industry',categories:['industry_development']},
+    deleted_at:null,valid_from:null,valid_to:null};
+  const fetchImpl=async(url,options={})=>{
+    const method=options.method||'GET',parsed=new URL(url),table=parsed.pathname.split('/').pop(),query=parsed.searchParams;
+    if(method==='GET'){
+      if(table==='knowledge_items')return response([{...item}]);
+      if(table==='knowledge_sources')return response([]);
+      if(table==='person_followup_advice')return response(query.has('client_request_id')?[]:[{...row}]);
+      return response([]);
+    }
+    if(method==='POST')return response([{...row}]);
+    if(method==='PATCH'){Object.assign(row,JSON.parse(options.body));return response([{...row}]);}
+    throw new Error(`Unexpected ${method} ${table}`);
+  };
+  const service=createKnowledgeLibrary({env:'crm-test123',key:'test-key',fetchImpl,
+    client:{callFunction:async()=>({result:{person:{occupation:'顾问',customer_stage:'新客'},recent_interactions:[]}})},
+    testDataReader:async refs=>({status:'verified',containsTestData:refs.some(ref=>ref.id==='3'),recordCount:1,
+      sources:[{batchKey:'crm_test_fixture',table:'knowledge_items',count:1}]}),
+    searchDataFactory:()=>({auditRdb:{}}),gatewayFactory:()=>({runAITask:async()=>{gatewayCalls++;throw new Error('must not call model');}})});
+  await assert.rejects(service.run({operation:'adviceGenerate',data:{personId:'42',clientRequestId:row.client_request_id}},'operator'),
+    error=>error.code==='TEST_DATA_BLOCKED');
+  assert.equal(gatewayCalls,0);assert.equal(row.system_status,'failed');
+});
+
+test('system advice fails closed when test-data provenance cannot be verified',async()=>{
+  const row={id:83,person_id:42,client_request_id:'e9e53b08-1f81-421e-83b0-8ff01f94adf9',title:'跟进建议',
+    system_title:'跟进建议',system_status:'generating',system_version:0,created_by:'operator',updated_by:'operator',
+    created_at:stamp,updated_at:stamp,deleted_at:null};
+  let gatewayCalls=0;
+  const item={id:4,source_id:null,item_type:'story',source:'行业分享',source_date:'2026-10-26',verified:true,
+    lifecycle_status:'verified',version_no:1,content:'普通行业经验',metadata:{domain:'industry',categories:['industry_development']},
+    deleted_at:null,valid_from:null,valid_to:null};
+  const fetchImpl=async(url,options={})=>{
+    const method=options.method||'GET',parsed=new URL(url),table=parsed.pathname.split('/').pop();
+    if(method==='GET'){
+      if(table==='knowledge_items')return response([{...item}]);
+      if(table==='knowledge_sources')return response([]);
+      if(table==='person_followup_advice')return response(parsed.searchParams.has('client_request_id')?[]:[{...row}]);
+      return response([]);
+    }
+    if(method==='POST')return response([{...row}]);
+    if(method==='PATCH'){Object.assign(row,JSON.parse(options.body));return response([{...row}]);}
+    throw new Error(`Unexpected ${method} ${table}`);
+  };
+  const service=createKnowledgeLibrary({env:'crm-test123',key:'test-key',fetchImpl,
+    client:{callFunction:async()=>({result:{person:{occupation:'顾问',customer_stage:'新客'},recent_interactions:[]}})},
+    testDataReader:async()=>({status:'unverified',containsTestData:null,recordCount:null,sources:[]}),
+    searchDataFactory:()=>({auditRdb:{}}),gatewayFactory:()=>({runAITask:async()=>{gatewayCalls++;throw new Error('must not call model');}})});
+  await assert.rejects(service.run({operation:'adviceGenerate',data:{personId:'42',clientRequestId:row.client_request_id}},'operator'),
+    error=>error.code==='TEST_DATA_SCOPE_UNVERIFIED');
+  assert.equal(gatewayCalls,0);assert.equal(row.system_status,'failed');
+});
+
+test('system advice never persists explicit fictional-test output from the model',async()=>{
+  const row={id:84,person_id:42,client_request_id:'f9e53b08-1f81-421e-83b0-8ff01f94adf9',title:'跟进建议',
+    system_title:'跟进建议',system_status:'generating',system_version:0,created_by:'operator',updated_by:'operator',
+    created_at:stamp,updated_at:stamp,deleted_at:null};
+  const item={id:5,source_id:null,item_type:'story',source:'行业经验',source_date:'2026-10-26',verified:true,
+    lifecycle_status:'verified',version_no:1,content:'一般行业经验',metadata:{domain:'industry',categories:['industry_development']},
+    deleted_at:null,valid_from:null,valid_to:null};
+  const fetchImpl=async(url,options={})=>{
+    const method=options.method||'GET',parsed=new URL(url),table=parsed.pathname.split('/').pop();
+    if(method==='GET'){
+      if(table==='knowledge_items')return response([{...item}]);
+      if(table==='knowledge_sources')return response([]);
+      if(table==='person_followup_advice')return response(parsed.searchParams.has('client_request_id')?[]:[{...row}]);
+      return response([]);
+    }
+    if(method==='POST')return response([{...row}]);
+    if(method==='PATCH'){Object.assign(row,JSON.parse(options.body));return response([{...row}]);}
+    throw new Error(`Unexpected ${method} ${table}`);
+  };
+  const service=createKnowledgeLibrary({env:'crm-test123',key:'test-key',fetchImpl,
+    client:{callFunction:async()=>({result:{person:{occupation:'顾问',customer_stage:'新客'},recent_interactions:[]}})},
+    testDataReader:async()=>({status:'verified',containsTestData:false,recordCount:0,sources:[]}),
+    searchDataFactory:()=>({auditRdb:{}}),gatewayFactory:()=>({runAITask:async()=>({
+      taskId:18,result:{title:'虚构测试客户跟进建议',
+        overallStrategy:{summary:'测试样本',objective:'确认',nextStep:'沟通',clarifyingQuestions:[],sourceRefs:[]},
+        productServiceAdvice:{recommendation:'暂无匹配资料',sourceRefs:[]}}
+    })})});
+  await assert.rejects(service.run({operation:'adviceGenerate',data:{personId:'42',clientRequestId:row.client_request_id}},'operator'),
+    error=>error.code==='TEST_DATA_OUTPUT_BLOCKED');
+  assert.equal(row.system_status,'failed');assert.equal(row.system_strategy,undefined);
+});
+
+test('GPT import preview refuses registered test knowledge references before preview writes',async()=>{
+  const writes=[];
+  const service=createKnowledgeLibrary({env:'crm-test123',key:'test-key',
+    fetchImpl:async(url,options={})=>{
+      if((options.method||'GET')==='PATCH')writes.push(url);
+      return response([]);
+    },
+    client:{callFunction:async()=>({result:{}})},
+    searchDataFactory:()=>({auditRdb:{rpc:async()=>({data:{}})}}),
+    testDataReader:async refs=>({status:'verified',containsTestData:refs.some(ref=>ref.id==='3'),recordCount:1,
+      sources:[{batchKey:'crm_test_fixture',table:'knowledge_items',count:1}]})});
+  await assert.rejects(service.run({operation:'gptImportPreview',data:{rows:[{adviceId:'81',personId:'42',systemVersion:1,
+    gptAdvice:{title:'GPT建议',overallStrategy:'策略',productServiceAdvice:'产品',strategySourceIds:[3],productSourceIds:[]}}]}},'operator'),
+    error=>error.code==='TEST_DATA_BLOCKED');
+  assert.equal(writes.length,0);
+});
+
 test('follow-up advice status stays pending while a slow startup has not created an AI task yet',async()=>{
   let adviceQueries=0;
   const fetchImpl=async(url)=>{
