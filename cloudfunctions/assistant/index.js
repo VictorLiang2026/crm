@@ -132,6 +132,9 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
             adviceId:String(input.adviceId),personId:String(input.personId),systemVersion:input.systemVersion,
             previewId:String(input.previewId),confirmed:true,
           }},actorUid);
+        if (input.tool === 'followup_gpt_advice_save' && Object.keys(input).every(k=>['tool','rows'].includes(k)) &&
+            Array.isArray(input.rows)&&input.rows.length>=1&&input.rows.length<=10)
+          return await knowledgeLibraryRunner({action:'knowledgeLibrary',operation:'gptAdviceDirectSave',data:{rows:input.rows}},actorUid);
         if (input.tool === 'knowledge_generation_status' && Object.keys(input).every(k=>['tool','commandId'].includes(k)) &&
             /^[0-9a-f-]{36}$/i.test(String(input.commandId)))
           return {ok:false,error:{code:'CONTENT_STATUS_REMOVED',message:'Generation status lookup is no longer exposed; saved content can be read from its record.'}};
@@ -140,7 +143,7 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
       }
       return {ok:false,error:{code:'INVALID_INPUT',message:'Unsupported knowledge operation',diagnostic:{
         recognizedTool:['knowledge_records_list','knowledge_record_get','knowledge_generate_gpt_pending','knowledge_generation_status',
-          'followup_gpt_task_package','followup_gpt_import_preview','followup_gpt_import_confirm'].includes(input.tool),
+          'followup_gpt_task_package','followup_gpt_import_preview','followup_gpt_import_confirm','followup_gpt_advice_save'].includes(input.tool),
         toolName:typeof input.tool==='string'&&/^[A-Za-z0-9_.:-]{1,80}$/.test(input.tool)?input.tool:'unclassified',
         fieldCount:Object.keys(input).length,
       }}};

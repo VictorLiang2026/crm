@@ -14,6 +14,7 @@ const DICT = {
   kmcp_followup_read: {'zh-CN':'读取 CRM 筛选并脱敏的人物跟进上下文、系统建议和相关知识资料','en':'Read CRM-filtered, redacted Person context, system advice, and related knowledge'},
   kmcp_followup_write: {'zh-CN':'提交 GPT 跟进建议；仅限系统建议已就绪且两段 GPT 内容均为空的记录','en':'Submit GPT follow-up advice only when the system advice is ready and both GPT sections are empty'},
   kmcp_followup_review: {'zh-CN':'跟进建议必须先显示 CRM 服务端核实的预览。只有你逐条检查并确认后，CRM 才会写入 GPT 栏位。','en':'Follow-up advice is saved only after you review each CRM-verified preview and explicitly confirm it.'},
+  kmcp_followup_direct_write: {'zh-CN':'直接保存 GPT 跟进建议；仅写入系统建议已就绪且 GPT 栏位为空的记录，保存后可在 CRM 中检查和编辑','en':'Save GPT follow-up advice directly only to records with ready system advice and empty GPT fields; review or edit saved advice in CRM'},
   kmcp_allow: {'zh-CN':'授权连接','en':'Authorize connection'}, kmcp_deny: {'zh-CN':'拒绝','en':'Deny'},
   kmcp_error: {'zh-CN':'无法完成授权，请返回 Codex 重试，或联系 CRM 管理员。','en':'Could not complete authorization. Return to Codex and retry, or contact your CRM administrator.'},
   kmcp_signin_error: {'zh-CN':'登录失败，请检查账号后重试。','en':'Sign-in failed. Check your credentials and try again.'},

@@ -28,6 +28,7 @@ function setup(){
     throw new Error(`Unexpected method ${method}`);
   };
   const service=createKnowledgeLibrary({env:'crm-test123',key:'test-key',fetchImpl,
+    testDataReader:async()=>({status:'verified',containsTestData:false,recordCount:0,sources:[]}),
     client:{callFunction:async()=>({result:{person:{display_name:'测试客户',occupation:'顾问',customer_stage:'新客'},
       household:{important_facts:'测试客户的家庭情况',members:[{name:'家属姓名',role:'配偶',phone:'13800138000'}]},
       relationship:[{other_person_id:91,other_name:'关联人物姓名',type:'合作关系',stage:'建立联系'}],
@@ -367,4 +368,76 @@ test('GPT import confirmation cannot write over content filled after preview',as
   await assert.rejects(service.run({operation:'gptImportConfirm',data:{confirmed:true,adviceId:'81',personId:'42',
     systemVersion:2,previewId:row.gpt_preview_id}},'operator'),error=>error.code==='STALE');
   assert.equal(writes.length,0);assert.equal(row.gpt_strategy,'GPT 策略');
+});
+
+test('direct GPT save writes only an empty ready GPT lane and leaves system advice unchanged',async()=>{
+  const {service,row,writes}=setup();
+  row.gpt_title=null;row.gpt_strategy=null;row.gpt_product_advice=null;row.gpt_status='pending';
+  const result=await service.run({operation:'gptAdviceDirectSave',data:{rows:[{adviceId:'81',personId:'42',systemVersion:2,
+    gptAdvice:{title:'直接生成建议',overallStrategy:'先确认当前重点，再商定下一步。',
+      productServiceAdvice:'目前无法核实适配产品，应先补充需求信息。',strategySourceIds:[],productSourceIds:[]}}]}},'operator');
+  assert.equal(result.savedCount,1);assert.equal(result.skippedCount,0);
+  assert.equal(result.rows[0].status,'saved');assert.equal(result.rows[0].advice.id,'81');
+  assert.equal(row.gpt_title,'直接生成建议');assert.equal(row.gpt_strategy,'先确认当前重点，再商定下一步。');
+  assert.equal(row.gpt_product_advice,'目前无法核实适配产品，应先补充需求信息。');
+  assert.equal(row.gpt_based_on_system_version,2);assert.equal(row.gpt_status,'ready');
+  assert.equal(row.system_strategy,'系统策略');assert.equal(row.system_product_advice,'系统产品建议');
+  assert.equal(row.updated_by,'operator');assert.equal(writes.length,1);
+  assert.equal(writes[0].filters.get('system_version'),'eq.2');
+  assert.equal(writes[0].filters.get('gpt_strategy'),'is.null');
+  assert.equal(writes[0].filters.get('gpt_product_advice'),'is.null');
+});
+
+test('direct GPT save skips already-filled and stale advice without overwriting',async()=>{
+  const {service,row,writes}=setup();
+  const nonempty=await service.run({operation:'gptAdviceDirectSave',data:{rows:[{adviceId:'81',personId:'42',systemVersion:2,
+    gptAdvice:{title:'覆盖',overallStrategy:'覆盖',productServiceAdvice:'覆盖',strategySourceIds:[],productSourceIds:[]}}]}},'operator');
+  assert.equal(nonempty.rows[0].status,'not_empty');
+  row.gpt_title=null;row.gpt_strategy=null;row.gpt_product_advice=null;
+  const stale=await service.run({operation:'gptAdviceDirectSave',data:{rows:[{adviceId:'81',personId:'42',systemVersion:1,
+    gptAdvice:{title:'旧版本',overallStrategy:'旧版本',productServiceAdvice:'旧版本',strategySourceIds:[],productSourceIds:[]}}]}},'operator');
+  assert.equal(stale.rows[0].status,'stale');assert.equal(writes.length,0);
+});
+
+test('direct GPT save rejects unverified sources and duplicate advice IDs before writing',async()=>{
+  const {service,row:writesRow,writes}=setup();
+  writesRow.gpt_title=null;writesRow.gpt_strategy=null;writesRow.gpt_product_advice=null;
+  const row={adviceId:'81',personId:'42',systemVersion:2,gptAdvice:{title:'建议',overallStrategy:'策略',
+    productServiceAdvice:'建议',strategySourceIds:[999],productSourceIds:[]}};
+  await assert.rejects(service.run({operation:'gptAdviceDirectSave',data:{rows:[row]}},'operator'),error=>error.code==='INVALID_SOURCE');
+  await assert.rejects(service.run({operation:'gptAdviceDirectSave',data:{rows:[{...row,gptAdvice:{...row.gptAdvice,strategySourceIds:[]}},
+    {...row,gptAdvice:{...row.gptAdvice,strategySourceIds:[]}}]}},'operator'),error=>error.code==='INVALID_INPUT');
+  assert.equal(writes.length,0);
+});
+
+test('direct GPT save keeps two advice rows for one Person paired by exact advice ID',async()=>{
+  const rows=[81,82].map(id=>({id,person_id:42,title:`系统建议 ${id}`,system_title:`系统建议 ${id}`,gpt_title:null,
+    system_status:'ready',system_strategy:'系统策略',system_product_advice:'系统产品建议',system_strategy_sources:[],system_product_sources:[],
+    system_version:2,gpt_strategy:null,gpt_product_advice:null,gpt_strategy_sources:[],gpt_product_sources:[],
+    gpt_based_on_system_version:null,gpt_kept_for_system_version:null,gpt_status:'pending',gpt_preview_id:null,
+    gpt_preview_payload:null,gpt_preview_actor:null,gpt_preview_expires_at:null,updated_by:'operator',updated_at:stamp,deleted_at:null}));
+  const writes=[];
+  const fetchImpl=async(url,options={})=>{
+    const parsed=new URL(url),method=options.method||'GET',table=parsed.pathname.split('/').pop(),query=parsed.searchParams;
+    if(method==='GET') {
+      if(table!=='person_followup_advice')return response([]);
+      return response(rows.filter(row=>(!query.has('id')||String(row.id)===query.get('id').replace('eq.',''))&&
+        (!query.has('person_id')||String(row.person_id)===query.get('person_id').replace('eq.',''))&&
+        (!query.has('system_status')||row.system_status===query.get('system_status').replace('eq.',''))&&row.deleted_at===null));
+    }
+    if(method==='PATCH') {
+      const id=Number(query.get('id').replace('eq.','')),row=rows.find(item=>item.id===id);writes.push({id,body:JSON.parse(options.body)});
+      if(!row||row.gpt_strategy!==null||row.gpt_product_advice!==null)return response([]);
+      Object.assign(row,JSON.parse(options.body));return response([{...row}]);
+    }
+    throw new Error(`Unexpected method ${method}`);
+  };
+  const service=createKnowledgeLibrary({env:'crm-test123',key:'test-key',fetchImpl,
+    client:{callFunction:async()=>({result:{person:{display_name:'测试客户'},recent_interactions:[]}})}});
+  const result=await service.run({operation:'gptAdviceDirectSave',data:{rows:[81,82].map((id,index)=>({adviceId:String(id),personId:'42',systemVersion:2,
+    gptAdvice:{title:`GPT 标题 ${id}`,overallStrategy:`策略 ${index+1}`,productServiceAdvice:`产品建议 ${index+1}`,
+      strategySourceIds:[],productSourceIds:[]}}))}},'operator');
+  assert.deepEqual(result.rows.map(item=>[item.adviceId,item.status]),[['81','saved'],['82','saved']]);
+  assert.equal(rows[0].gpt_title,'GPT 标题 81');assert.equal(rows[1].gpt_title,'GPT 标题 82');
+  assert.deepEqual(writes.map(item=>item.id),[81,82]);
 });

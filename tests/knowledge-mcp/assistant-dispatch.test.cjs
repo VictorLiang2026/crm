@@ -64,3 +64,16 @@ test('follow-up preview dispatch is narrow and confirm flag is server-owned',asy
     previewId:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',confirmed:true},async()=>{throw Error('client confirmation flag must not be accepted');});
   assert.equal(forged.error.code,'INVALID_INPUT');
 });
+
+test('direct follow-up GPT save dispatch accepts only the exact candidate rows',async()=>{
+  const rows=[{adviceId:'81',personId:'42',systemVersion:2,gptAdvice:{title:'GPT 建议',overallStrategy:'关系策略',
+    productServiceAdvice:'产品建议',strategySourceIds:[],productSourceIds:[]}}];
+  let captured;
+  const result=await invoke({tool:'followup_gpt_advice_save',rows},async(event,actor)=>{
+    captured={event,actor};return {ok:true,savedCount:1,skippedCount:0,rows:[{adviceId:'81',personId:'42',status:'saved'}]};
+  });
+  assert.equal(result.ok,true);
+  assert.deepEqual(captured,{event:{action:'knowledgeLibrary',operation:'gptAdviceDirectSave',data:{rows}},actor:'crm-test-user'});
+  const extra=await invoke({tool:'followup_gpt_advice_save',rows,confirmed:true},async()=>{throw Error('extra field must be rejected');});
+  assert.equal(extra.error.code,'INVALID_INPUT');
+});

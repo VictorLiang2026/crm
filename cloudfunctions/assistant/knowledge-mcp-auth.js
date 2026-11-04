@@ -67,11 +67,11 @@ async function runOAuth(operation,data) {
 }
 function validateScopes(scopeValue) {
   const requested=String(scopeValue||'').split(/\s+/).filter(Boolean),allowed=new Set([
-    'knowledge:read','knowledge:gpt:submit','followup:read','followup:gpt:submit']);
+    'knowledge:read','knowledge:gpt:submit','followup:read','followup:gpt:submit','followup:gpt:direct_write']);
   const hasRead=requested.includes('knowledge:read')||requested.includes('followup:read');
   if(!hasRead||requested.some(scope=>!allowed.has(scope))||new Set(requested).size!==requested.length||
     requested.includes('knowledge:gpt:submit')&&!requested.includes('knowledge:read')||
-    requested.includes('followup:gpt:submit')&&!requested.includes('followup:read')) {
+    (requested.includes('followup:gpt:submit')||requested.includes('followup:gpt:direct_write'))&&!requested.includes('followup:read')) {
     const error=new Error('INVALID_SCOPE');error.code='INVALID_INPUT';throw error;
   }
   return requested;

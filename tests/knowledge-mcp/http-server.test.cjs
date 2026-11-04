@@ -90,7 +90,7 @@ test('MCP metadata and tool contract expose text-only read and summary-only subm
   const resource=process.env.CRM_KNOWLEDGE_MCP_RESOURCE_URL;
   const metadataUrl='https://crm.example/.well-known/oauth-protected-resource/mcp/knowledge';
   const metadata=await main({httpMethod:'GET',url:metadataUrl,headers:{}},{httpContext:{httpMethod:'GET',url:metadataUrl,headers:{}}});
-  assert.deepEqual(JSON.parse(metadata.body).scopes_supported,['knowledge:read','knowledge:gpt:submit','followup:read','followup:gpt:submit']);
+  assert.deepEqual(JSON.parse(metadata.body).scopes_supported,['knowledge:read','knowledge:gpt:submit','followup:read','followup:gpt:submit','followup:gpt:direct_write']);
   mockCall=async({data})=>({result:data.input.operation==='access'?{ok:true,actorUid:'crm-user',resource,
     scopes:['knowledge:read','knowledge:gpt:submit']}:{ok:true,record:{}}});
   const url=resource;
@@ -114,6 +114,11 @@ test('MCP metadata and tool contract expose text-only read and summary-only subm
   const confirm=listed.find(tool=>tool.name==='followup_gpt_import_confirm');
   assert.deepEqual(confirm.securitySchemes[0].scopes,['followup:read','followup:gpt:submit']);
   assert.equal(Object.hasOwn(confirm.inputSchema.properties,'confirmed'),false);
+  const direct=listed.find(tool=>tool.name==='followup_gpt_advice_save');
+  assert.deepEqual(direct.securitySchemes[0].scopes,['followup:read','followup:gpt:direct_write']);
+  assert.equal(direct.inputSchema.properties.rows.maxItems,10);
+  assert.match(direct.description,/directly/);
+  assert.match(direct.description,/does not create a preview/);
 });
 
 test('follow-up-only grants can read task packages but cannot call knowledge or submit without the write scope',async()=>{
@@ -137,6 +142,9 @@ test('follow-up-only grants can read task packages but cannot call knowledge or 
   const noWrite=await main({httpMethod:'POST',url,headers,body:JSON.stringify({jsonrpc:'2.0',id:34,method:'tools/call',
     params:{name:'followup_gpt_import_preview',arguments:{rows:[{}]}}})},{httpContext:{httpMethod:'POST',url,headers}});
   assert.match(JSON.stringify(JSON.parse(noWrite.body).result._meta),/followup:read followup:gpt:submit/);
+  const noDirectWrite=await main({httpMethod:'POST',url,headers,body:JSON.stringify({jsonrpc:'2.0',id:35,method:'tools/call',
+    params:{name:'followup_gpt_advice_save',arguments:{rows:[{}]}}})},{httpContext:{httpMethod:'POST',url,headers}});
+  assert.match(JSON.stringify(JSON.parse(noDirectWrite.body).result._meta),/followup:read followup:gpt:direct_write/);
 });
 
 test('follow-up OAuth authorization accepts a distinct scope pair and rejects an unpaired submit scope',async()=>{
@@ -151,6 +159,13 @@ test('follow-up OAuth authorization accepts a distinct scope pair and rejects an
   const invalidUrl=makeUrl('followup:gpt:submit');
   const invalid=await main({httpMethod:'GET',url:invalidUrl,headers:{}},{httpContext:{httpMethod:'GET',url:invalidUrl,headers:{}}});
   assert.equal(invalid.statusCode,400);
+  const directUrl=makeUrl('followup:read followup:gpt:direct_write');
+  const direct=await main({httpMethod:'GET',url:directUrl,headers:{}},{httpContext:{httpMethod:'GET',url:directUrl,headers:{}}});
+  assert.equal(direct.statusCode,302);
+  const directWithoutRead=makeUrl('followup:gpt:direct_write');
+  const directInvalid=await main({httpMethod:'GET',url:directWithoutRead,headers:{}},
+    {httpContext:{httpMethod:'GET',url:directWithoutRead,headers:{}}});
+  assert.equal(directInvalid.statusCode,400);
 });
 
 test('MCP list failures retain only safe error codes and shape diagnostics',async()=>{

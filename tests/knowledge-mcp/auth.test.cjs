@@ -14,9 +14,12 @@ test('pathful OAuth issuer is derived from the configured HTTPS origin', () => {
 
 test('follow-up OAuth scopes stay separate and submit scopes require their matching read scope',()=>{
   assert.deepEqual(validateScopes('followup:read followup:gpt:submit'),['followup:read','followup:gpt:submit']);
+  assert.deepEqual(validateScopes('followup:read followup:gpt:direct_write'),['followup:read','followup:gpt:direct_write']);
   assert.deepEqual(validateScopes('knowledge:read knowledge:gpt:submit'),['knowledge:read','knowledge:gpt:submit']);
   assert.throws(()=>validateScopes('followup:gpt:submit'),error=>error.code==='INVALID_INPUT');
+  assert.throws(()=>validateScopes('followup:gpt:direct_write'),error=>error.code==='INVALID_INPUT');
   assert.throws(()=>validateScopes('knowledge:read followup:gpt:submit'),error=>error.code==='INVALID_INPUT');
+  assert.throws(()=>validateScopes('knowledge:read followup:gpt:direct_write'),error=>error.code==='INVALID_INPUT');
   assert.throws(()=>validateScopes('knowledge:read knowledge:read'),error=>error.code==='INVALID_INPUT');
   assert.throws(()=>validateScopes('knowledge:read followup:admin'),error=>error.code==='INVALID_INPUT');
 });

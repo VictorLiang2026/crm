@@ -8,7 +8,7 @@ const HMAC_KEY = process.env.CRM_KNOWLEDGE_MCP_HMAC_KEY;
 const CONSENT_URI = process.env.CRM_KNOWLEDGE_MCP_CONSENT_URI;
 const RESOURCE_URL = process.env.CRM_KNOWLEDGE_MCP_RESOURCE_URL;
 const ISSUER_ORIGIN = process.env.CRM_KNOWLEDGE_MCP_ISSUER_URL;
-const SCOPES = ['knowledge:read','knowledge:gpt:submit','followup:read','followup:gpt:submit'];
+const SCOPES = ['knowledge:read','knowledge:gpt:submit','followup:read','followup:gpt:submit','followup:gpt:direct_write'];
 const MCP_PATH = '/mcp/knowledge';
 const OAUTH_PATH = '/oauth';
 const ISSUER_PATH = '/knowledge-mcp';
@@ -156,6 +156,16 @@ const TOOLS=[
  {name:'followup_gpt_task_package',description:'Read CRM-verified, redacted Person context and ready CloudBase follow-up recommendations whose GPT strategy and product/service advice are both empty. Optionally filter by exact Person ID; pages contain at most 10 rows.',securitySchemes:[{type:'oauth2',scopes:['followup:read']}],inputSchema:{type:'object',properties:{personId:{type:'string',pattern:'^[1-9][0-9]*$'},afterId:{type:'string',pattern:'^[1-9][0-9]*$'},limit:{type:'integer',minimum:1,maximum:10}},additionalProperties:false}},
  {name:'followup_gpt_import_preview',description:'Ask CRM to verify GPT follow-up advice against the current Person, system version, empty GPT fields and approved knowledge sources. Creates a short-lived, operator-bound preview; this does not save the advice.',securitySchemes:[{type:'oauth2',scopes:['followup:read','followup:gpt:submit']}],inputSchema:{type:'object',properties:{rows:{type:'array',minItems:1,maxItems:10,items:{type:'object',properties:{adviceId:{type:'string',pattern:'^[1-9][0-9]*$'},personId:{type:'string',pattern:'^[1-9][0-9]*$'},systemVersion:{type:'integer',minimum:1},gptAdvice:{type:'object',properties:{title:{type:'string',maxLength:240},overallStrategy:{type:'string',maxLength:4000},productServiceAdvice:{type:'string',maxLength:4000},strategySourceIds:{type:'array',items:{type:'integer',minimum:1}},productSourceIds:{type:'array',items:{type:'integer',minimum:1}}},required:['title','overallStrategy','productServiceAdvice','strategySourceIds','productSourceIds'],additionalProperties:false}},required:['adviceId','personId','systemVersion','gptAdvice'],additionalProperties:false}}},required:['rows'],additionalProperties:false}},
  {name:'followup_gpt_import_confirm',description:'Save exactly one advice row from its current CRM-verified preview. Call only after the user has reviewed that preview and explicitly confirmed this Person and advice; the server rechecks operator, preview, version, expiry and empty GPT fields.',securitySchemes:[{type:'oauth2',scopes:['followup:read','followup:gpt:submit']}],inputSchema:{type:'object',properties:{adviceId:{type:'string',pattern:'^[1-9][0-9]*$'},personId:{type:'string',pattern:'^[1-9][0-9]*$'},systemVersion:{type:'integer',minimum:1},previewId:{type:'string',format:'uuid'}},required:['adviceId','personId','systemVersion','previewId'],additionalProperties:false}},
+ {name:'followup_gpt_advice_save',
+  description:'Save up to 10 GPT-generated follow-up advice rows directly to their exact CRM Person advice records. Requires explicit followup:gpt:direct_write authorization. The server verifies each Person/advice link, system version, ready system status, empty GPT fields and approved knowledge source IDs before writing only GPT fields; this operation does not create a preview. Saved advice remains editable in CRM.',
+  securitySchemes:[{type:'oauth2',scopes:['followup:read','followup:gpt:direct_write']}],
+  inputSchema:{type:'object',properties:{rows:{type:'array',minItems:1,maxItems:10,items:{type:'object',
+    properties:{adviceId:{type:'string',pattern:'^[1-9][0-9]*$'},personId:{type:'string',pattern:'^[1-9][0-9]*$'},
+      systemVersion:{type:'integer',minimum:1},gptAdvice:{type:'object',properties:{title:{type:'string',maxLength:240},
+        overallStrategy:{type:'string',maxLength:4000},productServiceAdvice:{type:'string',maxLength:4000},
+        strategySourceIds:{type:'array',items:{type:'integer',minimum:1}},productSourceIds:{type:'array',items:{type:'integer',minimum:1}}},
+        required:['title','overallStrategy','productServiceAdvice','strategySourceIds','productSourceIds'],additionalProperties:false}},
+    required:['adviceId','personId','systemVersion','gptAdvice'],additionalProperties:false}}},required:['rows'],additionalProperties:false}},
 ];
 async function mcp(req){
   const rpcMsg=req.body;
@@ -195,6 +205,7 @@ async function mcp(req){
     if(name==='followup_gpt_import_confirm'&&(!/^[1-9][0-9]*$/.test(String(args.adviceId))||
       !/^[1-9][0-9]*$/.test(String(args.personId))||!Number.isSafeInteger(args.systemVersion)||args.systemVersion<1||
       !/^[0-9a-f-]{36}$/i.test(String(args.previewId))))fail('INVALID_ARGUMENTS',400);
+    if(name==='followup_gpt_advice_save'&&(!Array.isArray(args.rows)||args.rows.length<1||args.rows.length>10))fail('INVALID_ARGUMENTS',400);
     const input={tool:name,...args};
     const result=await invokeAssistant(actorUid,input);
     let safeResult=result;
@@ -251,7 +262,8 @@ async function main(event,context){
          req.url.searchParams.get('code_challenge_method')!=='S256'||!(state&&state.length<=1024)||
          !/^[A-Za-z0-9_-]{43}$/.test(challenge||'')||!hasRead||scope.some(s=>!SCOPES.includes(s))||new Set(scope).size!==scope.length||
          scope.includes('knowledge:gpt:submit')&&!scope.includes('knowledge:read')||
-         scope.includes('followup:gpt:submit')&&!scope.includes('followup:read'))fail('INVALID_OAUTH_REQUEST');
+         (scope.includes('followup:gpt:submit')||scope.includes('followup:gpt:direct_write'))&&!scope.includes('followup:read'))
+        fail('INVALID_OAUTH_REQUEST');
       await rpc('validate_client',{clientId,redirectUri});
       const redirect=new URL(CONSENT_URI);
       for(const [k,v]of req.url.searchParams)redirect.searchParams.set(k,v);

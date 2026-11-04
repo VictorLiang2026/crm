@@ -29,14 +29,17 @@ test('CRM consent page returns only ChatGPT or exact Codex loopback callbacks',a
   ]) assert.equal(isAllowedAuthorizationCallback(uri),false,uri);
 });
 
-test('follow-up OAuth consent explains its separate read, submit, and human-review permissions bilingually',()=>{
+test('follow-up OAuth consent explains separate read, review, and direct-write permissions bilingually',()=>{
   const dictionary=fs.readFileSync(path.join(__dirname,'../../crm/js/modules/console/i18n.js'),'utf8');
   const consent=fs.readFileSync(path.join(__dirname,'../../crm/js/modules/console/knowledge-mcp-consent.js'),'utf8');
-  for(const key of ['kmcp_followup_read','kmcp_followup_write','kmcp_followup_review']) {
+  const html=fs.readFileSync(path.join(__dirname,'../../crm/oauth-consent.html'),'utf8');
+  for(const key of ['kmcp_followup_read','kmcp_followup_write','kmcp_followup_review','kmcp_followup_direct_write']) {
     assert.match(dictionary,new RegExp(`${key}: \\{'zh-CN':`));
     assert.match(dictionary,new RegExp(`${key}: \\{[^\\n]*'en':`));
   }
   assert.match(consent,/requested\.has\('followup:read'\)/);
   assert.match(consent,/requested\.has\('followup:gpt:submit'\)/);
+  assert.match(consent,/requested\.has\('followup:gpt:direct_write'\)/);
+  assert.match(html,/id="followupDirectWrite"/);
   assert.match(consent,/followupReview/);
 });
