@@ -620,7 +620,7 @@ export function openOpportunityCreate(ctx, { onDone }) {
       const rows = res.candidates || [];
       if (!rows.length) { candBox.replaceChildren(h('div', { class: 'sheet-err' }, t('no_person_found'))); return; }
       picked = rows.length === 1 ? rows[0] : null;
-      candBox.replaceChildren(rows.map((c) => h('div', {
+      candBox.replaceChildren(...rows.map((c) => h('div', {
         class: 'cand' + (rows.length === 1 ? ' active' : ''),
         onclick: (e) => {
           picked = c;
