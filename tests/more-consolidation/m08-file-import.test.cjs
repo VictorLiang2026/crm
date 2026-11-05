@@ -40,13 +40,18 @@ test('server claim determines source, retries reuse draft, failures retain origi
  assert.throws(()=>service.list(1,0,'server-actor'),/Invalid/);
 });
 test('ai_parse new draft timeout preserves legacy and Quick Capture dispatch',async()=>{
- const code=fs.readFileSync('cloudfunctions/ai_parse/index.js','utf8'),calls=[];
+ const code=fs.readFileSync('cloudfunctions/ai_parse/index.js','utf8'),calls=[],ocrCalls=[];
  const exports={};const sandbox={exports,process:{env:{AI_MODEL:'configured-text',VISION_MODEL:'configured-vision'}},require:name=>{
    if(name==='./db')return {rdb:{},generateText:async(m,o)=>{calls.push(o);return {text:'{"phone":"123"}'};},extractJson:JSON.parse,assertOk(){}};
+   if(name==='./knowledge-ocr-service')return {createKnowledgeOcr:options=>{ocrCalls.push(options);return {run:async event=>({ocr:true,event})};}};
    if(name==='./quick-capture-v2')return {quickCaptureV2:async()=>({v2:true})};
    if(name==='./quick-capture-focused')return {quickCaptureFocused:async()=>({focused:true})};
    throw Error(name);
  }};vm.runInNewContext(code,sandbox);
+ const ocrEvent={action:'ocr_knowledge_source',sourceId:'fictional-source'};
+ assert.deepEqual(await exports.main(ocrEvent),{ocr:true,event:ocrEvent});
+ assert.equal(ocrCalls.length,1);
+ assert.equal(ocrCalls[0].visionModel,'configured-vision');
  await exports.main({action:'parse_import_draft',text:'test'});assert.equal(calls.at(-1).timeout,45000);
  await exports.main({text:'test'});assert.equal(calls.at(-1).timeout,120000);
  await exports.main({action:'parse_import_draft',images:[{base64:'abc'}]});assert.equal(calls.at(-1).model,'configured-vision');

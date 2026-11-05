@@ -42,7 +42,7 @@ test('M01 actual Console routing preserves timeline and report dates through bac
   try {
     await browser.start();
     await browser.openConsole('#/more', 'authCase=1');
-    await browser.wait("document.querySelector('#console-main .more-section')");
+    await browser.wait("document.querySelector('.console-main .more-section')");
     await browser.evaluate(`(async()=>{
       const {data}=await import('/crm/js/modules/console/data.js');
       window.m01Reports=[];
@@ -53,15 +53,15 @@ test('M01 actual Console routing preserves timeline and report dates through bac
       };
       location.hash='#/person/980001/timeline';
     })()`);
-    await browser.wait("document.querySelector('#console-main .tabs .tab.active')");
-    assert.equal(await browser.evaluate("[...document.querySelectorAll('#console-main .tabs .tab')].findIndex(x=>x.classList.contains('active'))"), 1);
+    await browser.wait("document.querySelector('.console-main .tabs .tab.active')");
+    assert.equal(await browser.evaluate("[...document.querySelectorAll('.console-main .tabs .tab')].findIndex(x=>x.classList.contains('active'))"), 1);
     await browser.evaluate("location.hash='#/activity-report/customer?startDate=2026-10-01&endDate=2026-10-23'");
     await browser.wait('window.m01Reports.length>=1');
     assert.deepEqual(await browser.evaluate('window.m01Reports[0]'), {type:'customer',mode:'range',startDate:'2026-10-01',endDate:'2026-10-23'});
-    assert.deepEqual(await browser.evaluate("[...document.querySelectorAll('#console-main input[type=date]')].map(x=>x.value)"), ['2026-10-01','2026-10-23']);
+    assert.deepEqual(await browser.evaluate("[...document.querySelectorAll('.console-main input[type=date]')].map(x=>x.value)"), ['2026-10-01','2026-10-23']);
     await browser.evaluate('history.back()');
-    await browser.wait("location.hash==='#/person/980001/timeline' && document.querySelector('#console-main .tabs .tab.active')");
-    assert.equal(await browser.evaluate("[...document.querySelectorAll('#console-main .tabs .tab')].findIndex(x=>x.classList.contains('active'))"), 1);
+    await browser.wait("location.hash==='#/person/980001/timeline' && document.querySelector('.console-main .tabs .tab.active')");
+    assert.equal(await browser.evaluate("[...document.querySelectorAll('.console-main .tabs .tab')].findIndex(x=>x.classList.contains('active'))"), 1);
     await browser.evaluate('window.m01Reports=[];history.forward()');
     await browser.wait("location.hash.startsWith('#/activity-report/customer?') && window.m01Reports.length>=1");
     assert.equal(await browser.evaluate('window.m01Reports.at(-1).startDate'), '2026-10-01');

@@ -46,7 +46,7 @@ test('Knowledge Library supports categories, bilingual search, sorting, status, 
         statusTop:document.querySelector('.kg-status-filter').getBoundingClientRect().top,
         statusDefault:document.querySelector('.kg-status-filter option').innerText};
     })()`);
-    assert.deepEqual(layout.headers,['编号','标题','知识类别','系统内容','GPT内容','状态','更新时间','操作']);
+    assert.deepEqual(layout.headers,['编号','标题','知识类别','系统内容','GPT摘要','状态','更新时间','操作']);
     assert.ok(layout.summaryWidth>layout.titleWidth,'summary column gets more width than title');
     assert.ok(layout.titleWidth>Math.max(...layout.columnWidths.filter((_,index)=>![1,3,4].includes(index))),'title follows the two content columns');
     assert.equal(layout.date,'2026-10-17','updated time only shows the date');

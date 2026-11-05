@@ -5,10 +5,10 @@
  * 覆盖：
  *  A. customers.update 基础字段改道：
  *     - 基础字段经 PersonService 走 service_role 受控 REST 写 persons（rdb/anon 无写权限）；
- *     - 业务字段仍直写 customers（anon 有 customers DML 权限）；
+ *     - Person 自有阶段/优先级等字段走同一受控边界；customers 仅保留客户专属资料；
  *     - 无 person_id 且 legacy 无 Person → 拒绝 PERSON_NOT_LINKED（不静默旧值兜底）；
  *     - OCR 快照 ≥3 字段漂移仍拦截（forceRestore 才放行，且经边界写入）；
- *     - 仅业务字段（profile/stage）→ 不触碰 persons。
+ *     - 仅客户专属业务字段（profile）→ 不触碰 persons。
  *  B. customers.create：
  *     - 无同名 → resolveName 可用 → 受控 REST 建 Person + customers 关联；
  *     - 多同名 → PERSON_AMBIGUOUS 不自动选择；
@@ -164,16 +164,16 @@ function linkedFixture() {
   harness.restWrites = [];
   harness.db.persons = [{
     id: 11, display_name: '张三', name_key: '张三', phone: '13800000000', wechat: 'zs-wx',
-    gender: '男', birthday: '1990-01-01', occupation: '工程师', education: '本科',
+    gender: '男', birthday: '1990-01-01', occupation: '工程师', education: '本科', customer_stage: 'A',
     deleted_at: null, updated_at: '2026-10-01T00:00:00Z',
   }];
   harness.db.customers = [{
-    Id: 101, person_id: 11, customer_stage: 'A', deleted_at: null,
+    Id: 101, person_id: 11, deleted_at: null,
   }];
 }
 
 // ---------- A. update 改道 ----------
-test('A1 基础字段经受控 REST 写 persons；业务字段直写 customers', async () => {
+test('A1 基础资料和客户阶段经受控 REST 写 Person；customers 仅保留业务行', async () => {
   linkedFixture();
   const res = await customersFn.main({
     action: 'update', id: 101,
@@ -182,7 +182,8 @@ test('A1 基础字段经受控 REST 写 persons；业务字段直写 customers',
   assert.equal(res.ok, true, JSON.stringify(res));
   assert.equal(res.personUpdated, true);
   assert.equal(harness.db.persons[0].phone, '13822222222', 'persons 权威已更新');
-  assert.equal(harness.db.customers[0].customer_stage, 'B', '业务字段直写');
+  assert.equal(harness.db.persons[0].customer_stage, 'B', '客户阶段归 Person 所有');
+  assert.equal(Object.hasOwn(harness.db.customers[0], 'customer_stage'), false, 'customers 不再保留 Person 字段投影');
   assert.equal(harness.restWrites.length, 1);
   assert.equal(harness.restWrites[0].op, 'PATCH');
   assert.equal(harness.writes.some(w => w.table === 'persons'), false, 'persons 不得再走 anon rdb 写');
@@ -213,22 +214,23 @@ test('A3 OCR 快照 ≥3 字段漂移仍拦截；forceRestore 经边界写入', 
   assert.equal(harness.db.persons[0].occupation, '经理');
 });
 
-test('A3b 人工表单编辑 editSource:"form" 跳过 OCR 守卫；无标志仍拦截', async () => {
+test('A3b 人工表单编辑 editSource:"form" 跳过 OCR 守卫；Person 字段受控写入', async () => {
   linkedFixture();
-  // admin 编辑表单载荷：5 个基础字段全量提交（与 persons 当前值一致，仅 occupation 漂移）
+  // 人工表单显式确认职业与阶段；两个字段都由 PersonService 持久化。
   const formPayload = {
     customer_name: '张三', phone: '13800000000', gender: '男', birthday: '1990-01-01',
     occupation: '新职业', customer_stage: 'B',
   };
   const blocked = await customersFn.main({ action: 'update', id: 101, data: { ...formPayload } });
   assert.equal(blocked.error, 'OCR_SNAPSHOT_RESTORE_CONFLICT', JSON.stringify(blocked));
-  assert.deepEqual(blocked.conflicts, ['occupation']);
+  assert.deepEqual(blocked.conflicts.slice().sort(), ['customer_stage', 'occupation']);
   assert.equal(harness.restWrites.length, 0, '未放行时不得写 persons');
   const res = await customersFn.main({ action: 'update', id: 101, data: { ...formPayload }, editSource: 'form' });
   assert.equal(res.ok, true, JSON.stringify(res));
   assert.equal(res.personUpdated, true);
   assert.equal(harness.db.persons[0].occupation, '新职业', '表单编辑经边界写入');
-  assert.equal(harness.db.customers[0].customer_stage, 'B', '业务字段直写');
+  assert.equal(harness.db.persons[0].customer_stage, 'B', '客户阶段写入 Person 主记录');
+  assert.equal(Object.hasOwn(harness.db.customers[0], 'customer_stage'), false);
   assert.equal(harness.restWrites.length, 1);
 });
 
@@ -262,7 +264,8 @@ test('B1 无同名 → resolveName available → 受控 REST 建 Person + custom
   assert.equal(harness.db.persons[0].source, '客户建档');
   assert.equal(harness.restWrites[0].op, 'POST');
   assert.equal(String(harness.db.customers[0].person_id), String(res.personId));
-  assert.equal(harness.db.customers[0].customer_stage, 'C');
+  assert.equal(harness.db.persons[0].customer_stage, 'C');
+  assert.equal(Object.hasOwn(harness.db.customers[0], 'customer_stage'), false);
 });
 
 test('B2 多同名 → PERSON_AMBIGUOUS，不自动选择', async () => {

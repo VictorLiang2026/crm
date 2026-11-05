@@ -27,9 +27,12 @@ for(const lang of ['zh-CN','en'])test(`L01 customer status, paging, retry and sa
   await b.wait("document.querySelector('.people-col-wb_status')");
   assert.equal(await b.evaluate('window.l01Requests.at(-1).customerWorklist'),true);
   assert.equal(await b.evaluate('window.l01Requests.at(-1).sortField'),'wb_status');
-  assert.equal(await b.evaluate("document.querySelector('.people-col-recruit_status a').getAttribute('href')"),'#/person/990001/recruit');
+  assert.equal(await b.evaluate("document.querySelector('.people-col-recruit_status')"),null,
+   'the customer operating view does not include recruit fields');
+  assert.equal(await b.evaluate("document.querySelector('.people-col-convert_recruit')"),null,
+   'conversion actions are available from the overall People view');
   assert.equal(await b.evaluate("document.querySelector('.people-col-next_followup a').getAttribute('href')"),'#/person/990001/timeline');
-  assert.ok((await b.evaluate("document.querySelector('tbody').innerText")).includes(lang==='en'?'Past recruit':'曾经招募'));
+  assert.ok((await b.evaluate("document.querySelector('tbody').innerText")).includes('Fixture One'));
   await b.evaluate("(()=>{const e=document.querySelector('.toolbar select');e.value='overdue';e.dispatchEvent(new Event('change'));})()");
   await b.wait("window.l01Requests.at(-1).worklistStatus==='overdue' && document.querySelector('tbody')");
   await b.evaluate("document.querySelector('.pager button:last-child').click()");

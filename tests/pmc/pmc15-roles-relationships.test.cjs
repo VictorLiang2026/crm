@@ -209,6 +209,7 @@ test('B3 meeting-prep：双向 relationships 请求均带 eq.confirmed，pending
         ? [{ id: 1, display_name: '甲', occupation: null, organization: null, legacy_customer_id: null }]
         : [{ id: 2, display_name: '乙' }, { id: 3, display_name: '丙' }];
     }
+    if (table === 'customers') return [{ Id: 101 }];
     if (table === 'relationships') {
       // 模拟 PostgREST 严格过滤：无 confirmed 条件时本可返回两行
       if (filters.status !== 'eq.confirmed') throw new Error('relationships must filter confirmed');
@@ -221,6 +222,7 @@ test('B3 meeting-prep：双向 relationships 请求均带 eq.confirmed，pending
     if (table === 'households' || table === 'household_members') return [];
     if (table === 'context_items') return [];
     if (table === 'opportunities') return [];
+    if (table === 'knowledge_items' || table === 'playbooks') return [];
     if (table === 'actions' || table === 'commitments') return [];
     throw new Error(`Unexpected source: ${table}`);
   }
@@ -269,8 +271,11 @@ test('C2 前端角色可解释：8 类角色标签 + derived 来源 + 中英 i18
   assert.match(profile, /自动派生/);
 
   const people = read('crm/js/modules/console/pages/people.js');
-  for (const role of ['customer', 'recruit', 'speaker', 'participant', 'partner', 'referrer', 'alumni', 'other']) {
-    assert.match(people, new RegExp(`\\b${role}\\s*:\\s*\\[t\\(`));
+  assert.match(people, /const roles = \['customer', 'recruit', 'referrer', 'speaker', 'participant', 'partner', 'alumni', 'other'\]/);
+  for (const [role, key] of Object.entries({ customer: 'customer', recruit: 'recruit', speaker: 'speaker',
+    participant: 'participant', partner: 'role_partner', referrer: 'role_referrer',
+    alumni: 'role_alumni', other: 'role_other' })) {
+    assert.match(people, new RegExp(`${role}:\\s*t\\('${key}'\\)`), `role ${role} uses shared i18n`);
   }
   const i18n = read('crm/js/modules/console/i18n.js');
   for (const key of ['participant', 'role_partner', 'role_referrer', 'role_alumni', 'role_other']) {

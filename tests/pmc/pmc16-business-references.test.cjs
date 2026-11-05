@@ -27,6 +27,21 @@ const read = (rel) => fs.readFileSync(path.join(REPO_ROOT, rel), 'utf8');
 // ---------- 内存 RDB harness（拦截 customers/db.js 本地副本） ----------
 const dbTarget = path.join(REPO_ROOT, 'cloudfunctions', 'customers', 'db.js');
 const harness = { db: {}, updates: [] };
+process.env.TCB_ENV = 'crm-testenv';
+process.env.CRM_PERSON360_DB_API_KEY = 'offline-person-write-key';
+const originalFetch = globalThis.fetch;
+globalThis.fetch = async (url, options) => {
+  const u = new URL(url);
+  if (!u.pathname.endsWith('/v1/rdb/rest/persons') || options.method !== 'PATCH') {
+    throw new Error('offline fetch only emulates scoped Person PATCH');
+  }
+  const id = u.searchParams.get('id')?.replace(/^eq\./, '');
+  const row = (harness.db.persons || []).find(person => String(person.id) === id);
+  if (!row || row.deleted_at != null) return { ok: true, status: 200, text: async () => '[]' };
+  Object.assign(row, JSON.parse(options.body), { updated_at: '2026-10-10T00:00:00.000Z' });
+  return { ok: true, status: 200, text: async () => JSON.stringify([row]) };
+};
+test.after(() => { globalThis.fetch = originalFetch; });
 
 class FakeQuery {
   constructor(table) {
@@ -124,8 +139,8 @@ test('A2 快照与当前值一致 → 直接恢复（幂等，无冲突）', asy
     data: { customer_name: '张三', phone: '13800000000', occupation: '工程师', gender: '男' },
   });
   assert.equal(res.ok, true);
-  // PMC-17：基础字段经边界写 persons（同值幂等）+ 投影回写 customers，共 2 次写
-  assert.equal(harness.updates.length, 2);
+  // PMC-19 已删除 customers 基础字段投影：只写 Person，不再回填旧列。
+  assert.equal(harness.updates.length, 0);
   assert.equal(harness.db.persons[0].phone, '13800000000', 'persons 值不变');
 });
 
@@ -133,8 +148,9 @@ test('A3 人工确认 forceRestore → 覆盖当前值', async () => {
   customerFixture();
   const res = await customersFn.main({ action: 'update', id: 101, data: { ...SNAP }, forceRestore: true });
   assert.equal(res.ok, true);
-  assert.equal(harness.db.customers[0].phone, '13811111111', '快照值已覆盖');
-  assert.equal(harness.db.customers[0].occupation, '经理');
+  assert.equal(harness.db.persons[0].phone, '13811111111', '快照值只写回权威 Person');
+  assert.equal(harness.db.persons[0].occupation, '经理');
+  assert.equal(harness.updates.length, 0, '已删除的 customers 基础列不再回写');
 });
 
 test('A4 不足 3 个桥接字段 → 视为普通编辑，直写不拦截', async () => {
@@ -143,7 +159,8 @@ test('A4 不足 3 个桥接字段 → 视为普通编辑，直写不拦截', asy
     action: 'update', id: 101, data: { customer_name: '张三', phone: '13811111111' },
   });
   assert.equal(res.ok, true);
-  assert.equal(harness.db.customers[0].phone, '13811111111');
+  assert.equal(harness.db.persons[0].phone, '13811111111');
+  assert.equal(harness.updates.length, 0, '基础字段只经 Person 边界写入');
 });
 
 // ---------- B. InteractionService 防复活 ----------
@@ -151,7 +168,8 @@ const { InteractionService } = require(path.join(REPO_ROOT, 'cloudfunctions', '_
 
 function timelineFixture() {
   const tables = {
-    persons: [{ id: 11, legacy_customer_id: 101 }],
+    persons: [{ id: 11 }],
+    customers: [{ Id: 101, person_id: 11, deleted_at: null }],
     interactions: [
       { id: 1, person_id: 11, interaction_type: 'meeting', interaction_at: '2026-09-15T10:00:00Z',
         summary: '人工记录', source_type: 'manual', source_id: null },
@@ -163,7 +181,7 @@ function timelineFixture() {
     ],
     followups: [], // followups:5 已被删除
     recruit_candidates: [{ id: 7, customer_id: 101, person_id: 11 }],
-    recruit_followups: [{ id: 8, candidate_id: 7, followup_date: '2026-09-11',
+    recruit_followups: [{ id: 8, candidate_id: 7, interaction_id: 3, followup_date: '2026-09-11',
       interaction_summary: '增员沟通（活跃）', followup_notes: null, contact_method: 'phone' }],
     activity_speakers: [],
     activity_participants: [],
