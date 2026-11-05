@@ -16,7 +16,7 @@
 - Long OCR text is split into overlapping 1,500-character chunks. Each queue invocation summarizes one chunk using a 100-second AI Gateway timeout (within the existing function limit), then checkpoints its summary, cursor, and AI task/result IDs. Once all chunks complete, the existing draft creation path writes one knowledge item and keeps it unverified for human review. Short-document extraction remains on its existing single-call path.
 - Deployed only the existing `assistant` CloudBase function through `tools/deploy-function.ps1 -Function assistant`; no static page or other function was deployed.
 - Requeued only `public.knowledge_sources.id IN (29,33)` after checking both were failed, non-deleted, and had no associated `public.knowledge_items`. The update reset only extraction status and retry/lease/error bookkeeping; it retained OCR text, stage, page count, and page cursor.
-- First recovery run: S-29's full OCR text was preserved at summary stage and S-33 advanced page-by-page through all 13 pages. Their whole-document and initial segmented summaries hit timeout/retry responses, prompting the approved smaller segment and longer call timeout adjustments. Latest status after deploying the 1,500-character/100-second update: both were requeued in `summarize`, with original OCR text/cursors retained and no knowledge items; segmented summary completion remains pending.
+- Recovery result: S-29's 28/28 OCR pages and S-33's 13/13 OCR pages were retained. After transient whole-document and initial-segment timeouts, both records completed the approved 1,500-character segmented summary path. `public.knowledge_items` now contains exactly one active row for each source: S-29 → item 12 (6 summary task IDs), S-33 → item 13 (10 summary task IDs). Both items have `verified=false`, `lifecycle_status='draft'`, and remain for human review; neither was published or marked valid.
 - A successful worker run creates an unreviewed draft only. It does not publish the knowledge item; a person must review and approve it.
 
 ## Regression
@@ -29,7 +29,8 @@
 - Existing open gate limitations: interactive login, service-runtime writes, production business writes, and real mobile visual acceptance were not part of this repair.
 - CloudBase code review: manually confirmed the worker remains internal-only, no secret is returned/logged, all affected data references are explicitly `public`, and no schema changes were made.
 - Production business verification is limited to the two authorized records; no real customer records or unrelated knowledge sources were used.
-- CloudOnly source comparison and GitHub release for the 1,500-character/100-second update, plus final S-29/S-33 draft status: pending.
+- CloudOnly verification after deployment: 96 page/module/style assets match and all 30 functions / 243 source/config files match. Local `master`, GitHub `master`, release tag `release-20261105-2016`, and production CloudBase source match at commit `b460b3280d49a7aa074abef47807ce666b983f3d`. No static page changed.
+- Final S-29/S-33 status is recorded above. A documentation-only follow-up commit/tag is being published with this completed business verification; no CloudBase resource change is included in that follow-up.
 
 ## Rollback
 
