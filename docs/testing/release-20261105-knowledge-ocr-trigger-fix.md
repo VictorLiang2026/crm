@@ -11,9 +11,9 @@
 
 - Used SCF `UpdateTrigger` in `ap-shanghai` on `assistant / knowledgeOcrWorker`, setting `CustomArgument` from the existing runtime secret. The timer name and one-minute cron were preserved; no secret was printed or stored in Git.
 - Production logs now show long-running OCR worker calls instead of `INVALID_INTENT`, confirming the timer gate is working.
-- At the last public-only status check, S-29 had extracted all 28 pages but its summary failed with `AI_RETRY_LATER` five times; it is now `failed` and has no knowledge draft. Its extracted OCR text remains in the source job metadata for recovery.
-- S-33 reached OCR page 7 of 13, but its three-page `ai_parse` calls repeatedly hit the function's 120-second timeout (four attempts at the last check). It remains queued for the existing worker retry; no knowledge draft exists yet.
-- The trigger fix is effective. Completing these two drafts requires a separate change to OCR batch size and transient-summary retry behavior. That behavior change was presented for approval and has not been implemented pending the user's response.
+- At the post-release public-only verification, S-29 had extracted all 28 pages but its summary failed with `AI_RETRY_LATER` five times; it is `failed` and has no knowledge draft. Its extracted OCR text remains in the source job metadata for recovery.
+- S-33 stopped at the page 7 cursor after five failed three-page `ai_parse` attempts at the function's 120-second timeout. It is `failed` and has no knowledge draft; extracted OCR text for prior pages remains in job metadata.
+- Both rows are now outside the worker's active queue, and no `public.knowledge_items` rows were created for either source. The trigger fix is effective. Completing these two drafts requires a separate change to OCR batch size and transient-summary retry behavior. That behavior change was presented for approval and has not been implemented pending the user's response.
 
 ## Regression
 
