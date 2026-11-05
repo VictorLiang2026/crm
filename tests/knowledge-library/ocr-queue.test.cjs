@@ -5,6 +5,49 @@ const {createKnowledgeLibrary}=require('../../cloudfunctions/assistant/knowledge
 
 function rest(rows=[]){return {ok:true,status:200,text:async()=>JSON.stringify(rows)};}
 
+test('long OCR summaries checkpoint one text segment at a time and create one review draft',async()=>{
+  const source={id:82,created_by:'fixture-user',storage_key:'pg-private://knowledge-sources/82',
+    file_name:'long-scan.pdf',content_type:'application/pdf',original_base64:Buffer.from('%PDF-fixture').toString('base64'),
+    domain:'product',title:'Long fixture PDF',published_at:'2026-10-29',extraction_status:'extracting',deleted_at:null,
+    updated_at:'2026-10-29T00:00:00.000Z',
+    metadata:{categories:['on_sale_product'],ocr_job:{stage:'summarize',next_page:14,page_count:13,
+      text:'长文内容。'.repeat(500),attempts:0,lease_until:null,retry_after:null}}};
+  let taskNumber=0,itemPayload=null,clock=1;
+  const service=createKnowledgeLibrary({env:'crm-test123',key:'server-test-key',client:{callFunction:async()=>({})},
+    gatewayFactory:config=>({runAITask:async task=>{
+      assert.equal(config.timeoutMs,100000);
+      taskNumber++;
+      assert.ok(task.context.document.text.length<1800,'summary request stays below the chunk limit plus prompt');
+      return {result:{summary:`分段${taskNumber}摘要`,keyPoints:[`知识点${taskNumber}`],
+        applicationNotes:[`应用${taskNumber}`],boundaries:[`边界${taskNumber}`]},taskId:100+taskNumber,resultId:200+taskNumber};
+    }}),
+    fetchImpl:async(url,options={})=>{
+      const parsed=new URL(url);
+      if(parsed.pathname.endsWith('/rpc/crm_knowledge_content_v1'))return rest({ok:true,job:null});
+      if(options.method==='GET')return rest([source]);
+      const body=JSON.parse(options.body);
+      if(options.method==='POST'&&parsed.pathname.endsWith('/knowledge_items')){
+        itemPayload=body[0];return rest([{id:902,updated_at:'2026-10-29T00:01:00.000Z'}]);
+      }
+      Object.assign(source,body,{updated_at:new Date(Date.UTC(2026,9,29,0,0,clock++)).toISOString()});
+      return rest([{id:source.id,updated_at:source.updated_at}]);
+    }});
+  const options={internalOcrQueue:true};
+  const first=await service.run({operation:'processOcrQueue'},'worker',options);
+  assert.equal(first.stage,'summarize');assert.equal(first.completedSummaryChunks,1);
+  assert.equal(source.metadata.ocr_job.summary_chunk_index,1);assert.equal(taskNumber,1);assert.equal(itemPayload,null);
+  const second=await service.run({operation:'processOcrQueue'},'worker',options);
+  assert.equal(second.stage,'summarize');assert.equal(second.completedSummaryChunks,2);
+  assert.equal(source.metadata.ocr_job.summary_chunk_index,2);assert.equal(taskNumber,2);assert.equal(itemPayload,null);
+  const final=await service.run({operation:'processOcrQueue'},'worker',options);
+  assert.equal(final.stage,'complete');assert.equal(final.itemId,'902');
+  assert.equal(taskNumber,2);assert.equal(source.extraction_status,'draft');assert.equal(source.metadata.ocr_job,undefined);
+  assert.equal(itemPayload.verified,false);assert.equal(itemPayload.lifecycle_status,'draft');
+  assert.match(itemPayload.metadata.summary,/分段1摘要[\s\S]*分段2摘要/);
+  assert.deepEqual(itemPayload.metadata.extraction_task_ids,['101','102']);
+  assert.deepEqual(itemPayload.metadata.extraction_result_ids,['201','202']);
+});
+
 test('OCR worker checkpoints one page at a time and resumes at the next page',async()=>{
   const source={id:77,created_by:'fixture-user',storage_key:'pg-private://knowledge-sources/77',
     file_name:'scan.pdf',content_type:'application/pdf',original_base64:Buffer.from('%PDF-fixture').toString('base64'),

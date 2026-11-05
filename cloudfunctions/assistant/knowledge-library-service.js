@@ -18,6 +18,8 @@ const OCR_TRANSIENT_ERRORS = new Set(['AI_RETRY_LATER','AI_IN_PROGRESS','RATE_LI
   'FUNCTIONS_TIME_LIMIT_EXCEEDED','UPSTREAM_UNAVAILABLE']);
 const OCR_TRANSIENT_MAX_ATTEMPTS = 10;
 const OCR_MAX_BACKOFF_MS = 15 * 60 * 1000;
+const OCR_SUMMARY_CHUNK_CHARS = 1500;
+const OCR_SUMMARY_CHUNK_OVERLAP = 100;
 const CATEGORIES = Object.freeze(['on_sale_product','existing_service','recruitment_policy','industry_development',
   'marketing_activity','legal_tax','health_wealth_sharing','top_performer_sharing','customer_case','recruitment_case',
   'conversation_strategy','objection_handling','company_information','other']);
@@ -205,6 +207,30 @@ function boundedPdfText(value) {
   const text=String(value||'').replace(/\r/g,'').trim();
   if (!text || text.length>MAX_TEXT_CHARS || text.includes('\0')) fail('PDF_TEXT_LIMIT');
   return text;
+}
+function splitPdfSummaryText(value) {
+  const text=String(value||'').trim();
+  if(text.length<=OCR_SUMMARY_CHUNK_CHARS)return [text];
+  const chunks=[];let start=0;
+  while(start<text.length) {
+    let end=Math.min(text.length,start+OCR_SUMMARY_CHUNK_CHARS);
+    if(end<text.length) {
+      const boundary=Math.max(text.lastIndexOf('\n',end),text.lastIndexOf('。',end),text.lastIndexOf('. ',end));
+      if(boundary>start+Math.floor(OCR_SUMMARY_CHUNK_CHARS*.7))end=boundary+1;
+    }
+    chunks.push(text.slice(start,end).trim());
+    if(end>=text.length)break;
+    start=Math.max(start+1,end-OCR_SUMMARY_CHUNK_OVERLAP);
+  }
+  return chunks;
+}
+function mergePdfSummaryChunks(chunks) {
+  const outputs=Array.isArray(chunks)?chunks:[];
+  const unique=key=>[...new Set(outputs.flatMap(row=>Array.isArray(row?.[key])?row[key]:[])
+    .map(value=>String(value||'').trim()).filter(Boolean))].slice(0,30);
+  return {summary:outputs.map((row,index)=>`要点${index+1}：${String(row?.summary||'').trim()}`)
+      .filter(row=>!row.endsWith('：')).join('\n'),
+    keyPoints:unique('keyPoints'),applicationNotes:unique('applicationNotes'),boundaries:unique('boundaries')};
 }
 function extensionOf(fileName) { const lower=String(fileName||'').toLowerCase(); return lower.slice(lower.lastIndexOf('.')); }
 function fileTypeForName(fileName) { return EXTENSIONS[extensionOf(fileName)]||null; }
@@ -476,19 +502,11 @@ function createKnowledgeLibrary(options={}) {
     return {domain,categories,title,publisher,sourceUri,publishedAt,
       reviewAt:input.reviewAt||null,fileName,contentType};
   }
-  async function extractToDraft(source,base64,actor,preparedText=null) {
+  async function extractToDraft(source,base64,actor,preparedText=null,preparedTask=null) {
     const text=preparedText||await extractText(source.file_name,source.content_type,await sourceBytes(source,actor),
       {app:client,sourceId:source.id,uploadId:source.metadata?.upload?.upload_id});
     if(Array.isArray(source.metadata?.categories)&&source.metadata.categories.includes('top_performer_sharing')&&likelySensitive(text)) fail('PERSONAL_DATA_DETECTED');
-    const database=searchDataFactory({env,key,fetchImpl});
-    const gateway=gatewayFactory({app:client,rdb:database.auditRdb,timeoutMs:60000,maxAttempts:1,
-      actorResolver:async()=>({uid:actor,isAnonymous:false})});
-    const task=await gateway.runAITask({taskType:'knowledge_source_extract',skill:'knowledge_extract',capability:'summarization',
-      input:{domain:source.domain,title:source.title},
-      context:{document:{title:source.title,domain:source.domain,categories:source.metadata?.categories||[],
-        sourceDate:source.published_at||null,text}},
-      contextSnapshot:{document:{title:source.title,domain:source.domain,categories:source.metadata?.categories||[],
-        sourceDate:source.published_at||null,text},_context:{recipe:'knowledge_source_extract',version:'1.0.0'}}});
+    const task=preparedTask||await extractSummary(source,actor,text);
     const out=task.result;
     const content=[out.summary,`知识点：\n${out.keyPoints.map(x=>`• ${x}`).join('\n')}`,
       `营销/服务应用：\n${out.applicationNotes.map(x=>`• ${x}`).join('\n')}`,
@@ -498,6 +516,8 @@ function createKnowledgeLibrary(options={}) {
       source_uri:source.source_uri,published_at:source.published_at,
       summary:out.summary,summary_source:'ai',extraction_task_id:String(task.taskId),
       extraction_result_id:String(task.resultId),source_version:source.version_no};
+    if(Array.isArray(task.taskIds)&&task.taskIds.length)meta.extraction_task_ids=task.taskIds.map(String);
+    if(Array.isArray(task.resultIds)&&task.resultIds.length)meta.extraction_result_ids=task.resultIds.map(String);
     const itemRows=await request('knowledge_items','POST',{},[{item_type:itemTypeForCategories(categories),source:source.title,
       source_date:null,valid_from:null,valid_to:null,verified:false,
       confidence:null,content,metadata:meta,lifecycle_status:'draft',created_by:actor,updated_by:actor,
@@ -543,6 +563,36 @@ function createKnowledgeLibrary(options={}) {
     source.updated_at=claimed.updated_at;source.metadata={...source.metadata,ocr_job:claimedJob};
     try {
       if(job.stage==='summarize') {
+        const summaryChunks=splitPdfSummaryText(job.text);
+        if(summaryChunks.length>1) {
+          const outputs=Array.isArray(job.summary_outputs)?job.summary_outputs:[];
+          const index=Math.max(0,Number(job.summary_chunk_index)||0);
+          const count=summaryChunks.length;
+          if(index<count) {
+            const chunkText=`【全文分段摘要 ${index+1}/${count}。只根据本段提取内容，保留人名、数字、条件与限制；不要推测未提供的信息。】\n${summaryChunks[index]}`;
+            const partial=await extractSummary(source,actor,chunkText);
+            outputs[index]={summary:partial.result.summary,keyPoints:partial.result.keyPoints,
+              applicationNotes:partial.result.applicationNotes,boundaries:partial.result.boundaries,
+              taskId:String(partial.taskId),resultId:String(partial.resultId)};
+            job.summary_outputs=outputs;job.summary_chunk_index=index+1;job.summary_chunk_count=count;
+            Object.assign(job,{lease_until:null,retry_after:null,attempts:0,last_error:null});
+            const saved=await request('knowledge_sources','PATCH',{select:'id,updated_at',id:'eq.'+source.id,
+              created_by:'eq.'+actor,deleted_at:'is.null'},
+              {metadata:{...source.metadata,ocr_job:job},updated_at:new Date().toISOString(),updated_by:actor,
+               extraction_status:'extracting'},{timeoutMs:30000});
+            if(saved.length!==1)fail('STALE_SOURCE');
+            return {ok:true,processed:true,sourceId:String(source.id),stage:'summarize',
+              completedSummaryChunks:index+1,totalSummaryChunks:count};
+          }
+          const merged=mergePdfSummaryChunks(outputs);
+          const taskIds=outputs.map(row=>row?.taskId).filter(Boolean),resultIds=outputs.map(row=>row?.resultId).filter(Boolean);
+          const result=await extractToDraft(source,null,actor,job.text,
+            {result:merged,taskId:taskIds[0],resultId:resultIds[0],taskIds,resultIds});
+          const metadata={...source.metadata};delete metadata.ocr_job;
+          await request('knowledge_sources','PATCH',{id:'eq.'+source.id,created_by:'eq.'+actor,deleted_at:'is.null'},
+            {metadata,updated_at:new Date().toISOString(),updated_by:actor},{timeoutMs:30000});
+          return {ok:true,processed:true,sourceId:String(source.id),stage:'complete',itemId:result.itemId};
+        }
         const result=await extractToDraft(source,null,actor,job.text);
         const metadata={...source.metadata};delete metadata.ocr_job;
         await request('knowledge_sources','PATCH',{id:'eq.'+source.id,created_by:'eq.'+actor,deleted_at:'is.null'},
@@ -583,6 +633,18 @@ function createKnowledgeLibrary(options={}) {
       return {ok:false,processed:true,sourceId:String(source.id),errorCode,retrying:keep,
         ...(keep&&retryable?{retryAfter:failedJob.retry_after}:{})};
     }
+  }
+
+  async function extractSummary(source,actor,text) {
+    const database=searchDataFactory({env,key,fetchImpl});
+    const gateway=gatewayFactory({app:client,rdb:database.auditRdb,timeoutMs:100000,maxAttempts:1,
+      actorResolver:async()=>({uid:actor,isAnonymous:false})});
+    return gateway.runAITask({taskType:'knowledge_source_extract',skill:'knowledge_extract',capability:'summarization',
+      input:{domain:source.domain,title:source.title},
+      context:{document:{title:source.title,domain:source.domain,categories:source.metadata?.categories||[],
+        sourceDate:source.published_at||null,text}},
+      contextSnapshot:{document:{title:source.title,domain:source.domain,categories:source.metadata?.categories||[],
+        sourceDate:source.published_at||null,text},_context:{recipe:'knowledge_source_extract',version:'1.0.0'}}});
   }
 
   async function uploadStart(input,actorValue) {
