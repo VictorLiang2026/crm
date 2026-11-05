@@ -15,9 +15,11 @@ const LEGACY_MAX_FILE_BYTES = 6 * 1024 * 1024;
 const KNOWLEDGE_BUCKET = 'knowledge';
 const UPLOAD_CHUNK_BYTES = 768 * 1024;
 const OCR_TRANSIENT_ERRORS = new Set(['AI_RETRY_LATER','AI_IN_PROGRESS','RATE_LIMIT','TIMEOUT',
-  'FUNCTIONS_TIME_LIMIT_EXCEEDED','UPSTREAM_UNAVAILABLE']);
+  'FUNCTIONS_TIME_LIMIT_EXCEEDED','UPSTREAM_UNAVAILABLE','PDF_TIMEOUT']);
 const OCR_TRANSIENT_MAX_ATTEMPTS = 10;
 const OCR_MAX_BACKOFF_MS = 15 * 60 * 1000;
+const OCR_MAX_BATCH_PAGES = 3;
+const OCR_BATCH_UPSIZE_AFTER_SUCCESSES = 3;
 const OCR_SUMMARY_CHUNK_CHARS = 1500;
 const OCR_SUMMARY_CHUNK_OVERLAP = 100;
 const CATEGORIES = Object.freeze(['on_sale_product','existing_service','recruitment_policy','industry_development',
@@ -532,7 +534,8 @@ function createKnowledgeLibrary(options={}) {
     const prior=source.metadata?.ocr_job||{};
     const job={stage:prior.stage==='summarize'?'summarize':'ocr',next_page:Math.max(1,Number(prior.next_page)||1),
       page_count:Number.isSafeInteger(Number(prior.page_count))?Number(prior.page_count):null,
-      text:typeof prior.text==='string'?prior.text:'',attempts:0,lease_until:null,retry_after:null,last_error:null};
+      text:typeof prior.text==='string'?prior.text:'',attempts:0,lease_until:null,retry_after:null,last_error:null,
+      batch_pages:OCR_MAX_BATCH_PAGES,batch_successes:0};
     const saved=await request('knowledge_sources','PATCH',{select:'id,updated_at',id:'eq.'+source.id,
       updated_at:'eq.'+source.updated_at,created_by:'eq.'+actor,deleted_at:'is.null'},
       {metadata:{...source.metadata,ocr_job:job},extraction_status:'extracting',
@@ -600,9 +603,10 @@ function createKnowledgeLibrary(options={}) {
         return {ok:true,processed:true,sourceId:String(source.id),stage:'complete',itemId:result.itemId};
       }
       const bytes=await sourceBytes(source,actor),images=[];
+      const batchPages=Math.max(1,Math.min(OCR_MAX_BATCH_PAGES,Number(job.batch_pages)||OCR_MAX_BATCH_PAGES));
       const render=options.pdfPageRenderer||require('./knowledge-pdf-render').renderPdfPages;
       const rendered=await render(bytes,{
-        startPage:job.next_page,maxPages:1,timeoutMs:75000,onBatch:async batch=>{images.push(...batch);}
+        startPage:job.next_page,maxPages:batchPages,timeoutMs:75000,onBatch:async batch=>{images.push(...batch);}
       });
       if(!Number.isSafeInteger(rendered.pageCount)||rendered.pageCount<1||rendered.pageCount>MAX_PDF_PAGES)fail('PDF_PAGE_LIMIT');
       if(job.page_count&&job.page_count!==rendered.pageCount)fail('INVALID_CONTENT');
@@ -613,6 +617,12 @@ function createKnowledgeLibrary(options={}) {
       job.text=boundedPdfText(String(job.text||'')+(job.text?'\n\n':'')+boundedPdfText(result.ocrText));
       job.page_count=rendered.pageCount;job.next_page=rendered.nextPage;
       if(job.next_page>job.page_count)job.stage='summarize';
+      const batchSuccesses=Number(job.batch_successes||0)+1;
+      if(batchPages<OCR_MAX_BATCH_PAGES&&batchSuccesses>=OCR_BATCH_UPSIZE_AFTER_SUCCESSES) {
+        job.batch_pages=batchPages+1;job.batch_successes=0;
+      } else {
+        job.batch_pages=batchPages;job.batch_successes=batchPages<OCR_MAX_BATCH_PAGES?batchSuccesses:0;
+      }
       Object.assign(job,{lease_until:null,retry_after:null,attempts:0,last_error:null});
       const saved=await request('knowledge_sources','PATCH',{select:'id,updated_at',id:'eq.'+source.id,
         created_by:'eq.'+actor,deleted_at:'is.null'},
@@ -625,7 +635,10 @@ function createKnowledgeLibrary(options={}) {
       const errorCode=String(error?.code||'OCR_FAILED').slice(0,64),retryable=OCR_TRANSIENT_ERRORS.has(errorCode);
       const attempts=Number(job.attempts||0)+1,maxAttempts=retryable?OCR_TRANSIENT_MAX_ATTEMPTS:5,keep=attempts<maxAttempts;
       const delayMs=retryable?Math.min(OCR_MAX_BACKOFF_MS,60_000*2**Math.min(attempts-1,4)):0;
+      const batchPages=Math.max(1,Math.min(OCR_MAX_BATCH_PAGES,Number(job.batch_pages)||OCR_MAX_BATCH_PAGES));
       const failedJob={...job,attempts,lease_until:null,
+        batch_pages:retryable?Math.max(1,batchPages-1):batchPages,
+        batch_successes:retryable?0:Number(job.batch_successes||0),
         retry_after:keep&&retryable?new Date(Date.now()+delayMs).toISOString():null,last_error:errorCode};
       await request('knowledge_sources','PATCH',{id:'eq.'+source.id,created_by:'eq.'+actor,deleted_at:'is.null'},
         {metadata:{...source.metadata,ocr_job:failedJob},extraction_status:keep?'extracting':'failed',

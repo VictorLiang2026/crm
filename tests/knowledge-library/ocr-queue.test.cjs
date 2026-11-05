@@ -48,12 +48,13 @@ test('long OCR summaries checkpoint one text segment at a time and create one re
   assert.deepEqual(itemPayload.metadata.extraction_result_ids,['201','202']);
 });
 
-test('OCR worker checkpoints one page at a time and resumes at the next page',async()=>{
+test('OCR worker checkpoints a bounded three-page batch and resumes at the next page',async()=>{
   const source={id:77,created_by:'fixture-user',storage_key:'pg-private://knowledge-sources/77',
     file_name:'scan.pdf',content_type:'application/pdf',original_base64:Buffer.from('%PDF-fixture').toString('base64'),
     domain:'product',title:'Fixture PDF',published_at:'2026-10-29',extraction_status:'extracting',deleted_at:null,
     updated_at:'2026-10-29T00:00:00.000Z',
-    metadata:{categories:['on_sale_product'],ocr_job:{stage:'ocr',next_page:1,page_count:null,text:'',attempts:0,lease_until:null,retry_after:null}}};
+    metadata:{categories:['on_sale_product'],ocr_job:{stage:'ocr',next_page:1,page_count:null,text:'',attempts:0,lease_until:null,
+      retry_after:null,batch_pages:3,batch_successes:0}}};
   const requests=[];let timestamp=1;
   const service=createKnowledgeLibrary({env:'crm-test123',key:'server-test-key',client:{callFunction:async()=>({})},
     fetchImpl:async(url,options={})=>{
@@ -64,17 +65,44 @@ test('OCR worker checkpoints one page at a time and resumes at the next page',as
     }});
   const ranges=[];
   const options={internalOcrQueue:true,pdfPageRenderer:async(_bytes,{startPage,maxPages,onBatch})=>{
-    ranges.push([startPage,maxPages]);await onBatch([{page:startPage,fileName:'page.jpg',contentType:'image/jpeg',base64:'YQ=='}]);
+    ranges.push([startPage,maxPages]);
+    const count=Math.min(5,startPage+maxPages-1)-startPage+1;
+    await onBatch(Array.from({length:count},(_,i)=>({page:startPage+i,fileName:`${startPage+i}.jpg`,contentType:'image/jpeg',base64:'YQ=='})));
     return {pageCount:5,nextPage:Math.min(5,startPage+maxPages-1)+1};
-  },ocrPdfBatch:async images=>{assert.equal(images.length,1);return 'recognized page '+ranges.at(-1)[0];}};
+  },ocrPdfBatch:async images=>{assert.equal(images.length,Math.min(5,ranges.at(-1)[0]+ranges.at(-1)[1]-1)-ranges.at(-1)[0]+1);return 'recognized batch '+ranges.at(-1)[0];}};
   const first=await service.run({operation:'processOcrQueue'},'worker',options);
-  assert.equal(first.stage,'ocr');assert.equal(first.completedPages,1);assert.equal(first.totalPages,5);
-  assert.equal(source.metadata.ocr_job.next_page,2);assert.match(source.metadata.ocr_job.text,/recognized page 1/);
+  assert.equal(first.stage,'ocr');assert.equal(first.completedPages,3);assert.equal(first.totalPages,5);
+  assert.equal(source.metadata.ocr_job.next_page,4);assert.match(source.metadata.ocr_job.text,/recognized batch 1/);
   const second=await service.run({operation:'processOcrQueue'},'worker',options);
-  assert.equal(second.stage,'ocr');assert.equal(second.completedPages,2);
-  assert.deepEqual(ranges,[[1,1],[2,1]]);
-  assert.equal(source.metadata.ocr_job.stage,'ocr');
+  assert.equal(second.stage,'summarize');assert.equal(second.completedPages,5);
+  assert.deepEqual(ranges,[[1,3],[4,3]]);
+  assert.equal(source.metadata.ocr_job.stage,'summarize');
   assert.equal(requests.filter(x=>x.method==='PATCH').length,4);
+});
+
+test('OCR worker increases batch size after repeated successful smaller batches',async()=>{
+  const source={id:83,created_by:'fixture-user',storage_key:'pg-private://knowledge-sources/83',
+    file_name:'scan.pdf',content_type:'application/pdf',original_base64:Buffer.from('%PDF-fixture').toString('base64'),
+    domain:'product',title:'Adaptive fixture PDF',published_at:'2026-10-29',extraction_status:'extracting',deleted_at:null,
+    updated_at:'2026-10-29T00:00:00.000Z',
+    metadata:{categories:['on_sale_product'],ocr_job:{stage:'ocr',next_page:1,page_count:7,text:'',attempts:0,
+      lease_until:null,retry_after:null,batch_pages:1,batch_successes:0}}};
+  const sizes=[];let timestamp=1;
+  const service=createKnowledgeLibrary({env:'crm-test123',key:'server-test-key',client:{callFunction:async()=>({})},
+    fetchImpl:async(url,options={})=>{
+      if(String(url).includes('/rpc/crm_knowledge_content_v1'))return rest({ok:true,job:null});
+      if(options.method==='GET')return rest([source]);
+      Object.assign(source,JSON.parse(options.body),{updated_at:new Date(Date.UTC(2026,9,29,0,0,timestamp++)).toISOString()});
+      return rest([{id:source.id,updated_at:source.updated_at}]);
+    }});
+  const options={internalOcrQueue:true,pdfPageRenderer:async(_bytes,{startPage,maxPages,onBatch})=>{
+    sizes.push(maxPages);await onBatch(Array.from({length:maxPages},(_,i)=>({page:startPage+i,fileName:`${startPage+i}.jpg`,contentType:'image/jpeg',base64:'YQ=='})));
+    return {pageCount:7,nextPage:Math.min(7,startPage+maxPages-1)+1};
+  },ocrPdfBatch:async()=> 'recognized batch'};
+  for(let i=0;i<4;i++)await service.run({operation:'processOcrQueue'},'worker',options);
+  assert.deepEqual(sizes,[1,1,1,2]);
+  assert.equal(source.metadata.ocr_job.batch_pages,2);
+  assert.equal(source.metadata.ocr_job.next_page,6);
 });
 
 test('transient OCR timeouts retain the page cursor and back off before retrying',async()=>{
@@ -95,7 +123,7 @@ test('transient OCR timeouts retain the page cursor and back off before retrying
   const result=await service.run({operation:'processOcrQueue'},'worker',{
     internalOcrQueue:true,
     pdfPageRenderer:async(_bytes,{startPage,maxPages,onBatch})=>{
-      assert.equal(maxPages,1);await onBatch([{page:startPage,fileName:'page.jpg',contentType:'image/jpeg',base64:'YQ=='}]);
+      assert.equal(maxPages,3);await onBatch([{page:startPage,fileName:'page.jpg',contentType:'image/jpeg',base64:'YQ=='}]);
       return {pageCount:13,nextPage:startPage+1};
     },
     ocrPdfBatch:async()=>{const error=new Error('timeout fixture');error.code='FUNCTIONS_TIME_LIMIT_EXCEEDED';throw error;},
@@ -105,6 +133,7 @@ test('transient OCR timeouts retain the page cursor and back off before retrying
   assert.equal(source.extraction_status,'extracting');
   assert.equal(source.metadata.ocr_job.attempts,5);
   assert.equal(source.metadata.ocr_job.next_page,4);
+  assert.equal(source.metadata.ocr_job.batch_pages,2);
   assert.equal(source.metadata.ocr_job.text,'recognized pages 1–3');
   assert.equal(source.metadata.ocr_job.last_error,'FUNCTIONS_TIME_LIMIT_EXCEEDED');
   const later=await service.run({operation:'processOcrQueue'},'worker',{internalOcrQueue:true});
