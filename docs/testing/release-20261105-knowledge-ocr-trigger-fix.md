@@ -1,26 +1,33 @@
-# 2026-11-05 Knowledge OCR timer trigger repair
+# 2026-11-05 Knowledge OCR recovery and retry repair
 
 ## Cause and scope
 
 - Production `assistant` had the existing `knowledgeOcrWorker` timer enabled every minute, but the SCF trigger contained only the cron expression and no `CustomArgument` message.
 - The assistant already requires the timer event's `Message` to exactly equal `KNOWLEDGE_OCR_TRIGGER_SECRET`. With an empty message, scheduled calls fell through to the ordinary assistant router and returned `INVALID_INTENT` in 1–3 ms; neither PDF was processed.
 - The non-sensitive cron remains declared in `cloudbaserc.json`; the runtime secret is not committed. Any timer created/recreated without setting SCF `CustomArgument` from the existing CloudBase environment secret will be inert again.
-- Scope stayed within the user's approval: set the trigger message and let the existing worker process S-29/S-33. No source code, model configuration, schema, permissions, or data outside these public knowledge records was changed. Draft review/publishing remains human-controlled.
+- The follow-up implementation was approved after the first run showed that the trigger repair alone was insufficient: S-29's summary had transient AI errors and S-33's three-page batch exceeded the function timeout.
+- Scope stayed within the user's approval: make OCR page-at-a-time, preserve checkpoints, retry transient OCR/AI failures with bounded exponential backoff, then resume only S-29/S-33. No model configuration, schema, permissions, or unrelated records were changed. Draft review/publishing remains human-controlled.
 
 ## Repair and production result
 
 - Used SCF `UpdateTrigger` in `ap-shanghai` on `assistant / knowledgeOcrWorker`, setting `CustomArgument` from the existing runtime secret. The timer name and one-minute cron were preserved; no secret was printed or stored in Git.
 - Production logs now show long-running OCR worker calls instead of `INVALID_INTENT`, confirming the timer gate is working.
-- At the post-release public-only verification, S-29 had extracted all 28 pages but its summary failed with `AI_RETRY_LATER` five times; it is `failed` and has no knowledge draft. Its extracted OCR text remains in the source job metadata for recovery.
-- S-33 stopped at the page 7 cursor after five failed three-page `ai_parse` attempts at the function's 120-second timeout. It is `failed` and has no knowledge draft; extracted OCR text for prior pages remains in job metadata.
-- Both rows are now outside the worker's active queue, and no `public.knowledge_items` rows were created for either source. The trigger fix is effective. Completing these two drafts requires a separate change to OCR batch size and transient-summary retry behavior. That behavior change was presented for approval and has not been implemented pending the user's response.
+- `cloudfunctions/assistant/knowledge-library-service.js` now renders one PDF page per worker invocation. Each successful page advances the existing `next_page` cursor and appends to the existing OCR text. Transient failures (`AI_RETRY_LATER`, `AI_IN_PROGRESS`, `RATE_LIMIT`, timeouts, and upstream unavailable) retain the cursor/text and retry up to 10 attempts using exponential delays capped at 15 minutes. Non-transient errors keep the existing five-attempt limit. Exhausted retries mark extraction failed while retaining OCR text for recovery.
+- Deployed only the existing `assistant` CloudBase function through `tools/deploy-function.ps1 -Function assistant`; no static page or other function was deployed.
+- Requeued only `public.knowledge_sources.id IN (29,33)` after checking both were failed, non-deleted, and had no associated `public.knowledge_items`. The update reset only extraction status and retry/lease/error bookkeeping; it retained OCR text, stage, page count, and page cursor.
+- Post-requeue initial verification: S-29 is `extracting` at `summarize` with page cursor 29/28; S-33 is `extracting` at `ocr` with cursor 7/13. Both have zero knowledge items at this checkpoint. Final draft creation status is pending worker completion.
+- A successful worker run creates an unreviewed draft only. It does not publish the knowledge item; a person must review and approve it.
 
 ## Regression
 
-- Focused Knowledge Library/OCR suite: 87 passed, 0 failed.
+- Focused Knowledge Library/OCR and timer suite: 8 passed, 0 failed.
+- Full Knowledge Library suite: 94 passed, 0 failed.
+- AI Gateway suite: 18 passed, 0 failed.
 - WP01 release gate on clean master baseline: `PASS_WITH_LIMITATIONS`; 108 regression checks passed, 0 failed, 5 existing skips; 81/81 anonymous permission probes passed; public catalog audit 1,248 checks passed; WP04 identity audit retained 3 documented legacy participant exceptions.
 - Existing open gate limitations: interactive login, service-runtime writes, production business writes, and real mobile visual acceptance were not part of this repair.
-- CloudOnly source comparison: pending final result. No page or function code changed; runtime timer configuration is verified separately from source hashes.
+- CloudBase code review: manually confirmed the worker remains internal-only, no secret is returned/logged, all affected data references are explicitly `public`, and no schema changes were made.
+- Production business verification is limited to the two authorized records; no real customer records or unrelated knowledge sources were used.
+- CloudOnly source comparison and the final S-29/S-33 draft status: pending.
 
 ## Rollback
 
@@ -28,4 +35,4 @@
 
 ## Publication
 
-- Pending master commit/tag and post-publication CloudBase/GitHub sync verification. No code package or static page needs deployment for this configuration-only repair.
+- Pending master commit/tag and post-publication CloudBase/GitHub sync verification.
