@@ -541,7 +541,8 @@ export function renderPerson(ctx, id, initialSection) {
     try { panel.replaceChildren(await build()); }
     catch (error) {
       panel.replaceChildren(h('div', { class: 'card-body' }, [
-        h('p', { class: 'empty' }, t(aiFailureKey(error))),
+        h('p', { class: 'empty' }, t(kind === 'prep' && String(error?.code || error?.message || '').startsWith('TIMEOUT')
+          ? 'prep_status_timeout' : aiFailureKey(error))),
         h('div', { class: 'sheet-actions' }, [
           h('button', { class: 'btn btn-soft btn-sm', type: 'button',
             onclick: () => showAI(panel, kind, build) }, t('btn_retry_ai')),
@@ -593,6 +594,31 @@ export function renderPerson(ctx, id, initialSection) {
   const prepPanel = h('div', { class: 'card summary-card', style: 'display:none;margin-bottom:12px' });
   function openPrep() {
     prepPanel.style.display = '';
+    loadInto(prepPanel, async () => {
+      const [status, history] = await Promise.all([
+        data.meetingPrepStatus(ctx, id), data.personAIHistory(ctx, id),
+      ]);
+      if (!history?.ok) throw new Error(history?.error?.message || t('ai_history_failed'));
+      const latest = (history.generated || []).find(row => row.taskType === 'meeting_prep');
+      const state = status?.status || 'none';
+      const message = state === 'pending' || state === 'starting' ? t('prep_status_pending') :
+        state === 'failed' ? t(status.error?.code === 'TIMEOUT' ? 'prep_status_timeout' : 'prep_status_failed') :
+          state === 'completed' ? t('prep_status_completed') : t('prep_status_none');
+      return h('div', { class: 'card-body' }, [
+        sectionTitle(t('btn_meeting_prep_full')),
+        h('p', { class: 'row-sub' }, message),
+        latest ? aiHistoryNode(ctx, id, { generated: [latest], legacy: [] }) : emptyNote(t('prep_no_result')),
+        h('div', { class: 'sheet-actions' }, [
+          h('button', { class: 'btn btn-primary btn-sm', type: 'button',
+            disabled: state === 'pending' || state === 'starting', onclick: generatePrep,
+          }, t(state === 'none' ? 'btn_generate' : 'btn_regenerate')),
+          h('button', { class: 'btn btn-soft btn-sm', type: 'button', onclick: openPrep }, t('prep_refresh_status')),
+        ]),
+      ]);
+    });
+  }
+  function generatePrep() {
+    prepPanel.style.display = '';
     showAI(prepPanel, 'prep', async () => {
       let res;
       try { res = await data.meetingPrep(ctx, id); }
@@ -633,6 +659,10 @@ export function renderPerson(ctx, id, initialSection) {
       ]));
       blocks.push(aiSourcesNode(res.sources, id));
       blocks.push(h('p', { class: 'foot-note' }, t('prep_foot').replace('{taskId}', res.taskId)));
+      blocks.push(h('div', { class: 'sheet-actions' }, [
+        h('button', { class: 'btn btn-soft btn-sm', type: 'button', onclick: generatePrep }, t('btn_regenerate')),
+        h('button', { class: 'btn btn-soft btn-sm', type: 'button', onclick: openPrep }, t('prep_refresh_status')),
+      ]));
       return h('div', { class: 'card-body' }, blocks);
     });
   }

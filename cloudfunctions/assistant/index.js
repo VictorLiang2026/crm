@@ -79,12 +79,13 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
   knowledgeLibraryRunner = (event, uid, options) => require('./knowledge-library-service').handleKnowledgeLibrary(event, uid, options),
   aiTaskStatusRunner = (event, uid) => {
     if (event.taskType === 'person_summary') return require('./summarize-service').getSummaryTaskStatus(event);
+    if (event.taskType === 'meeting_prep') return require('./meeting-prep-service').getMeetingPrepTaskStatus(event);
     if (event.taskType === 'customer_followup_dual') return require('./knowledge-library-service').handleKnowledgeLibrary(
       { action: 'knowledgeLibrary', operation: 'dualStatus', data: event }, uid);
     if (event.taskType === 'person_followup_advice') return require('./knowledge-library-service').handleKnowledgeLibrary(
       { action: 'knowledgeLibrary', operation: 'adviceStatus', data: event }, uid);
     const error = new Error('Unsupported AI task type'); error.code = 'INVALID_INPUT'; throw error;
-  }) {
+  }, meetingPrepRunner = (event, options) => require('./meeting-prep-service').runMeetingPrep(event, options)) {
   const run = async (event, context, callback, earlyResponse) => {
     if (event?.action === 'knowledgeMcpInternal') {
       const mcpAuth=require('./knowledge-mcp-auth');
@@ -359,7 +360,7 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
     }
     if (event?.action === 'aiTaskStatus') {
       try {
-        if (!['person_summary','customer_followup_dual','person_followup_advice'].includes(event.taskType)) {
+        if (!['person_summary','meeting_prep','customer_followup_dual','person_followup_advice'].includes(event.taskType)) {
           return {ok:false,error:{code:'INVALID_INPUT',message:'AI task status request is invalid'}};
         }
         return await aiTaskStatusRunner({taskId:event.taskId,personId:event.personId,taskType:event.taskType,
@@ -390,8 +391,16 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
       }
     }
     if (event?.action === 'meetingPrep') {
-      try { return await require('./meeting-prep-service').runMeetingPrep(event); }
+      const asyncRequested=event.asyncWait===true&&typeof callback==='function';
+      try {
+        const result=await meetingPrepRunner(event,{onStarted:asyncRequested?({taskId})=>{
+          return earlyResponse.send({ok:true,status:'pending',taskId:String(taskId),personId:String(event.personId)});
+        }:undefined});
+        return earlyResponse.sent?undefined:result;
+      }
       catch (error) {
+        if(asyncRequested&&error?.code==='AI_IN_PROGRESS'&&error?.taskId){earlyResponse.send({ok:true,status:'pending',taskId:String(error.taskId),personId:String(event.personId)});return undefined;}
+        if(earlyResponse.sent){console.error('AI_BACKGROUND_FAILED',String(error?.code||'MEETING_PREP_FAILED'));return undefined;}
         const code = ['INVALID_INPUT', 'NOT_FOUND', 'INVALID_CONFIG', 'INVALID_RESULT',
           'RATE_LIMIT', 'TIMEOUT', 'UPSTREAM_UNAVAILABLE', 'PERSISTENCE_ERROR',
           'AI_IN_PROGRESS', 'AI_RETRY_LATER', 'AI_AUDIT_UNKNOWN',
@@ -484,7 +493,7 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
       return knowledgeLibraryRunner({action:'knowledgeLibrary',operation:'processOcrQueue'},'knowledge-ocr-worker',{internalOcrQueue:true});
     }
     const asyncRequested = typeof callback === 'function' &&
-      ((event?.action === 'summarize' && event.asyncWait === true) ||
+      (((event?.action === 'summarize' || event?.action === 'meetingPrep') && event.asyncWait === true) ||
        (event?.action === 'knowledgeLibrary' && ['dualGenerate','adviceGenerate'].includes(event.operation) && event.data?.asyncWait === true));
     const earlyResponse = createEarlyResponse(callback, context, asyncRequested);
     if (asyncRequested) console.log('AI_ASYNC_CALLBACK_MODE');

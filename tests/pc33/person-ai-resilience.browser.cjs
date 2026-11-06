@@ -20,6 +20,7 @@ test('PC33 Person AI suppresses duplicate clicks and shows bilingual failure/his
       data.personInteractions=async()=>({rows:[]});
       data.conversationPlaybookHistory=async()=>({ok:true,hasResult:false});
       data.personAIHistory=async()=>({ok:true,generated:[],legacy:[]});
+      data.meetingPrepStatus=async()=>({ok:true,status:'none'});
       window.pc33={summaryCalls:0,prepCalls:0};
       data.summarizePerson=async()=>{window.pc33.summaryCalls++;return await new Promise((resolve,reject)=>{window.pc33.summaryResolve=resolve;window.pc33.summaryReject=reject;});};
       data.meetingPrep=async()=>{window.pc33.prepCalls++;return await new Promise((resolve,reject)=>{window.pc33.prepResolve=resolve;window.pc33.prepReject=reject;});};
@@ -36,9 +37,22 @@ test('PC33 Person AI suppresses duplicate clicks and shows bilingual failure/his
     await browser.evaluate("window.pc33I18n.setLang('en');window.pc33Render()");
     await browser.wait("[...document.querySelectorAll('.console-main button')].some(x=>x.textContent.trim()==='Prep')");
     await browser.evaluate("[...document.querySelectorAll('.console-main button')].filter(x=>x.textContent.trim()==='Prep').forEach(x=>{x.click();x.click()})");
+    await browser.wait("[...document.querySelectorAll('.summary-card')].some(x=>x.innerText.includes('No meeting prep result is available yet'))");
+    assert.equal(await browser.evaluate('window.pc33.prepCalls'),0,'opening meeting prep only reads existing results');
+    await browser.evaluate("[...document.querySelectorAll('.summary-card button')].find(x=>x.textContent.trim()==='Generate').click();[...document.querySelectorAll('.summary-card button')].find(x=>x.textContent.trim()==='Generate')?.click()");
     assert.equal(await browser.evaluate('window.pc33.prepCalls'),1);
     await browser.evaluate("window.pc33.prepReject(new Error('TIMEOUT: uncertain'))");
-    await browser.wait("[...document.querySelectorAll('.summary-card')].some(x=>x.innerText.includes('remote completion is uncertain'))");
+    await browser.wait("[...document.querySelectorAll('.summary-card')].some(x=>x.innerText.includes('timed out without a result'))");
+    await browser.evaluate(`(async()=>{
+      const {data}=await import('/crm/js/modules/console/data.js');
+      data.meetingPrepStatus=async()=>({ok:false,status:'failed',error:{code:'TIMEOUT'}});
+      data.personAIHistory=async()=>({ok:true,generated:[{id:'72',taskType:'meeting_prep',createdAt:'2026-11-05',result:{brief30Seconds:'Existing meeting brief'},sources:[]}],legacy:[]});
+      window.pc33Render();
+    })()`);
+    await browser.evaluate("[...document.querySelectorAll('.console-main button')].find(x=>x.textContent.trim()==='Prep').click()");
+    await browser.wait("[...document.querySelectorAll('.summary-card')].some(x=>x.innerText.includes('Existing meeting brief'))");
+    assert.equal(await browser.evaluate('window.pc33.prepCalls'),1,'reading previous prep does not regenerate it');
+    assert.match(await browser.evaluate("[...document.querySelectorAll('.summary-card')].find(x=>x.innerText.includes('Existing meeting brief')).innerText"),/Regenerate/);
     for (const [width,height] of [[820,1180],[1180,820]]) {
       await browser.send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:false});
       assert.equal(await browser.evaluate('document.documentElement.scrollWidth<=innerWidth+1'),true,`${width}x${height} overflow`);
