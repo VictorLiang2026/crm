@@ -10,19 +10,27 @@
 npm test
 npm run test:backend
 npm run test:browser
+npm run test:regression:tooling
+npm run test:regression:service
+npm run test:regression:browser:short
+npm run test:regression:browser:long
+npm run test:wp01
+npm run check:release-gate
 ```
 
-也可直接运行 `node tests/regression/run.cjs`，不需要 npm install。命令支持 `--backend-only` 或 `--browser-only`，不接受线上 URL、凭据或写入开关。受限执行环境需允许启动浏览器和本机回环服务。
+也可直接运行 `node tests/regression/run.cjs`，不需要 npm install。回归命令支持 `--backend-only`、`--browser-only` 和 `--browser-only --browser-group=short|long`，不接受线上 URL、凭据或写入开关。安全门槛使用独立的 `test:wp01` / `check:release-gate` 报告，不混入离线回归计数。受限执行环境需允许启动浏览器和本机回环服务。
 
-退出码：0=本次所选自动化层全部通过；1=至少一项失败；2=配置或执行异常。SKIP 不计入通过。2026-09-22 用户授权修复活动详情只读问题后，完整测试为 56 PASS、0 FAIL、5 SKIP；原断言保留，并新增姓名补齐且原记录不变的断言。
+退出码：0=本次所选自动化层没有 FAIL（FLAKY 会单列）；1=至少一项失败；2=配置或执行异常。SKIP 不计入通过。仅当首次浏览器运行的失败全部被标记为浏览器启动/CDP 基础设施错误时，才使用全新浏览器 profile 隔离重跑一次；有任何普通断言失败就不自动重试。重试成功的原失败用例标为 `FLAKY`，首次失败与复跑记录分别保存，不覆盖或伪装为首次通过。
 
-每次运行自动输出 `.results/latest.json` 和 `.results/latest.md`，包含模式、时间、Git HEAD、页面 SHA-256、逐项 PASS/FAIL/SKIP、错误与耗时。结果目录不入 Git；本工作包的固定结果快照在 `docs/testing/`。单层运行会覆盖 latest，因此交付前使用完整运行结果。
+每次运行自动输出 `.results/latest.json` 和 `.results/latest.md`，并在 `.results/<run-id>/` 归档完整报告、首次浏览器结果、可选隔离重跑结果和失败截图。报告含运行模式/分组、时间、Git HEAD、Node/浏览器版本、逐项 PASS/FAIL/FLAKY/TODO/SKIP、失败阶段、路由、viewport、控制台错误、网络违规和耗时。截图只在失败时保存，页面内容为隔离合成夹具。结果目录不入 Git；单层运行会更新 `latest`，需用 run-id 归档对照前后结果。
 
 ## 文件
 
 | 文件 | 职责 |
 | --- | --- |
 | run.cjs | 执行测试、错误退出码、生成报告 |
+| runner-core.cjs | 参数校验、结果计数、基础设施重跑判定和两次结果合并 |
+| runner-core.test.cjs | 回归运行器的参数、重跑边界和 flaky 归档单元检查 |
 | browser.cjs | 本机 HTTP 服务、隐藏独立浏览器、CDP 驱动及外网拦截 |
 | fixtures.cjs | 仅本地模拟认证和允许的云函数响应，全部为合成数据 |
 | smoke.cjs | 真实前端脚本与 DOM 的路由、交互、异常回归 |
@@ -49,6 +57,8 @@ npm run test:browser
 | 相邻回归 | 快速录入点击背景保留草稿 |
 
 页面使用完整原始内联脚本与样式，测试服务器只在内存中替换外部 CloudBase SDK 脚本标签；不替换页面路由、callFn、渲染或表单实现。浏览器例程验证本地模拟 API 契约，不证明真实 SDK/Auth、云函数部署、RLS、AI 或网络健康。
+
+短浏览器组覆盖单路由、只读展示和快速交互；长浏览器组覆盖多步骤登录/账户/审批/写入边界交互。长组仍全部使用本地 mock，不执行真实业务写入。两个分组使用相同 CSP 和 CDP 网络限制；需要完整浏览器回归时继续用 `npm run test:browser` 或 `npm test`。
 
 后端测试执行仓库真实 index.js，require 仅允许替换的 ./db。内存适配器只实现测试所需的查询方法，不能替代 PostgreSQL 的类型、约束、权限、视图定义和事务验证。Node VM 用于隔离可信仓库代码的依赖，不是运行恶意代码的安全沙箱。
 

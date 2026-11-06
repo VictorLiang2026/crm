@@ -7,16 +7,35 @@ const { spawn } = require('node:child_process');
 const { once } = require('node:events');
 const { installFixtures } = require('./fixtures.cjs');
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+function infrastructureError(message, stage, cause) {
+  const error = new Error(message, cause ? { cause } : undefined);
+  error.code = 'BROWSER_INFRASTRUCTURE';
+  error.stage = stage;
+  return error;
+}
 
 class Browser {
-  constructor(root) { this.root = root; this.pending = new Map(); this.serial = 0; this.networkViolations = []; this.runtimeErrors = []; }
+  constructor(root, options = {}) {
+    this.root = root;
+    this.options = options;
+    this.pending = new Map();
+    this.serial = 0;
+    this.networkViolations = [];
+    this.runtimeErrors = [];
+    this.consoleErrors = [];
+    this.stage = 'browser.resolve';
+    this.currentRoute = null;
+    this.browserVersion = null;
+  }
   async start() {
     const executable = [process.env.CRM_TEST_BROWSER,
       'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
       'C:/Program Files/Microsoft/Edge/Application/msedge.exe',
       'C:/Program Files/Google/Chrome/Application/chrome.exe',
       '/usr/bin/chromium', '/usr/bin/chromium-browser', '/usr/bin/google-chrome'].filter(Boolean).find(p => fs.existsSync(p));
-    if (!executable) throw new Error('No browser: set CRM_TEST_BROWSER to a Chromium/Edge executable');
+    if (!executable) throw infrastructureError('No browser: set CRM_TEST_BROWSER to a Chromium/Edge executable', this.stage);
+    this.executable = executable;
+    this.stage = 'server.prepare';
     const source = fs.readFileSync(path.join(this.root, 'admin.html'), 'utf8');
     const sdk = /<script\s+src="https:\/\/static\.cloudbase\.net\/cloudbase-js-sdk\/3\.10\.1\/cloudbase\.full\.js"><\/script>/g;
     if ([...source.matchAll(sdk)].length !== 1) throw new Error('SDK injection anchor changed; refuse to serve production SDK');
@@ -87,7 +106,8 @@ class Browser {
       else { res.writeHead(404); res.end(); }
     });
     this.server.listen(0, '127.0.0.1');
-    await once(this.server, 'listening');
+    try { await once(this.server, 'listening'); }
+    catch (error) { throw infrastructureError('Local fixture server did not start', 'server.start', error); }
     this.origin = 'http://127.0.0.1:' + this.server.address().port;
     this.profile = fs.mkdtempSync(path.join(os.tmpdir(), 'crm-regression-'));
     this.process = spawn(executable, ['--headless=new', '--disable-gpu', '--no-sandbox', '--no-first-run', '--no-default-browser-check',
@@ -98,20 +118,20 @@ class Browser {
     this.process.on('error', e => { spawnError = e; });
     const portFile = path.join(this.profile, 'DevToolsActivePort');
     for (let i = 0; i < 450 && !fs.existsSync(portFile); i++) {
-      if (spawnError) throw spawnError;
+      if (spawnError) throw infrastructureError('Browser process could not start', 'browser.spawn', spawnError);
       // Edge may relaunch under the same test profile; the debugger port is the readiness signal.
       await delay(100);
     }
-    if (!fs.existsSync(portFile)) throw new Error('Browser debugger startup timed out');
+    if (!fs.existsSync(portFile)) throw infrastructureError('Browser debugger startup timed out', 'browser.spawn');
     let port;
     for (let i = 0; i < 100 && !port; i++) {
       try { port = fs.readFileSync(portFile, 'utf8').split(/\r?\n/)[0]; }
       catch (error) {
-        if (!['EBUSY','EACCES'].includes(error.code)) throw error;
+        if (!['EBUSY','EACCES'].includes(error.code)) throw infrastructureError('Browser debugger port could not be read', 'browser.debugger-port', error);
         await delay(100);
       }
     }
-    if (!port) throw new Error('Browser debugger port was not readable');
+    if (!port) throw infrastructureError('Browser debugger port was not readable', 'browser.debugger-port');
     let target;
     for (let i = 0; i < 200 && !target; i++) {
       try {
@@ -120,9 +140,17 @@ class Browser {
       } catch (_) { /* Edge can publish its port before the debugger is ready. */ }
       if (!target) await delay(100);
     }
-    if (!target) throw new Error('No browser page target');
+    if (!target) throw infrastructureError('No browser page target', 'browser.debugger-target');
     this.socket = new WebSocket(target.webSocketDebuggerUrl);
-    await new Promise((resolve, reject) => { this.socket.addEventListener('open', resolve, { once: true }); this.socket.addEventListener('error', reject, { once: true }); });
+    await new Promise((resolve, reject) => {
+      this.socket.addEventListener('open', resolve, { once: true });
+      this.socket.addEventListener('error', event => reject(infrastructureError('CDP WebSocket connection failed', 'browser.cdp-connect', event.error)), { once: true });
+    });
+    this.socket.addEventListener('close', () => {
+      const error = infrastructureError('CDP WebSocket closed unexpectedly', this.stage);
+      for (const pending of this.pending.values()) { clearTimeout(pending.timer); pending.reject(error); }
+      this.pending.clear();
+    });
     this.socket.addEventListener('message', event => {
       const message = JSON.parse(String(event.data));
       if (message.id) {
@@ -136,21 +164,36 @@ class Browser {
           .catch(e => this.runtimeErrors.push(e.message));
       } else if (message.method === 'Runtime.exceptionThrown') {
         this.runtimeErrors.push(message.params.exceptionDetails.exception?.description || message.params.exceptionDetails.text);
+      } else if (message.method === 'Runtime.consoleAPICalled' && ['error', 'warning'].includes(message.params.type)) {
+        this.consoleErrors.push({ type: message.params.type, text: message.params.args.map(arg => arg.value ?? arg.description ?? arg.type).join(' ').slice(0, 1200) });
       }
     });
+    this.stage = 'browser.cdp-enable';
     await this.send('Page.enable');
     await this.send('Runtime.enable');
+    await this.send('Log.enable');
     await this.send('Fetch.enable', { patterns: [{ urlPattern: '*' }] });
+    this.browserVersion = await this.send('Browser.getVersion').catch(() => null);
+    this.stage = 'browser.ready';
   }
   send(method, params = {}) {
+    this.stage = `cdp.${method}`;
     const id = ++this.serial;
     return new Promise((resolve, reject) => {
       // Cold Edge profiles can stall a single DevTools reply while the machine is
       // under load. Keep a finite failure bound without flagging a 15s stall as
       // an application regression; route expectations retain their own limit.
-      const timer = setTimeout(() => { this.pending.delete(id); reject(new Error('CDP timeout: ' + method)); }, 45000);
+      const timer = setTimeout(() => {
+        this.pending.delete(id);
+        reject(infrastructureError('CDP timeout: ' + method, `cdp.${method}`));
+      }, 45000);
       this.pending.set(id, { resolve, reject, timer });
-      this.socket.send(JSON.stringify({ id, method, params }));
+      try { this.socket.send(JSON.stringify({ id, method, params })); }
+      catch (error) {
+        clearTimeout(timer);
+        this.pending.delete(id);
+        reject(infrastructureError('CDP send failed: ' + method, `cdp.${method}`, error));
+      }
     });
   }
   async evaluate(expression) {
@@ -168,29 +211,34 @@ class Browser {
   }
   async open(hash, query = '') {
     this.runtimeErrors.length = 0;
+    this.consoleErrors.length = 0;
+    this.stage = 'page.navigate';
     const target = this.origin + '/admin.html?' + query + '&run=' + Date.now() + hash;
+    this.currentRoute = target;
     await this.send('Page.navigate', { url: target });
     await this.wait('location.href === ' + JSON.stringify(target) + ' && Boolean(window.__crmTest && document.getElementById("view"))', 45000);
   }
   async openConsole(hash = '#/today', query = '') {
     this.runtimeErrors.length = 0;
+    this.consoleErrors.length = 0;
+    this.stage = 'page.navigate';
     const target = this.origin + '/console.html?' + query + '&run=' + Date.now() + hash;
+    this.currentRoute = target;
     await this.send('Page.navigate', { url: target });
     await this.wait('location.href === ' + JSON.stringify(target) + ' && Boolean(window.__crmTest && document.getElementById("app"))', 45000);
   }
   async click(selector, text) {
+    this.stage = 'page.click';
     await this.evaluate(`(() => { const e = [...document.querySelectorAll(${JSON.stringify(selector)})].find(e => e.textContent.includes(${JSON.stringify(text)})); if (!e) throw new Error('Control not found: ' + ${JSON.stringify(text)}); e.click(); })()`);
   }
   async healthy() {
+    this.stage = 'page.health';
     const state = await this.evaluate('window.__crmTest');
     const failures = [...this.runtimeErrors, ...this.networkViolations, ...state.errors, ...state.violations];
     if (failures.length) throw new Error(failures.join('\n'));
   }
   async close() {
-    if (this.socket?.readyState === WebSocket.OPEN) {
-      try { await this.send('Browser.close'); } catch (e) { if (this.process?.exitCode === null) this.process.kill(); }
-      this.socket.close();
-    }
+    if (this.socket?.readyState === WebSocket.OPEN) this.socket.close();
     if (this.process?.exitCode === null) {
       this.process.kill();
       await Promise.race([once(this.process, 'exit'), delay(2000)]);
@@ -199,5 +247,32 @@ class Browser {
     if (this.server?.listening) await new Promise(resolve => this.server.close(resolve));
     // Keep the temporary profile for diagnosis; never touch the user's browser profile.
   }
+  async diagnostics({ runDir, testId, captureScreenshot = false } = {}) {
+    const result = {
+      stage: this.stage,
+      route: this.currentRoute,
+      executable: this.executable || null,
+      browser: this.browserVersion ? { product: this.browserVersion.product, userAgent: this.browserVersion.userAgent } : null,
+      consoleErrors: this.consoleErrors.slice(-20),
+      runtimeErrors: this.runtimeErrors.slice(-20),
+      networkViolations: this.networkViolations.slice(-20),
+    };
+    if (this.socket?.readyState === WebSocket.OPEN) {
+      try { result.viewport = await this.evaluate('({width:innerWidth,height:innerHeight,deviceScaleFactor:devicePixelRatio})'); }
+      catch (error) { result.viewportError = error.message; }
+      try { result.actualUrl = await this.evaluate('location.href'); }
+      catch (error) { result.urlError = error.message; }
+      if (captureScreenshot && runDir) {
+        try {
+          const shot = await this.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
+          const file = path.join(runDir, 'screenshots', `${String(testId || 'failure').replace(/[^a-z0-9_.-]/gi, '_')}.png`);
+          fs.mkdirSync(path.dirname(file), { recursive: true });
+          fs.writeFileSync(file, Buffer.from(shot.data, 'base64'));
+          result.screenshot = path.relative(this.root, file).replace(/\\/g, '/');
+        } catch (error) { result.screenshotError = error.message; }
+      }
+    }
+    return result;
+  }
 }
-module.exports = { Browser };
+module.exports = { Browser, infrastructureError };

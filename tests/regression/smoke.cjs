@@ -2,14 +2,32 @@
 const assert = require('node:assert/strict');
 const { Browser } = require('./browser.cjs');
 
-module.exports = async function smoke(root, test) {
-  const b = new Browser(root);
+const longBrowserCases = new Set([
+  'login.empty', 'login.denied', 'login.error-result', 'login.success', 'login.timeout',
+  'account.entry-refresh', 'account.logout', 'account.password', 'console.settings.password-signout', 'assistant.action.create',
+  'person360.opportunity-candidate-preview', 'person360.opportunity-create',
+  'person360.opportunity-edit', 'person360.opportunity-preview-error',
+  'activity.relationship-review-preview', 'activity.review-human-decision',
+  'activity.review-opportunity-outcome', 'activity.important-interaction',
+  'activity.person-first-add', 'speaker.person-first-create', 'speaker.person-link',
+  'recruit.list', 'recruit.customer-lookup', 'quickcapture.v2.confirm',
+]);
+
+module.exports = async function smoke(root, test, options = {}) {
+  const b = new Browser(root, options);
   const text = value => `document.getElementById('view').innerText.includes(${JSON.stringify(value)})`;
   const called = (name, action) => `window.__crmTest.calls.some(c => c.name === ${JSON.stringify(name)} && c.action === ${JSON.stringify(action)})`;
   const open = async (route, expected, query = '') => { await b.open(route, query); await b.wait(text(expected)); };
-  const check = (id, title, fn) => test(id, title, 'browser / isolated fixtures', async () => { await fn(); await b.healthy(); });
+  const check = (id, title, fn) => test(id, title, 'browser / isolated fixtures', async () => { await fn(); await b.healthy(); }, {
+    group: longBrowserCases.has(id) ? 'long' : 'short',
+    abortOnInfrastructureFailure: true,
+    diagnostics: ({ runDir, captureScreenshot }) => b.diagnostics({ runDir, testId: id, captureScreenshot }),
+  });
   try {
-    if (!await test('browser.start', '隔离浏览器启动', 'harness', () => b.start())) return;
+    if (!await test('browser.start', '隔离浏览器启动', 'harness', () => b.start(), {
+      group: 'harness', abortOnInfrastructureFailure: true,
+      diagnostics: ({ runDir, captureScreenshot }) => b.diagnostics({ runDir, testId: 'browser.start', captureScreenshot }),
+    })) return;
     await check('login.empty', '登录入口：空字段不发起认证', async () => {
       await open('#/customers', 'CRM 登录', 'login=required');
       await b.click('button', '登录');
