@@ -26,7 +26,7 @@ Restore the existing CRM Knowledge MCP OAuth discovery and dynamic registration 
 - Live GET `/.well-known/oauth-authorization-server/knowledge-mcp`: HTTP 200, advertises `/oauth/register`.
 - Live POST `/oauth/register` with a disallowed redirect URI: HTTP 400 from application validation; rejected before client registration storage.
 - `npm run test:wp01`: `PASS_WITH_LIMITATIONS`; all critical checks passed, with existing manual login, service runtime, production writes, and mobile checks explicitly unverified.
-- Full CloudBase/Git release parity: CloudOnly check is running before commit; post-release sync remains required.
+- `tools/release.ps1` published tag `release-20261106-132656`; post-release verification confirmed local/GitHub/CloudBase parity, 30 functions and 243 source/config files, and 96 reachable static assets.
 
 ## Recovery
 
