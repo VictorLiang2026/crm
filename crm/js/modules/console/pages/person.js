@@ -591,7 +591,7 @@ export function renderPerson(ctx, id, initialSection) {
   }
 
   // AI 会前准备（WP3.3a）
-  const prepPanel = h('div', { class: 'card summary-card', style: 'display:none;margin-bottom:12px' });
+  const prepPanel = h('div', { class: 'card summary-card meeting-prep-panel', style: 'display:none;margin-bottom:12px' });
   function openPrep() {
     prepPanel.style.display = '';
     loadInto(prepPanel, async () => {

@@ -46,7 +46,7 @@ test('PC33 Person AI suppresses duplicate clicks and shows bilingual failure/his
     await browser.evaluate(`(async()=>{
       const {data}=await import('/crm/js/modules/console/data.js');
       data.meetingPrepStatus=async()=>({ok:false,status:'failed',error:{code:'TIMEOUT'}});
-      data.personAIHistory=async()=>({ok:true,generated:[{id:'72',taskType:'meeting_prep',createdAt:'2026-11-05',result:{brief30Seconds:'Existing meeting brief'},sources:[]}],legacy:[]});
+      data.personAIHistory=async()=>({ok:true,generated:[{id:'72',taskType:'meeting_prep',createdAt:'2026-11-05',result:{brief30Seconds:'Existing meeting brief',recentChanges:['Recent change'],suggestedObjective:'Confirm needs'},sources:[]}],legacy:[]});
       window.pc33Render();
     })()`);
     await browser.evaluate("[...document.querySelectorAll('.console-main button')].find(x=>x.textContent.trim()==='Prep').click()");
@@ -55,6 +55,13 @@ test('PC33 Person AI suppresses duplicate clicks and shows bilingual failure/his
     assert.match(await browser.evaluate("[...document.querySelectorAll('.summary-card')].find(x=>x.innerText.includes('Existing meeting brief')).innerText"),/Regenerate/);
     for (const [width,height] of [[820,1180],[1180,820]]) {
       await browser.send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:false});
+      const layout = await browser.evaluate(`(()=>{
+        const row=document.querySelector('.meeting-prep-panel .ai-history-row');
+        if(!row)return null;
+        const boxes=[...row.children].map(el=>el.getBoundingClientRect());
+        return {direction:getComputedStyle(row).flexDirection,vertical:boxes.every((box,i)=>!i||box.top>=boxes[i-1].bottom-1),aligned:boxes.every(box=>Math.abs(box.left-boxes[0].left)<=1&&Math.abs(box.width-boxes[0].width)<=1)};
+      })()`);
+      assert.deepEqual(layout,{direction:'column',vertical:true,aligned:true},`${width}x${height} prep result layout`);
       assert.equal(await browser.evaluate('document.documentElement.scrollWidth<=innerWidth+1'),true,`${width}x${height} overflow`);
     }
     await browser.send('Emulation.clearDeviceMetricsOverride');
