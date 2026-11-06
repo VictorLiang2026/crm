@@ -60,6 +60,7 @@
     "test:regression:service": "node tests/regression/run.cjs --backend-only",
     "test:regression:browser:short": "node tests/regression/run.cjs --browser-only --browser-group=short",
     "test:regression:browser:long": "node tests/regression/run.cjs --browser-only --browser-group=long",
+    "test:performance:baseline": "node tests/performance/baseline.cjs",
     "test:backend": "node tests/regression/run.cjs --backend-only",
     "test:browser": "node tests/regression/run.cjs --browser-only",
     "test:wp02": "node --test tests/wp02/run.test.cjs tests/wp02/browser.test.cjs",

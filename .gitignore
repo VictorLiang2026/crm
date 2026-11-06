@@ -12,6 +12,7 @@ backups/
 
 # ===== 测试与临时文件 =====
 tests/regression/.results/
+tests/performance/.results/
 tests/permissions/.results/
 tests/security/.results/
 tests/households/.results/
