@@ -1,0 +1,28 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "crm-assistant",
+  "version": "0.1.0",
+  "description": "Bilingual CRM knowledge and follow-up workflows using the existing CRM MCP connection.",
+  "author": {
+    "name": "CRM"
+  },
+  "keywords": [
+    "crm",
+    "knowledge",
+    "follow-up",
+    "customer relationship management"
+  ],
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "CRM Assistant | CRM 助手",
+        "shortDescription": "CRM workflows · CRM 流程",
+        "longDescription": "读取已授权的 CRM 知识和跟进上下文；提交建议前展示服务端核验的预览，并由人确认。\nRead authorized CRM knowledge and follow-up context; show server-verified previews and require human confirmation before submitting advice.",
+        "developerName": "CRM",
+        "category": "Productivity",
+        "capabilities": [],
+        "defaultPrompt": "使用 CRM 助手处理已授权的知识库和跟进建议工作流。 / Use CRM Assistant for authorized knowledge and follow-up advice workflows."
+      }
+    }
+  }
+}

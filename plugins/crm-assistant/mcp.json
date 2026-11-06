@@ -1,0 +1,27 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+  "mcpServers": {
+    "crm-assistant": {
+      "type": "streamable-http",
+      "url": "https://crm-d1gkae8ddc930d151.ap-shanghai.app.tcloudbase.com/mcp/knowledge",
+      "extensions": {
+        "com.openai": {
+          "auth": {
+            "type": "oauth",
+            "client": {
+              "mode": "dcr"
+            },
+            "baseScopes": [
+              "knowledge:read",
+              "followup:read"
+            ],
+            "defaultScopes": [
+              "knowledge:gpt:submit",
+              "followup:gpt:submit"
+            ]
+          }
+        }
+      }
+    }
+  }
+}
