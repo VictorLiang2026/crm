@@ -25,6 +25,13 @@ test('Person AI history shows sourced outputs and legacy advice on iPad in both 
       window.renderTestPerson();
     })()`);
     await browser.wait("document.querySelector('.console-main button')");
+    const buttonStyles = await browser.evaluate(`(()=>{
+      const buttons=[...document.querySelectorAll('.console-main button')];
+      const followup=buttons.find(x=>x.textContent.trim()==='跟进建议');
+      const playbook=buttons.find(x=>x.textContent.trim()==='对话策略');
+      return {followup:followup?.className,playbook:playbook?.className};
+    })()`);
+    assert.equal(buttonStyles.followup,buttonStyles.playbook,'follow-up advice matches the playbook button style');
     await browser.evaluate("[...document.querySelectorAll('.console-main button')].find(x=>x.textContent.trim()==='AI 历史').click()");
     await browser.wait("document.querySelector('.error-box button')");
     await browser.evaluate("document.querySelector('.error-box button').click()");
