@@ -5,6 +5,8 @@ const assert = require('node:assert/strict');
 const http = require('node:http');
 const { once } = require('node:events');
 const Module = require('node:module');
+const fs = require('node:fs');
+const { execFileSync } = require('node:child_process');
 process.env.TCB_ENV='crm-d1gkae8ddc930d151';
 process.env.CRM_KNOWLEDGE_MCP_CLOUDBASE_API_KEY='test-api-key';
 process.env.CRM_KNOWLEDGE_MCP_HMAC_KEY='test-only-hmac-secret-with-at-least-32-characters';
@@ -18,6 +20,13 @@ Module._load = function(request,parent,isMain) {
   return originalLoad.call(this,request,parent,isMain);
 };
 const { createHttpServer,main } = require('../../cloudfunctions/knowledge_mcp');
+
+test('HTTP bootstrap is LF-only and tracked as executable', () => {
+  const bootstrap = fs.readFileSync('cloudfunctions/knowledge_mcp/scf_bootstrap');
+  assert.equal(bootstrap.toString('utf8'), '#!/bin/bash\n/var/lang/node18/bin/node index.js\n', 'scf_bootstrap must contain real LF line endings');
+  const indexEntry = execFileSync('git', ['ls-files', '-s', '--', 'cloudfunctions/knowledge_mcp/scf_bootstrap'], { encoding: 'utf8' });
+  assert.match(indexEntry, /^100755\s/m, 'scf_bootstrap must be executable in the Git tree');
+});
 
 test('redirect allowlist permits Codex loopback callbacks and rejects untrusted callback targets', () => {
   const {isAllowedRedirectUri}=require('../../cloudfunctions/knowledge_mcp');
