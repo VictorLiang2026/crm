@@ -22,7 +22,9 @@
 
 ## 发布
 
-- 状态：数据库 migration 已部署；会前准备功能已独立发布至 GitHub master，本次修复现基于最新 master 进行发布核验。
+- 状态：数据库 migration 已部署；本次代码、migration、rollback 与回归用例已发布。
 - 静态页面与云函数产物没有变化。
 - 首次 release verification 曾因 `crm/js/modules/console/data.js` 线上资源与当时 GitHub 基线不一致而停止；会前准备功能随后已在独立提交/标签中发布。本次从最新 GitHub master 创建干净克隆，不包含该功能的修改内容。
-- 当前本次 migration 和回归文件仅包含空客户版本修复，正在执行标准提交/标签流程与 CloudBase 一致性检查。
+- 最终完整修复提交：`b33755e08a936c6ccf442d260709ed57e254ccda`，标签：`release-20261107-0024`。
+- 一次中间发布提交 `c501bb3` / 标签 `release-20261107-0012` 只包含 RPC 参数边界回归测试；随后提交 `b33755e` 补齐 migration、rollback、SQL 语义回归和发布记录。最终标签包含完整工作包。
+- 发布后 CloudOnly 核验通过：96 页面资源、30 云函数、243 源/配置文件与 CloudBase 一致；GitHub master 与最终标签指向 `b33755e`。数据库 migration 版本 `20261106143000` 仍为最新版本。
