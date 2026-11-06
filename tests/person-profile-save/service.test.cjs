@@ -29,3 +29,14 @@ test('updatePerson rejects invalid values before the transaction call', async ()
   await assert.rejects(service.updatePerson({personId:'71',expectedUpdatedAt:'2026-10-15T01:00:00Z',customerFields:{annual_income:-2}},'test-uid'),/Invalid annual_income/);
   assert.equal(calls,0);
 });
+
+test('updatePerson preserves a null customer version for rows without updated_at', async () => {
+  let call;
+  const service=createService({rpc:async(name,args)=>{call={name,args};return{ok:true,updated:true};}});
+  await service.updatePerson({personId:'71',expectedUpdatedAt:'2026-10-15T01:00:00Z',
+    personFields:{},customerId:'81',customerExpectedUpdatedAt:null,customerFields:{tags:'更新标签'}},'test-uid');
+  assert.equal(call.name,'crm_person_profile_save_v1');
+  assert.equal(call.args.p_customer_id,81);
+  assert.equal(call.args.p_customer_expected_updated_at,null);
+  assert.deepEqual(call.args.p_customer_fields,{tags:'更新标签'});
+});
