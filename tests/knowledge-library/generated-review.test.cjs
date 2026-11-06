@@ -44,7 +44,9 @@ test('knowledge editor uses direct saving and exposes no review or manual progre
   assert.match(ui,/call\('save'/);assert.match(ui,/kc-edit-grid/);
   assert.doesNotMatch(ui,/call\('(approve|reject|preview|apply|command|retry)'/);
   assert.doesNotMatch(ui,/pending|history|candidate|refresh/i);
-  assert.match(governance,/sourceExtractionStatus==='draft'/);assert.match(governance,/knowledgeLibrary\(ctx,'review'/);
+  assert.match(governance,/knowledgeLibrary\(ctx,'setValidity'/);
+  assert.doesNotMatch(governance,/sourceExtractionStatus==='draft'/);
+  assert.doesNotMatch(governance,/knowledgeLibrary\(ctx,'review'/);
   assert.doesNotMatch(governance,/contentReviewPending/);
   for(const key of ['kc_save','kc_system_summary','kc_gpt_summary','kc_regenerate_text','kc_regenerate_summary'])assert.match(i18n,new RegExp(key+'\\s*:'));
   for(const key of ['kc_save_preview','kc_approve','kc_reject','kc_refresh','kc_candidate'])assert.doesNotMatch(i18n,new RegExp(key+'\\s*:'));

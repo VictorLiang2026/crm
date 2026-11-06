@@ -53,11 +53,8 @@ export function renderKnowledgeGovernance(ctx) {
   ];
   const setStatus=async row=>{
     const next=!active(row);
-    const sourceReview=next&&row.table==='knowledge_items'&&row.source_id&&row.sourceLifecycleStatus==='draft'&&row.sourceExtractionStatus==='draft';
-    const result=sourceReview
-      ?await data.knowledgeLibrary(ctx,'review',{data:{sourceId:String(row.source_id),itemId:String(row.id),decision:'verify',expectedUpdatedAt:row.sourceUpdatedAt}})
-      :await data.knowledgeLibrary(ctx,'setValidity',{data:{table:row.table,id:row.id,
-        valid:next,expectedUpdatedAt:row.updated_at}});
+    const result=await data.knowledgeLibrary(ctx,'setValidity',{data:{table:row.table,id:row.id,
+      valid:next,expectedUpdatedAt:row.updated_at}});
     if(!result?.ok)throw new Error(text('state_failed'));
     await load();
   };

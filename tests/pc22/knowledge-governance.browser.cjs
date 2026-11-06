@@ -159,3 +159,37 @@ test('Knowledge Library refreshes failed PDF retry state and handles stale delet
     assert.equal(state.rowDate,'2026-10-28');
   }finally{await browser.close();}
 });
+
+test('Knowledge Library activates source-linked drafts through the confidence-safe validity route', async () => {
+  const browser = new Browser(path.resolve(__dirname, '../..'));
+  try {
+    await browser.start();
+    await browser.openConsole('#/more', 'authCase=1');
+    await browser.wait("document.querySelector('.console-main')");
+    await browser.evaluate(`(async()=>{
+      const {renderKnowledgeGovernance}=await import('/crm/js/modules/console/knowledge-governance.js');
+      const calls=[];let listCount=0;
+      const updatedAt='2026-11-05T12:38:01.844Z';
+      const ctx={main:document.querySelector('.console-main'),api:{call:async(name,payload)=>{
+        calls.push({name,payload});
+        if(payload.operation==='list'){
+          listCount++;
+          return {ok:true,sources:[],playbooks:[],knowledge:[{id:13,source_id:33,item_type:'evidence',
+            source:'Imported evidence',content:'Review this source-backed evidence',metadata:{categories:['industry_development']},
+            confidence:null,verified:false,lifecycle_status:'draft',updated_at:updatedAt,
+            sourceLifecycleStatus:'draft',sourceExtractionStatus:'draft',sourceUpdatedAt:updatedAt}]};
+        }
+        if(payload.operation!=='setValidity')throw new Error('unexpected operation: '+payload.operation);
+        return {ok:true};
+      }}};
+      window.kgActivation={calls,get listCount(){return listCount;}};
+      renderKnowledgeGovernance(ctx);
+    })()`);
+    await browser.wait("document.querySelector('.kg-table tbody tr[data-kg-id=\"13\"] .kg-action-activate')");
+    await browser.evaluate("document.querySelector('.kg-table tbody tr[data-kg-id=\"13\"] .kg-action-activate').click()");
+    await browser.wait("window.kgActivation.listCount===2");
+    const calls=await browser.evaluate("window.kgActivation.calls.filter(call=>call.payload.operation!=='list').map(call=>call.payload)");
+    assert.deepEqual(calls,[{action:'knowledgeLibrary',operation:'setValidity',data:{table:'knowledge_items',id:13,valid:true,expectedUpdatedAt:'2026-11-05T12:38:01.844Z'}}],
+      'source-linked evidence activation keeps optimistic concurrency and uses the backend path that supplies the manual confidence default');
+  } finally { await browser.close(); }
+});
