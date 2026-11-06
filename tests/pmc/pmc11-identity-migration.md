@@ -1,12 +1,19 @@
-# PMC11 identity test migration
+# PMC11 Person AI Gateway migration status
 
-The former suite called legacy AI event functions directly and asserted their old prompt, profile-field, and persistence contracts. Those expectations no longer describe the current Person AI Gateway flow, and several fields formerly read from `customers` have since become Person-owned.
+The original PMC11 assertions targeted legacy AI prompts, `customers` profile fields, and direct persistence behavior. Those assertions do not describe the current Person AI Gateway contracts and remain retired.
 
-The old assertions are retired. The current automated coverage is distributed across:
+The endpoint-by-endpoint inventory is maintained in [`docs/work-packages/pmc11-person-ai-gateway-mapping-20261107.md`](../../docs/work-packages/pmc11-person-ai-gateway-mapping-20261107.md). It distinguishes active Legacy consumers from current Gateway routes. The inventory confirms that several Legacy AI functions still have live callers and are not replaced by the new Person experience; do not infer migration or remove their behavior.
 
-- `tests/pc20/recruit-coach.test.cjs` and `tests/pc20/recruit-coach.browser.cjs` for candidate-scoped Gateway generation and human-confirmed outcomes.
-- `tests/pc23/person-ai-history.test.cjs`, `tests/pc23/conversation-history.test.cjs`, and `tests/pc23/assistant-history-auth.test.cjs` for Person AI history and access boundaries.
-- `tests/pc33/ai-async-response.test.cjs` and `tests/pc33/person-ai-resilience.browser.cjs` for durable task lifecycle, timeout, and Person AI UI recovery.
-- `tests/pc29/ai-experience.test.cjs` for task/result/decision/outcome lineage.
+## Existing Gateway coverage
 
-**Remaining gap:** these suites do not yet prove that every old AI endpoint has a deliberate compatibility response or a verified replacement route. Keep this todo visible until endpoint-by-endpoint routing is mapped. Do not infer that deleting the old assertions removed or migrated any Cloud Function behavior.
+- `tests/pc20/recruit-coach.test.cjs` and `tests/pc20/recruit-coach.browser.cjs`: candidate-scoped Gateway context, generation without business writes, candidate-bound human decisions/history, and Console UI flow.
+- `tests/pc23/person-ai-history.test.cjs`, `tests/pc23/conversation-history.test.cjs`, and `tests/pc23/assistant-history-auth.test.cjs`: Person-owned history, public source references, legacy advice linked through Customer, deleted-Person isolation, and authentication.
+- `tests/pc33/ai-async-response.test.cjs`, `tests/pc33/meeting-prep-async.test.cjs`, and `tests/pc33/person-ai-resilience.browser.cjs`: async task lifecycle, supported task types, timeout/recovery, duplicate-click handling, and prior-result reuse.
+- `tests/pc29/ai-experience.test.cjs` and `tests/pc29/ai-experience.browser.cjs`: human decisions, outcomes, learning lineage, and confirmation boundary.
+- `tests/pmc/pmc12-recruit.test.cjs`: legacy recruit functions keep Person-first identity with the documented legacy fallback and conflict behavior.
+
+These tests cover the current Gateway behavior found in the inventory. No new assertion was added here because the identified unresolved items concern old endpoints that still have active Legacy callers; asserting that they are migrated would be false. Keep the PMC11 TODO visible until each active old path either has an approved replacement and compatibility plan or is explicitly classified as intentionally Legacy-only with verified identity/write semantics.
+
+```text
+TODO: PMC11 legacy AI identity suite is retired; endpoint-by-endpoint replacement/compatibility closure remains incomplete.
+```
