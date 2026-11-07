@@ -14,6 +14,12 @@ const legacyRoutes = [
   '#/more/photos', '#/speakers', '#/topics', '#/recruit/goals',
   '#/activity/customer', '#/activity/recruit', '#/customers/trash', '#/recruit/trash',
 ];
+const consoleRedirects = {
+  '#/account': '#/settings', '#/speakers': '#/activity-speakers', '#/topics': '#/activity-topics',
+  '#/recruit/goals': '#/recruit/goals', '#/activity/customer': '#/activity-report/customer',
+  '#/activity/recruit': '#/activity-report/recruit', '#/customers/trash': '#/recycle/customers',
+  '#/recruit/trash': '#/recycle/recruit',
+};
 const report = { environment: 'crm-d1gkae8ddc930d151', startedAt: new Date().toISOString(), console: [], legacy: [] };
 let browser;
 
@@ -73,17 +79,29 @@ async function run() {
   for (const route of legacyRoutes) {
     const beforePage = pageErrors;
     const beforeServer = serverErrors;
-    await page.evaluate(hash => { location.hash = hash; }, route);
-    await pause(2000);
+    await page.goto(base + 'admin.html' + route, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await waitUntil(async () => {
+      const destination = consoleRedirects[route];
+      return page.evaluate(({ route, destination }) => {
+        if (destination) return location.pathname.endsWith('/console.html') && location.hash === destination &&
+          !!document.querySelector('#console-main') && document.querySelector('#console-main').childElementCount > 0;
+        return location.pathname.endsWith('/admin.html') && location.hash === route &&
+          !!document.querySelector('#view') && document.querySelector('#view').childElementCount > 0;
+      }, { route, destination });
+    }, 15000, route + ' route');
+    await pause(1000);
     const state = await page.evaluate(() => {
       const view = document.querySelector('#view');
-      const first = (view?.innerText || '').trim().slice(0, 180);
+      const main = document.querySelector('#console-main');
+      const target = location.pathname.endsWith('/console.html') ? main : view;
+      const first = (target?.innerText || '').trim().slice(0, 180);
       const nav = document.getElementById('mod-switch');
-      return { ready: !!nav && nav.style.display !== 'none' && !document.querySelector('.relogin-overlay'),
-        children: view?.childElementCount || 0,
+      const consoleShell = !!document.querySelector('.console-topbar');
+      return { ready: consoleShell ? !!main : !!nav && nav.style.display !== 'none' && !document.querySelector('.relogin-overlay'),
+        children: target?.childElementCount || 0, pathname: location.pathname, hash: location.hash,
         failed: /^(操作未完成|加载失败|发生错误|Error:|permission denied)/i.test(first) };
     });
-    report.legacy.push({ route, status: state.ready && state.children > 0 && !state.failed &&
+    report.legacy.push({ route, ...(consoleRedirects[route] ? { destination: consoleRedirects[route] } : {}), status: state.ready && state.children > 0 && !state.failed &&
       pageErrors === beforePage && serverErrors === beforeServer ? 'PASS' : 'FAIL',
       pageErrors: pageErrors - beforePage, serverErrors: serverErrors - beforeServer,
       ...(state.ready && state.children > 0 && !state.failed ? {} : { ready: state.ready, children: state.children, failed: state.failed }) });

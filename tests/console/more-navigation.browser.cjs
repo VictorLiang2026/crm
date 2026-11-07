@@ -25,6 +25,17 @@ const LEGACY_ROUTES = [
   ['#/recruit/trash', '[CRM_TEST_ONLY]已删除候选人'],
 ];
 
+const CONSOLE_REDIRECTS = {
+  '#/account': { hash: '#/settings', selector: '.settings-password-form' },
+  '#/speakers': { hash: '#/activity-speakers', selector: '.resource-directory-results' },
+  '#/topics': { hash: '#/activity-topics', selector: '.resource-directory-results' },
+  '#/recruit/goals': { hash: '#/recruit/goals', selector: '.recruit-analysis-targets' },
+  '#/activity/customer': { hash: '#/activity-report/customer', selector: '.sheet-field' },
+  '#/activity/recruit': { hash: '#/activity-report/recruit', selector: '.sheet-field' },
+  '#/customers/trash': { hash: '#/recycle/customers', selector: '.page-title' },
+  '#/recruit/trash': { hash: '#/recycle/recruit', selector: '.page-title' },
+};
+
 const REMAINING_MORE_ROUTES = [];
 
 test('Console More keeps only uncovered gaps bilingual and preserves all 17 old URLs', async () => {
@@ -94,9 +105,19 @@ test('Console More keeps only uncovered gaps bilingual and preserves all 17 old 
         assert.equal(await browser.evaluate(`[...document.querySelectorAll('.console-main a')].some(a=>a.getAttribute('href')===${JSON.stringify(target)})`), false,
           `Duplicate More card remains: ${hash}`);
         // These bookmarks must still work even though the duplicate card was removed.
-        await browser.send('Page.navigate', { url: browser.origin + '/crm/admin.html?authCase=1&run=' + Date.now() + hash });
+        await browser.send('Page.navigate', { url: browser.origin + '/admin.html?authCase=1&run=' + Date.now() + hash });
       }
-      await browser.wait(`location.pathname === '/crm/admin.html' && location.hash === ${JSON.stringify(hash)}`);
+      if (CONSOLE_REDIRECTS[hash]) {
+        const destination = CONSOLE_REDIRECTS[hash];
+        await browser.wait(`location.pathname.endsWith('/console.html') && location.hash === ${JSON.stringify(destination.hash)}`);
+        await browser.wait(`document.querySelector('#console-main ${destination.selector}')`, 15000);
+        assert.equal(await browser.evaluate("document.querySelector('#console-main')?.innerText.includes('CRM 登录')"), false,
+          `${hash} lost the existing authenticated session`);
+        assert.equal(await browser.evaluate("window.__crmTest.calls.some(c=>['create','update','delete','restore','execute'].includes(c.action))"), false,
+          `${hash} attempted a business write while opening`);
+        continue;
+      }
+      await browser.wait(`location.pathname.endsWith('/admin.html') && location.hash === ${JSON.stringify(hash)}`);
       await browser.wait(`document.getElementById('view')?.innerText?.includes(${JSON.stringify(marker)})`, 15000);
       const pageText = await browser.evaluate("document.getElementById('view').innerText");
       assert.ok(!pageText.includes('CRM 登录'), `${hash} returned to login`);
@@ -104,6 +125,13 @@ test('Console More keeps only uncovered gaps bilingual and preserves all 17 old 
       assert.equal(await browser.evaluate("window.__crmTest.calls.some(c=>['create','update','delete','restore','execute'].includes(c.action))"), false,
         `${hash} attempted a business write while opening`);
     }
+
+    await browser.send('Page.navigate', { url: browser.origin + '/admin.html?authCase=1&run=' + Date.now() + '#/activity/customer?startDate=2026-10-01&endDate=2026-10-17' });
+    await browser.wait("location.pathname.endsWith('/console.html') && location.hash.startsWith('#/activity-report/customer?')");
+    await browser.wait("document.querySelector('#console-main .sheet-field input[type=date]')", 15000);
+    assert.match(await browser.evaluate('location.hash'), /startDate=2026-10-01.*endDate=2026-10-17/);
+    assert.deepEqual(await browser.evaluate("[...document.querySelectorAll('#console-main input[type=date]')].map(x=>x.value)"), ['2026-10-01','2026-10-17']);
+    assert.equal(await browser.evaluate("window.__crmTest.calls.some(c=>['create','update','delete','restore','execute'].includes(c.action))"), false);
 
     await browser.send('Page.navigate', { url: browser.origin + '/crm/admin.html?authCase=1&run=' + Date.now() + '#/customers' });
     await browser.wait("document.querySelector('.legacy-customer-route a[href=\"#/people\"]')");

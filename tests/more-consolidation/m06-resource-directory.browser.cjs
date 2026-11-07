@@ -11,7 +11,7 @@ test('M06 standalone resources page searches and pages without an activity, reus
    data.resolveActivityPerson=async()=>({candidates:[]});
    data.resourceDirectory=async(ctx,kind,args)=>{
     window.m06.calls.push({kind,...args});if(window.m06.fail)throw Error('RESOURCE_SEARCH_LIMIT');
-    return{rows:kind==='speaker'?[{id:args.page,name:'[CRM_TEST_ONLY] Speaker '+args.page,person_id:22,linked_person:{id:22,name:'[CRM_TEST_ONLY] Person'},status:'active',relationship_stage:'new'}]:[{id:33,topic_name:'[CRM_TEST_ONLY] Topic',status:'active',keywords:[]}],hasMore:kind==='speaker'&&args.page===1,page:args.page,pageSize:20,total:null};
+    return{rows:kind==='speaker'?[{id:args.page,name:'[CRM_TEST_ONLY] Speaker '+args.page,...(window.m06.unlinked?{}:{person_id:22,linked_person:{id:22,name:'[CRM_TEST_ONLY] Person'}}),status:'active',relationship_stage:'new'}]:[{id:33,topic_name:'[CRM_TEST_ONLY] Topic',status:'active',keywords:[]}],hasMore:kind==='speaker'&&args.page===1,page:args.page,pageSize:20,total:null};
    };
    location.hash='#/activity-resources';
   })()`);
@@ -52,6 +52,47 @@ test('M06 standalone resources page searches and pages without an activity, reus
   await b.wait("document.querySelector('.act-topic-catalog .act-resource-row')");
   assert.equal(await b.evaluate('window.m06.calls.at(-1).keyword'),'[CRM_TEST_ONLY]');
   assert.equal(await b.evaluate("window.__crmTest.calls.some(c=>c.name==='activities'&&c.action==='get')"),false);
+
+  await b.evaluate(`(async()=>{
+   const {data}=await import('/crm/js/modules/console/data.js');
+   const {renderSpeakerDirectory}=await import('/crm/js/modules/console/activity-people.js');
+   window.m06.candidates=[{id:980001,displayName:'[CRM_TEST_ONLY] Person',organization:'Fixture Org'}];
+   window.m06.created=null;window.m06.linked=null;window.m06.unlinked=false;
+   data.resolveActivityPerson=async(ctx,name)=>{window.m06.resolvedName=name;return{candidates:window.m06.candidates};};
+   data.createPersonSpeaker=async(ctx,payload)=>{window.m06.created=payload;return{id:990012};};
+   data.linkSpeakerPerson=async(ctx,payload)=>{window.m06.linked=payload;return{ok:true};};
+   renderSpeakerDirectory({main:document.querySelector('#console-main'),toast(){},api:{call:async()=>({})}});
+  })()`);
+  await b.wait("document.querySelector('#console-main .resource-directory-results tbody tr')");
+  await b.evaluate("[...document.querySelectorAll('#console-main button')].find(x=>x.textContent==='新增嘉宾档案').click()");
+  await b.wait("document.querySelector('.sheet-overlay input[type=text]')");
+  await b.evaluate(`(async()=>{const {t}=await import('/crm/js/modules/console/i18n.js');const input=document.querySelector('.sheet-overlay input[type=text]');input.value='[CRM_TEST_ONLY] New Speaker';input.dispatchEvent(new Event('input',{bubbles:true}));[...document.querySelectorAll('.sheet-overlay button')].find(x=>x.textContent===t('act_person_resolve')).click()})()`);
+  await b.wait("document.querySelector('.sheet-overlay .act-person-candidate')");
+  assert.equal(await b.evaluate('window.m06.created'),null,'creating a speaker must wait for Person selection and Save');
+  await b.evaluate("document.querySelector('.sheet-overlay .act-person-candidate').click();document.querySelector('.sheet-overlay .act-speaker-save').click()");
+  await b.wait('window.m06.created !== null');
+  assert.equal(await b.evaluate('window.m06.created.personId'),'980001');
+  assert.equal(await b.evaluate('window.m06.created.selectedDisplayName'),'[CRM_TEST_ONLY] Person');
+  assert.equal(await b.evaluate('window.m06.created.confirmed'),true);
+  assert.equal(await b.evaluate('window.m06.created.profile.expertise'),null);
+
+  await b.evaluate(`(async()=>{
+   window.m06.unlinked=true;
+   const {renderSpeakerDirectory}=await import('/crm/js/modules/console/activity-people.js');
+   renderSpeakerDirectory({main:document.querySelector('#console-main'),toast(){},api:{call:async()=>({})}});
+  })()`);
+  await b.wait("document.querySelector('#console-main .resource-directory-results tbody tr')");
+  await b.evaluate(`(async()=>{const {t}=await import('/crm/js/modules/console/i18n.js');[...document.querySelectorAll('#console-main .act-resource-actions button')].find(x=>x.textContent===t('act_speaker_link')).click()})()`);
+  await b.wait("document.querySelector('.sheet-overlay input[type=search]')");
+  await b.evaluate(`(async()=>{const {t}=await import('/crm/js/modules/console/i18n.js');[...document.querySelectorAll('.sheet-overlay button')].find(x=>x.textContent===t('act_person_resolve')).click()})()`);
+  await b.wait("document.querySelector('.sheet-overlay .act-person-candidate')");
+  assert.equal(await b.evaluate('window.m06.linked'),null,'linking a speaker must wait for Person selection and confirmation');
+  await b.evaluate("document.querySelector('.sheet-overlay .act-person-candidate').click();document.querySelector('.sheet-overlay .act-speaker-link-confirm').click()");
+  await b.wait('window.m06.linked !== null');
+  assert.equal(await b.evaluate('window.m06.linked.speakerId'),'1');
+  assert.equal(await b.evaluate('window.m06.linked.personId'),'980001');
+  assert.equal(await b.evaluate('window.m06.linked.confirmed'),true);
+
   for(const size of [{width:820,height:1180},{width:1180,height:820}]){
    await b.send('Emulation.setDeviceMetricsOverride',{...size,deviceScaleFactor:2,mobile:false});
    assert.equal(await b.evaluate('document.documentElement.scrollWidth<=innerWidth+1'),true);

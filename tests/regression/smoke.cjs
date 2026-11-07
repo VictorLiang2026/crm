@@ -4,12 +4,12 @@ const { Browser } = require('./browser.cjs');
 
 const longBrowserCases = new Set([
   'login.empty', 'login.denied', 'login.error-result', 'login.success', 'login.timeout',
-  'account.entry-refresh', 'account.logout', 'account.password', 'console.settings.password-signout', 'assistant.action.create',
+  'account.entry-refresh', 'console.settings.password-signout', 'assistant.action.create',
   'person360.opportunity-candidate-preview', 'person360.opportunity-create',
   'person360.opportunity-edit', 'person360.opportunity-preview-error',
   'activity.relationship-review-preview', 'activity.review-human-decision',
   'activity.review-opportunity-outcome', 'activity.important-interaction',
-  'activity.person-first-add', 'speaker.person-first-create', 'speaker.person-link',
+  'activity.person-first-add',
   'recruit.list', 'recruit.customer-lookup', 'quickcapture.v2.confirm',
 ]);
 
@@ -103,47 +103,12 @@ module.exports = async function smoke(root, test, options = {}) {
     await check('account.entry-refresh', '更多入口可强制重新加载且保留本地业务缓存', async () => {
       await open('#/more', '账号与应用维护', 'authCase=1');
       await b.click('#view a', '账号与应用维护');
-      await b.wait("location.hash==='#/account' && [...document.querySelectorAll('#view button')].some(button=>button.textContent==='强制加载最新版')");
+      await b.wait("location.pathname.endsWith('/console.html') && location.hash==='#/settings' && document.querySelector('.settings-password-form')");
       await b.evaluate("localStorage.setItem('todayCoachCache','fixture-cache'); window.confirm=()=>true");
-      await b.click('#view button', '强制加载最新版');
-      await b.wait("performance.getEntriesByType('navigation')[0]?.name.includes('_fresh=') && document.getElementById('view')?.innerText?.includes('账号与应用维护') === true", 15000);
+      await b.click('#console-main button', '强制加载最新版');
+      await b.wait("performance.getEntriesByType('navigation')[0]?.name.includes('_fresh=') && document.querySelector('.settings-password-form')", 15000);
       assert.equal(await b.evaluate("localStorage.getItem('todayCoachCache')"), 'fixture-cache');
-      assert.equal(await b.evaluate("document.getElementById('view').innerText.includes('CRM 登录')"), false);
-    });
-    await check('account.logout', '退出失败可重试；成功后旧导航仍停留在登录页', async () => {
-      await b.evaluate("sessionStorage.setItem('crm_fixture_fail_signout','1')");
-      await b.click('#view button', '退出登录');
-      await b.wait(text('TEST_SIGNOUT_DENIED'));
-      assert.equal(await b.evaluate("document.getElementById('view').innerText.includes('修改密码')"), true);
-      await b.evaluate("sessionStorage.removeItem('crm_fixture_fail_signout')");
-      await b.click('#view button', '退出登录');
-      await b.wait("document.getElementById('view')?.innerText?.includes('CRM 登录') === true", 15000);
-      assert.equal(await b.evaluate("sessionStorage.getItem('crm_fixture_signed_out')"), '1');
-      assert.equal(await b.evaluate("getComputedStyle(document.getElementById('mod-switch')).display"), 'none');
-      assert.equal(await b.evaluate("getComputedStyle(document.getElementById('qc-entry-btn')).display"), 'none');
-      await b.evaluate("location.hash='#/customers'");
-      await b.wait("location.hash==='#/customers'");
-      assert.equal(await b.evaluate("document.getElementById('view').innerText.includes('CRM 登录')"), true);
-      assert.equal(await b.evaluate('window.__crmTest.calls.length'), 0);
-    });
-    await check('account.password', '旧密码错误不更新；成功后退出并用新密码登录', async () => {
-      await b.evaluate("document.querySelector('[name=username]').value='[CRM_TEST_ONLY]'; document.querySelector('[name=password]').value='local-fixture-only'");
-      await b.click('button', '登录');
-      await b.wait(text('请在新版人物页继续'));
-      assert.notEqual(await b.evaluate("getComputedStyle(document.getElementById('mod-switch')).display"), 'none');
-      await open('#/account', '修改密码', 'authCase=1');
-      await b.evaluate("document.querySelector('[name=account-old-password]').value='wrong'; document.querySelector('[name=account-new-password]').value='NewTestPass123!'; document.querySelector('[name=account-confirm-password]').value='NewTestPass123!'");
-      await b.click('#view button', '修改密码');
-      await b.wait(text('TEST_OLD_PASSWORD_DENIED'));
-      assert.equal(await b.evaluate('window.__crmTest.passwordChanges'), 1);
-      await b.evaluate("document.querySelector('[name=account-old-password]').value='local-fixture-only'");
-      await b.click('#view button', '修改密码');
-      await b.wait("document.getElementById('view')?.innerText?.includes('CRM 登录') === true", 15000);
-      assert.equal(await b.evaluate("sessionStorage.getItem('crm_fixture_pw_changed')"), '1');
-      await b.evaluate("document.querySelector('[name=username]').value='[CRM_TEST_ONLY]'; document.querySelector('[name=password]').value='NewTestPass123!'");
-      await b.click('button', '登录');
-      await b.wait(text('今日'));
-      assert.equal(await b.evaluate("document.getElementById('view').innerText.includes('CRM 登录')"), false);
+      assert.equal(await b.evaluate("document.querySelector('#console-main')?.innerText.includes('CRM 登录')"), false);
     });
     await check('console.settings.password-signout', 'Console 设置沿用旧密码改密语义并复用 CloudBase 退出', async () => {
       await b.openConsole('#/settings', 'authCase=1');
@@ -557,39 +522,6 @@ module.exports = async function smoke(root, test, options = {}) {
       assert.equal(payload.selectedDisplayName, '[CRM_TEST_ONLY]客户甲');
       assert.equal(payload.confirmed, true);
     });
-    await check('speaker.person-first-create', '嘉宾专业档案先选择 Person 再保存', async () => {
-      await open('#/speakers', '[CRM_TEST_ONLY]客户甲');
-      await b.click('#view button', '+ 从 Person 新增嘉宾');
-      assert.equal(await b.evaluate("window.__crmTest.calls.some(c=>c.action==='executeIdentity')"), false);
-      await b.evaluate("(() => { const input=document.querySelector('.modal-overlay input[type=text]'); input.value='[CRM_TEST_ONLY]客户甲'; input.dispatchEvent(new Event('input',{bubbles:true})); })()");
-      await b.wait("document.querySelectorAll('.modal-overlay button').length > 2");
-      await b.click('.modal-overlay button', '[CRM_TEST_ONLY]客户甲');
-      await b.click('.modal-overlay button', '确认选择 Person');
-      await b.wait("document.querySelector('.modal-overlay [name=expertise]') !== null");
-      await b.evaluate("document.querySelector('.modal-overlay [name=expertise]').value='[CRM_TEST_ONLY]保险讲座'");
-      await b.evaluate('window.confirm=()=>true');
-      await b.click('.modal-overlay .modal-footer button', '确定');
-      await b.wait(called('person_360', 'executeIdentity'));
-      const payload = await b.evaluate("window.__crmTest.calls.find(c=>c.action==='previewIdentity').payload");
-      assert.equal(payload.personId, '980001');
-      assert.equal(payload.displayName, '[CRM_TEST_ONLY]客户甲');
-      assert.equal(payload.kind, 'speaker');
-      assert.equal(await b.evaluate("window.__crmTest.calls.some(c=>c.name==='activity_speakers'&&c.action==='update'&&c.payload.expertise==='[CRM_TEST_ONLY]保险讲座')"),true);
-    });
-    await check('speaker.person-link', '旧嘉宾必须人工选择 Person 才能关联', async () => {
-      await open('#/speakers', '[CRM_TEST_ONLY]客户甲');
-      await b.click('#view a', '关联 Person');
-      assert.equal(await b.evaluate("window.__crmTest.calls.some(c=>c.action==='linkSpeakerPerson')"), false);
-      await b.evaluate("(() => { const input=document.querySelector('.modal-overlay input[type=text]'); input.value='[CRM_TEST_ONLY]客户甲'; input.dispatchEvent(new Event('input',{bubbles:true})); })()");
-      await b.wait("document.querySelectorAll('.modal-overlay button').length > 2");
-      await b.click('.modal-overlay button', '[CRM_TEST_ONLY]客户甲');
-      await b.click('.modal-overlay button', '确认选择 Person');
-      await b.wait(called('person_360', 'linkSpeakerPerson'));
-      const payload = await b.evaluate("window.__crmTest.calls.find(c=>c.action==='linkSpeakerPerson').payload");
-      assert.equal(payload.speakerId, 990010);
-      assert.equal(payload.personId, '980001');
-      assert.equal(payload.confirmed, true);
-    });
     await check('recruit.list', '增员列表与漏斗加载', async () => {
       await open('#/recruit', '[CRM_TEST_ONLY]候选人甲');
       await b.wait(called('recruit_candidates', 'funnel'));
@@ -612,16 +544,23 @@ module.exports = async function smoke(root, test, options = {}) {
       ['recruit', '#/recruit/trash', '[CRM_TEST_ONLY]已删除候选人', 'recruit_candidates']
     ]) {
       await check('recycle.' + key, '回收站只读展示：' + key, async () => {
-        await open(route, name);
-        await b.wait(called(fn, 'trashList'));
-        await b.wait(text('2026-09-20 01:00'));
-        assert.equal(await b.evaluate("[...document.querySelectorAll('#view button')].find(e=>e.textContent.includes('批量恢复')).disabled"), true);
+        const target = key === 'customers' ? '#/recycle/customers' : '#/recycle/recruit';
+        await b.send('Page.navigate', { url: b.origin + '/admin.html?mode=smoke' + route });
+        await b.wait(`location.pathname.endsWith('/console.html') && location.hash===${JSON.stringify(target)}`);
+        await b.wait("document.querySelector('#console-main tbody tr')");
+        assert.equal(await b.evaluate(called(fn, 'trashList')), true);
+        assert.equal(await b.evaluate("document.querySelector('#console-main')?.innerText.includes('CRM 登录')"), false);
+        assert.equal(await b.evaluate("window.__crmTest.calls.some(c=>/restore|remove|delete|execute/i.test(c.action))"), false);
       });
     }
     for (const [key, route, expected] of [
       ['customers', '#/customers', '请在新版人物页继续'], ['activities', '#/activities', '暂无活动'],
-      ['recycle', '#/customers/trash', '回收站为空'], ['funnels', '#/funnels', '漏斗为空']
+      ['funnels', '#/funnels', '漏斗为空']
     ]) await check('empty.' + key, '空数据状态：' + key, () => open(route, expected, 'mode=empty'));
+    await check('empty.recycle', 'Console 客户回收站显示空数据状态', async () => {
+      await b.openConsole('#/recycle/customers', 'mode=empty');
+      await b.wait("document.getElementById('console-main')?.innerText.includes('回收站为空')");
+    });
     for (const [key, route, api, tab] of [
       ['customer', '#/customer/910001', 'customers:get'], ['activities', '#/activities', 'activities:list'],
       ['activity', '#/activity/940001', 'activities:get'], ['recruit', '#/recruit/930001', 'recruit_candidates:get'],
