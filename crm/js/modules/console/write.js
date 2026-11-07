@@ -31,6 +31,16 @@ async function aiParse(ctx, params) {
   if (res && res.error) throw new Error(String(res.error));
   return res;
 }
+function quickCaptureFailureDetail(err) {
+  const message = String(err && err.message || err || '').trim();
+  if (/timeout|timed out|deadline exceeded|etimedout|aborterror/i.test(message)) {
+    return `${t('capture_ai_timeout')} ${message}`;
+  }
+  if (/^(load failed|failed to fetch|networkerror(?::.*)?|network request failed)$/i.test(message)) {
+    return t('capture_ai_network_failed');
+  }
+  return message || t('capture_ai_unknown_error');
+}
 function uuid() {
   try { if (window.crypto && crypto.randomUUID) return crypto.randomUUID(); } catch (e) { /* 继续 */ }
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
@@ -834,7 +844,7 @@ export function openQuickCapture(ctx, { personId, onDone } = {}) {
       await renderReview(r, text, btn, selected);
     } catch (err) {
       busy(btn, false, t('ai_parse'));
-      sheet.showErr(`${t('ai_parse_failed')}${err.message}`);
+      sheet.showErr(`${t('ai_parse_failed')}${quickCaptureFailureDetail(err)}`);
     }
   }
   async function renderReview(r, text, parseBtn, reviewedPerson = null) {

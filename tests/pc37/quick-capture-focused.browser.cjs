@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 const { Browser } = require('../regression/browser.cjs');
 
-async function setup(b, recordOnly = false, multipleItems = false) {
+async function setup(b, recordOnly = false, multipleItems = false, parseFailure = null) {
   await b.start(); await b.open('#/more');
   await b.evaluate(`(async()=>{
     await new Promise((resolve,reject)=>{
@@ -15,13 +15,16 @@ async function setup(b, recordOnly = false, multipleItems = false) {
     const {setLang}=await import('/crm/js/modules/console/i18n.js');setLang('zh-CN');
     window.focus={calls:[],done:0, async call(api,args){
       this.calls.push({api,args});
-      if(api==='ai_parse')return {parsed:{focused:true,person_name:'虚构甲',
+      if(api==='ai_parse'){
+        if(${JSON.stringify(parseFailure)})throw new Error(${JSON.stringify(parseFailure)});
+        return {parsed:{focused:true,person_name:'虚构甲',
         interaction_type:'微信',summary:'交流摘要：约好发资料。',facts:['只周末联系'],
         memories:[{content:'只周末联系',evidence:'只周末联系'}],contextChecked:!!args.personId,
         suggestions:[{kind:'action',title:'发资料',date:null,method:'微信发送',reason:'应对方要求',
           existing:args.personId?{id:7,kind:'action',person_id:783,title:'原有发资料任务',status:'open'}:null}],
         commitments:${multipleItems ? JSON.stringify([{kind:'commitment',title:'确认保费预算',date:'2026-10-25',
           evidence:'我答应下周确认保费预算',commitmentType:'I_PROMISED'}]) : '[]'}}};
+      }
       if(args.action==='resolveQuickCaptureName')return {displayName:'虚构甲',status:'confirm_existing',
         candidates:[{id:783,displayName:'虚构甲'}]};
       if(args.action==='listPeople')return {rows:[{id:784,display_name:'正确人物',occupation:'顾问',organization:'测试机构'}],hasMore:false};
@@ -39,6 +42,10 @@ async function setup(b, recordOnly = false, multipleItems = false) {
     document.querySelector('.sheet-overlay textarea').value='虚构甲只周末联系，约好发资料';
     document.querySelector('.sheet-overlay .btn-primary').click();
   })()`);
+  if (parseFailure) {
+    await b.wait("document.querySelector('.sheet-overlay .sheet-err')");
+    return;
+  }
   await b.wait("document.querySelector('.sheet-overlay .cand')");
   await b.evaluate("document.querySelector('.sheet-overlay .cand').click()");
   await b.wait("document.querySelector('.sheet-overlay')?.innerText.includes('已参考近期')");
@@ -133,6 +140,19 @@ test('manual Person search selects the corrected identity and preserves edited c
     assert.equal(command.displayName, '正确人物');
     assert.equal(command.interaction.summary, '人工修正后的摘要');
     assert.equal(await b.evaluate("window.focus.calls.some(c=>c.args.action==='executeIdentity')"), false);
+    await b.healthy();
+  } finally { await b.close(); }
+});
+test('AI network failure explains the missing server detail and preserves the note', async () => {
+  const b = new Browser(path.resolve(__dirname, '../..'));
+  try {
+    await setup(b, false, false, 'Load failed');
+    await b.wait("document.querySelector('.sheet-overlay .sheet-err')");
+    const result = await b.evaluate(`({error:document.querySelector('.sheet-overlay .sheet-err')?.innerText||'',
+      note:document.querySelector('.sheet-overlay textarea')?.value||''})`);
+    assert.match(result.error, /Load failed/);
+    assert.match(result.error, /原文仍保留/);
+    assert.equal(result.note, '虚构甲只周末联系，约好发资料');
     await b.healthy();
   } finally { await b.close(); }
 });

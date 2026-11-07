@@ -124,7 +124,7 @@ async function quickCaptureFocused(event, deps) {
         id: row.id, kind: row.kind, title: String(row.title || row.content || '').slice(0, 500),
         due_at: row.due_at,
       })) } }) },
-  ], { timeout: 55000 });
+  ], { timeout: 100000 });
   return { parsed: normalize(deps.extractJson(response.text), raw, context), today: deps.today };
 }
 module.exports = { quickCaptureFocused, readContext, normalize, prompt };

@@ -60,6 +60,18 @@ test('unselected notes never read contact history and use configured model routi
   });
   assert.equal(requests, 1); assert.equal(result.parsed.contextChecked, false);
 });
+test('focused quick capture gives the model 100 seconds and preserves its failure reason', async () => {
+  let options;
+  const failure = new Error('model request timed out');
+  await assert.rejects(quickCaptureFocused({ text: raw, language: 'en' }, {
+    rdb: { from() { throw Error('Unexpected DB read'); } }, today: '2026-10-20',
+    extractJson: JSON.parse, generateText: async (_messages, opts) => {
+      options = opts;
+      throw failure;
+    },
+  }), error => error === failure);
+  assert.equal(options.timeout, 100000);
+});
 test('a changed or deleted selected identity stops before the AI call', async () => {
   const query = { select() { return this; }, eq() { return this; }, is() { return this; },
     limit() { return { data: [{ id: 1, display_name: '另一个人' }] }; } };
