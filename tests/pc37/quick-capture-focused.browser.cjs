@@ -16,7 +16,11 @@ async function setup(b, recordOnly = false, multipleItems = false, parseFailure 
     window.focus={calls:[],done:0, async call(api,args){
       this.calls.push({api,args});
       if(api==='ai_parse'){
-        if(${JSON.stringify(parseFailure)})throw new Error(${JSON.stringify(parseFailure)});
+        if(${JSON.stringify(parseFailure)}){
+          const failure=typeof ${JSON.stringify(parseFailure)}==='string'?{message:${JSON.stringify(parseFailure)}}:${JSON.stringify(parseFailure)};
+          if(failure.response===true)return {error:failure.message||'AI request failed',code:failure.code};
+          const error=new Error(failure.message||'AI request failed');if(failure.code)error.code=failure.code;throw error;
+        }
         return {parsed:{focused:true,person_name:'虚构甲',
         interaction_type:'微信',summary:'交流摘要：约好发资料。',facts:['只周末联系'],
         memories:[{content:'只周末联系',evidence:'只周末联系'}],contextChecked:!!args.personId,
@@ -153,6 +157,17 @@ test('AI network failure explains the missing server detail and preserves the no
     assert.match(result.error, /Load failed/);
     assert.match(result.error, /原文仍保留/);
     assert.equal(result.note, '虚构甲只周末联系，约好发资料');
+    await b.healthy();
+  } finally { await b.close(); }
+});
+test('AI failure displays a server-provided error code', async () => {
+  const b = new Browser(path.resolve(__dirname, '../..'));
+  try {
+    await setup(b, false, false, {response:true, message:'AI upstream failed', code:'AI_UPSTREAM_UNAVAILABLE'});
+    await b.wait("document.querySelector('.sheet-overlay .sheet-err')");
+    const error = await b.evaluate("document.querySelector('.sheet-overlay .sheet-err')?.innerText||''");
+    assert.match(error, /AI_UPSTREAM_UNAVAILABLE/);
+    assert.match(error, /AI upstream failed/);
     await b.healthy();
   } finally { await b.close(); }
 });

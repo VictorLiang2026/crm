@@ -122,7 +122,12 @@ exports.main = async (event, context) => {
 
     return { parsed: parsed, raw: raw };
   } catch (e) {
-    return { error: e.message };
+    const result = { error: String(e && e.message || e || 'AI parse failed') };
+    if (event?.action === 'quick_capture' && event?.profile === 'focused' &&
+        typeof e?.code === 'string' && /^[A-Za-z0-9_.:-]{1,80}$/.test(e.code)) {
+      result.code = e.code;
+    }
+    return result;
   }
 };
 

@@ -1,7 +1,7 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { normalize, quickCaptureFocused, readContext } = require('../../cloudfunctions/ai_parse/quick-capture-focused');
+const { normalize, quickCaptureFocused, readContext, withTimeout, MODEL_TIMEOUT_MS } = require('../../cloudfunctions/ai_parse/quick-capture-focused');
 const raw = '张先生只愿周末联系。我答应发资料。他答应回复。';
 const base = () => ({ person_name: '张先生', interaction_type: '微信', interaction_date: null,
   summary: raw, memories: [{ content: '只愿周末联系', evidence: '只愿周末联系', change: false }],
@@ -70,7 +70,12 @@ test('focused quick capture gives the model 100 seconds and preserves its failur
       throw failure;
     },
   }), error => error === failure);
+  assert.equal(options.timeout, MODEL_TIMEOUT_MS);
   assert.equal(options.timeout, 100000);
+});
+test('focused quick capture enforces its server-side deadline if the model promise hangs', async () => {
+  await assert.rejects(withTimeout(() => new Promise(() => {}), 5), error =>
+    error.code === 'TIMEOUT' && /timed out after 1 seconds/i.test(error.message));
 });
 test('a changed or deleted selected identity stops before the AI call', async () => {
   const query = { select() { return this; }, eq() { return this; }, is() { return this; },

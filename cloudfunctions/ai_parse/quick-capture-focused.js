@@ -1,5 +1,18 @@
 'use strict';
 
+const MODEL_TIMEOUT_MS = 100000;
+function withTimeout(operation, timeoutMs) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      const error = new Error(`AI model request timed out after ${Math.ceil(timeoutMs / 1000)} seconds`);
+      error.code = 'TIMEOUT';
+      reject(error);
+    }, timeoutMs);
+  });
+  return Promise.race([Promise.resolve().then(operation), timeout]).finally(() => clearTimeout(timer));
+}
+
 // Read-only draft preparation. Persistence remains in the existing reviewed executors.
 const key = value => String(value || '').normalize('NFKC').toLowerCase().replace(/[\s\p{P}\p{S}]+/gu, '');
 function text(value, max, empty = false) {
@@ -117,14 +130,14 @@ function normalize(value, raw, context) {
 async function quickCaptureFocused(event, deps) {
   const raw = text(event.text, 10000);
   const context = await readContext(event, deps, deps.today);
-  const response = await deps.generateText([
+  const response = await withTimeout(() => deps.generateText([
     { role: 'system', content: prompt(deps.today, event.language) },
     { role: 'user', content: JSON.stringify({ note: raw, selectedPerson: event.selectedName || null,
       history: { memories: context.memories, workItems: context.workItems.map(row => ({
         id: row.id, kind: row.kind, title: String(row.title || row.content || '').slice(0, 500),
         due_at: row.due_at,
       })) } }) },
-  ], { timeout: 100000 });
+  ], { timeout: MODEL_TIMEOUT_MS }), MODEL_TIMEOUT_MS);
   return { parsed: normalize(deps.extractJson(response.text), raw, context), today: deps.today };
 }
-module.exports = { quickCaptureFocused, readContext, normalize, prompt };
+module.exports = { quickCaptureFocused, readContext, normalize, prompt, withTimeout, MODEL_TIMEOUT_MS };

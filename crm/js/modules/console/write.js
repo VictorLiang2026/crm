@@ -28,18 +28,25 @@ async function assistant(ctx, params) {
 }
 async function aiParse(ctx, params) {
   const res = await ctx.api.call('ai_parse', params);
-  if (res && res.error) throw new Error(String(res.error));
+  if (res && res.error) {
+    const failure = new Error(String(res.error));
+    if (typeof res.code === 'string') failure.code = res.code;
+    throw failure;
+  }
   return res;
 }
 function quickCaptureFailureDetail(err) {
   const message = String(err && err.message || err || '').trim();
+  const rawCode = err && (err.code || err.details?.code || err.error?.code);
+  const code = typeof rawCode === 'string' && /^[A-Za-z0-9_.:-]{1,80}$/.test(rawCode)
+    ? ` ${t('capture_ai_error_code')} ${rawCode}` : '';
   if (/timeout|timed out|deadline exceeded|etimedout|aborterror/i.test(message)) {
-    return `${t('capture_ai_timeout')} ${message}`;
+    return `${t('capture_ai_timeout')} ${message}${code}`;
   }
   if (/^(load failed|failed to fetch|networkerror(?::.*)?|network request failed)$/i.test(message)) {
-    return t('capture_ai_network_failed');
+    return `${t('capture_ai_network_failed')}${code}`;
   }
-  return message || t('capture_ai_unknown_error');
+  return `${message || t('capture_ai_unknown_error')}${code}`;
 }
 function uuid() {
   try { if (window.crypto && crypto.randomUUID) return crypto.randomUUID(); } catch (e) { /* 继续 */ }
