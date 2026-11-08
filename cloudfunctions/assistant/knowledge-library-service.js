@@ -1084,11 +1084,14 @@ function createKnowledgeLibrary(options={}) {
     return Array.isArray(value)?[...new Set(value.map(item=>String(typeof item==='object'?item?.id:item)))]
       .filter(id=>allowed.has(id)).map(id=>allowed.get(id)):[];
   }
-  async function listFollowupAdvice(personIdValue,actorValue) {
+  async function listFollowupAdvice(personIdValue,actorValue,page={}) {
     actorUid(actorValue);const personId=String(personIdValue||'');if(!positiveId(personId))fail('INVALID_INPUT');
+    const limit=page.limit===undefined?100:Number(page.limit),offset=page.offset===undefined?0:Number(page.offset);
+    if(!Number.isInteger(limit)||limit<1||limit>100||!Number.isInteger(offset)||offset<0||offset>1000000)fail('INVALID_INPUT');
     const rows=await request('person_followup_advice','GET',{select:FOLLOWUP_ADVICE_COLUMNS,person_id:`eq.${personId}`,
-      deleted_at:'is.null',order:'updated_at.desc.nullslast,id.desc',limit:100});
-    return {ok:true,personId,rows:rows.map(row=>adviceDto(row))};
+      deleted_at:'is.null',order:'updated_at.desc.nullslast,id.desc',limit:limit+1,offset});
+    const hasMore=rows.length>limit,selected=rows.slice(0,limit);
+    return {ok:true,personId,rows:selected.map(row=>adviceDto(row)),limit,offset,hasMore,nextOffset:hasMore?offset+limit:null};
   }
   async function runSystemAdvice(adviceId,personId,focus,options={}) {
     const row=(await request('person_followup_advice','GET',{select:FOLLOWUP_ADVICE_COLUMNS,id:`eq.${adviceId}`,
@@ -1230,9 +1233,12 @@ function createKnowledgeLibrary(options={}) {
           const gptAction=input.gptAction||'keep';
           if(gptAction==='edit') {
             if(!gptExists)fail('INVALID_STATE');
+            const gptCurrent=splitAdviceAndMessage(current.gpt_product_advice),
+              gptMessageDraft=Object.prototype.hasOwnProperty.call(input,'gptMessageDraft')
+              ? cleanText(input.gptMessageDraft,1000,'gptWechatMessage')||'' : gptCurrent.messageDraft;
             body.gpt_title=cleanText(input.gptTitle,240,'gptTitle',true);
             body.gpt_strategy=cleanText(input.gptStrategy,4000,'gptStrategy',true);
-            body.gpt_product_advice=cleanText(input.gptProductAdvice,4000,'gptProductAdvice',true);
+            body.gpt_product_advice=packAdviceAndMessage(cleanText(input.gptProductAdvice,4000,'gptProductAdvice',true),gptMessageDraft);
             body.gpt_based_on_system_version=Number(current.system_version)+(changed?1:0);
             body.gpt_kept_for_system_version=null;body.gpt_status='manual';
             Object.assign(body,{gpt_preview_id:null,gpt_preview_payload:null,gpt_preview_actor:null,gpt_preview_expires_at:null});
@@ -1249,9 +1255,12 @@ function createKnowledgeLibrary(options={}) {
             gpt_preview_id:null,gpt_preview_payload:null,gpt_preview_actor:null,gpt_preview_expires_at:null};
         } else if(input.action==='edit') {
           if(!current.gpt_strategy||!current.gpt_product_advice)fail('NOT_FOUND');
+          const gptCurrent=splitAdviceAndMessage(current.gpt_product_advice),
+            gptMessageDraft=Object.prototype.hasOwnProperty.call(input,'gptMessageDraft')
+              ? cleanText(input.gptMessageDraft,1000,'gptWechatMessage')||'' : gptCurrent.messageDraft;
           body={...body,gpt_title:cleanText(input.title,240,'title',true),
             gpt_strategy:cleanText(input.strategy,4000,'strategy',true),
-            gpt_product_advice:cleanText(input.productAdvice,4000,'productAdvice',true),
+            gpt_product_advice:packAdviceAndMessage(cleanText(input.productAdvice,4000,'productAdvice',true),gptMessageDraft),
             gpt_based_on_system_version:Number(current.system_version),gpt_kept_for_system_version:null,gpt_status:'manual',
             gpt_preview_id:null,gpt_preview_payload:null,gpt_preview_actor:null,gpt_preview_expires_at:null};
         } else fail('INVALID_INPUT');
@@ -1278,8 +1287,11 @@ function createKnowledgeLibrary(options={}) {
       Object.assign(body,{gpt_strategy:null,gpt_product_advice:null,gpt_strategy_sources:[],gpt_product_sources:[],
         gpt_based_on_system_version:null,gpt_kept_for_system_version:null,gpt_status:'pending'});
     } else if(gptAction==='edit') {
+      const gptCurrent=splitAdviceAndMessage(current.gpt_product_advice),
+        gptMessageDraft=Object.prototype.hasOwnProperty.call(input,'gptMessageDraft')
+          ? cleanText(input.gptMessageDraft,1000,'gptWechatMessage')||'' : gptCurrent.messageDraft;
       body.gpt_strategy=cleanText(input.gptStrategy,4000,'gptStrategy',true);
-      body.gpt_product_advice=cleanText(input.gptProductAdvice,4000,'gptProductAdvice',true);
+      body.gpt_product_advice=packAdviceAndMessage(cleanText(input.gptProductAdvice,4000,'gptProductAdvice',true),gptMessageDraft);
       body.gpt_strategy_sources=current.gpt_strategy_sources;
       body.gpt_product_sources=current.gpt_product_sources;
       body.gpt_based_on_system_version=nextVersion;body.gpt_kept_for_system_version=null;body.gpt_status='manual';
@@ -1338,14 +1350,15 @@ function createKnowledgeLibrary(options={}) {
           customerSnapshot:safeSnapshot,recentInteractions:context.interactions,
           strategySources:safeSources(context.strategy.refs),productSources:safeSources(context.products.refs),
           outputContract:{adviceId:'copy exact value',personId:'copy exact value',systemVersion:'copy exact value',
-            gptAdvice:{title:'string',overallStrategy:'string',productServiceAdvice:'string',strategySourceIds:'integer[]',productSourceIds:'integer[]'}}});
+          gptAdvice:{title:'string',overallStrategy:'string',productServiceAdvice:'string',wechatMessage:'string',
+            strategySourceIds:'integer[]',productSourceIds:'integer[]'}}});
       } catch(error) {
         logger.warn('FOLLOWUP_ADVICE_PACKAGE_ITEM_SKIPPED',JSON.stringify({adviceId:String(row.id),code:String(error?.code||'CONTEXT_FAILED')}));
       }
     }
     return {ok:true,packageId:randomUUID(),generatedAt:new Date().toISOString(),count:result.length,rows:result,
       nextAfterId:hasMore?String(selected.at(-1)?.id||''):null,
-      instructions:'Produce one result for each package row. Keep adviceId, personId and systemVersion unchanged. Generate a concise independent gptAdvice.title. gptAdvice.overallStrategy must contain only the relationship and next-step strategy; it must not name products or services. gptAdvice.productServiceAdvice may make product/service claims only when supported by productSources. Use only exact supplied source IDs in strategySourceIds and productSourceIds. If no suitable product source exists, clearly say a match could not be verified and leave productSourceIds empty. Do not invent person facts, product terms, returns, guarantees, legal or tax conclusions. Return only JSON shaped as {"rows":[{"adviceId":"...","personId":"...","systemVersion":1,"gptAdvice":{"title":"...","overallStrategy":"...","productServiceAdvice":"...","strategySourceIds":[],"productSourceIds":[]}}]}.',
+      instructions:'Produce one result for each package row. Keep adviceId, personId and systemVersion unchanged. Generate a concise independent gptAdvice.title. gptAdvice.overallStrategy must contain only the relationship and next-step strategy; it must not name products or services. gptAdvice.productServiceAdvice may make product/service claims only when supported by productSources. gptAdvice.wechatMessage must be one concise, natural, respectful WeChat draft based on known facts and the strategy; do not invent a meeting, agreement, need, product claim, guarantee, or urgency. Mention a product/service only when supported by productSources; otherwise ask permission to continue the conversation. Use only exact supplied source IDs in strategySourceIds and productSourceIds. If no suitable product source exists, clearly say a match could not be verified and leave productSourceIds empty. Do not invent person facts, product terms, returns, guarantees, legal or tax conclusions. Return only JSON shaped as {"rows":[{"adviceId":"...","personId":"...","systemVersion":1,"gptAdvice":{"title":"...","overallStrategy":"...","productServiceAdvice":"...","wechatMessage":"...","strategySourceIds":[],"productSourceIds":[]}}]}.',
       notice:'The package omits direct contact fields. It is still customer context; review it and use only the approved ChatGPT workspace. CRM validates versions and sources before saving.'};
   }
   async function previewGptImport(input,actorValue) {
@@ -1366,13 +1379,15 @@ function createKnowledgeLibrary(options={}) {
       const title=cleanText(item.gptAdvice.title,240,'title',true),
         strategy=cleanText(item.gptAdvice.overallStrategy,4000,'overallStrategy',true),
         product=cleanText(item.gptAdvice.productServiceAdvice,4000,'productServiceAdvice',true),
+        messageDraft=Object.prototype.hasOwnProperty.call(item.gptAdvice,'wechatMessage')
+          ? cleanText(item.gptAdvice.wechatMessage,1000,'wechatMessage')||'' : '',
         strategySources=keepAllowedSources(item.gptAdvice.strategySourceIds,strategyMap),
         productSources=keepAllowedSources(item.gptAdvice.productSourceIds,productMap);
-      if(hasExplicitTestMarker({title,strategy,product}))fail('TEST_DATA_OUTPUT_BLOCKED');
+      if(hasExplicitTestMarker({title,strategy,product,messageDraft}))fail('TEST_DATA_OUTPUT_BLOCKED');
       if(!Array.isArray(item.gptAdvice.strategySourceIds)||!Array.isArray(item.gptAdvice.productSourceIds)||
           item.gptAdvice.strategySourceIds.length!==strategySources.length||
           item.gptAdvice.productSourceIds.length!==productSources.length)fail('INVALID_SOURCE');
-      const previewId=randomUUID(),payload={title,strategy,product,strategySources,productSources,systemVersion:item.systemVersion};
+      const previewId=randomUUID(),payload={title,strategy,product,messageDraft,strategySources,productSources,systemVersion:item.systemVersion};
       const expiresAt=new Date(Date.now()+30*60*1000).toISOString();
       const saved=await request('person_followup_advice','PATCH',{id:`eq.${item.adviceId}`,system_version:`eq.${item.systemVersion}`,
         deleted_at:'is.null',system_status:'eq.ready',gpt_strategy:'is.null',gpt_product_advice:'is.null'},
@@ -1381,7 +1396,7 @@ function createKnowledgeLibrary(options={}) {
       if(saved.length!==1) {previewRows.push({adviceId:String(item.adviceId),status:'stale'});continue;}
       previewRows.push({adviceId:String(item.adviceId),personId:String(item.personId),title:row.system_title||row.title,systemVersion:item.systemVersion,
         status:'preview',previewId,expiresAt,gptAdvice:{title,overallStrategy:strategy,productServiceAdvice:product,
-          strategySources,productSources}});
+          wechatMessage:messageDraft,strategySources,productSources}});
     }
     return {ok:true,rows:previewRows};
   }
@@ -1398,7 +1413,7 @@ function createKnowledgeLibrary(options={}) {
     const rows=await request('person_followup_advice','PATCH',{id:`eq.${id}`,person_id:`eq.${personId}`,
       system_version:`eq.${version}`,gpt_preview_id:`eq.${previewId}`,gpt_preview_actor:`eq.${actor}`,
       deleted_at:'is.null',system_status:'eq.ready',gpt_strategy:'is.null',gpt_product_advice:'is.null'},
-      {gpt_title:payload.title,gpt_strategy:payload.strategy,gpt_product_advice:payload.product,gpt_strategy_sources:payload.strategySources,
+      {gpt_title:payload.title,gpt_strategy:payload.strategy,gpt_product_advice:packAdviceAndMessage(payload.product,payload.messageDraft),gpt_strategy_sources:payload.strategySources,
         gpt_product_sources:payload.productSources,gpt_based_on_system_version:version,gpt_kept_for_system_version:null,
         gpt_status:'ready',gpt_preview_id:null,gpt_preview_payload:null,gpt_preview_actor:null,gpt_preview_expires_at:null,
         updated_by:actor,updated_at:new Date().toISOString()});
@@ -1555,7 +1570,7 @@ function createKnowledgeLibrary(options={}) {
       case 'dualStatus':return dualStatus(event.data);
       case 'dualSelect':return selectDual(event.data,actor);
       case 'dualHistory':return history(event.personId);
-      case 'adviceList':return listFollowupAdvice(event.personId,actor);
+      case 'adviceList':return listFollowupAdvice(event.personId,actor,{limit:event.limit,offset:event.offset});
       case 'adviceGenerate':return createFollowupAdvice(event.data,actor,options);
       case 'adviceStatus':return adviceStatus(event.data,actor);
       case 'adviceUpdate':return updateFollowupAdvice(event.data,actor);

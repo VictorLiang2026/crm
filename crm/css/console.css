@@ -1065,6 +1065,19 @@ body:has(.login), body.is-login { padding-top: env(safe-area-inset-top); }
 .fa-modal{width:min(820px,100%);max-height:min(92vh,1000px);overflow:auto;background:#fff;border-radius:14px;padding:20px;display:grid;gap:12px;box-shadow:0 24px 60px rgba(0,0,0,.24)}
 .fa-modal>header,.fa-modal>footer{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
 .fa-modal h2{margin:0;font-size:19px}
+.fa-scripts-modal{width:min(760px,100%)}
+.fa-scripts-modal>header>div{min-width:0}
+.fa-scripts-modal>header p{max-width:580px}
+.fa-scripts-list{display:grid;gap:10px;min-width:0}
+.fa-script-status{min-height:20px;margin:0;color:var(--ink-600,#6d7480);font-size:13px}
+.fa-script-card{min-width:0;padding:14px;border:1px solid var(--line,#e5e7eb);border-radius:10px;background:#fff;display:grid;gap:10px}
+.fa-script-card>header{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.fa-script-card h3{margin:0;font-size:15px;overflow-wrap:anywhere}
+.fa-script-meta,.fa-script-version{margin:4px 0 0;color:var(--ink-600,#6d7480);font-size:12px;overflow-wrap:anywhere}
+.fa-script-version{flex:none}
+.fa-script-text{margin:0;color:var(--ink,#2e333b);line-height:1.75;white-space:pre-wrap;overflow-wrap:anywhere}
+.fa-script-pager{justify-content:center!important}
+.fa-script-page{min-width:76px;text-align:center;color:var(--ink-600,#6d7480);font-size:13px}
 .fa-edit-group{min-width:0;border:1px solid var(--line,#e5e7eb);border-radius:10px;padding:14px;display:grid;gap:12px}
 .fa-edit-group h3{margin:0;color:var(--ink,#2e333b);font-size:15px}
 .fa-edit-fields{display:grid;grid-template-columns:minmax(0,1fr);gap:12px}

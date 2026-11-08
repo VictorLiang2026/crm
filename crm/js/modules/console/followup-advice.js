@@ -34,10 +34,11 @@ function editDialog(row, onClose, onSave) {
   const systemStrategy = input('system_strategy_label', row.system.strategy);
   const systemProduct = input('system_product_label', row.system.productAdvice);
   const systemMessage = input('system_message_label', row.system.messageDraft);
-  const gptExists = Boolean(row.gpt.strategy || row.gpt.productAdvice);
+  const gptExists = Boolean(row.gpt.strategy || row.gpt.productAdvice || row.gpt.messageDraft);
   const gptTitle = gptExists ? input('advice_title', row.gpt.title, false) : null;
   const gptStrategy = gptExists ? input('gpt_strategy_label', row.gpt.strategy) : null;
   const gptProduct = gptExists ? input('gpt_product_label', row.gpt.productAdvice) : null;
+  const gptMessage = gptExists ? input('gpt_message_label', row.gpt.messageDraft) : null;
   const gptAction = gptExists ? h('select', { class: 'fa-edit-policy-select', onchange: event => {
     gptFields.hidden = event.currentTarget.value !== 'edit';
   } }, [
@@ -45,7 +46,9 @@ function editDialog(row, onClose, onSave) {
     h('option', { value: 'edit' }, text('edit_gpt')),
     h('option', { value: 'delete' }, text('delete_gpt')),
   ]) : null;
-  const gptFields = gptExists ? h('div', { class: 'fa-edit-fields', hidden: true }, [gptTitle.node, gptStrategy.node, gptProduct.node]) : null;
+  const gptFields = gptExists ? h('div', { class: 'fa-edit-fields', hidden: true }, [
+    gptTitle.node, gptStrategy.node, gptProduct.node, gptMessage.node,
+  ]) : null;
   const status = h('p', { class: 'fa-form-status', role: 'status' });
   const panel = h('section', { class: 'fa-modal', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'fa-edit-title' }, [
     h('header', {}, [h('h2', { id: 'fa-edit-title' }, text('edit_title')),
@@ -64,7 +67,8 @@ function editDialog(row, onClose, onSave) {
           messageDraft: systemMessage.control.value,
           ...(gptExists ? { gptAction: gptAction.value,
             ...(gptAction.value === 'edit' ? { gptTitle: gptTitle.control.value,
-              gptStrategy: gptStrategy.control.value, gptProductAdvice: gptProduct.control.value } : {}) } : {}),
+              gptStrategy: gptStrategy.control.value, gptProductAdvice: gptProduct.control.value,
+              gptMessageDraft: gptMessage.control.value } : {}) } : {}),
         }); onClose(); }
         catch (_) { status.textContent = text('save_failed'); event.currentTarget.disabled = false; }
       } }, text('save'))]),
@@ -91,6 +95,9 @@ export function renderFollowupAdvice(ctx, personId) {
   let rows = [], legacyRows = [], busy = false, modal = null;
   const status = h('p', { class: 'fa-page-status', role: 'status' });
   const listRoot = h('div', { class: 'fa-list' });
+  const scriptsButton = h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => { void showScripts(); } }, [
+    ic('chat'), text('scripts_button'),
+  ]);
   const createButton = h('button', { class: 'btn btn-primary', type: 'button', onclick: async () => {
     if (busy) return;
     busy = true; createButton.disabled = true; status.textContent = text('generating');
@@ -107,6 +114,67 @@ export function renderFollowupAdvice(ctx, personId) {
       data.dualFollowupHistory(ctx, personId).catch(() => ({ rows: [] })),
     ]);
     rows = current.rows || []; legacyRows = legacy.rows || []; draw();
+  }
+  async function showScripts() {
+    if (busy || modal) return;
+    const pageSize = 25;
+    let pageOffset = 0, pageHasMore = false, requestId = 0;
+    const pageStatus = h('p', { class: 'fa-script-status', role: 'status', 'aria-live': 'polite' }, text('scripts_loading'));
+    const scriptList = h('div', { class: 'fa-scripts-list' });
+    const pageLabel = h('span', { class: 'fa-script-page' });
+    const previous = h('button', { class: 'btn btn-ghost btn-sm', type: 'button', disabled: true,
+      onclick: () => { void loadScriptPage(Math.max(0, pageOffset - pageSize)); } }, text('scripts_previous'));
+    const next = h('button', { class: 'btn btn-ghost btn-sm', type: 'button', disabled: true,
+      onclick: () => { if (pageHasMore) void loadScriptPage(pageOffset + pageSize); } }, text('scripts_next'));
+    const close = () => { if (modal === overlay) { overlay.remove(); modal = null; draw(); } };
+    const panel = h('section', { class: 'fa-modal fa-scripts-modal', role: 'dialog', 'aria-modal': 'true',
+      'aria-labelledby': 'fa-scripts-title' }, [
+      h('header', {}, [h('div', {}, [h('h2', { id: 'fa-scripts-title' }, text('scripts_title')),
+        h('p', { class: 'fa-muted' }, text('scripts_description'))]),
+        h('button', { class: 'btn btn-ghost', type: 'button', onclick: close }, text('close'))]),
+      pageStatus, scriptList,
+      h('footer', { class: 'fa-script-pager' }, [previous, pageLabel, next]),
+    ]);
+    const overlay = h('div', { class: 'fa-modal-overlay', onclick: event => {
+      if (event.target === event.currentTarget) close();
+    } }, panel);
+    modal = overlay; draw();
+    async function loadScriptPage(offset) {
+      const currentRequest = ++requestId;
+      pageOffset = offset; pageHasMore = false;
+      previous.disabled = offset <= 0; next.disabled = true;
+      pageStatus.textContent = text('scripts_loading');
+      scriptList.replaceChildren();
+      try {
+        const result = await data.followupAdviceList(ctx, String(personId), { limit: pageSize, offset });
+        if (currentRequest !== requestId || modal !== overlay) return;
+        const scripts = (result.rows || []).flatMap(row => [
+          ['system', row.system], ['gpt', row.gpt],
+        ].filter(([, lane]) => String(lane?.messageDraft || '').trim()).map(([source, lane]) => ({
+          title: lane.title || row.title || text('advice_title'), source, lane,
+          updatedAt: row.updatedAt, version: source === 'system' ? row.system?.version : lane?.basedOnSystemVersion,
+        })));
+        pageHasMore = result.hasMore === true; pageOffset = Number(result.offset ?? offset);
+        previous.disabled = pageOffset <= 0; next.disabled = !pageHasMore;
+        pageLabel.textContent = text('scripts_page').replace('{page}', String(Math.floor(pageOffset / pageSize) + 1));
+        pageStatus.textContent = scripts.length ? '' : text(pageHasMore ? 'scripts_page_empty' : 'scripts_empty');
+        scriptList.replaceChildren(...scripts.map(script => h('article', { class: 'fa-script-card' }, [
+          h('header', {}, [h('div', {}, [h('h3', {}, script.title),
+            h('p', { class: 'fa-script-meta' }, `${text(script.source === 'system' ? 'cloudbase_ai' : 'gpt')} · ${text(script.source === 'system'
+              ? `system_${script.lane.status}` : `gpt_${script.lane.status}`)} · ${new Date(script.updatedAt).toLocaleString()}`)]),
+            script.version ? h('span', { class: 'fa-script-version' }, `${text('system_version')} ${script.version}`) : null]),
+          h('p', { class: 'fa-script-text' }, script.lane.messageDraft),
+        ])));
+      } catch (_) {
+        if (currentRequest !== requestId || modal !== overlay) return;
+        pageStatus.textContent = text('scripts_load_failed');
+        const retry = h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => {
+          void loadScriptPage(pageOffset);
+        } }, text('scripts_retry'));
+        scriptList.replaceChildren(retry);
+      }
+    }
+    await loadScriptPage(0);
   }
   function edit(row) {
     modal = editDialog(row, () => { modal?.remove(); modal = null; draw(); }, async changes => {
@@ -141,7 +209,7 @@ export function renderFollowupAdvice(ctx, personId) {
     ])) : [h('p', { class: 'fa-empty' }, text('empty'))]));
     if (modal) main.append(modal);
   }
-  const head = pageHead({ kicker: text('kicker'), title: text('title'), sub: text('person_description'), actions: [createButton] });
+  const head = pageHead({ kicker: text('kicker'), title: text('title'), sub: text('person_description'), actions: [scriptsButton, createButton] });
   const legacy = legacyRows.length ? h('details', { class: 'fa-legacy' }, [h('summary', {}, text('legacy_history')),
     ...legacyRows.slice(0, 10).map(item => h('article', { class: 'fa-legacy-row' }, [
       h('b', {}, new Date(item.createdAt).toLocaleString()),

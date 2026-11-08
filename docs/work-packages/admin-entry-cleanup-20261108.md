@@ -2,7 +2,7 @@
 
 日期：2026-11-08  
 工作基线：`435d9b36cf5e05966d7f979e42ca6c8c381adcaf` (`release-20261108-094516`)  
-状态：静态页面已部署，CloudBase 全量核对通过；待 GitHub 提交/标签发布及最终同步核对。
+状态：已完成部署、回归、GitHub 发布与本地/GitHub/CloudBase 一致性核验。
 
 ## 范围与影响
 
@@ -32,4 +32,7 @@
 
 - 回滚基线：`release-20261108-094516`。恢复时创建恢复提交并重新部署上述静态文件，不强推历史。
 - CloudBase 静态托管：`/crm/admin.html`、`/crm/js/modules/phase14-hubs.js`，上传成功 2/2；线上地址为 https://crm-d1gkae8ddc930d151-1434199662.tcloudbaseapp.com/crm/admin.html 。未部署云函数。
-- GitHub 提交、发布标签及 GitHub/CloudBase 最终核对：待完成，完成后在此补记提交与标签。
+- 功能发布提交：`b3dc23d4e62fdf69d974d25d018d826f7324c14a`；标签：`release-20261108-111100`；GitHub `master`、本地 HEAD 与标签指向一致。
+- `tools/release.ps1`：PASS，包含提交前云端核验、原子推送分支与标签、推送后 GitHub/CloudBase 全量核验。
+- 发布后核验：Admin 页面 HTTP 200 且 SHA-256 匹配；95 个可达页面资源匹配；30 个函数 / 243 个源码与配置文件匹配。
+- 本报告的结果补记为仅文档跟进，不改变已部署页面或云函数。

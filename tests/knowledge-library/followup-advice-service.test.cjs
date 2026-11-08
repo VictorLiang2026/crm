@@ -48,6 +48,16 @@ test('system lane edits update its title and content while keeping GPT and marki
   assert.equal(writes[0].body.title,'新系统标题');assert.equal(writes[0].body.system_title,'新系统标题');
 });
 
+test('advice list uses bounded limit/offset pagination and rejects invalid page values',async()=>{
+  const {service,reads}=setup();
+  const page=await service.run({operation:'adviceList',personId:'42',limit:25,offset:50},'operator');
+  assert.equal(page.limit,25);assert.equal(page.offset,50);assert.equal(page.hasMore,false);
+  assert.equal(reads.at(-1).get('limit'),'26');assert.equal(reads.at(-1).get('offset'),'50');
+  await assert.rejects(service.run({operation:'adviceList',personId:'42',limit:0},'operator'),error=>error.code==='INVALID_INPUT');
+  await assert.rejects(service.run({operation:'adviceList',personId:'42',limit:101},'operator'),error=>error.code==='INVALID_INPUT');
+  await assert.rejects(service.run({operation:'adviceList',personId:'42',offset:-1},'operator'),error=>error.code==='INVALID_INPUT');
+});
+
 test('GPT lane deletion clears only GPT fields and returns the paired row to pending',async()=>{
   const {service,row,writes}=setup();
   const result=await service.run({operation:'adviceUpdate',data:{id:'81',personId:'42',lane:'gpt',action:'delete',
@@ -66,6 +76,19 @@ test('GPT lane edit leaves the CloudBase lane and system version unchanged',asyn
   assert.equal(result.advice.gpt.title,'GPT 新标题');assert.equal(result.advice.gpt.status,'manual');
   assert.equal(result.advice.gpt.basedOnSystemVersion,2);assert.equal(result.advice.system.version,2);
   assert.equal(row.system_title,'系统标题');assert.equal(row.system_strategy,'系统策略');
+});
+
+test('GPT message edits are stored in the existing advice field and can be cleared',async()=>{
+  const {service,row,writes}=setup();
+  row.gpt_product_advice='GPT 产品建议\n\n---\n\n微信沟通话术：\n旧 GPT 话术';
+  const updated=await service.run({operation:'adviceUpdate',data:{id:'81',personId:'42',lane:'gpt',action:'edit',
+    systemVersion:2,updatedAt:stamp,title:'GPT 新标题',strategy:'GPT 新策略',productAdvice:'GPT 新产品建议',
+    gptMessageDraft:'更新后的 GPT 微信话术'}},'operator');
+  assert.equal(updated.advice.gpt.messageDraft,'更新后的 GPT 微信话术');
+  assert.match(row.gpt_product_advice,/GPT 新产品建议[\s\S]*更新后的 GPT 微信话术/);
+  await service.run({operation:'adviceUpdate',data:{id:'81',personId:'42',lane:'gpt',action:'edit',
+    systemVersion:2,updatedAt:row.updated_at,title:'GPT 新标题',strategy:'GPT 新策略',productAdvice:'GPT 新产品建议',gptMessageDraft:''}},'operator');
+  assert.equal(writes.length,2);assert.equal(row.gpt_product_advice,'GPT 新产品建议');
 });
 
 test('system advice sends only the registered personId input while retaining focus in context retrieval',async()=>{
@@ -316,6 +339,17 @@ test('paired row edit changes existing GPT content without changing the CloudBas
   assert.equal(result.advice.system.strategy,'系统策略');assert.equal(result.advice.gpt.productAdvice,'GPT 新产品建议');
 });
 
+test('paired edit preserves GPT message when omitted and updates it when supplied',async()=>{
+  const {service,row}=setup();row.gpt_product_advice='GPT 产品建议\n\n---\n\n微信沟通话术：\n原话术';
+  let result=await service.run({operation:'adviceUpdate',data:{id:'81',personId:'42',lane:'pair',gptAction:'keep',
+    systemVersion:2,updatedAt:stamp,title:'系统标题',strategy:'系统策略',productAdvice:'系统产品建议'}},'operator');
+  assert.equal(result.advice.gpt.messageDraft,'原话术');
+  result=await service.run({operation:'adviceUpdate',data:{id:'81',personId:'42',lane:'pair',gptAction:'edit',
+    systemVersion:2,updatedAt:row.updated_at,title:'系统标题',strategy:'系统策略',productAdvice:'系统产品建议',
+    gptTitle:'GPT 标题',gptStrategy:'GPT 策略',gptProductAdvice:'GPT 产品建议',gptMessageDraft:'新话术'}},'operator');
+  assert.equal(result.advice.gpt.messageDraft,'新话术');
+});
+
 test('GPT task package selects empty GPT lanes and excludes non-empty stale advice',async()=>{
   const {service,row,reads}=setup();
   let result=await service.run({operation:'gptTaskPackage',data:{limit:10}},'operator');
@@ -351,19 +385,31 @@ test('GPT import preview and confirmed save update only the empty GPT lane',asyn
   row.gpt_title=null;row.gpt_strategy=null;row.gpt_product_advice=null;row.gpt_status='pending';
   const preview=await service.run({operation:'gptImportPreview',data:{rows:[{adviceId:'81',personId:'42',systemVersion:2,
     gptAdvice:{title:'GPT 建议',overallStrategy:'先确认当前关注点，再约定下一步沟通。',
-      productServiceAdvice:'当前资料不足以核实产品匹配，应先确认保障需求。',strategySourceIds:[],productSourceIds:[]}}]}},'operator');
+      productServiceAdvice:'当前资料不足以核实产品匹配，应先确认保障需求。',wechatMessage:'您好，方便时我们可以确认一下您当前最关注的安排。',
+      strategySourceIds:[],productSourceIds:[]}}]}},'operator');
   assert.equal(preview.rows[0].status,'preview');
+  assert.equal(preview.rows[0].gptAdvice.wechatMessage,'您好，方便时我们可以确认一下您当前最关注的安排。');
   const confirmed=await service.run({operation:'gptImportConfirm',data:{confirmed:true,adviceId:'81',personId:'42',
     systemVersion:2,previewId:preview.rows[0].previewId}},'operator');
   assert.equal(confirmed.ok,true);
   assert.equal(confirmed.advice.gpt.strategy,'先确认当前关注点，再约定下一步沟通。');
   assert.equal(confirmed.advice.gpt.productAdvice,'当前资料不足以核实产品匹配，应先确认保障需求。');
+  assert.equal(confirmed.advice.gpt.messageDraft,'您好，方便时我们可以确认一下您当前最关注的安排。');
+  assert.match(row.gpt_product_advice,/微信沟通话术：\n您好/);
   assert.equal(confirmed.advice.system.strategy,'系统策略');
   assert.equal(confirmed.advice.system.productAdvice,'系统产品建议');
   assert.equal(row.gpt_based_on_system_version,2);
   assert.equal(row.gpt_status,'ready');
   assert.equal(row.gpt_preview_id,null);
   assert.equal(writes.length,2);
+});
+
+test('GPT import preview rejects test markers in WeChat drafts before writing',async()=>{
+  const {service,row,writes}=setup();row.gpt_title=null;row.gpt_strategy=null;row.gpt_product_advice=null;row.gpt_status='pending';
+  await assert.rejects(service.run({operation:'gptImportPreview',data:{rows:[{adviceId:'81',personId:'42',systemVersion:2,
+    gptAdvice:{title:'GPT 建议',overallStrategy:'策略',productServiceAdvice:'产品',wechatMessage:'【系统测试·勿联系】样本文案',
+      strategySourceIds:[],productSourceIds:[]}}]}},'operator'),error=>error.code==='TEST_DATA_OUTPUT_BLOCKED');
+  assert.equal(writes.length,0);
 });
 
 test('GPT import confirmation cannot write over content filled after preview',async()=>{
@@ -380,7 +426,8 @@ test('direct GPT save writes only an empty ready GPT lane and leaves system advi
   row.gpt_title=null;row.gpt_strategy=null;row.gpt_product_advice=null;row.gpt_status='pending';
   const result=await service.run({operation:'gptAdviceDirectSave',data:{rows:[{adviceId:'81',personId:'42',systemVersion:2,
     gptAdvice:{title:'直接生成建议',overallStrategy:'先确认当前重点，再商定下一步。',
-      productServiceAdvice:'目前无法核实适配产品，应先补充需求信息。',strategySourceIds:[],productSourceIds:[]}}]}},'operator');
+      productServiceAdvice:'目前无法核实适配产品，应先补充需求信息。',wechatMessage:'不应绕过确认流程',
+      strategySourceIds:[],productSourceIds:[]}}]}},'operator');
   assert.equal(result.savedCount,1);assert.equal(result.skippedCount,0);
   assert.equal(result.rows[0].status,'saved');assert.equal(result.rows[0].advice.id,'81');
   assert.equal(row.gpt_title,'直接生成建议');assert.equal(row.gpt_strategy,'先确认当前重点，再商定下一步。');

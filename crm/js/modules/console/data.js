@@ -63,7 +63,9 @@ export const data = {
     data: { ...payload, asyncWait: true } }, 'customer_followup_dual', payload?.personId, { recoverStartup: true }),
   selectDualFollowup: (ctx, payload) => call(ctx, 'assistant', { action: 'knowledgeLibrary', operation: 'dualSelect', data: payload }),
   dualFollowupHistory: (ctx, personId) => call(ctx, 'assistant', { action: 'knowledgeLibrary', operation: 'dualHistory', personId }),
-  followupAdviceList: (ctx, personId) => call(ctx, 'assistant', { action: 'knowledgeLibrary', operation: 'adviceList', personId }),
+  followupAdviceList: (ctx, personId, page = {}) => call(ctx, 'assistant', {
+    action: 'knowledgeLibrary', operation: 'adviceList', personId, limit: page.limit, offset: page.offset,
+  }),
   generateFollowupAdvice: (ctx, payload) => aiTask(ctx, { action: 'knowledgeLibrary', operation: 'adviceGenerate',
     data: { ...payload, asyncWait: true } }, 'person_followup_advice', payload?.personId, { recoverStartup: true }),
   updateFollowupAdvice: (ctx, payload) => call(ctx, 'assistant', { action: 'knowledgeLibrary', operation: 'adviceUpdate', data: payload }),
