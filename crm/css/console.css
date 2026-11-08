@@ -1091,6 +1091,7 @@ body:has(.login), body.is-login { padding-top: env(safe-area-inset-top); }
 .fa-legacy summary{cursor:pointer;font-weight:600}
 .fa-legacy-row{padding:10px 0;border-top:1px solid var(--line,#e5e7eb);white-space:pre-wrap}
 @media(max-width:900px){.fa-compare{grid-template-columns:minmax(0,1fr)}.fa-preview-copy{grid-template-columns:minmax(0,1fr)}}
+@media(min-width:701px) and (max-width:900px){.fa-script-compare{grid-template-columns:repeat(2,minmax(0,1fr))}}
 
 
 /* L06: personal planning stays folded; keep the assumption editor usable on iPad. */

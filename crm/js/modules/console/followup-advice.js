@@ -90,6 +90,24 @@ function compareLane(label, lane, variant, statusText, emptyText) {
   ]);
 }
 
+function scriptLane(labelKey, lane = {}, variant, sharedTitle) {
+  const message = String(lane.messageDraft || '').trim();
+  const status = lane.status || (message ? (variant === 'system' ? 'ready' : 'manual') : 'pending');
+  const laneTitle = lane.title && lane.title !== sharedTitle ? lane.title : '';
+  const version = variant === 'system' && lane.version
+    ? `${text('system_version')} ${lane.version}`
+    : variant === 'gpt' && lane.basedOnSystemVersion
+      ? `${text('based_on_version')} ${lane.basedOnSystemVersion}` : '';
+  return h('article', { class: `fa-lane fa-lane-${variant} fa-script-lane` }, [
+    h('header', { class: 'fa-lane-head' }, [h('div', {}, [h('h3', {}, text(labelKey)),
+      laneTitle ? h('p', { class: 'fa-script-meta' }, laneTitle) : null,
+      version ? h('p', { class: 'fa-script-meta' }, version) : null]),
+      h('span', { class: `fa-status fa-status-${status}` }, text(`${variant}_${status}`))]),
+    message ? h('p', { class: 'fa-script-text' }, message)
+      : h('p', { class: 'fa-empty fa-lane-empty fa-script-empty' }, text('scripts_lane_empty')),
+  ]);
+}
+
 export function renderFollowupAdvice(ctx, personId) {
   const main = ctx.main;
   let rows = [], legacyRows = [], busy = false, modal = null;
@@ -148,23 +166,23 @@ export function renderFollowupAdvice(ctx, personId) {
       try {
         const result = await data.followupAdviceList(ctx, String(personId), { limit: pageSize, offset });
         if (currentRequest !== requestId || modal !== overlay) return;
-        const scripts = (result.rows || []).flatMap(row => [
-          ['system', row.system], ['gpt', row.gpt],
-        ].filter(([, lane]) => String(lane?.messageDraft || '').trim()).map(([source, lane]) => ({
-          title: lane.title || row.title || text('advice_title'), source, lane,
-          updatedAt: row.updatedAt, version: source === 'system' ? row.system?.version : lane?.basedOnSystemVersion,
-        })));
+        const scripts = (result.rows || []).filter(row =>
+          String(row.system?.messageDraft || '').trim() || String(row.gpt?.messageDraft || '').trim());
         pageHasMore = result.hasMore === true; pageOffset = Number(result.offset ?? offset);
         previous.disabled = pageOffset <= 0; next.disabled = !pageHasMore;
         pageLabel.textContent = text('scripts_page').replace('{page}', String(Math.floor(pageOffset / pageSize) + 1));
         pageStatus.textContent = scripts.length ? '' : text(pageHasMore ? 'scripts_page_empty' : 'scripts_empty');
-        scriptList.replaceChildren(...scripts.map(script => h('article', { class: 'fa-script-card' }, [
-          h('header', {}, [h('div', {}, [h('h3', {}, script.title),
-            h('p', { class: 'fa-script-meta' }, `${text(script.source === 'system' ? 'cloudbase_ai' : 'gpt')} · ${text(script.source === 'system'
-              ? `system_${script.lane.status}` : `gpt_${script.lane.status}`)} · ${new Date(script.updatedAt).toLocaleString()}`)]),
-            script.version ? h('span', { class: 'fa-script-version' }, `${text('system_version')} ${script.version}`) : null]),
-          h('p', { class: 'fa-script-text' }, script.lane.messageDraft),
-        ])));
+        scriptList.replaceChildren(...scripts.map(row => {
+          const title = row.title || row.system?.title || row.gpt?.title || text('advice_title');
+          return h('article', { class: 'fa-script-card' }, [
+          h('header', {}, [h('div', {}, [h('h3', {}, title),
+            h('p', { class: 'fa-script-meta' }, new Date(row.updatedAt).toLocaleString())])]),
+          h('div', { class: 'fa-compare fa-script-compare' }, [
+            scriptLane('scripts_cloudbase_heading', row.system, 'system', title),
+            scriptLane('scripts_gpt_heading', row.gpt, 'gpt', title),
+          ]),
+          ]);
+        }));
       } catch (_) {
         if (currentRequest !== requestId || modal !== overlay) return;
         pageStatus.textContent = text('scripts_load_failed');

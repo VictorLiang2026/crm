@@ -7,6 +7,7 @@ test('follow-up advice generates one CloudBase lane and manages each model indep
  try{
   await b.start();await b.openConsole('#/people','authCase=1');
   await b.wait("document.querySelector('.console-main')");
+  await b.send('Emulation.setDeviceMetricsOverride',{width:768,height:1024,deviceScaleFactor:2,mobile:false});
   await b.evaluate(`(async()=>{
    const {data}=await import('/crm/js/modules/console/data.js');
    const advice={id:'81',personId:'42',title:'退休规划回访',updatedAt:'2026-10-31T01:00:00.000Z',
@@ -41,8 +42,10 @@ test('follow-up advice generates one CloudBase lane and manages each model indep
   assert.match(actions[0],/沟通话术/);assert.match(actions[1],/生成跟进建议/);
   await b.evaluate("document.querySelector('.page-head .head-actions button').click()");
   await b.wait("document.querySelector('.fa-scripts-modal .fa-script-card')");
-  const scriptView=await b.evaluate("({text:document.querySelector('.fa-scripts-modal').textContent,cards:document.querySelectorAll('.fa-script-card').length,content:[...document.querySelectorAll('.fa-script-text')].map(x=>x.textContent)})");
-  assert.equal(scriptView.cards,2);assert.deepEqual(scriptView.content,['您好，方便时想和您确认一下近期安排。','GPT版：您好，方便时我们可以继续聊聊。']);
+  const scriptView=await b.evaluate("({text:document.querySelector('.fa-scripts-modal').textContent,cards:document.querySelectorAll('.fa-script-card').length,lanes:[...document.querySelectorAll('.fa-script-compare .fa-lane-head h3')].map(x=>x.textContent),content:[...document.querySelectorAll('.fa-script-compare .fa-script-text')].map(x=>x.textContent),columns:getComputedStyle(document.querySelector('.fa-script-compare')).gridTemplateColumns})");
+  assert.equal(scriptView.cards,1);assert.deepEqual(scriptView.lanes,['CloudBase沟通话术','GPT沟通话术']);
+  assert.equal(scriptView.columns.trim().split(/\s+/).length,2,'iPad portrait keeps the two script columns side by side');
+  assert.deepEqual(scriptView.content,['您好，方便时想和您确认一下近期安排。','GPT版：您好，方便时我们可以继续聊聊。']);
   assert.match(scriptView.text,/退休准备复盘/);
   assert.doesNotMatch(scriptView.text,/先确认客户近期目标|核实需求后再介绍/);
   assert.equal(await b.evaluate("document.querySelectorAll('.fa-scripts-modal .fa-script-card button').length"),0);
@@ -51,10 +54,12 @@ test('follow-up advice generates one CloudBase lane and manages each model indep
   await b.evaluate("document.querySelector('.fa-script-pager button:last-child').click()");
   await b.wait("document.querySelector('.fa-script-text')?.textContent==='历史 GPT 微信话术'");
   assert.equal(await b.evaluate("document.querySelectorAll('.fa-script-card').length"),1);
+  assert.equal(await b.evaluate("document.querySelectorAll('.fa-script-compare .fa-lane').length"),2);
+  assert.equal(await b.evaluate("document.querySelector('.fa-script-compare .fa-lane-system .fa-script-empty')?.textContent"),'暂无已保存的微信沟通话术。');
   assert.equal(await b.evaluate("document.querySelector('.fa-script-page').textContent"),'第 2 页');
   assert.equal(await b.evaluate("document.querySelector('.fa-script-pager button:first-child').disabled"),false);
   await b.evaluate("document.querySelector('.fa-script-pager button:first-child').click()");
-  await b.wait("document.querySelectorAll('.fa-script-card').length===2");
+  await b.wait("document.querySelectorAll('.fa-script-card').length===1");
   await b.evaluate("document.querySelector('.fa-scripts-modal .btn-ghost').click()");
   const parallel=await b.evaluate(`({lanes:[...document.querySelectorAll('.fa-lane-head h3')].map(n=>n.textContent),sections:[...document.querySelectorAll('.fa-section h4')].map(n=>n.textContent),titles:[...document.querySelectorAll('.fa-lane-title')].map(n=>n.textContent),gptStatus:document.querySelector('.fa-lane-gpt .fa-status-stale')?.textContent})`);
   assert.deepEqual(parallel.lanes,['CloudBase AI','GPT']);
@@ -72,7 +77,7 @@ test('follow-up advice generates one CloudBase lane and manages each model indep
   assert.equal(await b.evaluate("window.faCalls.find(x=>x.update)?.update.gptAction"),'keep');
   await b.evaluate("document.querySelector('.page-head .head-actions button').click()");
   await b.wait("document.querySelector('.fa-scripts-modal .fa-script-card')");
-  assert.equal(await b.evaluate("document.querySelectorAll('.fa-script-text')[0].textContent"),'更新后的微信话术');
+  assert.equal(await b.evaluate("document.querySelectorAll('.fa-script-compare .fa-script-text')[0].textContent"),'更新后的微信话术');
   await b.evaluate("document.querySelector('.fa-scripts-modal .btn-ghost').click()");
   await b.evaluate("document.querySelector('.fa-row-edit').click()");
   await b.wait("document.querySelector('.fa-modal .fa-edit-policy-select')");
@@ -81,8 +86,8 @@ test('follow-up advice generates one CloudBase lane and manages each model indep
    field('GPT：微信沟通话术').value='更新后的 GPT 微信话术';document.querySelector('.fa-modal .btn-primary').click()})()`);
   await b.wait("window.faCalls.some(x=>x.update?.gptMessageDraft==='更新后的 GPT 微信话术')");
   await b.evaluate("document.querySelector('.page-head .head-actions button').click()");
-  await b.wait("document.querySelectorAll('.fa-scripts-modal .fa-script-card').length===2");
-  assert.deepEqual(await b.evaluate("[...document.querySelectorAll('.fa-script-text')].map(x=>x.textContent)"),['更新后的微信话术','更新后的 GPT 微信话术']);
+  await b.wait("document.querySelectorAll('.fa-scripts-modal .fa-script-card').length===1");
+  assert.deepEqual(await b.evaluate("[...document.querySelectorAll('.fa-script-compare .fa-script-text')].map(x=>x.textContent)"),['更新后的微信话术','更新后的 GPT 微信话术']);
   await b.evaluate("document.querySelector('.fa-scripts-modal .btn-ghost').click()");
   await b.evaluate("document.querySelector('.fa-row-edit').click()");
   await b.wait("document.querySelector('.fa-modal .fa-edit-policy-select')");
