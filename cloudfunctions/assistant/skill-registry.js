@@ -225,7 +225,7 @@ const SKILLS = [
     confirmationLevel:'review',timeoutClass:'standard',
   },
   {
-    name:'person_followup_advice',version:'1.1.0',capability:'coaching',
+    name:'person_followup_advice',version:'1.2.0',capability:'coaching',
     contextRecipe:recipe(['customer_snapshot','recent_interactions','strategy_sources','product_sources',
       'generation_rules','guardrails'],[],{recent_interactions:6,strategy_sources:8,product_sources:10}),
     inputSchema:object({personId:{type:'string',pattern:'^[1-9][0-9]*$',maxLength:16}},['personId']),
@@ -234,7 +234,8 @@ const SKILLS = [
         items:{type:'string',pattern:'^[1-9][0-9]*$'}}},['summary','objective','nextStep','clarifyingQuestions','sourceRefs']),
       productServiceAdvice:object({recommendation:text(1800),sourceRefs:{type:'array',maxItems:10,uniqueItems:true,
         items:{type:'string',pattern:'^[1-9][0-9]*$'}},needsVerification:{type:'boolean'}},
-      ['recommendation','sourceRefs','needsVerification'])},['title','overallStrategy','productServiceAdvice']),
+      ['recommendation','sourceRefs','needsVerification']),wechatMessage:text(1000)},
+    ['title','overallStrategy','productServiceAdvice','wechatMessage']),
     confirmationLevel:'review',timeoutClass:'standard',
   },
   {

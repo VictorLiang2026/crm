@@ -33,6 +33,7 @@ function editDialog(row, onClose, onSave) {
   const systemTitle = input('advice_title', row.system.title || row.title, false);
   const systemStrategy = input('system_strategy_label', row.system.strategy);
   const systemProduct = input('system_product_label', row.system.productAdvice);
+  const systemMessage = input('system_message_label', row.system.messageDraft);
   const gptExists = Boolean(row.gpt.strategy || row.gpt.productAdvice);
   const gptTitle = gptExists ? input('advice_title', row.gpt.title, false) : null;
   const gptStrategy = gptExists ? input('gpt_strategy_label', row.gpt.strategy) : null;
@@ -50,7 +51,7 @@ function editDialog(row, onClose, onSave) {
     h('header', {}, [h('h2', { id: 'fa-edit-title' }, text('edit_title')),
       h('button', { class: 'btn btn-ghost', type: 'button', onclick: onClose }, text('close'))]),
     h('section', { class: 'fa-edit-group' }, [h('h3', {}, text('cloudbase_ai')),
-      systemTitle.node, systemStrategy.node, systemProduct.node]),
+      systemTitle.node, systemStrategy.node, systemProduct.node, systemMessage.node]),
     gptExists ? h('section', { class: 'fa-edit-group' }, [h('h3', {}, text('gpt')),
       h('label', { class: 'fa-form-field' }, [h('span', {}, text('gpt_edit_policy')), gptAction]), gptFields]) :
       h('p', { class: 'fa-muted' }, text('gpt_empty_edit_hint')),
@@ -60,6 +61,7 @@ function editDialog(row, onClose, onSave) {
         event.currentTarget.disabled = true; status.textContent = text('saving');
         try { await onSave({
           title: systemTitle.control.value, strategy: systemStrategy.control.value, productAdvice: systemProduct.control.value,
+          messageDraft: systemMessage.control.value,
           ...(gptExists ? { gptAction: gptAction.value,
             ...(gptAction.value === 'edit' ? { gptTitle: gptTitle.control.value,
               gptStrategy: gptStrategy.control.value, gptProductAdvice: gptProduct.control.value } : {}) } : {}),
@@ -78,6 +80,7 @@ function compareLane(label, lane, variant, statusText, emptyText) {
       h('span', { class: `fa-status fa-status-${lane.status || 'pending'}` }, statusText)]),
     available ? h('div', {}, [section('overall_strategy', lane.strategy, lane.strategySources),
       section('product_service_advice', lane.productAdvice, lane.productSources),
+      lane.messageDraft ? section('wechat_message', lane.messageDraft, []) : null,
       lane.basedOnSystemVersion ? h('p', { class: 'fa-muted' }, `${text('based_on_version')} ${lane.basedOnSystemVersion}`) : null]) :
       h('p', { class: 'fa-empty fa-lane-empty' }, emptyText || text('gpt_skill_pending')),
   ]);

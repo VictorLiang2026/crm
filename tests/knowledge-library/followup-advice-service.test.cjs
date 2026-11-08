@@ -93,14 +93,18 @@ test('system advice sends only the registered personId input while retaining foc
     gatewayFactory:()=>({runAITask:async request=>{
       gatewayRequest=request;
       return {taskId:17,result:{title:'沟通下一步',overallStrategy:{summary:'先了解目标',objective:'确认需求',
-        nextStep:'安排沟通',clarifyingQuestions:[],sourceRefs:[]},productServiceAdvice:{recommendation:'暂无匹配资料',sourceRefs:[]}}};
+        nextStep:'安排沟通',clarifyingQuestions:[],sourceRefs:[]},productServiceAdvice:{recommendation:'暂无匹配资料',sourceRefs:[]},
+        wechatMessage:'您好，想和您确认一下近期最关注的安排，方便时我们再继续聊。'}};
     }})});
   const result=await service.run({operation:'adviceGenerate',data:{personId:'42',clientRequestId:row.client_request_id,focus:'确认家庭保障重点'}},'operator');
   assert.equal(result.status,'completed');
+  assert.equal(result.advice.system.productAdvice,'暂无匹配资料');
+  assert.equal(result.advice.system.messageDraft,'您好，想和您确认一下近期最关注的安排，方便时我们再继续聊。');
+  assert.match(row.system_product_advice,/\n\n---\n\n微信沟通话术：\n/);
   assert.deepEqual(gatewayRequest.input,{personId:'42'});
   assert.equal(gatewayRequest.context.customer_snapshot.person.customer_stage,'新客');
   assert.match(gatewayRequest.context.generation_rules,/Simplified Chinese \(zh-CN\)/);
-  assert.match(gatewayRequest.context.generation_rules,/title and every user-facing text field in both sections/);
+  assert.match(gatewayRequest.context.generation_rules,/three separate sections: overallStrategy, productServiceAdvice, and wechatMessage/);
 });
 
 test('follow-up advice status recovers a task ID after the async startup response is delayed',async()=>{
@@ -161,7 +165,8 @@ test('system advice excludes confirmed test sources and continues with clean kno
       gatewayRequest=request;
       return {taskId:27,result:{title:'沟通下一步',overallStrategy:{summary:'先确认客户目标',objective:'核实需求',
         nextStep:'预约沟通',clarifyingQuestions:[],sourceRefs:['4']},
-        productServiceAdvice:{recommendation:'结合已核实资料介绍适用服务',sourceRefs:['5']}}};
+        productServiceAdvice:{recommendation:'结合已核实资料介绍适用服务',sourceRefs:['5']},
+        wechatMessage:'您好，方便时我们可以再确认一下您当前的关注点。'}};
     }})});
   const result=await service.run({operation:'adviceGenerate',data:{personId:'42',clientRequestId:row.client_request_id}},'operator');
   assert.equal(result.status,'completed');assert.equal(row.system_status,'ready');
@@ -223,7 +228,7 @@ test('system advice never persists explicit fictional-test output from the model
     searchDataFactory:()=>({auditRdb:{}}),gatewayFactory:()=>({runAITask:async()=>({
       taskId:18,result:{title:'虚构测试客户跟进建议',
         overallStrategy:{summary:'测试样本',objective:'确认',nextStep:'沟通',clarifyingQuestions:[],sourceRefs:[]},
-        productServiceAdvice:{recommendation:'暂无匹配资料',sourceRefs:[]}}
+        productServiceAdvice:{recommendation:'暂无匹配资料',sourceRefs:[]},wechatMessage:'【系统测试·勿联系】虚构话术'}
     })})});
   await assert.rejects(service.run({operation:'adviceGenerate',data:{personId:'42',clientRequestId:row.client_request_id}},'operator'),
     error=>error.code==='TEST_DATA_OUTPUT_BLOCKED');

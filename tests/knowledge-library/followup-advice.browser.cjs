@@ -10,8 +10,9 @@ test('follow-up advice generates one CloudBase lane and manages each model indep
   await b.evaluate(`(async()=>{
    const {data}=await import('/crm/js/modules/console/data.js');
    const advice={id:'81',personId:'42',title:'退休规划回访',updatedAt:'2026-10-31T01:00:00.000Z',
-    system:{title:'退休规划回访',status:'ready',version:2,strategy:'先确认客户近期目标，再约定复盘。',productAdvice:'核实需求后再介绍适配服务。',strategySources:[],productSources:[]},
-    gpt:{title:'退休准备复盘',status:'stale',basedOnSystemVersion:1,strategy:'先确认目标。',productAdvice:'待进一步核实。',strategySources:[],productSources:[]}};
+    system:{title:'退休规划回访',status:'ready',version:2,strategy:'先确认客户近期目标，再约定复盘。',productAdvice:'核实需求后再介绍适配服务。',
+      messageDraft:'您好，方便时想和您确认一下近期安排。',strategySources:[],productSources:[]},
+    gpt:{title:'退休准备复盘',status:'stale',basedOnSystemVersion:1,strategy:'先确认目标。',productAdvice:'待进一步核实。',messageDraft:'',strategySources:[],productSources:[]}};
    window.faAdvice=advice;window.faCalls=[];
    window.confirm=()=>true;
    data.followupAdviceList=async()=>({rows:[advice]});data.dualFollowupHistory=async()=>({rows:[]});
@@ -26,16 +27,17 @@ test('follow-up advice generates one CloudBase lane and manages each model indep
   await b.wait("document.querySelectorAll('.fa-lane').length===2");
   const parallel=await b.evaluate(`({lanes:[...document.querySelectorAll('.fa-lane-head h3')].map(n=>n.textContent),sections:[...document.querySelectorAll('.fa-section h4')].map(n=>n.textContent),titles:[...document.querySelectorAll('.fa-lane-title')].map(n=>n.textContent),gptStatus:document.querySelector('.fa-lane-gpt .fa-status-stale')?.textContent})`);
   assert.deepEqual(parallel.lanes,['CloudBase AI','GPT']);
-  assert.deepEqual(parallel.sections,['整体跟进策略','产品与服务建议','整体跟进策略','产品与服务建议']);
+  assert.deepEqual(parallel.sections,['整体跟进策略','产品与服务建议','微信沟通话术','整体跟进策略','产品与服务建议']);
   assert.deepEqual(parallel.titles,['退休规划回访','退休准备复盘']);
   assert.match(parallel.gptStatus,/系统版已更新/);
   assert.equal(await b.evaluate("document.querySelectorAll('.fa-row-head .fa-row-actions button').length"),2);
   assert.equal(await b.evaluate("document.querySelectorAll('.fa-lane .fa-row-actions').length"),0);
   await b.evaluate("document.querySelector('.fa-row-edit').click()");
   await b.wait("document.querySelector('.fa-modal input')");
-  await b.evaluate("document.querySelector('.fa-modal input').value='更新后的系统标题';document.querySelector('.fa-modal .fa-edit-policy-select').value='edit';document.querySelector('.fa-modal .fa-edit-policy-select').dispatchEvent(new Event('change',{bubbles:true}));document.querySelector('.fa-modal .fa-edit-policy-select').value='keep';document.querySelector('.fa-modal .fa-edit-policy-select').dispatchEvent(new Event('change',{bubbles:true}));document.querySelector('.fa-modal .btn-primary').click()");
+  await b.evaluate("document.querySelector('.fa-modal input').value='更新后的系统标题';document.querySelectorAll('.fa-modal textarea')[2].value='更新后的微信话术';document.querySelector('.fa-modal .fa-edit-policy-select').value='edit';document.querySelector('.fa-modal .fa-edit-policy-select').dispatchEvent(new Event('change',{bubbles:true}));document.querySelector('.fa-modal .fa-edit-policy-select').value='keep';document.querySelector('.fa-modal .fa-edit-policy-select').dispatchEvent(new Event('change',{bubbles:true}));document.querySelector('.fa-modal .btn-primary').click()");
   await b.wait("window.faCalls.some(x=>x.update?.lane==='pair')");
   assert.equal(await b.evaluate("window.faCalls.find(x=>x.update)?.update.title"),'更新后的系统标题');
+  assert.equal(await b.evaluate("window.faCalls.find(x=>x.update)?.update.messageDraft"),'更新后的微信话术');
   assert.equal(await b.evaluate("window.faCalls.find(x=>x.update)?.update.gptAction"),'keep');
   await b.evaluate("document.querySelector('.fa-row-edit').click()");
   await b.wait("document.querySelector('.fa-modal .fa-edit-policy-select')");
@@ -63,7 +65,7 @@ test('follow-up advice generates one CloudBase lane and manages each model indep
   await b.evaluate("(async()=>{const {setLang}=await import('/crm/js/modules/console/i18n.js');setLang('en');window.faRender()})()");
   await b.wait("document.querySelectorAll('.fa-lane').length===2");
   assert.deepEqual(await b.evaluate("[...document.querySelectorAll('.fa-section h4')].map(x=>x.textContent)"),
-    ['Overall Follow-up Strategy','Product and Service Advice','Overall Follow-up Strategy','Product and Service Advice']);
+    ['Overall Follow-up Strategy','Product and Service Advice','WeChat Message Draft','Overall Follow-up Strategy','Product and Service Advice']);
   await b.evaluate("window.faAdvice.system.status='failed';window.faRender()");
   await b.wait("document.querySelector('.fa-status-failed')");
   assert.equal(await b.evaluate("document.querySelectorAll('.fa-row-head .fa-row-delete').length"),1,

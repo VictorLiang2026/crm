@@ -39,6 +39,7 @@ const FOLLOWUP_ADVICE_COLUMNS = 'id,person_id,client_request_id,title,system_tit
   'system_strategy_sources,system_product_sources,system_version,system_task_id,gpt_strategy,gpt_product_advice,'+
   'gpt_strategy_sources,gpt_product_sources,gpt_based_on_system_version,gpt_kept_for_system_version,gpt_status,'+
   'gpt_preview_id,gpt_preview_payload,gpt_preview_actor,gpt_preview_expires_at,created_by,updated_by,created_at,updated_at,deleted_at';
+const WECHAT_SCRIPT_DELIMITER = '\n\n---\n\n微信沟通话术：\n';
 const EXTENSIONS = Object.freeze({
   '.pdf': 'application/pdf', '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
@@ -88,13 +89,25 @@ function redactTaskData(value,person={},depth=0) {
   }
   return safe;
 }
+function splitAdviceAndMessage(value) {
+  const raw=String(value||''),index=raw.lastIndexOf(WECHAT_SCRIPT_DELIMITER);
+  return index<0?{productAdvice:raw,messageDraft:''}:{productAdvice:raw.slice(0,index),messageDraft:raw.slice(index+WECHAT_SCRIPT_DELIMITER.length)};
+}
+function packAdviceAndMessage(productAdvice,messageDraft) {
+  const product=cleanText(productAdvice,4000,'productAdvice',true)||'';
+  const message=cleanText(messageDraft||null,1000,'wechatMessage')||'';
+  return cleanText(message?`${product}${WECHAT_SCRIPT_DELIMITER}${message}`:product,5000,'productAdvice',true);
+}
 function adviceDto(row,personName=null) {
   const systemTitle=row.system_title||row.title;
+  const systemContent=splitAdviceAndMessage(row.system_product_advice),gptContent=splitAdviceAndMessage(row.gpt_product_advice);
   return {id:String(row.id),personId:String(row.person_id),personName:personName||null,title:systemTitle,
-    system:{title:systemTitle,status:row.system_status,strategy:row.system_strategy||'',productAdvice:row.system_product_advice||'',
+    system:{title:systemTitle,status:row.system_status,strategy:row.system_strategy||'',productAdvice:systemContent.productAdvice,
+      messageDraft:systemContent.messageDraft,
       strategySources:row.system_strategy_sources||[],productSources:row.system_product_sources||[],
       version:Number(row.system_version||0),taskId:row.system_task_id?String(row.system_task_id):null},
-    gpt:{title:row.gpt_title||'',status:row.gpt_status,strategy:row.gpt_strategy||'',productAdvice:row.gpt_product_advice||'',
+    gpt:{title:row.gpt_title||'',status:row.gpt_status,strategy:row.gpt_strategy||'',productAdvice:gptContent.productAdvice,
+      messageDraft:gptContent.messageDraft,
       strategySources:row.gpt_strategy_sources||[],productSources:row.gpt_product_sources||[],
       basedOnSystemVersion:row.gpt_based_on_system_version==null?null:Number(row.gpt_based_on_system_version),
       keptForSystemVersion:row.gpt_kept_for_system_version==null?null:Number(row.gpt_kept_for_system_version),
@@ -1063,7 +1076,7 @@ function createKnowledgeLibrary(options={}) {
     const strategy=sourceContext(strategyEntries),products=sourceContext(productEntries);
     return {customerSnapshot,interactions,strategy,products,context:{customer_snapshot:customerSnapshot,
       recent_interactions:interactions,strategy_sources:strategy.refs,product_sources:products.refs,
-      generation_rules:'Generate one CloudBase system recommendation as two separate sections. Use Simplified Chinese (zh-CN) as the default language for the title and every user-facing text field in both sections, including strategy, objective, next step, clarifying questions, and product/service recommendation, even when source material is in another language. Use another language only when the current request explicitly asks for it. Preserve official brand or product names when needed and explain them in Chinese. overallStrategy must apply relevant international sales and relationship practices to the stated facts, cover relationship progress, objective, questions and next step, and must not name or recommend a specific product or service. productServiceAdvice must be grounded only in product_sources and may state that no suitable source was found. Use only exact supplied knowledge item IDs in each section sourceRefs. Do not invent person facts, product terms, returns, guarantees, tax or legal conclusions. Keep the advice actionable, concise and tailored to the customer facts and recent interactions.',
+      generation_rules:'Generate one CloudBase system recommendation with three separate sections: overallStrategy, productServiceAdvice, and wechatMessage. Use Simplified Chinese (zh-CN) as the default language for every user-facing field, even when source material is in another language. Use another language only when the current request explicitly asks for it. overallStrategy must cover relationship progress, objective, questions and next step without recommending products or services. productServiceAdvice must be grounded only in product_sources. wechatMessage must be one concise, natural, respectful message ready to send on WeChat, based on known facts and the strategy; do not invent a meeting, agreement, need, product claim, guarantee, or urgency. Mention a product or service only when supported by product_sources; otherwise focus on reconnecting and asking permission to continue the conversation. Use only exact supplied knowledge item IDs in sourceRefs. Do not invent person facts, product terms, returns, guarantees, tax or legal conclusions. Keep all sections actionable, concise and tailored to the customer facts and recent interactions.',
       guardrails:'Industry and strategy sources may support the overall strategy only. Product, company and service claims require current verified product_sources. If there is no valid product source, say that a product/service match could not be verified and list what a person should confirm. Avoid repeating contact details or unnecessarily identifying information.'},
       redactionPerson:person.person};
   }
@@ -1088,7 +1101,7 @@ function createKnowledgeLibrary(options={}) {
         actorResolver:async()=>({uid:row.created_by,isAnonymous:false})});
       const task=await gateway.runAITask({taskType:'person_followup_advice',skill:'person_followup_advice',capability:'coaching',
         subjectType:'person',subjectId:personId,input:{personId},context:context.context,
-        contextSnapshot:{...context.context,_context:{recipe:'person_followup_advice',version:'1.1.0',source:'assistant.knowledge-library-service'}},
+        contextSnapshot:{...context.context,_context:{recipe:'person_followup_advice',version:'1.2.0',source:'assistant.knowledge-library-service'}},
         ...(typeof options.onStarted==='function'?{onStarted:async({taskId})=>{
           await request('person_followup_advice','PATCH',{id:`eq.${adviceId}`,person_id:`eq.${personId}`,
             system_status:'eq.generating',deleted_at:'is.null'},
@@ -1096,10 +1109,11 @@ function createKnowledgeLibrary(options={}) {
           await options.onStarted({taskId:String(taskId),personId,adviceId});
         }}:{})});
       const result=task.result;
-      if(!object(result)||!object(result.overallStrategy)||!object(result.productServiceAdvice))fail('INVALID_RESULT');
+      if(!object(result)||!object(result.overallStrategy)||!object(result.productServiceAdvice)||typeof result.wechatMessage!=='string')fail('INVALID_RESULT');
       if(hasExplicitTestMarker(result))fail('TEST_DATA_OUTPUT_BLOCKED');
       const strategyRefs=keepAllowedSources(result.overallStrategy.sourceRefs,context.strategy.allowed);
       const productRefs=keepAllowedSources(result.productServiceAdvice.sourceRefs,context.products.allowed);
+      const messageDraft=cleanText(result.wechatMessage,1000,'wechatMessage',true);
       const strategyText=[result.overallStrategy.summary,
         `Objective: ${result.overallStrategy.objective}`,
         `Next step: ${result.overallStrategy.nextStep}`,
@@ -1109,7 +1123,7 @@ function createKnowledgeLibrary(options={}) {
       const saved=await request('person_followup_advice','PATCH',{id:`eq.${adviceId}`,person_id:`eq.${personId}`,
         system_status:'eq.generating',deleted_at:'is.null'},
         {title:generatedTitle,system_title:generatedTitle,system_status:'ready',system_strategy:cleanText(strategyText,4000,'strategy',true),
-          system_product_advice:cleanText(result.productServiceAdvice.recommendation,4000,'productAdvice',true),
+          system_product_advice:packAdviceAndMessage(result.productServiceAdvice.recommendation,messageDraft),
           system_strategy_sources:strategyRefs,system_product_sources:productRefs,system_version:1,
           system_task_id:String(task.taskId),updated_by:row.created_by,updated_at:new Date().toISOString()});
       if(saved.length!==1)fail('STALE');
@@ -1200,9 +1214,13 @@ function createKnowledgeLibrary(options={}) {
       if(input.lane==='system'||input.lane==='pair') {
         const title=cleanText(input.title,240,'title',true),
           strategy=cleanText(input.strategy,4000,'strategy',true),
-          product=cleanText(input.productAdvice,4000,'productAdvice',true);
-        const changed=title!==(current.system_title||current.title)||strategy!==current.system_strategy||product!==current.system_product_advice;
-        body={...body,title,system_title:title,system_strategy:strategy,system_product_advice:product,
+          product=cleanText(input.productAdvice,4000,'productAdvice',true),
+          currentParts=splitAdviceAndMessage(current.system_product_advice),
+          messageDraft=Object.prototype.hasOwnProperty.call(input,'messageDraft')
+            ? cleanText(input.messageDraft,1000,'wechatMessage',true) : currentParts.messageDraft,
+          packedProduct=packAdviceAndMessage(product,messageDraft);
+        const changed=title!==(current.system_title||current.title)||strategy!==current.system_strategy||packedProduct!==current.system_product_advice;
+        body={...body,title,system_title:title,system_strategy:strategy,system_product_advice:packedProduct,
           system_version:Number(current.system_version)+(changed?1:0),
           gpt_kept_for_system_version:changed?null:current.gpt_kept_for_system_version,
           gpt_status:current.gpt_strategy?(changed?'stale':current.gpt_status):'pending',
@@ -1244,10 +1262,14 @@ function createKnowledgeLibrary(options={}) {
     }
     // Retain the original paired-update contract for older Console clients.
     const title=cleanText(input.title,240,'title',true),strategy=cleanText(input.systemStrategy,4000,'strategy',true),
-      product=cleanText(input.systemProductAdvice,4000,'productAdvice',true);
-    const systemChanged=title!==current.title||strategy!==current.system_strategy||product!==current.system_product_advice;
+      product=cleanText(input.systemProductAdvice,4000,'productAdvice',true),
+      currentParts=splitAdviceAndMessage(current.system_product_advice),
+      messageDraft=Object.prototype.hasOwnProperty.call(input,'systemMessageDraft')
+        ? cleanText(input.systemMessageDraft,1000,'wechatMessage',true) : currentParts.messageDraft,
+      packedProduct=packAdviceAndMessage(product,messageDraft);
+    const systemChanged=title!==current.title||strategy!==current.system_strategy||packedProduct!==current.system_product_advice;
     const nextVersion=Number(current.system_version)+(systemChanged?1:0);
-    const body={title,system_title:title,system_strategy:strategy,system_product_advice:product,system_version:nextVersion,
+    const body={title,system_title:title,system_strategy:strategy,system_product_advice:packedProduct,system_version:nextVersion,
       gpt_kept_for_system_version:systemChanged?null:current.gpt_kept_for_system_version,
       gpt_status:current.gpt_strategy?(systemChanged?'stale':current.gpt_status):'pending',updated_by:actor,
       updated_at:new Date().toISOString()};
@@ -1291,6 +1313,7 @@ function createKnowledgeLibrary(options={}) {
     for(const row of selected) {
       try {
         const context=await followupAdviceContext(String(row.person_id),row.title);
+        const currentAdvice=splitAdviceAndMessage(row.system_product_advice);
         const safePerson=context.customerSnapshot.person;
         const safeSnapshot={person:safePerson,
           household:redactTaskData(context.customerSnapshot.household,context.redactionPerson),
@@ -1310,7 +1333,8 @@ function createKnowledgeLibrary(options={}) {
           summary:redactForTask(ref.summary,context.redactionPerson)}));
         result.push({adviceId:String(row.id),personId:String(row.person_id),title:redactForTask(row.title,context.redactionPerson),systemVersion:Number(row.system_version),
           currentSystemAdvice:{title:redactForTask(row.system_title||row.title,context.redactionPerson),overallStrategy:redactForTask(row.system_strategy,context.redactionPerson),
-            productServiceAdvice:redactForTask(row.system_product_advice,context.redactionPerson)},
+            productServiceAdvice:redactForTask(currentAdvice.productAdvice,context.redactionPerson),
+            wechatMessage:redactForTask(currentAdvice.messageDraft,context.redactionPerson)},
           customerSnapshot:safeSnapshot,recentInteractions:context.interactions,
           strategySources:safeSources(context.strategy.refs),productSources:safeSources(context.products.refs),
           outputContract:{adviceId:'copy exact value',personId:'copy exact value',systemVersion:'copy exact value',
