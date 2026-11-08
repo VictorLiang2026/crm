@@ -9,7 +9,7 @@ test('Recruit directory renders sortable 30-row pages and applies name, stage, a
   try {
     await b.start();
     await b.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
-    await b.open('#/more');
+    await b.open('#/ai');
     await b.evaluate(`(async()=>{
       const {renderRecruit}=await import('/crm/js/modules/console/pages/recruit.js');
       window.recruitRequests=[];

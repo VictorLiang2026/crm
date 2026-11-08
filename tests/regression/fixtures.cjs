@@ -383,7 +383,6 @@ function installFixtures() {
       : fail('UNEXPECTED_LEGACY_AI_PARSE'),
     'customers:trashList': () => ({ ...rows([{ ...customer, Id: 910099, customer_name: marker + '已删除客户', deleted_at: '2026-09-20T01:00:00Z', legacy_delete:true }]), counts: {}, recoverable_counts:{910099:{}} }),
     'customers:restore': () => ({legacy_restored:[910099],restored:[910099],skipped:[]}),
-    'ai_recommendations:listAll': () => rows([]),
     'recruit_candidates:rcMap': () => rows([{ id: candidate.candidate_id, customer_id: customer.Id, deleted_at: null }]),
     'recruit_candidates:list': () => rows([candidate]),
     'recruit_candidates:funnel': () => ({ funnel: { '新增人才': mode === 'empty' ? 0 : 1 }, total: mode === 'empty' ? 0 : 1 }),

@@ -7,7 +7,7 @@ const {Browser}=require('../regression/browser.cjs');
 test('PC17 resolves and confirms Person links, stages names explicitly, and manages speaker/topic resources',async()=>{
   const browser=new Browser(path.resolve(__dirname,'../..'));
   try{
-    await browser.start();await browser.open('#/more');
+    await browser.start();await browser.open('#/ai');
     await browser.evaluate(`(async()=>{
       const {renderActivityParticipants,renderActivityResources}=await import('/crm/js/modules/console/activity-people.js');
       const activity={id:42,name:'【系统测试·勿联系】PC17活动',activity_date:'2026-10-20',topic_ids:[],updated_at:'2026-10-16T04:00:00.000Z'};

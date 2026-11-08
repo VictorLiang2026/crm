@@ -4,7 +4,7 @@ const {Browser}=require('../regression/browser.cjs');
 for(const lang of ['zh-CN','en'])test(`L04a PDF imports preserve originals, localized failure history and human review (${lang})`,async()=>{
  const b=new Browser(path.resolve(__dirname,'../..'));
  try{
-  await b.start();await b.open('#/more');
+  await b.start();await b.open('#/ai');
   await b.evaluate(`(async()=>{
    const {fileImportNode}=await import('/crm/js/modules/console/file-import.js');
    const {data}=await import('/crm/js/modules/console/data.js');

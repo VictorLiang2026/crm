@@ -13,7 +13,7 @@ test('manual Person creation keeps the candidate visible and previews a differen
   const browser = new Browser(path.resolve(__dirname, '../..'));
   try {
     await browser.start();
-    await browser.open('#/more');
+    await browser.open('#/ai');
     await browser.evaluate(`(async()=>{
       const {openPersonNew}=await import('/crm/js/modules/console/write.js');
       const {setLang}=await import('/crm/js/modules/console/i18n.js');
@@ -57,7 +57,7 @@ test('Quick Capture permits a reviewed new Person when only a different qualifie
   const browser = new Browser(path.resolve(__dirname, '../..'));
   try {
     await browser.start();
-    await browser.open('#/more');
+    await browser.open('#/ai');
     await browser.evaluate(`(async()=>{
       const {openQuickCapture}=await import('/crm/js/modules/console/write.js');
       const {setLang}=await import('/crm/js/modules/console/i18n.js');

@@ -9,7 +9,7 @@ test('Person facts show provenance and require a reviewed preview before execute
   const b = new Browser(path.resolve(__dirname, '../..'));
   try {
     await b.start();
-    await b.open('#/more');
+    await b.open('#/ai');
     await b.evaluate(`(async()=>{
       const {renderPerson}=await import('/crm/js/modules/console/pages/person.js');
       const i18n=await import('/crm/js/modules/console/i18n.js');

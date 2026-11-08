@@ -8,7 +8,7 @@ test('PC15 directory filters, history, analysis drill-through, details, edit pre
   const browser=new Browser(path.resolve(__dirname,'../..'));
   try{
     await browser.start();
-    await browser.open('#/more');
+    await browser.open('#/ai');
     await browser.evaluate(`(async()=>{
       const {renderOpportunities}=await import('/crm/js/modules/console/pages/opportunities.js');
       const i18n=await import('/crm/js/modules/console/i18n.js');window.pc15I18n=i18n;

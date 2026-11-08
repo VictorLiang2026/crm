@@ -7,7 +7,7 @@ const { Browser } = require('../regression/browser.cjs');
 test('Person editor saves Person, Customer, and Recruit fields with one atomic form submission', async () => {
   const b = new Browser(path.resolve(__dirname, '../..'));
   try {
-    await b.start(); await b.open('#/more');
+    await b.start(); await b.open('#/ai');
     await b.evaluate(`(async()=>{
       const {openPersonEdit}=await import('/crm/js/modules/console/write.js');
       window.profileMode='linked';window.personWrites=[];
@@ -58,7 +58,7 @@ test('People directory customer view is additive, keeps the full directory, and 
   const b = new Browser(path.resolve(__dirname, '../..'));
   try {
     await b.start();
-    await b.open('#/more');
+    await b.open('#/ai');
     await b.evaluate(`(async()=>{
       const {renderPeople}=await import('/crm/js/modules/console/pages/people.js');
       window.peopleRequests=[];

@@ -7,7 +7,7 @@ const {Browser}=require('../regression/browser.cjs');
 for(const lang of ['zh-CN','en'])test(`L01 customer status, paging, retry and same-Person links (${lang})`,async()=>{
  const b=new Browser(path.resolve(__dirname,'../..'));
  try{
-  await b.start();await b.open('#/more');
+  await b.start();await b.open('#/ai');
   await b.evaluate(`(async()=>{
    const {setLang}=await import('/crm/js/modules/console/i18n.js');setLang(${JSON.stringify(lang)});
    const {renderPeople}=await import('/crm/js/modules/console/pages/people.js');

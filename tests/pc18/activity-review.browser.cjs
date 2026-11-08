@@ -7,7 +7,7 @@ const {Browser}=require('../regression/browser.cjs');
 test('PC18 displays review history and requires server preview then explicit confirmation for all writes',async()=>{
   const browser=new Browser(path.resolve(__dirname,'../..'));
   try{
-    await browser.start();await browser.open('#/more');
+    await browser.start();await browser.open('#/ai');
     await browser.evaluate(`(async()=>{
       const i18n=await import('/crm/js/modules/console/i18n.js');i18n.setLang('en');
       const {renderActivityReview}=await import('/crm/js/modules/console/activity-review.js');

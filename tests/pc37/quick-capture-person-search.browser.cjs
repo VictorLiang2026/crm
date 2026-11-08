@@ -8,7 +8,7 @@ test('legacy Quick Capture search opens exact Person capture preview before writ
   const b = new Browser(path.resolve(__dirname, '../..'));
   try {
     await b.start();
-    await b.open('#/more', 'mode=quick-capture-search');
+    await b.open('#/ai', 'mode=quick-capture-search');
     await b.click('#qc-entry-btn', '快速记录');
     await b.evaluate(`(()=>{
       document.querySelector('.modal-overlay textarea').value='【CRM_TEST_ONLY】虚构原话';

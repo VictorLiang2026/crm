@@ -336,19 +336,6 @@ export function renderAssistantHub({ root }) {
   wrap.append(grid);
 }
 
-export function renderMore({ root }) {
-  const wrap = page(root, t('title_more'), t('legacy_ai_suggestions_desc'));
-  const grid = node('div', 'phase14-grid');
-  for (const [title, hash, description] of [
-    [t('legacy_ai_suggestions'), '#/ai-suggestions', t('legacy_ai_suggestions_desc')],
-  ]) {
-    const card = link(title, hash, 'phase14-tile');
-    card.append(node('span', 'phase14-muted', description));
-    grid.append(card);
-  }
-  wrap.append(grid);
-}
-
 export function renderLegacyPicker({ root, callFn, feature, openLegacyTab }) {
   const target = LEGACY_TABS[feature];
   if (!target) throw new Error('未知的旧功能入口');

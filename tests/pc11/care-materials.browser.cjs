@@ -9,7 +9,7 @@ test('Person care materials stores gifts on a Person and keeps files customer-sc
   const browser = new Browser(path.resolve(__dirname, '../..'));
   try {
     await browser.start();
-    await browser.open('#/more');
+    await browser.open('#/ai');
     await browser.evaluate(`(async()=>{
       const {careMaterialsNode}=await import('/crm/js/modules/console/care-materials.js');
       window.careMaterialsNode=careMaterialsNode;

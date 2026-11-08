@@ -69,7 +69,7 @@ test('Person insurance editor offers a reload after an optimistic-lock conflict'
   const b = new Browser(path.resolve(__dirname, '../..'));
   try {
     await b.start();
-    await b.open('#/more');
+    await b.open('#/ai');
     await b.evaluate(`(async()=>{
       const {renderInsuranceEditor}=await import('/crm/js/modules/console/insurance-editor.js');
       window.pc12Reloads=0;
@@ -94,7 +94,7 @@ test('Person insurance editor blocks editing until the customer relationship exi
   const b = new Browser(path.resolve(__dirname, '../..'));
   try {
     await b.start();
-    await b.open('#/more');
+    await b.open('#/ai');
     await b.evaluate(`(async()=>{
       const {renderInsuranceEditor}=await import('/crm/js/modules/console/insurance-editor.js');
       const ctx={api:{call:async(name,args)=>({rows:[],customerId:null,version:null})}};

@@ -18,6 +18,7 @@ module.exports = async function smoke(root, test, options = {}) {
   const text = value => `document.getElementById('view').innerText.includes(${JSON.stringify(value)})`;
   const called = (name, action) => `window.__crmTest.calls.some(c => c.name === ${JSON.stringify(name)} && c.action === ${JSON.stringify(action)})`;
   const open = async (route, expected, query = '') => { await b.open(route, query); await b.wait(text(expected)); };
+  const navigateAdmin = async route => b.send('Page.navigate', {url:b.origin + '/admin.html?authCase=1&run=' + Date.now() + route});
   const check = (id, title, fn) => test(id, title, 'browser / isolated fixtures', async () => { await fn(); await b.healthy(); }, {
     group: longBrowserCases.has(id) ? 'long' : 'short',
     abortOnInfrastructureFailure: true,
@@ -64,16 +65,15 @@ module.exports = async function smoke(root, test, options = {}) {
       await b.click('button', '登录');
       await b.wait(text('请在新版人物页继续'));
     });
-    await check('phase14.navigation', '旧导航只保留尚无 Console 替代入口的更多页', async () => {
+    await check('phase14.navigation', '旧 Admin 首页入口转到 Console 今日经营', async () => {
       await open('#/today', '今日');
       const labels = await b.evaluate("[...document.querySelectorAll('#mod-switch button')].map(x=>x.textContent.trim())");
       assert.deepEqual(labels, ['更多']);
       assert.equal(await b.evaluate("document.getElementById('qc-entry-btn')?.textContent.includes('快速记录')"), true);
       assert.equal(await b.evaluate("document.querySelector('#mod-switch [data-mod=people], #mod-switch [data-mod=activity], #mod-switch [data-mod=recruit]') === null"), true);
-      await b.open('#/');
-      await b.wait("document.querySelector('.dash-entry')");
-      assert.deepEqual(await b.evaluate("[...document.querySelectorAll('.dash-entry a')].map(x=>x.getAttribute('href'))"), ['#/ai-suggestions', '#/assistant/actions/new']);
-      assert.equal(await b.evaluate("[...document.querySelectorAll('.dash-entry button')].some(x=>/新增客户|AI 解析新增/.test(x.textContent))"), false);
+      await navigateAdmin('');
+      await b.wait("location.pathname.endsWith('/console.html') && location.hash === '#/today' && document.querySelector('#console-main')");
+      assert.equal(await b.evaluate("document.querySelector('.dash-entry, .dash-hero, #view') === null"), true);
     });
     await check('phase14.people', '人物目录以只读方式进入 Person 360', async () => {
       await open('#/people', '[CRM_TEST_ONLY]客户甲');
@@ -90,16 +90,13 @@ module.exports = async function smoke(root, test, options = {}) {
       assert.equal(await b.evaluate("document.querySelector('#mod-switch [data-mod=opportunities]')"), null);
       assert.equal(await b.evaluate("window.__crmTest.calls.some(c=>c.name==='opportunities' && c.action==='create')"), false);
     });
-    await check('phase14.ai-more', '更多只保留 AI 建议历史入口，旧功能路由仍可直接访问', async () => {
+    await check('phase14.ai-more', '旧更多与 AI 历史地址转到 Console，其他旧功能路由仍可访问', async () => {
       await open('#/ai', 'AI CRM 搜索');
-      await open('#/more', 'AI建议历史');
-      assert.equal(await b.evaluate("document.getElementById('view').innerText.includes('传统客户列表')"), false);
-      assert.deepEqual(await b.evaluate("[...document.querySelectorAll('.phase14-tile')].map(x=>x.innerText.trim().split('\\n')[0])"), ['AI建议历史']);
-      for (const removed of ['传统跟进', '经营漏斗', '保单检视', '嘉宾资源', '主题资源', '招募目标', '客户回收站'])
-        assert.equal(await b.evaluate(`document.getElementById('view').innerText.includes(${JSON.stringify(removed)})`), false);
-      await b.click('#view a', 'AI建议历史');
-      await b.wait("location.hash==='#/ai-suggestions'");
-      await b.wait(text('暂无 AI 建议'));
+      await navigateAdmin('#/more');
+      await b.wait("location.pathname.endsWith('/console.html') && location.hash === '#/more' && document.querySelector('.console-main .more-section')");
+      assert.equal(await b.evaluate("document.querySelector('.phase14-tile') === null"), true);
+      await navigateAdmin('#/ai-suggestions');
+      await b.wait("location.pathname.endsWith('/console.html') && location.hash === '#/ai/experience' && document.querySelector('.crm-ai-exp-page')");
       await open('#/more/followups', '[CRM_TEST_ONLY]客户甲');
       await b.click('#view button', '打开传统跟进');
       await b.wait(text('[CRM_TEST_ONLY]跟进内容'));

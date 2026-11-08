@@ -1493,8 +1493,6 @@ const DICT = {
   'legacy_followups_desc': { 'zh-CN': '选择客户后进入旧跟进记录', 'en': 'Pick a customer, then open follow-ups' },
   'legacy_funnels': { 'zh-CN': '经营漏斗', 'en': 'Funnels' },
   'legacy_funnels_desc': { 'zh-CN': '原漏斗分析', 'en': 'Original funnel analysis' },
-  'legacy_ai_suggestions': { 'zh-CN': 'AI建议历史', 'en': 'AI Suggestions' },
-  'legacy_ai_suggestions_desc': { 'zh-CN': '原 AI 建议记录', 'en': 'Original AI suggestion records' },
   'legacy_policy_review': { 'zh-CN': '保单检视', 'en': 'Policy Review' },
   'legacy_policy_review_desc': { 'zh-CN': '旧客户详情中的保单检视', 'en': 'Policy review in legacy customer detail' },
   'legacy_products': { 'zh-CN': '客户保障记录', 'en': 'Customer Coverage' },

@@ -27,6 +27,7 @@ const LEGACY_ROUTES = [
 
 const CONSOLE_REDIRECTS = {
   '#/account': { hash: '#/settings', selector: '.settings-password-form' },
+  '#/ai-suggestions': { hash: '#/ai/experience', selector: '.crm-ai-exp-page' },
   '#/speakers': { hash: '#/activity-speakers', selector: '.resource-directory-results' },
   '#/topics': { hash: '#/activity-topics', selector: '.resource-directory-results' },
   '#/recruit/goals': { hash: '#/recruit/goals', selector: '.recruit-analysis-targets' },

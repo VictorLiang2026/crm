@@ -5,7 +5,7 @@ const path = require('node:path');
 const { Browser } = require('../regression/browser.cjs');
 
 async function setup(b, recordOnly = false, multipleItems = false, parseFailure = null) {
-  await b.start(); await b.open('#/more');
+  await b.start(); await b.open('#/ai');
   await b.evaluate(`(async()=>{
     await new Promise((resolve,reject)=>{
       const css=document.createElement('link');css.rel='stylesheet';css.href='/crm/css/console.css';

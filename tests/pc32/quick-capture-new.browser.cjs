@@ -8,7 +8,7 @@ test('Console new Person capture shows server preview and executes once without 
   const b = new Browser(path.resolve(__dirname, '../..'));
   try {
     await b.start();
-    await b.open('#/more');
+    await b.open('#/ai');
     await b.evaluate(`(async()=>{
       const {openQuickCapture}=await import('/crm/js/modules/console/write.js');
       const {setLang}=await import('/crm/js/modules/console/i18n.js');

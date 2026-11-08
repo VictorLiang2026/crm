@@ -4,7 +4,7 @@ const {Browser}=require('../regression/browser.cjs');
 test('M11 legacy same-ID edit/close, stale preview reset, uncertain execute replay and readback recovery',async()=>{
  const b=new Browser(path.resolve(__dirname,'../..'));
  try{
-  await b.start();await b.open('#/more');
+  await b.start();await b.open('#/ai');
   await b.evaluate(`(async()=>{
    const {renderOpportunities}=await import('/crm/js/modules/console/pages/opportunities.js');
    window.m11Open=(await import('/crm/js/modules/console/legacy-opportunity.js')).openLegacyOpportunity;

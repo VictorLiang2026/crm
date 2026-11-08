@@ -9,7 +9,7 @@ test('Person insurance reports preserve AI originals, show human revisions, and 
   const b = new Browser(path.resolve(__dirname, '../..'));
   try {
     await b.start();
-    await b.open('#/more');
+    await b.open('#/ai');
     await b.evaluate(`(async()=>{
       const {renderInsuranceReports}=await import('/crm/js/modules/console/insurance-reports.js');
       window.pc13State={calls:[],reloads:0,report:{
@@ -73,7 +73,7 @@ test('report revision skips untouched blocks, clears an override returned to AI 
   const b = new Browser(path.resolve(__dirname, '../..'));
   try {
     await b.start();
-    await b.open('#/more');
+    await b.open('#/ai');
     await b.evaluate(`(async()=>{
       const {setLang}=await import('/crm/js/modules/console/i18n.js');
       const {renderInsuranceReports}=await import('/crm/js/modules/console/insurance-reports.js');
@@ -135,7 +135,7 @@ test('Person insurance report generation uses the linked customer and keeps the 
   const b = new Browser(path.resolve(__dirname, '../..'));
   try {
     await b.start();
-    await b.open('#/more');
+    await b.open('#/ai');
     await b.evaluate(`(async()=>{
       const {renderInsuranceReports}=await import('/crm/js/modules/console/insurance-reports.js');
       window.pc13State={calls:[],generated:false,report:{id:32,report_date:'2026-10-16',report_type:'保单年度检视',
@@ -173,7 +173,7 @@ test('Person insurance reports do not call the report service without an active 
   const b = new Browser(path.resolve(__dirname, '../..'));
   try {
     await b.start();
-    await b.open('#/more');
+    await b.open('#/ai');
     await b.evaluate(`(async()=>{
       const {renderInsuranceReports}=await import('/crm/js/modules/console/insurance-reports.js');
       window.pc13Calls=[];

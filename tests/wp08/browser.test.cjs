@@ -7,7 +7,7 @@ const {Browser}=require('../regression/browser.cjs');
 test('Person work item remains unchanged until human preview confirmation, then refreshes its state',async()=>{
   const browser=new Browser(path.resolve(__dirname,'../..'));
   try{
-    await browser.start(); await browser.open('#/more');
+    await browser.start(); await browser.open('#/ai');
     await browser.evaluate(`(async()=>{
       const {mountPersonWorkItems}=await import('/crm/js/modules/work-items.js');
       localStorage.setItem('todayCoachCache','stale');

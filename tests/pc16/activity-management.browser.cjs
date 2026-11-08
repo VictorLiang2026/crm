@@ -7,7 +7,7 @@ const {Browser}=require('../regression/browser.cjs');
 test('PC16 activity create/edit/delete and task CRUD retain review, legacy report, bilingual iPad layout',async()=>{
   const browser=new Browser(path.resolve(__dirname,'../..'));
   try{
-    await browser.start();await browser.open('#/more');
+    await browser.start();await browser.open('#/ai');
     await browser.evaluate(`(async()=>{
       const i18n=await import('/crm/js/modules/console/i18n.js');window.pc16I18n=i18n;
       const {renderActivities,renderActivity}=await import('/crm/js/modules/console/pages/activities.js');

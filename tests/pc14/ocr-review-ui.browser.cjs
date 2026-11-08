@@ -8,7 +8,7 @@ test('Person OCR review requires identity and field review before apply, and ver
   const b = new Browser(path.resolve(__dirname, '../..'));
   try {
     await b.start();
-    await b.open('#/more');
+    await b.open('#/ai');
     await b.evaluate(`(async()=>{
       const {renderOcrReview}=await import('/crm/js/modules/console/ocr-review.js');
       const i18n=await import('/crm/js/modules/console/i18n.js'); window.pc14I18n=i18n;

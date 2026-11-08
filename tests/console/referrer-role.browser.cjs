@@ -8,7 +8,7 @@ test('Person profile confirms manual referrer mark and removal, then refreshes i
   const b = new Browser(path.resolve(__dirname, '../..'));
   try {
     await b.start();
-    await b.open('#/more');
+    await b.open('#/ai');
     await b.evaluate(`(async()=>{
       const {renderPerson}=await import('/crm/js/modules/console/pages/person.js');
       window.referrerMarked=false;window.roleCalls=[];window.roleToasts=[];
@@ -51,7 +51,7 @@ test('Referrer filter explains its meaning and provides a useful empty state in 
   const b = new Browser(path.resolve(__dirname, '../..'));
   try {
     await b.start();
-    await b.open('#/more');
+    await b.open('#/ai');
     await b.evaluate(`(async()=>{
       const {renderPeople}=await import('/crm/js/modules/console/pages/people.js');
       window.filterRequests=[];

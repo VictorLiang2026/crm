@@ -8,7 +8,7 @@ test('Person network shows real directed edge evidence, separates family, and ke
   const browser = new Browser(path.resolve(__dirname, '../..'));
   try {
     await browser.start();
-    await browser.open('#/more');
+    await browser.open('#/ai');
     await browser.evaluate(`(async()=>{
       const {relationshipNetworkNode}=await import('/crm/js/modules/console/relationship-network.js');
       const i18n=await import('/crm/js/modules/console/i18n.js');window.networkI18n=i18n;
@@ -57,7 +57,7 @@ test('empty network never invokes AI and makes insufficient confirmed evidence e
   const browser = new Browser(path.resolve(__dirname, '../..'));
   try {
     await browser.start();
-    await browser.open('#/more');
+    await browser.open('#/ai');
     await browser.evaluate(`(async()=>{
       const {relationshipNetworkNode}=await import('/crm/js/modules/console/relationship-network.js');
       window.emptyNetworkCalls=[];

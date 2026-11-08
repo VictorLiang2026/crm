@@ -7,7 +7,7 @@ const os = require('node:os');
 const puppeteer = require('puppeteer-core');
 
 const base = 'https://crm-d1gkae8ddc930d151-1434199662.tcloudbaseapp.com/crm/';
-const consoleRoutes = ['#/today', '#/people', '#/opportunities', '#/activities', '#/recruit', '#/ai', '#/more', '#/person/783', '#/recycle/recruit'];
+const consoleRoutes = ['#/today', '#/people', '#/opportunities', '#/activities', '#/recruit', '#/ai', '#/ai/experience', '#/more', '#/person/783', '#/recycle/recruit'];
 const legacyRoutes = [
   '#/account', '#/test-scenario', '#/customers', '#/more/followups', '#/funnels',
   '#/ai-suggestions', '#/more/policy-review', '#/more/products', '#/more/gifts',
@@ -15,6 +15,7 @@ const legacyRoutes = [
   '#/activity/customer', '#/activity/recruit', '#/customers/trash', '#/recruit/trash',
 ];
 const consoleRedirects = {
+  '#/ai-suggestions': '#/ai/experience',
   '#/account': '#/settings', '#/speakers': '#/activity-speakers', '#/topics': '#/activity-topics',
   '#/recruit/goals': '#/recruit/goals', '#/activity/customer': '#/activity-report/customer',
   '#/activity/recruit': '#/activity-report/recruit', '#/customers/trash': '#/recycle/customers',
