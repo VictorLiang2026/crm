@@ -102,7 +102,7 @@ async function main() {
       ['scene','#/test-scenario',"text.includes('初始样本 10 / 10') && text.includes('已有测试场景')"],
       ['person','#/person/'+ids.personId,"!!document.querySelector('#view .person360 h2') && text.includes('【系统测试·勿联系】虚构体验甲')"],
       ['customer','#/customer/'+ids.customerId,"!!document.querySelector('#view .tabs') && text.includes('【系统测试·勿联系】虚构体验甲') && text.includes('跟进记录')"],
-      ['activity','#/activity/'+ids.activityId,"text.includes('【系统测试·勿联系】') && text.includes('日期：') && text.includes('+ 新增活动')"],
+      ['activity','#/activity/'+ids.activityId,"text.includes('【系统测试·勿联系】') && text.includes('日期：') && !text.includes('+ 新增活动')"],
       ['funnel','#/funnels',"text.includes('含测试数据')"]
     ];
     for (const [id,hash,condition] of routes) {

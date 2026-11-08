@@ -64,17 +64,21 @@ module.exports = async function smoke(root, test, options = {}) {
       await b.click('button', '登录');
       await b.wait(text('请在新版人物页继续'));
     });
-    await check('phase14.navigation', '七项主导航和全局快速记录始终可见', async () => {
+    await check('phase14.navigation', '旧导航只保留尚无 Console 替代入口的更多页', async () => {
       await open('#/today', '今日');
       const labels = await b.evaluate("[...document.querySelectorAll('#mod-switch button')].map(x=>x.textContent.trim())");
-      assert.deepEqual(labels, ['今日', 'AI助手', '人', '机会', '活动', '招募', '更多']);
+      assert.deepEqual(labels, ['更多']);
       assert.equal(await b.evaluate("document.getElementById('qc-entry-btn')?.textContent.includes('快速记录')"), true);
-      assert.equal(await b.evaluate("document.querySelector('#mod-switch [data-mod=today]')?.classList.contains('active')"), true);
+      assert.equal(await b.evaluate("document.querySelector('#mod-switch [data-mod=people], #mod-switch [data-mod=activity], #mod-switch [data-mod=recruit]') === null"), true);
+      await b.open('#/');
+      await b.wait("document.querySelector('.dash-entry')");
+      assert.deepEqual(await b.evaluate("[...document.querySelectorAll('.dash-entry a')].map(x=>x.getAttribute('href'))"), ['#/ai-suggestions', '#/assistant/actions/new']);
+      assert.equal(await b.evaluate("[...document.querySelectorAll('.dash-entry button')].some(x=>/新增客户|AI 解析新增/.test(x.textContent))"), false);
     });
     await check('phase14.people', '人物目录以只读方式进入 Person 360', async () => {
       await open('#/people', '[CRM_TEST_ONLY]客户甲');
       await b.wait(called('person_360', 'listPeople'));
-      assert.equal(await b.evaluate("document.querySelector('#mod-switch [data-mod=people]')?.classList.contains('active')"), true);
+      assert.equal(await b.evaluate("document.querySelector('#mod-switch [data-mod=people]')"), null);
       await b.click('#view a', '[CRM_TEST_ONLY]客户甲');
       await b.wait(called('person_360', 'get'));
       assert.equal(await b.evaluate('location.hash'), '#/person/980001');
@@ -83,26 +87,26 @@ module.exports = async function smoke(root, test, options = {}) {
     await check('phase14.opportunities', '机会目录包含 Person 专属机会和人工入口', async () => {
       await open('#/opportunities', '[CRM_TEST_ONLY]联系候选人');
       await b.wait(called('person_360', 'listOpportunityDirectory'));
-      assert.equal(await b.evaluate("document.querySelector('#mod-switch [data-mod=opportunities]')?.classList.contains('active')"), true);
+      assert.equal(await b.evaluate("document.querySelector('#mod-switch [data-mod=opportunities]')"), null);
       assert.equal(await b.evaluate("window.__crmTest.calls.some(c=>c.name==='opportunities' && c.action==='create')"), false);
     });
-    await check('phase14.ai-more', 'AI助手与更多保留旧入口', async () => {
+    await check('phase14.ai-more', '更多只保留 AI 建议历史入口，旧功能路由仍可直接访问', async () => {
       await open('#/ai', 'AI CRM 搜索');
-      await open('#/more', '传统跟进');
+      await open('#/more', 'AI建议历史');
       assert.equal(await b.evaluate("document.getElementById('view').innerText.includes('传统客户列表')"), false);
-      for (const textLabel of ['传统跟进', '经营漏斗', 'AI建议历史', '保单检视', '产品',
-        '伴手礼', '照片/OCR', '嘉宾资源', '主题资源', '招募目标', '客户活动量',
-        '增员活动量', '客户回收站', '增员回收站']) {
-        assert.equal(await b.evaluate(`document.getElementById('view').innerText.includes(${JSON.stringify(textLabel)})`), true);
-      }
+      assert.deepEqual(await b.evaluate("[...document.querySelectorAll('.phase14-tile')].map(x=>x.innerText.trim().split('\\n')[0])"), ['AI建议历史']);
+      for (const removed of ['传统跟进', '经营漏斗', '保单检视', '嘉宾资源', '主题资源', '招募目标', '客户回收站'])
+        assert.equal(await b.evaluate(`document.getElementById('view').innerText.includes(${JSON.stringify(removed)})`), false);
+      await b.click('#view a', 'AI建议历史');
+      await b.wait("location.hash==='#/ai-suggestions'");
+      await b.wait(text('暂无 AI 建议'));
       await open('#/more/followups', '[CRM_TEST_ONLY]客户甲');
       await b.click('#view button', '打开传统跟进');
       await b.wait(text('[CRM_TEST_ONLY]跟进内容'));
       assert.equal(await b.evaluate('location.hash'), '#/customer/910001');
     });
     await check('account.entry-refresh', '更多入口可强制重新加载且保留本地业务缓存', async () => {
-      await open('#/more', '账号与应用维护', 'authCase=1');
-      await b.click('#view a', '账号与应用维护');
+      await b.send('Page.navigate', {url:b.origin + '/admin.html?authCase=1&run=' + Date.now() + '#/account'});
       await b.wait("location.pathname.endsWith('/console.html') && location.hash==='#/settings' && document.querySelector('.settings-password-form')");
       await b.evaluate("localStorage.setItem('todayCoachCache','fixture-cache'); window.confirm=()=>true");
       await b.click('#console-main button', '强制加载最新版');
@@ -433,6 +437,7 @@ module.exports = async function smoke(root, test, options = {}) {
     });
     await check('activities.list', '活动列表点击进入活动详情', async () => {
       await open('#/activities', '[CRM_TEST_ONLY]活动甲');
+      assert.equal(await b.evaluate("[...document.querySelectorAll('#view .toolbar button')].some(x=>/新增活动|嘉宾资源|活动主题/.test(x.textContent))"), false);
       await b.click('#view strong', '[CRM_TEST_ONLY]活动甲');
       await b.wait(called('activities', 'get'));
       await b.wait(text('[CRM_TEST_ONLY]活动说明'));
@@ -526,12 +531,9 @@ module.exports = async function smoke(root, test, options = {}) {
       await open('#/recruit', '[CRM_TEST_ONLY]候选人甲');
       await b.wait(called('recruit_candidates', 'funnel'));
     });
-    await check('recruit.customer-lookup', '新增候选人通过有上限的服务端查询选择客户', async () => {
-      await b.click('#view button', '+ 新增候选人');
-      await b.evaluate("(() => { const x=document.querySelector('input[placeholder=\"输入客户姓名…\"]'); x.value='[CRM_TEST_ONLY]客户甲'; x.dispatchEvent(new Event('blur')); })()");
-      await b.wait("document.body.innerText.includes('✓ 已关联客户：[CRM_TEST_ONLY]客户甲')");
-      assert.equal(await b.evaluate("window.__crmTest.calls.some(c=>c.name==='customers' && c.action==='list' && c.exactName==='[crm_test_only]客户甲' && c.pageSize===1)"), true);
-      await b.click('body .card button', '取消');
+    await check('recruit.customer-lookup', '旧增员页不再显示重复的新建候选人入口', async () => {
+      await open('#/recruit', '[CRM_TEST_ONLY]候选人甲');
+      assert.equal(await b.evaluate("[...document.querySelectorAll('#view button')].some(x=>x.textContent.includes('新增候选人'))"), false);
     });
     await check('recruit.detail', '增员详情与增员跟进标签', async () => {
       await open('#/recruit/930001', '[CRM_TEST_ONLY]候选人甲');

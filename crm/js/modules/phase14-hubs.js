@@ -337,25 +337,10 @@ export function renderAssistantHub({ root }) {
 }
 
 export function renderMore({ root }) {
-  const wrap = page(root, '更多', '旧功能继续保留原页面与地址。选择客户后可进入旧客户详情中的功能。');
+  const wrap = page(root, t('title_more'), t('legacy_ai_suggestions_desc'));
   const grid = node('div', 'phase14-grid');
   for (const [title, hash, description] of [
-    ['账号与应用维护', '#/account', '修改密码、退出登录、强制加载最新版'],
-    ['测试场景', '#/test-scenario', '受控生成 / 打开虚构测试场景'],
-    ['传统跟进', '#/more/followups', '选择客户后进入旧跟进记录'],
-    ['经营漏斗', '#/funnels', '原漏斗分析'],
-    ['AI建议历史', '#/ai-suggestions', '原建议记录'],
-    ['保单检视', '#/more/policy-review', '旧客户详情中的保单检视'],
-    ['产品', '#/more/products', '旧客户详情中的产品资料'],
-    ['伴手礼', '#/more/gifts', '旧客户详情中的伴手礼'],
-    ['照片/OCR', '#/more/photos', '选择客户后可进入照片或 OCR 记录'],
-    ['嘉宾资源', '#/speakers', '原嘉宾档案'],
-    ['主题资源', '#/topics', '原活动主题'],
-    ['招募目标', '#/recruit/goals', '原目标管理'],
-    ['客户活动量', '#/activity/customer', '原客户经营活动量'],
-    ['增员活动量', '#/activity/recruit', '原组织发展活动量'],
-    ['客户回收站', '#/customers/trash', '原客户恢复入口'],
-    ['增员回收站', '#/recruit/trash', '原候选人恢复入口'],
+    [t('legacy_ai_suggestions'), '#/ai-suggestions', t('legacy_ai_suggestions_desc')],
   ]) {
     const card = link(title, hash, 'phase14-tile');
     card.append(node('span', 'phase14-muted', description));

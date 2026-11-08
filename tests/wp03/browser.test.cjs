@@ -4,7 +4,7 @@ const {Browser}=require('../regression/browser.cjs');
 test('scene UI requires preview and human confirmation, opens existing scene and rejects unauthorized access',async()=>{
  const b=new Browser(path.resolve(__dirname,'../..'));
  try{
-  await b.start();await b.open('#/more');await b.wait("document.getElementById('view').innerText.includes('测试场景')");
+  await b.start();await b.open('#/test-scenario');await b.wait("document.getElementById('view').innerText.includes('生成 / 打开测试场景')");
   await b.evaluate(`(async()=>{
    history.replaceState(null,'','#/test-scenario');window.wp03Calls=[];window.wp03Ready=false;
    const m=await import('/crm/js/modules/test-scenario.js');

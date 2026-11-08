@@ -515,12 +515,6 @@
     <span class="env" id="env-label">PersonalAIOperatingSystemforRelationship,Sales&amp;Growth</span>
   </div>
   <nav class="mod-switch" id="mod-switch">
-    <button type="button" class="mod-btn" data-mod="today" onclick="location.hash='#/today'">今日</button>
-    <button type="button" class="mod-btn" data-mod="ai" onclick="location.hash='#/ai'">AI助手</button>
-    <button type="button" class="mod-btn" data-mod="people" onclick="location.hash='#/people'">人</button>
-    <button type="button" class="mod-btn" data-mod="opportunities" onclick="location.hash='#/opportunities'">机会</button>
-    <button type="button" class="mod-btn" data-mod="activity" onclick="location.hash='#/activities'">活动</button>
-    <button type="button" class="mod-btn" data-mod="recruit" onclick="location.hash='#/recruit'">招募</button>
     <button type="button" class="mod-btn" data-mod="more" onclick="location.hash='#/more'">更多</button>
   </nav>
   <button type="button" id="qc-entry-btn" class="global-capture">＋ 快速记录</button>
@@ -1810,19 +1804,10 @@ async function showDashboard(){
   view.appendChild(remindCard);
   loadDashCockpit(trendCard, remindCard);
 
-  // 底部安静入口：旧工作台功能全部保持可达
+  // Keep only legacy AI suggestion history here; shared workspaces live in Console.
   view.appendChild(el('div', {class:'dash-entry'}, [
-    el('button', {type:'button', onclick:function(){ openCustomerForm(null); }}, '＋ 新增客户'),
-    el('button', {type:'button', onclick:function(){ openAiParse(); }}, 'AI 解析新增'),
-    el('a', {href:'#/customers'}, '全部客户'),
-    el('a', {href:'#/today'}, '今日经营'),
-    el('a', {href:'#/funnels'}, '漏斗经营'),
     el('a', {href:'#/ai-suggestions'}, 'AI 建议'),
-    el('a', {href:'#/ai/search'}, 'AI CRM 搜索'),
     el('a', {href:'#/assistant/actions/new'}, '新建行动'),
-    el('a', {href:'#/recruit'}, '增员管理'),
-    el('a', {href:'#/activities'}, '活动列表'),
-    el('a', {href:'#/activity/customer'}, '活动量'),
   ]));
 }
 
@@ -2009,11 +1994,7 @@ async function showList(){
   toolbar.appendChild(el('button', {class:'btn', onclick:function(){ location.hash='#/'; }}, '← 返回首页'));
   toolbar.appendChild(searchInput);
   toolbar.appendChild(el('button', {class:'btn', onclick:doSearch}, '搜索'));
-  toolbar.appendChild(el('button', {class:'btn btn-primary', onclick:function(){ openCustomerForm(null); }}, '+ 新增客户'));
-  toolbar.appendChild(el('button', {class:'btn', onclick:function(){ openAiParse(); }}, 'AI 解析新增'));
   toolbar.appendChild(el('button', {class:'btn', onclick:function(){ location.hash='#/ai-suggestions'; }}, 'AI 建议'));
-  toolbar.appendChild(el('button', {class:'btn', onclick:function(){ location.hash='#/ai/search'; }}, 'AI CRM 搜索'));
-  toolbar.appendChild(el('button', {class:'btn', onclick:function(){ location.hash='#/customers/trash'; }}, '回收站'));
   view.appendChild(toolbar);
 
   var card = el('div', {class:'card'});
@@ -4367,10 +4348,6 @@ async function showRecruit(){
   var toolbar = el('div', {class:'toolbar'}, [
     searchInput,
     el('button', {class:'btn', onclick:doSearch}, '搜索'),
-    el('button', {class:'btn btn-primary', onclick:function(){ openCandidateForm(null); }}, '+ 新增候选人'),
-    el('button', {class:'btn btn-recruit', onclick:function(){ location.hash='#/recruit/goals'; }}, '目标管理'),
-    el('button', {class:'btn', onclick:function(){ location.hash='#/activity/recruit'; }}, '活动量'),
-    el('button', {class:'btn', onclick:function(){ location.hash='#/recruit/trash'; }}, '回收站'),
   ]);
   view.appendChild(toolbar);
 
@@ -4564,9 +4541,6 @@ async function showActivities(){
   var view = $('view');
   view.innerHTML = '';
   var toolbar = el('div', {class:'toolbar'}, [
-    el('button', {class:'btn btn-primary', onclick:function(){ openActivityForm(null); }}, '+ 新增活动'),
-    el('button', {class:'btn', onclick:function(){ location.hash='#/speakers'; }}, '嘉宾资源'),
-    el('button', {class:'btn', onclick:function(){ location.hash='#/topics'; }}, '活动主题'),
     el('button', {class:'btn btn-ai', onclick:function(){ toggleActivityLearning(); }}, '✨ 活动经验'),
   ]);
   view.appendChild(toolbar);
