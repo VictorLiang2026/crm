@@ -139,7 +139,7 @@ function assistantTaskPanel(ctx) {
     loadInto(out, async () => renderAssistantTask(ctx, await data.assistantReadTask(ctx, {
       query:query.value.trim(), language:document.documentElement.lang === 'en' ? 'en' : 'zh-CN',
       ...(selectedIntent ? {selectedIntent} : {}), ...(selectedPersonId ? {selectedPersonId} : {}),
-    }), run), h('div',{class:'muted'},t('assistant_task_loading')));
+    }), run), h('div',{class:'muted'},t('assistant_task_waiting')));
   }
   const form = h('form',{class:'search-form',onsubmit:e=>{e.preventDefault();run();}},[
     query,h('button',{class:'btn btn-soft',type:'submit'},[ic('sparkle'),t('assistant_task_run')]),

@@ -103,7 +103,23 @@ async function runReadIntent(event, dependencies = {}) {
     result = await (dependencies.search || (input=>require('./search-v2-service').runSearchV2(input)))(
       {query,language,selectedPersonId:personMention?selectedPersonId:undefined});
   } else if (parsed.intent === 'summarize') {
-    result = await (dependencies.summarize || (input=>require('./summarize-service').runSummarize(input)))({personId:selectedPersonId});
+    const onTaskStarted = typeof event.onTaskStarted === 'function'
+      ? value => event.onTaskStarted({ ...value, personId: selectedPersonId, intent: parsed.intent, plan: base.plan })
+      : undefined;
+    try {
+      result = await (dependencies.summarize || ((input, options)=>require('./summarize-service').runSummarize(input, options)))
+        ({personId:selectedPersonId}, onTaskStarted ? { onStarted: onTaskStarted } : {});
+    } catch (error) {
+      if (error?.code === 'AI_IN_PROGRESS' && error.taskId && onTaskStarted) {
+        await onTaskStarted({ taskId: error.taskId });
+        result = { ok: true, status: 'pending', taskId: String(error.taskId), personId: selectedPersonId };
+      } else throw error;
+    }
+    if (result?.status === 'pending' && result.taskId) {
+      return { ...base, status: 'pending', intent: parsed.intent, result,
+        plan: { ...base.plan, completed: false },
+        execution: { performed: false, modelCalled: true, businessDataRead: true, businessDataWritten: false } };
+    }
   } else if (parsed.intent === 'prepare') {
     result = await (dependencies.prepare || (input=>require('./meeting-prep-service').runMeetingPrep(input)))({personId:selectedPersonId});
   } else if (parsed.intent === 'plan') {

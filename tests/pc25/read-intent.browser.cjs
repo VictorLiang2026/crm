@@ -14,7 +14,7 @@ test('AI page offers read-only tasks, intent choice, Person choice, scope and so
   for(const token of ['assistantTaskPanel','data.assistantReadTask','needs_intent_choice','needs_person_selection',
     'assistant_task_scope_label','assistant_task_readonly','result.sources','search_v2_condition_']) assert.ok(misc.includes(token),token);
   for(const key of ['assistant_task_title','assistant_task_choose_intent','assistant_task_person_choice',
-    'assistant_task_analyze_unsupported','assistant_intent_search','assistant_intent_summarize','assistant_intent_prepare','assistant_intent_plan']) {
+    'assistant_task_analyze_unsupported','assistant_task_waiting','assistant_intent_search','assistant_intent_summarize','assistant_intent_prepare','assistant_intent_plan']) {
     assert.ok(i18n.includes(`'${key}'`),`missing ${key}`);
     const start=i18n.indexOf(`'${key}'`), line=i18n.slice(start,i18n.indexOf('\n',start));
     assert.match(line,/'zh-CN':/); assert.match(line,/'en':/);
@@ -35,6 +35,7 @@ test('assistant task UI confirms intent and Person, renders sourced results on i
     await browser.evaluate(`(async()=>{
       const {renderAI}=await import('/crm/js/modules/console/pages/misc.js');
       const {data}=await import('/crm/js/modules/console/data.js');
+      window.realAssistantReadTask=data.assistantReadTask;
       const i18n=await import('/crm/js/modules/console/i18n.js');
       window.taskCalls=[];
       data.assistantReadTask=async(_ctx,p)=>{
@@ -64,5 +65,25 @@ test('assistant task UI confirms intent and Person, renders sourced results on i
     assert.match(en,/Read-only Tasks/);assert.match(en,/Data scope/);assert.match(en,/Today priorities/);assert.match(en,/public\.actions #8/);
     for(const [width,height] of [[1180,820],[820,1180]]) { await browser.send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:false}); assert.equal(await browser.evaluate('document.documentElement.scrollWidth<=innerWidth+1'),true,`${width}x${height}`); }
     await browser.send('Emulation.clearDeviceMetricsOverride');
+
+    const resolved=await browser.evaluate(`(async()=>{
+      const {data}=await import('/crm/js/modules/console/data.js');
+      data.assistantReadTask=window.realAssistantReadTask;
+      const calls=[];
+      const result=await data.assistantReadTask({api:{call:async(name,payload)=>{
+        calls.push({name,payload});
+        if(calls.length===1)return {ok:true,status:'pending',taskId:'91',personId:'783',intent:'summarize',
+          plan:{intent:'summarize',interpretation:'Summarize a selected Person',dataScope:'one Person'},
+          execution:{performed:false,modelCalled:true,businessDataRead:true,businessDataWritten:false}};
+        return {ok:true,status:'completed',taskId:'91',personId:'783',summary:'Completed summary',
+          sources:[{schema:'public',table:'persons',id:'783'}],execution:{businessDataWritten:false}};
+      }}},{query:'总结测试人物',selectedPersonId:'783'});
+      return {result,calls};
+    })()`);
+    assert.equal(resolved.calls.length,2,JSON.stringify(resolved));
+    assert.deepEqual(resolved.calls[1].payload,{action:'aiTaskStatus',taskId:'91',personId:'783',taskType:'person_summary'});
+    assert.equal(resolved.result.status,'complete');assert.equal(resolved.result.intent,'summarize');
+    assert.equal(resolved.result.result.summary,'Completed summary');
+    assert.equal(resolved.result.execution.businessDataWritten,false);
   } finally { await browser.close(); }
 });

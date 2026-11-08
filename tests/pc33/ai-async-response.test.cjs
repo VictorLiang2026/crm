@@ -13,6 +13,29 @@ function mainWithKnowledgeLibrary(libraryRunner){
     libraryRunner,async()=>({ok:true,status:'pending'}));
 }
 
+function mainWithReadTask(readTaskRunner){
+  return createMain(()=>({uid:'test-operator',isAnonymous:false}),...Array(3).fill(undefined),readTaskRunner);
+}
+
+test('read-only summary returns a pending task before background generation completes',async()=>{
+  let finish, reachedModel=false;
+  const readTaskRunner=async(event)=>{
+    await event.onTaskStarted({taskId:'74',personId:'783',intent:'summarize',plan:{intent:'summarize'}});
+    reachedModel=true;
+    await new Promise(resolve=>{finish=resolve;});
+    return {ok:true,status:'complete'};
+  };
+  const main=mainWithReadTask(readTaskRunner),callbacks=[],context={};
+  assert.equal(main({action:'assistantReadTask',query:'总结李明',selectedPersonId:'783'},context,
+    (error,result)=>callbacks.push({error,result,callbackWaitsForEmptyEventLoop:context.callbackWaitsForEmptyEventLoop})),undefined);
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(reachedModel,true);assert.equal(callbacks.length,1);
+  assert.equal(callbacks[0].callbackWaitsForEmptyEventLoop,false);
+  assert.deepEqual(callbacks[0].result,{ok:true,status:'pending',taskId:'74',personId:'783',intent:'summarize',
+    plan:{intent:'summarize'},execution:{performed:false,modelCalled:true,businessDataRead:true,businessDataWritten:false}});
+  finish();
+});
+
 test('AI summary sends a pending task ID before generation completes and keeps the invocation alive',async()=>{
   let finish,markComplete;let reachedModel=false;
   const completed=new Promise(resolve=>{markComplete=resolve;});

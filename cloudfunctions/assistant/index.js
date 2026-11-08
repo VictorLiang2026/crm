@@ -350,8 +350,17 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
       }
     }
     if (event?.action === 'assistantReadTask') {
-      try { return await readTaskRunner({query:event.query,language:event.language,
-        selectedIntent:event.selectedIntent,selectedPersonId:event.selectedPersonId}); }
+      const asyncRequested = typeof callback === 'function';
+      try {
+        const result = await readTaskRunner({query:event.query,language:event.language,
+          selectedIntent:event.selectedIntent,selectedPersonId:event.selectedPersonId,
+          ...(asyncRequested ? { onTaskStarted: value => earlyResponse.send({
+            ok:true,status:'pending',taskId:String(value.taskId),personId:String(value.personId),
+            intent:value.intent,plan:value.plan,
+            execution:{performed:false,modelCalled:true,businessDataRead:true,businessDataWritten:false},
+          }) } : {})});
+        return earlyResponse.sent ? undefined : result;
+      }
       catch (error) {
         const code = ['INVALID_INPUT','INVALID_RESULT','INVALID_CONFIG','RATE_LIMIT','TIMEOUT',
           'UPSTREAM_UNAVAILABLE','PERSISTENCE_ERROR','AI_REQUEST_FAILED','NOT_FOUND'].includes(error?.code) || AI_AUDIT_CODES.has(error?.code) ? error.code : 'READ_TASK_FAILED';
@@ -493,7 +502,8 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
       return knowledgeLibraryRunner({action:'knowledgeLibrary',operation:'processOcrQueue'},'knowledge-ocr-worker',{internalOcrQueue:true});
     }
     const asyncRequested = typeof callback === 'function' &&
-      (((event?.action === 'summarize' || event?.action === 'meetingPrep') && event.asyncWait === true) ||
+      (event?.action === 'assistantReadTask' ||
+       ((event?.action === 'summarize' || event?.action === 'meetingPrep') && event.asyncWait === true) ||
        (event?.action === 'knowledgeLibrary' && ['dualGenerate','adviceGenerate'].includes(event.operation) && event.data?.asyncWait === true));
     const earlyResponse = createEarlyResponse(callback, context, asyncRequested);
     if (asyncRequested) console.log('AI_ASYNC_CALLBACK_MODE');

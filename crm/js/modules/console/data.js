@@ -48,7 +48,19 @@ export const data = {
   morningBrief: (ctx) => call(ctx, 'today_coach', { action: 'daily_review', view: 'morning' }),
   aiSearch: (ctx, query) => call(ctx, 'assistant', { action: 'search', query }),
   aiSearchV2: (ctx, payload) => call(ctx, 'assistant', { action: 'searchV2', ...payload }),
-  assistantReadTask: (ctx, payload) => call(ctx, 'assistant', { action: 'assistantReadTask', ...payload }),
+  assistantReadTask: async (ctx, payload) => {
+    const initial = await call(ctx, 'assistant', { action: 'assistantReadTask', ...payload });
+    if (initial?.status !== 'pending') return initial;
+    const status = await resolveAITask(() => Promise.resolve(initial),
+      ({ taskId, personId, taskType }) => call(ctx, 'assistant', { action: 'aiTaskStatus', taskId, personId, taskType }),
+      'person_summary', initial.personId, { timeoutMs: 120000 });
+    return {
+      ok: true, status: 'complete', intent: initial.intent || 'summarize',
+      plan: { ...(initial.plan || {}), completed: true },
+      execution: initial.execution || { performed: true, modelCalled: true, businessDataRead: true, businessDataWritten: false },
+      result: { ...status, personName: initial.personName || undefined },
+    };
+  },
   summarizePerson: (ctx, personId) => aiTask(ctx, { action: 'summarize', personId, asyncWait: true }, 'person_summary', personId),
   meetingPrep: (ctx, personId) => aiTask(ctx, { action: 'meetingPrep', personId, asyncWait: true },
     'meeting_prep', personId, { recoverStartup: true, timeoutMs: 150000 }),

@@ -42,6 +42,22 @@ test('summary requires a Person choice and resolves the selected candidate again
   assert.equal(calls.find(x=>x[0]==='summarize')[1].personId,'2');
 });
 
+test('summary publishes its task ID for background polling after the selected Person is revalidated',async()=>{
+  const {dependencies}=setup([parsed('summarize','supported',{personMention:'李明'})]);
+  let started;
+  dependencies.summarize=async(input,{onStarted})=>{
+    assert.deepEqual(input,{personId:'2'});
+    await onStarted({taskId:'71'});
+    return {ok:true,personId:'2',summary:'Sourced summary',sources:[]};
+  };
+  const result=await runReadIntent({query:'总结李明近期变化',selectedPersonId:'2',
+    onTaskStarted:value=>{started=value;}},dependencies);
+  assert.equal(result.status,'complete');
+  assert.equal(started.taskId,'71');assert.equal(started.personId,'2');
+  assert.equal(started.intent,'summarize');assert.equal(started.plan.intent,'summarize');
+  assert.equal(result.execution.businessDataWritten,false);
+});
+
 test('forged or stale Person selection is rejected before a read executor runs',async()=>{
   const {dependencies,calls}=setup([parsed('prepare','supported',{personMention:'李明'})]);
   await assert.rejects(runReadIntent({query:'准备与李明会面',selectedPersonId:'999'},dependencies),{code:'INVALID_INPUT'});

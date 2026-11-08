@@ -1392,6 +1392,7 @@ const DICT = {
   'assistant_task_scope': { 'zh-CN': '只运行搜索、人物摘要、会前准备和今日计划。分析意图暂未接入；此入口不会写入 CRM 业务数据。', 'en': 'Runs search, Person summary, meeting prep and today’s plan only. Analysis is not connected; this entry never writes CRM business data.' },
   'assistant_task_run': { 'zh-CN': '运行只读任务', 'en': 'Run Read-only Task' },
   'assistant_task_loading': { 'zh-CN': '正在核实意图和数据…', 'en': 'Checking intent and data…' },
+  'assistant_task_waiting': { 'zh-CN': '正在处理只读任务；人物摘要最长等待 120 秒…', 'en': 'Processing the read-only task. Person summaries may take up to 120 seconds…' },
   'assistant_task_choose_intent': { 'zh-CN': '我不确定你要做哪种任务，请选择；选择前不会读取业务数据。', 'en': 'Choose the task you mean. No business data is read until you choose.' },
   'assistant_task_name_needed': { 'zh-CN': '请在原请求中补充要查询的人物姓名后重试。', 'en': 'Add the Person’s name to your request and try again.' },
   'assistant_task_person_choice': { 'zh-CN': '服务端找到以下人物候选。选择后才会运行人物相关任务。', 'en': 'The server found these Person candidates. A Person task runs only after you choose one.' },

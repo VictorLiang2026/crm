@@ -9,16 +9,16 @@ test('Person summary keeps source provenance inside Gateway metadata and preserv
   const file = path.resolve(__dirname, '../../cloudfunctions/assistant/summarize-service.js');
   const loaded = new Module(file);
   loaded.filename = file;
-  let request;
+  let request, gatewayOptions;
   const stubs = {
     './interaction-service': require('../../cloudfunctions/_shared/interaction-service'),
     './db': { app: {} },
-    './ai-gateway': { createAIGateway: () => ({ runAITask: async value => {
+    './ai-gateway': { createAIGateway: options => { gatewayOptions=options; return { runAITask: async value => {
       request = value;
       await value.onStarted?.({taskId:91,runId:93});
       return { taskId: 91, resultId: 92, skillVersion: '1.0.0',
         result: { summary: '【系统测试·勿联系】虚构摘要', signals: [], gaps: [], nextActions: [], evidence: [] } };
-    } }) },
+    } }; } },
     './search-data': { createSearchData: () => ({ auditRdb: {} }) },
   };
   loaded.require = id => {
@@ -38,6 +38,7 @@ test('Person summary keeps source provenance inside Gateway metadata and preserv
   try {
   let started;
   const result = await loaded.exports.runSummarize({ personId: '783' }, {onStarted:value=>{started=value;}});
+    assert.equal(gatewayOptions.timeoutMs,100000);
     const { _context, ...snapshotData } = request.contextSnapshot;
     assert.deepEqual(snapshotData, request.context);
     assert.deepEqual(_context.sources, result.sources);
