@@ -31,6 +31,6 @@
 
 ## 发布记录
 
-CloudBase `assistant` 函数部署成功；Console 静态资源 4/4 上传成功（仅本报告列出的四个文件）。部署后 `sync-check.ps1 -CloudOnly` 通过：主页面 HTTP 200 且 SHA-256 匹配，95 个可达页面资源匹配，30 个 CRM 函数 / 243 个源码与配置文件匹配。线上地址：https://crm-d1gkae8ddc930d151-1434199662.tcloudbaseapp.com/crm/admin.html。Git 提交、标签及推送待完成。
+CloudBase `assistant` 函数部署成功；Console 静态资源 4/4 上传成功（仅本报告列出的四个文件）。部署后 `sync-check.ps1 -CloudOnly` 通过：主页面 HTTP 200 且 SHA-256 匹配，95 个可达页面资源匹配，30 个 CRM 函数 / 243 个源码与配置文件匹配。线上地址：https://crm-d1gkae8ddc930d151-1434199662.tcloudbaseapp.com/crm/admin.html。功能提交：`f85ea353354284a2fcb7ca101ba4557191d4fb8c`；标签：`release-20261108-200117`；GitHub `master`、本地 HEAD 与标签一致。`tools/release.ps1` 完成原子推送，推送后 `sync-check.ps1 -AllowPreservedDocs` 通过：95 个可达静态资源、30 个 CRM 函数 / 243 个源码与配置文件匹配。文档补记不改动 CloudBase 业务产物。
 
 本轮开始前已有暂存的 `docs/work-packages/admin-entry-cleanup-20261108.md` 修正继续保留，没有撤销或改写；它会随项目既定 `release.ps1` 提交。
