@@ -58,6 +58,17 @@ test('advice list uses bounded limit/offset pagination and rejects invalid page 
   await assert.rejects(service.run({operation:'adviceList',personId:'42',offset:-1},'operator'),error=>error.code==='INVALID_INPUT');
 });
 
+test('advice list recovers a legacy GPT WeChat section with compact CRLF separators without writing data',async()=>{
+  const {service,row,writes}=setup();
+  const legacy='GPT 产品建议\r\n---\r\n微信沟通话术：\r\n刘老师您好，方便时想和您确认一下近期安排。';
+  row.gpt_product_advice=legacy;
+  const result=await service.run({operation:'adviceList',personId:'42'},'operator');
+  assert.equal(result.rows[0].gpt.productAdvice,'GPT 产品建议');
+  assert.equal(result.rows[0].gpt.messageDraft,'刘老师您好，方便时想和您确认一下近期安排。');
+  assert.equal(row.gpt_product_advice,legacy);
+  assert.equal(writes.length,0);
+});
+
 test('GPT lane deletion clears only GPT fields and returns the paired row to pending',async()=>{
   const {service,row,writes}=setup();
   const result=await service.run({operation:'adviceUpdate',data:{id:'81',personId:'42',lane:'gpt',action:'delete',

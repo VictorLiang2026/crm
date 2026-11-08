@@ -90,8 +90,13 @@ function redactTaskData(value,person={},depth=0) {
   return safe;
 }
 function splitAdviceAndMessage(value) {
-  const raw=String(value||''),index=raw.lastIndexOf(WECHAT_SCRIPT_DELIMITER);
-  return index<0?{productAdvice:raw,messageDraft:''}:{productAdvice:raw.slice(0,index),messageDraft:raw.slice(index+WECHAT_SCRIPT_DELIMITER.length)};
+  const raw=String(value||''),marker=/(?:\r?\n)[ \t]*-{3,}[ \t]*(?:\r?\n)+[ \t]*微信沟通话术[ \t]*[：:][ \t]*(?:\r?\n)*/g;
+  let match=null,next;
+  while((next=marker.exec(raw)))match=next;
+  if(!match)return {productAdvice:raw,messageDraft:''};
+  const productAdvice=raw.slice(0,match.index).replace(/[ \t\r\n]+$/,''),
+    messageDraft=raw.slice(match.index+match[0].length).trim();
+  return messageDraft?{productAdvice,messageDraft}:{productAdvice:raw,messageDraft:''};
 }
 function packAdviceAndMessage(productAdvice,messageDraft) {
   const product=cleanText(productAdvice,4000,'productAdvice',true)||'';
