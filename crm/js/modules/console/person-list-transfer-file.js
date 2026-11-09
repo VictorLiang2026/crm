@@ -51,6 +51,57 @@ export function rowsFromMatrix(matrix) {
   })) };
 }
 
+export function mergeContinuationRows(rows, nameHeader) {
+  const source = Array.isArray(rows) ? rows : [];
+  const grouped = [];
+  const mergedRowNumbers = [];
+  const mergedInto = [];
+  const unresolvedRowNumbers = [];
+  let previous = null;
+  for (const item of source) {
+    const hasName = String(item?.values?.[nameHeader] ?? '').trim() !== '';
+    if (hasName) {
+      const next = { rowNumber: item.rowNumber, values: { ...(item.values || {}) }, sourceRowNumbers: [item.rowNumber] };
+      grouped.push(next);
+      previous = next;
+      continue;
+    }
+    if (!previous) {
+      unresolvedRowNumbers.push(item?.rowNumber);
+      grouped.push({ rowNumber: item?.rowNumber, values: { ...(item?.values || {}) }, sourceRowNumbers: [item?.rowNumber] });
+      continue;
+    }
+    mergedRowNumbers.push(item.rowNumber);
+    mergedInto.push({ rowNumber: item.rowNumber, mergedIntoRowNumber: previous.rowNumber });
+    previous.sourceRowNumbers.push(item.rowNumber);
+    for (const [header, rawValue] of Object.entries(item.values || {})) {
+      const value = String(rawValue ?? '').trim();
+      if (!value || header === nameHeader) continue;
+      const current = String(previous.values[header] ?? '').trim();
+      previous.values[header] = current ? `${current}\n${value}` : value;
+    }
+  }
+  return { rows: grouped, mergedRowNumbers, mergedInto, unresolvedRowNumbers };
+}
+
+export function mapMappedValues(row, headers, mappings, skipValue = '__skip__') {
+  const values = {};
+  for (let index = 0; index < headers.length; index += 1) {
+    const field = mappings[index];
+    if (!field || field === skipValue) continue;
+    const incoming = String(row?.values?.[headers[index]] ?? '').trim();
+    if (!incoming) continue;
+    if (field === 'notes') {
+      const segment = `${headers[index]}：${incoming}`;
+      values.notes = values.notes ? `${values.notes}\n${segment}` : segment;
+      continue;
+    }
+    if (Object.hasOwn(values, field)) throw new Error('DUPLICATE_FIELD_MAPPING');
+    values[field] = incoming;
+  }
+  return values;
+}
+
 function loadXlsx() {
   if (window.XLSX) return Promise.resolve(window.XLSX);
   if (window.__crmXlsxLoading) return window.__crmXlsxLoading;

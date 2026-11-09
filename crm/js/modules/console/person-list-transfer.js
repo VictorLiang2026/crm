@@ -3,10 +3,10 @@ import { ic } from './icons.js';
 import { data } from './data.js';
 import { pageHead, emptyNote } from './ui.js';
 import { getLang, t } from './i18n.js';
-import { PERSON_EXPORT_COLUMNS, readRosterFile, toCsv, toXlsx } from './person-list-transfer-file.js';
+import { PERSON_EXPORT_COLUMNS, mapMappedValues, mergeContinuationRows, readRosterFile, toCsv, toXlsx } from './person-list-transfer-file.js';
 
 const IMPORT_FIELDS = PERSON_EXPORT_COLUMNS.filter(field => !field.fixed).map(field => field.key);
-const NAME_ALIASES = new Set(['姓名','名字','人物姓名','客户姓名','name','display_name','person name','full name']);
+const NAME_ALIASES = new Set(['姓名','姓名或称呼','名字','人物姓名','客户姓名','name','display_name','person name','full name']);
 const PERSON_ID_ALIASES = new Set(['personid','person id','person_id']);
 const ALIASES = Object.freeze({
   phone: ['电话','手机','手机号','联系电话','phone','mobile'],
@@ -15,7 +15,8 @@ const ALIASES = Object.freeze({
   education: ['教育','学历','education'], source: ['来源','介绍来源','source'], hobbies: ['兴趣','爱好','hobbies','interests'],
   customer_stage: ['客户阶段','customer_stage','customer stage'], sales_priority: ['销售优先级','sales_priority','sales priority'],
   referral_priority: ['转介绍优先级','referral_priority','referral priority'], marital_status: ['婚姻状况','婚姻','marital_status','marital status'],
-  first_contact_date: ['首次联系日期','初次联系日期','first_contact_date','first contact date'], notes: ['备注','说明','notes','note'],
+  first_contact_date: ['首次联系日期','初次联系日期','first_contact_date','first contact date'],
+  notes: ['备注','说明','基本信息','故事经历','学生案例','教育观点','notes','note'],
 });
 const SKIP = '__skip__';
 const errorMessage = error => {
@@ -24,7 +25,7 @@ const errorMessage = error => {
     FILE_TYPE_UNSUPPORTED:'plt_load_failed', FILE_DUPLICATE_HEADER:'plt_load_failed', NAME_REQUIRED:'plt_name_required',
     IMPORT_PREVIEW_TOO_LARGE:'plt_preview_too_large', PREVIEW_EXPIRED:'plt_preview_expired', CONFIRMATION_REQUIRED:'plt_decision_required',
     IMPORT_HAS_BLOCKED_ROWS:'plt_blocked_source_help', IDENTITY_DECISION_REQUIRED:'plt_decision_required',
-    INVALID_IMPORT_ROW_NUMBER:'plt_load_failed',
+    INVALID_IMPORT_ROW_NUMBER:'plt_load_failed', DUPLICATE_FIELD_MAPPING:'plt_duplicate_mapping',
     QUALIFIER_CONFLICT:'plt_qualifier_conflict', QUALIFIER_REQUIRED:'plt_qualifier_conflict',
     EXISTING_QUALIFIER_REQUIRED:'plt_qualifier_conflict', PERSON_NOT_IN_PREVIEW:'plt_preview_expired',
     INVALID_FIELD_POLICY:'plt_import_failed', PREVIEW_STALE:'plt_preview_expired' })[code];
@@ -55,17 +56,6 @@ function fieldOptions(selected) {
     h('option', { value: 'PersonID' }, 'PersonID'),
     ...IMPORT_FIELDS.map(field => h('option', { value: field }, `${field} · ${translateField(field)}`)),
   ];
-}
-
-function mapValues(row, headers, mappings) {
-  const values = {};
-  for (let i = 0; i < headers.length; i += 1) {
-    const field = mappings[i];
-    if (!field || field === SKIP) continue;
-    if (Object.hasOwn(values, field)) throw new Error('DUPLICATE_FIELD_MAPPING');
-    values[field] = row.values[headers[i]] ?? '';
-  }
-  return values;
 }
 
 function findCandidate(row, personId) {
@@ -99,6 +89,8 @@ export function renderPersonListTransfer(ctx) {
   let fileData = null;
   let mappings = [];
   let aiConfidence = [];
+  let mergeUnnamedRows = false;
+  let continuationSummary = null;
   let preview = null;
   let previewId = '';
   let decisions = {};
@@ -146,6 +138,7 @@ export function renderPersonListTransfer(ctx) {
           fileData.fileName = file.name;
           mappings = fileData.headers.map(localHeaderField);
           aiConfidence = mappings.map(field => field ? 100 : 0);
+          mergeUnnamedRows = false; continuationSummary = null;
           preview = null; previewId = ''; decisions = {}; results = null;
           busy = false; render();
         } catch (error) { busy = false; fileData = null; render(); setStatus(errorMessage(error), true); }
@@ -199,12 +192,18 @@ export function renderPersonListTransfer(ctx) {
       return h('tr', {}, [h('td', {}, header), h('td', {}, select), h('td', { class: 'plt-sample-cell' }, sample),
         h('td', { class: level }, confidence)]);
     });
+    const nameHeader = fileData.headers[mappings.findIndex(field => field === 'display_name')];
+    const unnamedCount = nameHeader ? fileData.rows.filter(row => !String(row.values[nameHeader] || '').trim()).length : 0;
     return h('div', { class: 'plt-mapping' }, [h('div', { class: 'plt-section-head' }, [
       h('div', {}, [h('h2', {}, t('plt_mapping_title')), h('p', { class: 'foot-note' }, t('plt_mapping_help'))]), mapBtn,
     ]), h('div', { class: 'plt-table-scroll' }, h('table', { class: 'plt-table' }, [
       h('thead', {}, h('tr', {}, [h('th', {}, t('plt_column')), h('th', {}, t('plt_target_field')),
         h('th', {}, t('plt_sample')), h('th', {}, t('plt_confidence'))])), h('tbody', {}, rows),
-    ])), h('p', { class: 'plt-privacy' }, [ic('lock'), t('plt_ai_privacy')]),
+    ])), h('p', { class: 'plt-inline-help' }, t('plt_notes_multi_mapping')),
+    unnamedCount ? h('label', { class: 'plt-check plt-continuation-check' }, [h('input', { type: 'checkbox', checked: mergeUnnamedRows,
+      onchange: event => { mergeUnnamedRows = event.target.checked; continuationSummary = null; } }),
+      h('span', {}, t('plt_merge_unnamed_rows').replace('{count}', String(unnamedCount)))]) : null,
+    h('p', { class: 'plt-privacy' }, [ic('lock'), t('plt_ai_privacy')]),
     h('div', { class: 'plt-actions align-end' }, h('button', { class: 'btn btn-primary', type: 'button', disabled: busy,
       onclick: analyze }, [ic(busy ? 'clock' : 'search'), busy ? t('plt_analyzing') : t('plt_analyze')]))]);
   }
@@ -234,7 +233,23 @@ export function renderPersonListTransfer(ctx) {
     try {
       setStatus(t('plt_analyzing'));
       busy = true; render();
-      const rows = fileData.rows.map(row => ({ rowNumber: row.rowNumber, values: mapValues(row, fileData.headers, mappings) }));
+      let sourceRows = fileData.rows;
+      const nameHeader = fileData.headers[mappings.findIndex(field => field === 'display_name')];
+      if (mergeUnnamedRows) {
+        continuationSummary = mergeContinuationRows(fileData.rows, nameHeader);
+        if (continuationSummary.unresolvedRowNumbers.length) {
+          busy = false; render();
+          setStatus(t('plt_leading_unnamed_rows').replace('{rows}', continuationSummary.unresolvedRowNumbers.join(', ')), true);
+          return;
+        }
+        sourceRows = continuationSummary.rows;
+      } else {
+        const unnamedCount = fileData.rows.filter(row => !String(row.values[nameHeader] || '').trim()).length;
+        if (unnamedCount) {
+          busy = false; render(); setStatus(t('plt_unnamed_rows_need_action').replace('{count}', String(unnamedCount)), true); return;
+        }
+      }
+      const rows = sourceRows.map(row => ({ rowNumber: row.rowNumber, values: mapMappedValues(row, fileData.headers, mappings, SKIP) }));
       const response = await data.previewPersonListTransfer(ctx, { rows, idempotencyKey: newUuid() });
       if (!response?.previewId || !Array.isArray(response?.preview?.rows)) throw new Error('IMPORT_PREVIEW_FAILED');
       preview = response.preview; previewId = response.previewId; decisions = {}; draftDifferent = {}; results = null;
@@ -248,7 +263,7 @@ export function renderPersonListTransfer(ctx) {
       const target = preview.rows.some(row => ['needs_identity','blocked'].includes(row.status))
         ? ctx.main.querySelector('.plt-review-list, .plt-blocked-help')
         : ctx.main.querySelector('.plt-confirm-bar');
-      target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      target?.scrollIntoView({ behavior: 'auto', block: 'center' });
     } catch (error) { busy = false; render(); setStatus(errorMessage(error), true); }
   }
 
@@ -284,6 +299,9 @@ export function renderPersonListTransfer(ctx) {
       stat(preview?.counts?.duplicate || 0, 'plt_duplicate'), stat(unresolved.length, 'plt_review_count'),
       stat(preview?.counts?.blocked || 0, 'plt_blocked_count'),
     ]);
+    const continuationNote = continuationSummary?.mergedInto?.length
+      ? h('p', { class: 'plt-inline-help' }, t('plt_merged_rows_summary').replace('{rows}',
+        continuationSummary.mergedInto.map(item => `${item.rowNumber}→${item.mergedIntoRowNumber}`).join('、'))) : null;
     const highMatches = rows.filter(row => row.status === 'needs_identity' && row.candidates.some(candidate => candidate.suggested));
     const accept = h('button', { class: 'btn btn-soft', type: 'button', disabled: !highMatches.length || busy,
       onclick: () => { for (const row of highMatches) {
@@ -305,7 +323,7 @@ export function renderPersonListTransfer(ctx) {
         onclick: () => executeImport(readyCount) }, [ic(busy ? 'clock' : 'check'), t('plt_confirm_count').replace('{count}', String(readyCount))])]);
     return h('section', { class: 'card plt-section plt-preview' }, [
       h('div', { class: 'plt-section-head' }, [h('div', {}, [h('h2', {}, t('plt_review_title')), h('p', { class: 'foot-note' }, t('plt_review_help'))]), accept]),
-      stats,
+      continuationNote, stats,
       blockedRows.length ? h('div',{class:'plt-blocked-help'},[h('p',{class:'foot-note'},t('plt_blocked_source_help')),
         h('button',{class:'btn btn-ghost',type:'button',onclick:()=>downloadFile(toCsv([...(fileData?.headers||[]),...blockedMeta],blockedCsvRows),
           'people-import-blocked.csv','text/csv;charset=utf-8')},t('plt_download_errors'))]) : null,
