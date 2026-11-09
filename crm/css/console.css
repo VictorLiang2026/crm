@@ -1277,7 +1277,7 @@ body:has(.login), body.is-login { padding-top: env(safe-area-inset-top); }
 .plt-field-policies { display: flex; flex-wrap: wrap; gap: 8px; }
 .plt-field-policy-row { display: grid; gap: 4px; color: var(--ink-2); font-size: 11px; font-weight: 700; }
 .plt-field-policy { min-width: 220px; font-size: 12px; }
-.plt-confirm-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-top: 16px; border-top: 1px solid var(--line); }
+.plt-confirm-bar { position: sticky; bottom: 0; z-index: 5; display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 0 -20px -20px; padding: 12px 20px 20px; border-top: 1px solid var(--line); background: #fff; box-shadow: 0 -8px 18px rgba(20, 24, 36, .08); }
 .plt-confirm-bar > div { display: grid; gap: 3px; }
 .plt-export-fields { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 8px; }
 .plt-export-field { display: flex; align-items: center; gap: 8px; min-height: 42px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; background: #fff; font-size: 12px; }

@@ -76,6 +76,24 @@ test('Console More keeps only uncovered gaps bilingual and preserves all 17 old 
     await browser.evaluate("document.querySelector('.plt-section-head button').click()");
     await browser.wait("document.querySelectorAll('.plt-mapping tbody tr').length === 4");
     assert.match(await browser.evaluate("document.querySelector('.plt-drop-copy')?.innerText"), /4 rows/);
+    await browser.evaluate("document.querySelector('.plt-mapping .plt-section-head button').click()");
+    await browser.wait("document.querySelector('.plt-status')?.innerText.includes('AI mappings ready')");
+    assert.equal(await browser.evaluate("window.__crmTest.calls.some(c=>c.action==='mapPersonListFields')"), true);
+    await browser.evaluate("document.querySelector('.plt-actions button').click()");
+    await browser.wait("document.querySelector('.plt-preview .plt-confirm-bar button') && document.querySelector('.plt-status')?.innerText.includes('Analysis complete')");
+    const previewReady = await browser.evaluate(`(() => {
+      const button=document.querySelector('.plt-preview .plt-confirm-bar button');
+      const box=button?.getBoundingClientRect();
+      return {label:button?.innerText,disabled:button?.disabled,inViewport:!!box&&box.top<innerHeight&&box.bottom>0,
+        previewCalled:window.__crmTest.calls.some(c=>c.action==='previewPersonListTransfer')};
+    })()`);
+    assert.match(previewReady.label || '', /Confirm 4 changes/);
+    assert.equal(previewReady.disabled, false);
+    assert.equal(previewReady.inViewport, true, 'analysis should bring the import confirmation into view');
+    assert.equal(previewReady.previewCalled, true);
+    await browser.evaluate("document.querySelector('.plt-preview .plt-confirm-bar button').click()");
+    await browser.wait("window.__crmTest.calls.some(c=>c.action==='executePersonListTransfer') && document.querySelector('.plt-status')?.innerText.includes('Import complete')");
+    assert.equal(await browser.evaluate("window.__crmTest.calls.some(c=>c.action==='savePersonListTransferDecisions') && window.__crmTest.calls.some(c=>c.action==='executePersonListTransfer')"), true);
     await browser.evaluate("document.querySelector('.plt-tab[aria-pressed=\"false\"]').click()");
     await browser.wait("document.querySelector('.plt-export')");
     assert.equal(await browser.evaluate("document.querySelectorAll('.plt-export-field.is-fixed input:disabled').length"), 2);

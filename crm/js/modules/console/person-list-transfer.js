@@ -19,6 +19,7 @@ const ALIASES = Object.freeze({
 });
 const SKIP = '__skip__';
 const errorMessage = error => {
+  const code = error?.code || String(error?.message || '').split(':')[0];
   const key = ({ FILE_SIZE_LIMIT:'plt_load_failed', FILE_ROW_LIMIT:'plt_load_failed', FILE_COLUMN_LIMIT:'plt_load_failed',
     FILE_TYPE_UNSUPPORTED:'plt_load_failed', FILE_DUPLICATE_HEADER:'plt_load_failed', NAME_REQUIRED:'plt_name_required',
     IMPORT_PREVIEW_TOO_LARGE:'plt_preview_too_large', PREVIEW_EXPIRED:'plt_preview_expired', CONFIRMATION_REQUIRED:'plt_decision_required',
@@ -26,7 +27,7 @@ const errorMessage = error => {
     INVALID_IMPORT_ROW_NUMBER:'plt_load_failed',
     QUALIFIER_CONFLICT:'plt_qualifier_conflict', QUALIFIER_REQUIRED:'plt_qualifier_conflict',
     EXISTING_QUALIFIER_REQUIRED:'plt_qualifier_conflict', PERSON_NOT_IN_PREVIEW:'plt_preview_expired',
-    INVALID_FIELD_POLICY:'plt_import_failed', PREVIEW_STALE:'plt_preview_expired' })[error?.message];
+    INVALID_FIELD_POLICY:'plt_import_failed', PREVIEW_STALE:'plt_preview_expired' })[code];
   return t(key || 'plt_load_failed');
 };
 const newUuid = () => globalThis.crypto?.randomUUID?.() || 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, char => {
@@ -205,7 +206,7 @@ export function renderPersonListTransfer(ctx) {
         h('th', {}, t('plt_sample')), h('th', {}, t('plt_confidence'))])), h('tbody', {}, rows),
     ])), h('p', { class: 'plt-privacy' }, [ic('lock'), t('plt_ai_privacy')]),
     h('div', { class: 'plt-actions align-end' }, h('button', { class: 'btn btn-primary', type: 'button', disabled: busy,
-      onclick: analyze }, [ic('search'), t('plt_analyze')]))]);
+      onclick: analyze }, [ic(busy ? 'clock' : 'search'), busy ? t('plt_analyzing') : t('plt_analyze')]))]);
   }
 
   async function runAiMapping() {
@@ -231,16 +232,23 @@ export function renderPersonListTransfer(ctx) {
     let nameColumns = mappings.filter(field => field === 'display_name').length;
     if (nameColumns !== 1) { setStatus(t('plt_name_required'), true); return; }
     try {
+      setStatus(t('plt_analyzing'));
       busy = true; render();
       const rows = fileData.rows.map(row => ({ rowNumber: row.rowNumber, values: mapValues(row, fileData.headers, mappings) }));
       const response = await data.previewPersonListTransfer(ctx, { rows, idempotencyKey: newUuid() });
+      if (!response?.previewId || !Array.isArray(response?.preview?.rows)) throw new Error('IMPORT_PREVIEW_FAILED');
       preview = response.preview; previewId = response.previewId; decisions = {}; draftDifferent = {}; results = null;
       for (const row of preview?.rows || []) {
         if (row.personId && row.candidates.some(candidate => String(candidate.id) === String(row.personId))) {
           decisions[String(row.rowNumber)] = { kind: 'same', personId: String(row.personId) };
         }
       }
+      setStatus(t('plt_analysis_ready'));
       busy = false; render();
+      const target = preview.rows.some(row => ['needs_identity','blocked'].includes(row.status))
+        ? ctx.main.querySelector('.plt-review-list, .plt-blocked-help')
+        : ctx.main.querySelector('.plt-confirm-bar');
+      target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     } catch (error) { busy = false; render(); setStatus(errorMessage(error), true); }
   }
 

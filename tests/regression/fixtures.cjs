@@ -45,6 +45,9 @@ function installFixtures() {
     'assistant:testSamples': () => ({ok:true,ready:params.get('v2')==='1',
       targets:{personId:'980001',customerId:'910001',activityId:'940001'},
       initialCount:10,derivedCount:2,auditCount:1,marker:'【系统测试·勿联系】'}),
+    'assistant:mapPersonListFields': data => ({ok:true,mappings:(data.headers||[]).map((_,columnIndex)=>({
+      columnIndex,field:['display_name','phone','organization','notes'][columnIndex]||null,confidence:95,
+    }))}),
     'assistant:quickCaptureV2': data => {
       if(data.stage==='parse') return {ok:true,stage:'parse',today:'2026-10-03',
         aiTaskId:990101,aiRunId:990102,aiResultId:990103,preview:{
@@ -177,6 +180,17 @@ function installFixtures() {
       total:1,counts:{930100:{followups:1}},personOnly:true,
     }) : ({rows:[],total:0,personOnly:true}),
     'person_360:restorePersonOnlyRecruit': () => ({restored:[930100],skipped:[]}),
+    'person_360:previewPersonListTransfer': data => {
+      const source = data.data?.rows || [];
+      const previewRows = source.map(row => ({ rowNumber:row.rowNumber, values:row.values,
+        baseName:row.values.display_name, candidates:[], status:'new', current:null, personId:null }));
+      return { previewId:'33333333-3333-4333-8333-333333333333', status:'preview',
+        preview:{ rows:previewRows, counts:{new:previewRows.length,update:0,blocked:0,duplicate:0} } };
+    },
+    'person_360:savePersonListTransferDecisions': () => ({ok:true,status:'ready'}),
+    'person_360:executePersonListTransfer': () => ({ok:true,
+      counts:{succeeded:4,failed:0,blocked:0,skipped:0},
+      rows:[2,3,4,5].map(rowNumber=>({rowNumber,status:'created'}))}),
     'person_360:previewIdentity': data => ({previewId:'a45da2ae-b2ed-42c0-992e-e68e53085acc',
       preview:{kind:data.data.kind,personId:data.data.personId,displayName:data.data.displayName,
         newPerson:false,willCreateSpeaker:true,willCreateCustomer:false},
@@ -519,9 +533,10 @@ function installFixtures() {
         page: data.page, pageSize: data.pageSize, keyword: data.keyword, exactName: data.exactName,
         sortField: data.sortField, sortDir: data.sortDir,
         candidateId:data.candidateId, personId: data.personId || data.data?.personId, version: data.version,
-        previewId:data.previewId,
-        payload: ['assistant:quickCaptureV2', 'person_360:commitQuickCaptureV2', 'person_360:addCanonicalParticipant', 'person_360:recordActivityInteraction', 'person_360:createOpportunity',
+        previewId:data.previewId || data.data?.previewId,
+        payload: ['assistant:mapPersonListFields','assistant:quickCaptureV2', 'person_360:commitQuickCaptureV2', 'person_360:addCanonicalParticipant', 'person_360:recordActivityInteraction', 'person_360:createOpportunity',
           'person_360:updateOpportunity', 'person_360:createSpeakerProfile',
+          'person_360:previewPersonListTransfer','person_360:savePersonListTransferDecisions','person_360:executePersonListTransfer',
           'person_360:previewOpportunity','person_360:previewWorkItem','person_360:executeWorkItem',
           'person_360:previewIdentity','person_360:executeIdentity',
           'person_360:previewActivityReview','activity_speakers:update',
