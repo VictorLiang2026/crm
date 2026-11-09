@@ -1029,6 +1029,9 @@ exports.main = async event => {
     const uid = identity && identity.uid;
     if (typeof uid !== 'string' || !uid.trim() ||
         identity.isAnonymous === true || identity.is_anonymous === true) return { error: 'UNAUTHORIZED' };
+    if (event?.action === 'requestBrowserDevice' || event?.action === 'issueBrowserChallenge') {
+      return await require('./device-control').makeControl(app,process.env.TCB_ENV).control(event,identity);
+    }
     const service = createService();
     switch (event?.action) {
       case 'get': return await service.get(event.personId);

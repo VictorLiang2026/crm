@@ -4094,7 +4094,9 @@
         "policies": [
           {
             "name": "person_followup_advice_service_only",
-            "roles": ["service_role"],
+            "roles": [
+              "service_role"
+            ],
             "command": "*",
             "check_hash": "b326b5062b2f0e69046810717534cb09",
             "permissive": true,
@@ -4104,7 +4106,16 @@
         "force_rls": true,
         "privileges": {
           "anon": [],
-          "service_role": ["DELETE", "INSERT", "MAINTAIN", "REFERENCES", "SELECT", "TRIGGER", "TRUNCATE", "UPDATE"],
+          "service_role": [
+            "DELETE",
+            "INSERT",
+            "MAINTAIN",
+            "REFERENCES",
+            "SELECT",
+            "TRIGGER",
+            "TRUNCATE",
+            "UPDATE"
+          ],
           "authenticated": []
         },
         "security_invoker": false
@@ -4130,7 +4141,9 @@
         "policies": [
           {
             "name": "crm_knowledge_mcp_clients_service_only",
-            "roles": ["service_role"],
+            "roles": [
+              "service_role"
+            ],
             "command": "*",
             "check_hash": "b326b5062b2f0e69046810717534cb09",
             "permissive": true,
@@ -4140,7 +4153,16 @@
         "force_rls": true,
         "privileges": {
           "anon": [],
-          "service_role": ["DELETE", "INSERT", "MAINTAIN", "REFERENCES", "SELECT", "TRIGGER", "TRUNCATE", "UPDATE"],
+          "service_role": [
+            "DELETE",
+            "INSERT",
+            "MAINTAIN",
+            "REFERENCES",
+            "SELECT",
+            "TRIGGER",
+            "TRUNCATE",
+            "UPDATE"
+          ],
           "authenticated": []
         },
         "security_invoker": false
@@ -4155,7 +4177,9 @@
         "policies": [
           {
             "name": "crm_knowledge_mcp_grants_service_only",
-            "roles": ["service_role"],
+            "roles": [
+              "service_role"
+            ],
             "command": "*",
             "check_hash": "b326b5062b2f0e69046810717534cb09",
             "permissive": true,
@@ -4165,7 +4189,16 @@
         "force_rls": true,
         "privileges": {
           "anon": [],
-          "service_role": ["DELETE", "INSERT", "MAINTAIN", "REFERENCES", "SELECT", "TRIGGER", "TRUNCATE", "UPDATE"],
+          "service_role": [
+            "DELETE",
+            "INSERT",
+            "MAINTAIN",
+            "REFERENCES",
+            "SELECT",
+            "TRIGGER",
+            "TRUNCATE",
+            "UPDATE"
+          ],
           "authenticated": []
         },
         "security_invoker": false
@@ -4207,6 +4240,123 @@
       "detail": {
         "anon_execute": false,
         "service_execute": true,
+        "security_definer": false,
+        "authenticated_execute": false
+      }
+    },
+    {
+      "kind": "relation",
+      "name": "crm_access_members",
+      "detail": {
+        "rls": true,
+        "type": "r",
+        "policies": [
+          {
+            "name": "crm_members_service_read",
+            "roles": [
+              "service_role"
+            ],
+            "command": "r",
+            "check_hash": "d41d8cd98f00b204e9800998ecf8427e",
+            "permissive": true,
+            "using_hash": "b326b5062b2f0e69046810717534cb09"
+          }
+        ],
+        "force_rls": false,
+        "privileges": {
+          "anon": [],
+          "service_role": [
+            "SELECT"
+          ],
+          "authenticated": []
+        },
+        "security_invoker": false
+      }
+    },
+    {
+      "kind": "relation",
+      "name": "crm_browser_devices",
+      "detail": {
+        "rls": true,
+        "type": "r",
+        "policies": [
+          {
+            "name": "crm_devices_service_read",
+            "roles": [
+              "service_role"
+            ],
+            "command": "r",
+            "check_hash": "d41d8cd98f00b204e9800998ecf8427e",
+            "permissive": true,
+            "using_hash": "b326b5062b2f0e69046810717534cb09"
+          }
+        ],
+        "force_rls": false,
+        "privileges": {
+          "anon": [],
+          "service_role": [
+            "SELECT"
+          ],
+          "authenticated": []
+        },
+        "security_invoker": false
+      }
+    },
+    {
+      "kind": "relation",
+      "name": "crm_device_challenges",
+      "detail": {
+        "rls": true,
+        "type": "r",
+        "policies": [
+          {
+            "name": "crm_challenges_service_read",
+            "roles": [
+              "service_role"
+            ],
+            "command": "r",
+            "check_hash": "d41d8cd98f00b204e9800998ecf8427e",
+            "permissive": true,
+            "using_hash": "b326b5062b2f0e69046810717534cb09"
+          }
+        ],
+        "force_rls": false,
+        "privileges": {
+          "anon": [],
+          "service_role": [
+            "SELECT"
+          ],
+          "authenticated": []
+        },
+        "security_invoker": false
+      }
+    },
+    {
+      "kind": "routine",
+      "name": "crm_device_gateway_v1(p_op text, p_uid text, p_fingerprint text, p_args jsonb)",
+      "detail": {
+        "anon_execute": true,
+        "service_execute": false,
+        "security_definer": true,
+        "authenticated_execute": false
+      }
+    },
+    {
+      "kind": "routine",
+      "name": "crm_device_state_changed_v1()",
+      "detail": {
+        "anon_execute": false,
+        "service_execute": false,
+        "security_definer": false,
+        "authenticated_execute": false
+      }
+    },
+    {
+      "kind": "routine",
+      "name": "crm_member_disabled_v1()",
+      "detail": {
+        "anon_execute": false,
+        "service_execute": false,
         "security_definer": false,
         "authenticated_execute": false
       }

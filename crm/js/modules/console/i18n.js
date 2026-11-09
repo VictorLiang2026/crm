@@ -2,6 +2,20 @@
 const DEFAULT = 'zh-CN';
 
 const DICT = {
+  device_setup_title: {"zh-CN":"此设备的访问申请","en":"Device access request"},
+  device_setup_intro: {"zh-CN":"先登录你的 CRM，再申请此浏览器的访问权限。只有 CloudBase 后台可以批准。","en":"Sign in to your CRM and request access for this browser. Approval is available only in CloudBase."},
+  device_sign_in: {"zh-CN":"登录","en":"Sign in"},
+  device_label: {"zh-CN":"设备备注（例如：我的 iPad）","en":"Device label (for example, My iPad)"},
+  device_request: {"zh-CN":"申请或查看状态","en":"Request or check status"},
+  device_ready: {"zh-CN":"已登录，请申请访问。","en":"Signed in. Request access to continue."},
+  device_login_failed: {"zh-CN":"登录失败，请检查用户名和密码。","en":"Sign-in failed. Check your username and password."},
+  device_wait: {"zh-CN":"正在检查设备…","en":"Checking device…"},
+  device_fingerprint: {"zh-CN":"设备核对码：","en":"Device verification code:"},
+  device_pending: {"zh-CN":"等待后台批准。请在 CloudBase 核对设备码后批准，再查看状态。","en":"Pending. Match the code in CloudBase before approving, then check again."},
+  device_approved: {"zh-CN":"后台已批准此设备。","en":"CloudBase has approved this device."},
+  device_revoked: {"zh-CN":"此设备的授权已撤销。","en":"Access for this device has been revoked."},
+  device_limit: {"zh-CN":"待批准的申请已达上限，请在 CloudBase 整理申请。","en":"Pending request limit reached. Review requests in CloudBase."},
+  device_error: {"zh-CN":"无法申请或检查权限。请确认后台已绑定你的 CRM 账号，并使用支持安全存储的浏览器。","en":"Access could not be checked. Verify your CRM account is bound in CloudBase and your browser supports secure storage."},
   plt_more_title: {'zh-CN':'人物名单导入/导出','en':'People Import / Export'},
   plt_more_desc: {'zh-CN':'用 AI 映射名单字段，批量导入或导出人物资料。','en':'Map fields with AI, then import or export people.'},
   plt_title: {'zh-CN':'人物名单导入/导出','en':'People Import / Export'},

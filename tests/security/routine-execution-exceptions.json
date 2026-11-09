@@ -29,6 +29,36 @@
         "service_execute": false
       },
       "reason": "The existing pmc18_observer Cloud Function uses app.rdb() as anon. On 2026-10-19, revoking anon and granting service_role caused its real collect invocation to fail with permission denied; restoring anon made it return the already-collected 20-metric snapshot. Keep this exact ACL until PM18 has an independently approved service_role caller migration."
+    },
+    {
+      "id": "routine:crm_device_gateway_v1(p_op text, p_uid text, p_fingerprint text, p_args jsonb)",
+      "expectedDetail": {
+        "anon_execute": true,
+        "service_execute": false,
+        "security_definer": true,
+        "authenticated_execute": false
+      },
+      "reason": "Server SDK only: requires signed anon role without a subject. Rejects client JWTs; membership and device state are checked per operation. Cannot approve devices or change members."
+    },
+    {
+      "id": "routine:crm_device_state_changed_v1()",
+      "expectedDetail": {
+        "anon_execute": false,
+        "service_execute": false,
+        "security_definer": false,
+        "authenticated_execute": false
+      },
+      "reason": "Trigger only; revocation invalidates outstanding challenges. No API execution grant."
+    },
+    {
+      "id": "routine:crm_member_disabled_v1()",
+      "expectedDetail": {
+        "anon_execute": false,
+        "service_execute": false,
+        "security_definer": false,
+        "authenticated_execute": false
+      },
+      "reason": "Trigger only; disabling a member revokes that member's devices. No API execution grant."
     }
   ]
 }
