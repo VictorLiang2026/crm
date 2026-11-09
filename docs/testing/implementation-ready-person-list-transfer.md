@@ -45,12 +45,13 @@
 ## 未验证项
 
 - 尚未用 CRM 账号登录生产页面；未请求真实 AI 映射，也未执行线上人物写入/导出。
-- 本次变更还未提交/推送 GitHub、打新标签；基线仍为提交 `ee050cab0ea4c3580a004baa3be8b5b32b536a3b` 与标签 `release-20261109-063946`。
+- 人工登录、生产业务写入/导出及服务角色写入探针仍未验证；需由获授权账号在 CRM 页面完成线上业务验收。
 
 ## 待发布清单与回滚
 
 - Migration：上述两组 SQL 与 rollback。
 - 云函数：`person_360`、`assistant`、`ai_activity`（为保持 AI Gateway 副本一致）。
 - 页面资源：`crm/css/console.css`；`crm/js/modules/console/{data.js,i18n.js,pages/misc.js,router.js,views.js,person-list-transfer.js,person-list-transfer-file.js}`；`crm/js/vendor/sheetjs-0.20.3.full.min.js` 与许可证。
-- 生产 migration、函数与静态资源已部署；下一步使用项目 release 脚本提交、推送并打标签，再做完整三端 sync-check。
+- 生产 migration、函数与静态资源已部署；代码提交 `68153a01f13e725b5469e65721214808df5d2c8e` 已推送至 GitHub `master`，代码发布标签为 `release-20261109-105836`。
+- 推送后完整 sync-check 通过，Local / GitHub / CloudBase 的页面资源、30 个函数与 245 个源码/配置文件一致。生产入口为 `https://crm-d1gkae8ddc930d151-1434199662.tcloudbaseapp.com/crm/admin.html`。
 - 若只撤回代码：恢复发布前两个函数及列出的页面资源。数据库对象回滚分别运行配对 rollback；在回滚命令表前先确认没有未完成确认/执行批次。已经导入的人物资料不由 schema rollback 删除，需按数据影响另行评估。
