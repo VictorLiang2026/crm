@@ -102,3 +102,33 @@ test('Person profile transaction RPC is public-only, service-role-only, and reve
   const rollbackSql = rollback.replace(/\r\n/g, '\n').replace(/^\s*--.*$/gm, '').trim();
   assert.equal(rollbackSql, 'DROP FUNCTION IF EXISTS public.crm_person_profile_save_v1(\n  text,bigint,timestamptz,jsonb,bigint,timestamptz,jsonb,bigint,timestamptz,jsonb\n);');
 });
+
+test('Person list transfer objects are public-only, service-role-only, and reversibly scoped', () => {
+  const table = object(copy(), 'crm_person_list_transfer_commands');
+  const routine = object(copy(), 'crm_person_list_transfer_create_v1(p_actor_uid text, p_existing jsonb, p_new_person jsonb)');
+  assert.ok(table);
+  assert.deepEqual(table.detail.privileges, { anon: [], service_role: ['INSERT', 'SELECT', 'UPDATE'], authenticated: [] });
+  assert.equal(table.detail.rls, true);
+  assert.equal(table.detail.force_rls, true);
+  assert.deepEqual(table.detail.policies[0].roles, ['service_role']);
+  assert.deepEqual(routine.detail, { anon_execute: false, service_execute: true, security_definer: false, authenticated_execute: false });
+  const root = path.resolve(__dirname, '../..');
+  const migration = fs.readFileSync(path.join(root, 'cloudbase/migrations/20261109160000_person_list_transfer_commands.sql'), 'utf8');
+  const rollback = fs.readFileSync(path.join(root, 'cloudbase/migrations/20261109160000_person_list_transfer_commands.rollback.sql'), 'utf8');
+  const createMigration = fs.readFileSync(path.join(root, 'cloudbase/migrations/20261109170000_person_list_transfer_atomic_create.sql'), 'utf8');
+  const createRollback = fs.readFileSync(path.join(root, 'cloudbase/migrations/20261109170000_person_list_transfer_atomic_create.rollback.sql'), 'utf8');
+  assert.match(migration, /CREATE TABLE public\.crm_person_list_transfer_commands/);
+  assert.match(migration, /FORCE ROW LEVEL SECURITY/);
+  assert.match(migration, /FROM PUBLIC, anon, authenticated, service_role/);
+  assert.match(migration, /TO service_role/);
+  assert.match(createMigration, /CREATE FUNCTION public\.crm_person_list_transfer_create_v1/);
+  assert.match(createMigration, /SECURITY INVOKER[\s\S]*SET search_path = pg_catalog, public/);
+  assert.match(createMigration, /FROM PUBLIC, anon, authenticated/);
+  assert.match(createMigration, /TO service_role/);
+  for (const sql of [migration, rollback, createMigration, createRollback]) {
+    assert.doesNotMatch(sql, /(?:\bpr\.|\bpr_[a-z0-9_]+)/i);
+    assert.doesNotMatch(sql, /\bCASCADE\b/i);
+  }
+  assert.match(rollback, /DROP TABLE public\.crm_person_list_transfer_commands/);
+  assert.match(createRollback, /DROP FUNCTION public\.crm_person_list_transfer_create_v1/);
+});

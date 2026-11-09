@@ -16,6 +16,27 @@ const recipe = (required, optional = [], limits = {}) => ({ required, optional, 
 
 const SKILLS = [
   {
+    name: 'person_list_field_mapping', version: '1.0.0', capability: 'analysis',
+    contextRecipe: recipe([], []),
+    inputSchema: object({
+      headers: { type: 'array', minItems: 1, maxItems: 100, items: text(120) },
+      language: { enum: ['zh-CN', 'en'] },
+    }, ['headers', 'language']),
+    outputSchema: object({
+      mappings: { type: 'array', maxItems: 100, items: object({
+        columnIndex: { type: 'integer', minimum: 0 },
+        field: { anyOf: [
+          { enum: ['display_name','phone','wechat','gender','birthday','occupation','organization','education','source',
+            'hobbies','customer_stage','sales_priority','referral_priority','marital_status','first_contact_date','notes'] },
+          { type: 'null' },
+        ] },
+        confidence: { type: 'integer', minimum: 0, maximum: 100 },
+        reason: { type: 'string', maxLength: 240 },
+      }, ['columnIndex','field','confidence','reason']) },
+    }, ['mappings']),
+    confirmationLevel: 'review', timeoutClass: 'short',
+  },
+  {
     name: 'quick_capture', version: '1.0.0', capability: 'structured_extraction',
     contextRecipe: recipe([], ['operator_profile']),
     inputSchema: object({ text: text(12000) }, ['text']),

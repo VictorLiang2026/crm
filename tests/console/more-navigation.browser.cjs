@@ -63,10 +63,29 @@ test('Console More keeps only uncovered gaps bilingual and preserves all 17 old 
     assert.deepEqual(english.legacyHrefs, REMAINING_MORE_ROUTES.map(hash => '/crm/admin.html' + hash).sort());
     assert.equal(english.legacyStatusCount, REMAINING_MORE_ROUTES.length);
     assert.equal(english.subtitle, 'Workspaces and system tools.');
+    assert.equal(await browser.evaluate("document.querySelector('.console-main .more-primary a[href=\"#/people-list-transfer\"]')?.innerText.includes('People Import / Export')"), true);
     assert.match(english.currentRecycle || '', /Recycle Bin/);
     assert.match(english.quickRecord || '', /confirm the Person/);
     assert.match(english.signOut || '', /Sign Out/);
     assert.deepEqual(english.nav, ['#/today', '#/people', '#/opportunities', '#/activities', '#/recruit', '#/ai', '#/knowledge-library', '#/more']);
+
+    await browser.evaluate("document.querySelector('.console-main a[href=\"#/people-list-transfer\"]').click()");
+    await browser.wait("location.hash === '#/people-list-transfer' && document.querySelector('.person-list-transfer')");
+    assert.match(await browser.evaluate("document.querySelector('.console-main').innerText"), /People Import \/ Export/);
+    assert.equal(await browser.evaluate("window.__crmTest.calls.some(c=>['previewPersonListTransfer','executePersonListTransfer','exportPersonList'].includes(c.action))"), false);
+    await browser.evaluate("document.querySelector('.plt-section-head button').click()");
+    await browser.wait("document.querySelectorAll('.plt-mapping tbody tr').length === 4");
+    assert.match(await browser.evaluate("document.querySelector('.plt-drop-copy')?.innerText"), /4 rows/);
+    await browser.evaluate("document.querySelector('.plt-tab[aria-pressed=\"false\"]').click()");
+    await browser.wait("document.querySelector('.plt-export')");
+    assert.equal(await browser.evaluate("document.querySelectorAll('.plt-export-field.is-fixed input:disabled').length"), 2);
+    for (const viewport of [{ width: 820, height: 1180 }, { width: 1180, height: 820 }]) {
+      await browser.send('Emulation.setDeviceMetricsOverride', { ...viewport, deviceScaleFactor: 2, mobile: false });
+      assert.equal(await browser.evaluate('document.documentElement.scrollWidth <= innerWidth + 1'), true, 'transfer page should fit iPad');
+    }
+    await browser.send('Emulation.clearDeviceMetricsOverride');
+    await browser.openConsole('#/more', 'authCase=1');
+    await browser.wait("document.querySelector('.console-main .more-section')");
 
     await browser.evaluate("localStorage.setItem('crm_lang', 'zh-CN')");
     await browser.openConsole('#/more', 'authCase=1');
@@ -77,6 +96,7 @@ test('Console More keeps only uncovered gaps bilingual and preserves all 17 old 
     for (const label of ['工作区域与系统工具。', '常用工具', '知识库', '经营分析', '回收站', '工作区捷径与快速记录']) {
       assert.ok(chinese.includes(label), `Missing Chinese label: ${label}`);
     }
+    assert.ok(chinese.includes('人物名单导入/导出'));
     assert.equal(/WP[0-9]/.test(chinese), false);
 
     for (const viewport of [{ width: 820, height: 1180 }, { width: 1180, height: 820 }]) {

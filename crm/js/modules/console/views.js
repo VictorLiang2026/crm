@@ -2,6 +2,7 @@
 export { renderToday } from './pages/today.js';
 export { renderPeople } from './pages/people.js';
 export { renderPersonFileImport } from './person-files.js';
+export { renderPersonListTransfer } from './person-list-transfer.js';
 export { renderPeopleTrash } from './pages/people-trash.js';
 export { renderCustomerTrash, renderRecruitTrash, renderRecycleHub } from './pages/recycle.js';
 export { renderPerson } from './pages/person.js';

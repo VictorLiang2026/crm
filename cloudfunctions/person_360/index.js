@@ -25,6 +25,7 @@ const { OcrReviewService } = require('./ocr-review-service');
 const { FileImportService } = require('./file-import-service');
 const { downloadKnowledgeObject } = require('./knowledge-storage');
 const { PersonFileService } = require('./person-file-service');
+const { PersonListTransferService } = require('./person-list-transfer-service');
 const { LegacyOpportunityService, LegacyOpportunityMaintenanceService } = require('./legacy-opportunity-service');
 const { RecruitDirectoryService } = require('./recruit-directory-service');
 const { RecruitCandidateService } = require('./recruit-candidate-service');
@@ -55,6 +56,7 @@ const KNOWLEDGE_SOURCE_READ_TABLES = new Set(['knowledge_sources']);
 const KNOWLEDGE_PDF_ERRORS = new Set(['INVALID_CONTENT','UNAUTHORIZED','PDF_SOURCE_UNAVAILABLE','PDF_SOURCE_READ_FAILED',
   'PDF_STORAGE_DENIED','PDF_STORAGE_READ_FAILED','PDF_STORAGE_TIMEOUT','PDF_LIMIT','PDF_ENCRYPTED','PDF_NO_TEXT','PDF_TIMEOUT']);
 const PROACTIVE_COACH_TABLES = new Set(['crm_proactive_coach_decisions']);
+const PERSON_LIST_TRANSFER_TABLES = new Set(['crm_person_list_transfer_commands']);
 const TABLES = new Set([
   'persons', 'households', 'household_members', 'interactions', 'commitments',
   'opportunities',
@@ -68,6 +70,7 @@ const TABLES = new Set([
   ...KNOWLEDGE_GOVERNANCE_TABLES,
   ...KNOWLEDGE_SOURCE_READ_TABLES,
   ...PROACTIVE_COACH_TABLES,
+  ...PERSON_LIST_TRANSFER_TABLES,
   ...LEGACY_INTERACTION_TABLES,
 ]);
 const ROLES = new Set(['spouse', 'child', 'parent', 'sibling', 'other']);
@@ -116,6 +119,7 @@ async function pgRequest(table, method, filters = {}, body, { timeoutMs = 8000 }
   if (KNOWLEDGE_GOVERNANCE_TABLES.has(table) && !['GET', 'POST', 'PATCH'].includes(method)) throw new Error('Invalid source operation');
   if (KNOWLEDGE_SOURCE_READ_TABLES.has(table) && method !== 'GET') throw new Error('Invalid source operation');
   if (PROACTIVE_COACH_TABLES.has(table) && method !== 'GET') throw new Error('Invalid source operation');
+  if (PERSON_LIST_TRANSFER_TABLES.has(table) && !['GET', 'POST', 'PATCH'].includes(method)) throw new Error('Invalid source operation');
   if (table === 'commitments' && method !== 'GET') throw new Error('Invalid source operation');
   const env = process.env.TCB_ENV;
   const key = process.env.CRM_PERSON360_DB_API_KEY;
@@ -160,7 +164,7 @@ async function pgRpc(name, body) {
     'crm_relationship_preview_v1','crm_relationship_execute_v1',
     'crm_ocr_parse_preview_v1','crm_ocr_parse_undo_preview_v1','crm_ocr_parse_execute_v1',
     'crm_recruit_candidate_create_v1','crm_recruit_candidate_transition_v1','crm_recruit_coach_outcome_v1',
-    'crm_knowledge_review_v1','crm_proactive_coach_decision_v1','crm_file_import_v1',
+    'crm_knowledge_review_v1','crm_proactive_coach_decision_v1','crm_file_import_v1','crm_person_list_transfer_create_v1',
     'crm_person_profile_save_v1','crm_person_interaction_v1',
     'crm_legacy_opportunity_v1','crm_recycle_batch_v1','person_role_recovery_v1']).has(name)) throw new Error('Invalid RPC');
   const env = process.env.TCB_ENV;
@@ -946,6 +950,7 @@ function createService({ request = pgRequest, rpc = pgRpc, disclosure = disclose
   }
 
   const personService = new PersonService({ request });
+  const personListTransfer = new PersonListTransferService({ request, rpc, personService });
   const recruitCandidateService = new RecruitCandidateService({
     request, rpc, resolveName: name => personService.resolveName(name),
   });
@@ -1011,7 +1016,11 @@ function createService({ request = pgRequest, rpc = pgRpc, disclosure = disclose
     transitionRecruitStage: (data, uid) => recruitCandidateService.transition(data, uid),
     listOpportunities, listRecruitContext, getRecruitCoachContext, createOpportunity, updateOpportunity, closeOpportunity, removeOpportunity,
     getInsuranceContext,
-    resolveQuickCaptureName, commitQuickCaptureV2 };
+    resolveQuickCaptureName, commitQuickCaptureV2,
+    previewPersonListTransfer: (data, uid) => personListTransfer.preview(data, uid),
+    savePersonListTransferDecisions: (data, uid) => personListTransfer.saveDecisions(data, uid),
+    executePersonListTransfer: (data, uid) => personListTransfer.execute(data, uid),
+    exportPersonList: (data, uid) => personListTransfer.exportPeople(data, uid) };
 }
 
 exports.main = async event => {
@@ -1090,6 +1099,10 @@ exports.main = async event => {
       case 'getRecruitCandidate': return await service.getRecruitCandidate(event.candidateId, event.personId);
       case 'transitionRecruitStage': return await service.transitionRecruitStage(event.data, uid);
       case 'resolveIdentity': return await service.resolveIdentity(event.name);
+      case 'previewPersonListTransfer': return await service.previewPersonListTransfer(event.data, uid);
+      case 'savePersonListTransferDecisions': return await service.savePersonListTransferDecisions(event.data, uid);
+      case 'executePersonListTransfer': return await service.executePersonListTransfer(event.data, uid);
+      case 'exportPersonList': return await service.exportPersonList(event.data, uid);
       case 'getPersonRoleRecovery': return await service.getPersonRoleRecovery(event.personId, event.kind, uid);
       case 'previewIdentity': return await service.previewIdentity(event.data, uid);
       case 'executeIdentity': return await service.executeIdentity(event.data, uid);
@@ -1266,6 +1279,8 @@ exports.main = async event => {
       default: return { error: 'Unknown action' };
     }
   } catch (error) {
+    const transferError = /^([A-Z][A-Z0-9_]{1,80})$/.test(String(error?.message || '')) &&
+      ['previewPersonListTransfer','savePersonListTransferDecisions','executePersonListTransfer','exportPersonList'].includes(event?.action);
     if(event?.action==='extractKnowledgePdfText'){
       const code=KNOWLEDGE_PDF_ERRORS.has(error?.code)?error.code:
         KNOWLEDGE_PDF_ERRORS.has(error?.message)?error.message:
@@ -1277,6 +1292,7 @@ exports.main = async event => {
       /^Database request failed \((\d{3})(?:, ((?:PGRST\d{3}|[0-9A-Z]{5})))?\)$/.exec(error.message);
     if (/^INTERACTION_[A-Z_]+$/.test(error.message)) return { error: error.message };
     return { error: error.message === 'UNAUTHORIZED' ? 'UNAUTHORIZED' :
+      transferError ? error.message :
       event?.action === 'previewOcrUndo' && error.message === 'OCR_UNDO_CONFLICT' ? 'OCR_UNDO_CONFLICT' :
       diagnostic ? `Person 360 request failed (HTTP ${diagnostic[1]}${diagnostic[2] ? `, ${diagnostic[2]}` : ''})` :
       /^(Invalid |Person |Person-only recruit|Activity |Attendance |Post-event |Participant |Speaker |This customer|Both people|Human confirmation|Selected Person|Household |Important facts|Could not|Same-name|Deleted identity|Customer |Preview |Identity candidates|Idempotency key|Test account|Test parent|Work item|Action |Commitment |Opportunity |Context item)/.test(error.message)

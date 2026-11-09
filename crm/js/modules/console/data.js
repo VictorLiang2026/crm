@@ -95,6 +95,11 @@ export const data = {
   // ---------- 人物目录 ----------
   listPeople: (ctx, params) => p360(ctx, 'listPeople', params || {}),
   listPersonTrash: (ctx, params) => p360(ctx, 'listPersonTrash', params || {}),
+  mapPersonListFields: (ctx, headers, language) => call(ctx, 'assistant', { action: 'mapPersonListFields', headers, language }),
+  previewPersonListTransfer: (ctx, data) => p360(ctx, 'previewPersonListTransfer', { data }),
+  savePersonListTransferDecisions: (ctx, data) => p360(ctx, 'savePersonListTransferDecisions', { data }),
+  executePersonListTransfer: (ctx, previewId) => p360(ctx, 'executePersonListTransfer', { data: { previewId } }),
+  exportPersonList: (ctx, fields, afterId) => p360(ctx, 'exportPersonList', { data: { fields, afterId } }),
   restorePerson: (ctx, personId) => p360(ctx, 'restorePerson', { data: { personId: String(personId) } }),
   customerTrash: (ctx, params) => call(ctx, 'customers', { action: 'trashList', ...(params || {}) }),
   restoreCustomer: (ctx, id) => call(ctx, 'customers', { action: 'restore', ids: [Number(id)] }),

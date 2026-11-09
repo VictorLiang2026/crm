@@ -155,6 +155,18 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
     if (typeof identity?.uid !== 'string' || !identity.uid.trim() || identity.isAnonymous !== false) {
       return { ok: false, error: { code: 'UNAUTHORIZED', message: 'Login required' } };
     }
+    if (event?.action === 'mapPersonListFields') {
+      if (!event || Object.keys(event).some(key => !['action','headers','language'].includes(key))) {
+        return { ok: false, error: { code: 'INVALID_INPUT', message: 'Field mapping request is invalid' } };
+      }
+      try { return await require('./person-list-field-mapping-service').mapPersonListFields(event); }
+      catch (error) {
+        const code = ['INVALID_INPUT','INVALID_CONFIG','INVALID_RESULT','RATE_LIMIT','TIMEOUT',
+          'UPSTREAM_UNAVAILABLE','PERSISTENCE_ERROR','AI_REQUEST_FAILED','UNAUTHORIZED'].includes(error?.code)
+          ? error.code : 'PERSON_LIST_MAPPING_FAILED';
+        return { ok: false, error: { code, message: 'Person list fields could not be mapped' } };
+      }
+    }
     if (event?.action === 'testSamples') {
       try { return await require('./test-scenario-service').runScenario({action:event.action,stage:event.stage,
         ...(event.previewId === undefined ? {} : {previewId:event.previewId}),
