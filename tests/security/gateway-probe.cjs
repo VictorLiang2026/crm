@@ -43,12 +43,8 @@ async function probe() {
   const key = fs.readFileSync(keyFile, 'utf8').trim();
   if (!key || /\s/.test(key)) throw new Error('Invalid anonymous key file');
   const objects = baseline.objects.filter(item => item.kind === 'relation');
-  // PMC-10 已批准：persons 授予 anon SELECT + RLS (deleted_at IS NULL)，
-  // 云函数 rdb() 走 anon 角色直读 persons 未软删行（identity helper 等）。
-  // 安全限制：anon 仅能读到未软删行（display_name 等基础字段），敏感写入仍需 service_role。
-  // 待 PMC 后续包将 identity helper 改走 service_role/person_360 委托后可移除此例外。
+  // persons must follow the zero-visible-rows check, including after rollback.
   const anonSelectExceptions = {
-    persons: 'PMC-10 approved: anon reads non-deleted persons rows via rdb() gateway',
     pmc18_observations: 'PM18 approved exact probe exception: aggregate observation count only; HEAD response, no row values fetched or stored'
   };
   const results = [];
