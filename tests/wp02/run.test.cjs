@@ -39,6 +39,7 @@ function load(name,data,ledger=[]) {
  const context={exports,module:{exports},console,setTimeout,clearTimeout,process:{env:{}},Date,Map,Set,Buffer,
  require(dep){
   if(dep==='./db')return db;
+  if(dep==='./device-internal-delegation')return {unwrap:async(_app,event,context)=>({event,context})};
   if(dep==='./test-data')return testData;
   if(dep==='./device-runtime')return {protect:(_name,main)=>main,internalCall:(target,request)=>target.callFunction(request)};
   if(dep==='./action-facts')return {...require('../../cloudfunctions/today_coach/action-facts'),readOpenActions:async()=>({rows:data.actions||[],persons:data.persons||[]})};

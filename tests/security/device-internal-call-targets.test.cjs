@@ -4,6 +4,18 @@ const test=require('node:test');
 const assert=require('node:assert/strict');
 const path=require('node:path');
 const root=path.resolve(__dirname,'../..');
+for (const name of ['ai_parse','today_coach']) {
+ test(name+' denies unsigned direct calls before parsing and verifies the signed actor', async()=>{
+   const {unwrap}=require(path.join(root,'cloudfunctions',name,'device-internal-delegation'));
+   const handler=require('node:fs').readFileSync(path.join(root,'cloudfunctions',name,'index.js'),'utf8');
+   assert.ok(handler.includes("const authorized=await require('./device-internal-delegation').unwrap(app,event,context,'"+name+"')"));
+   const app={auth:()=>({getUserInfo:()=>({uid:'member'})}),callFunction:async()=>({result:{verified:true,actor:'member'}})};
+   await assert.rejects(unwrap(app,{action:'get'}, {},name),/DEVICE_ACCESS_DENIED/);
+   const event={__deviceRequest:{action:'read',__deviceProof:{}}};
+   assert.deepEqual((await unwrap(app,event,{__crmInternalDelegation:{actor:'spoofed'}},name)),{event:{action:'read'},context:{}});
+   await assert.rejects(unwrap({...app,callFunction:async()=>({result:{verified:true,actor:'other'}})},event,{},name),/DEVICE_ACCESS_DENIED/);
+ });
+}
 
 test('ai_parse unwraps only a verified OCR delegation and rejects invalid ticket responses',async()=>{
  const {unwrap}=require(path.join(root,'cloudfunctions/ai_parse/device-internal-delegation'));

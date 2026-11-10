@@ -112,17 +112,26 @@ async function issueInternalDelegation(app,event){
 }
 async function consumeInternalDelegation(app,event){
  if(!event||Object.keys(event).sort().join(',')!=='action,audience,payload,token'||!/^[a-f0-9-]{36}$/.test(event.token||''))throw deny();
+ const input=event.payload;
+ const importDraft=event.audience==='ai_parse' && input?.action==='parse_import_draft' && (
+   (exactKeys(input,['action','text']) && typeof input.text==='string' && input.text.length>0 && input.text.length<=100000) ||
+   (exactKeys(input,['action','images']) && Array.isArray(input.images) && input.images.length===1 &&
+    exactKeys(input.images[0],['base64','content_type','file_name']) &&
+    ['image/jpeg','image/png','image/webp'].includes(input.images[0].content_type) &&
+    typeof input.images[0].file_name==='string' && typeof input.images[0].base64==='string' &&
+    input.images[0].base64.length<=4*Math.ceil(4*1024*1024/3))
+ );
  const source=event.audience==='recruit_goals'?'activity_reports':event.audience==='person_360'&&event.payload?.action==='listActivityData'?'activities':
    event.audience==='person_360'&&event.payload?.action==='listInteractions'?'ai_followup':
    ['person_360','ai_parse','today_coach'].includes(event.audience)?'assistant':null;
  const valid=event.audience==='recruit_goals'?validRecruitGoalPayload(event.payload):
    (source==='activities'&&exactKeys(event.payload,['action','activityId'])&&/^\d{1,20}$/.test(String(event.payload.activityId||'')))||
-   Boolean(source&&internalPayloadAllowed(source,event.audience,event.payload,
+   importDraft || Boolean(source&&internalPayloadAllowed(source,event.audience,event.payload,
      event.payload?.action==='extractKnowledgePdfText'?event.payload.actorUid:undefined));
  if(!valid)throw deny();
  const payload=JSON.parse(JSON.stringify(event.payload));
  const result=await delegate(app,'consume',{audience:event.audience,payload_hash:digest(canonical(payload)),token:event.token});
- if(typeof result?.actor!=='string'||!result.actor||!['browser','mcp','worker'].includes(result.origin)||
+ if(typeof result?.actor!=='string'||!result.actor||!['browser','mcp','worker'].includes(result.origin)||(importDraft&&result.origin!=='browser')||
    (result.origin==='browser'&&!/^([0-9a-f]{64})$/.test(result.fingerprint||''))||
    (event.payload?.action==='extractKnowledgePdfText'&&event.payload.actorUid!==result.actor))throw deny();
  return {verified:true,actor:result.actor,origin:result.origin,fingerprint:result.fingerprint,payload};

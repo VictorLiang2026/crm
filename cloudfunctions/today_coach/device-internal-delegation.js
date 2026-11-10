@@ -1,7 +1,18 @@
 'use strict';
 
 async function unwrap(app,event,context,name){
- if(!event||!Object.hasOwn(event,'__crmDelegation'))return {event,context};
+ if (!event || (Object.hasOwn(event,'__deviceRequest') && Object.hasOwn(event,'__crmDelegation'))) throw Error('DEVICE_ACCESS_DENIED');
+ if (!Object.hasOwn(event,'__crmDelegation')) {
+   const request=event.__deviceRequest;
+   if (!request || !request.__deviceProof) throw Error('DEVICE_ACCESS_DENIED');
+   const who=app.auth().getUserInfo();
+   if (typeof who?.uid!=='string' || !who.uid.trim() || who.isAnonymous===true || who.is_anonymous===true) throw Error('DEVICE_ACCESS_DENIED');
+   const response=await app.callFunction({name:'person_360',data:{action:'verifyBusinessDeviceOnly',audience:name,request}});
+   if (response?.result?.verified!==true || response.result.actor!==who.uid) throw Error('DEVICE_ACCESS_DENIED');
+   const {__deviceProof,...payload}=request;
+   const {__crmInternalDelegation,...platform}=context||{};
+   return {event:payload,context:platform};
+ }
  const ticket=event.__crmDelegation;
  if(Object.keys(event).length!==1||!ticket||Object.keys(ticket).sort().join(',')!=='payload,token'||
    typeof ticket.token!=='string'||!/^[a-f0-9-]{36}$/.test(ticket.token)||

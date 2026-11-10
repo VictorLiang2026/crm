@@ -56,6 +56,7 @@ function loadToday(ai,empty=false) {
   const context={exports,process:{env:{}},console,Date,Buffer,Map,Set,setTimeout,clearTimeout,
     require(name){
       if(name==='./db')return db;
+      if(name==='./device-internal-delegation')return {unwrap:async(_app,event,context)=>({event,context})};
       if(name==='./test-data')return {...TD,disclose:async()=>disclosure};
       if(name==='./action-facts')return {...require(path.join(directory,name)),readOpenActions:async()=>({rows:[],persons:[]})};
       if(name==='./ai-wait')return {waitForTodayAi:(work,start)=>waitForTodayAi(work,start,clock)};
