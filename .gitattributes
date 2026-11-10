@@ -1,1 +1,4 @@
 cloudfunctions/knowledge_mcp/scf_bootstrap text eol=lf
+cloudfunctions/*/device-proof.js text eol=lf
+cloudfunctions/*/device-control.js text eol=lf
+cloudfunctions/*/device-runtime.js text eol=lf
