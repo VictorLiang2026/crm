@@ -59,6 +59,16 @@
         "authenticated_execute": false
       },
       "reason": "Trigger only; disabling a member revokes that member's devices. No API execution grant."
+    },
+    {
+      "id": "routine:crm_device_delegate_v1(p_op text, p_args jsonb)",
+      "expectedDetail": {
+        "anon_execute": true,
+        "service_execute": false,
+        "security_definer": true,
+        "authenticated_execute": false
+      },
+      "reason": "Server-only internal delegations require a subjectless signed backend role. Browser JWTs and public keys must be denied. Each ticket binds audience and payload and can be consumed only once."
     }
   ]
 }

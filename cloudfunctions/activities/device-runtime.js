@@ -84,7 +84,10 @@ async function dispatch(name,main,event,ctx,callback,app){
    s={name,origin:'browser',actor,fingerprint:request.__deviceProof.fingerprint};
  }
  if(!s.actor||!data||data.Type==='Timer'||['knowledgeMcpInternal','requestBrowserDevice','issueBrowserChallenge','verifyBusinessDeviceOnly'].includes(data.action))throw deny();
- if(name==='assistant'&&data.action==='knowledgeMcpAuthorize'&&(s.origin!=='browser'||s.actor!==process.env.CRM_KNOWLEDGE_MCP_OWNER_UID))throw deny();
+ if (name === 'assistant' && data.action === 'knowledgeMcpAuthorize') {
+   const owner = process.env.CRM_KNOWLEDGE_MCP_OWNER_UID || require('./device-oauth-owner.json')[process.env.TCB_ENV];
+   if (s.origin !== 'browser' || !owner || s.actor !== owner) throw deny();
+ }
  return scope.run(s,()=>{
    if (name === 'person_360' && data.action === 'verifyBrowserDevice' && s.origin === 'browser') {
      console.info('CRM_DEVICE_PILOT_SIGNATURE_VERIFIED');

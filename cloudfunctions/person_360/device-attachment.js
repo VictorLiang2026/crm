@@ -14,8 +14,9 @@ function makeHandler({query,stage,object}){
   valid(bucket,path);
   if(bucket==='knowledge'){
    if(op!=='upload'||path.split('/').length!==3||path.split('/')[0]!==s.actor)reject();
-   const [row]=await query('knowledge_sources',{select:'id,file_size_bytes,metadata',created_by:'eq.'+s.actor,storage_key:'eq.'+path,deleted_at:'is.null',limit:1});
+   const [row]=await query('knowledge_sources',{select:'id,file_size_bytes,content_type,metadata',created_by:'eq.'+s.actor,storage_key:'eq.'+path,deleted_at:'is.null',limit:1});
    if(!row||Number(row.file_size_bytes)!==size||row.metadata?.upload?.phase!=='receiving'||row.metadata.upload.upload_id!==path.split('/')[1])reject();
+   return row.content_type;
   }else{
    const m=/^candidate_([1-9]\d*)\/(radar|winner_report)_[0-9]+\.[a-z0-9]{1,16}$/i.exec(path);if(!m)reject();
    const [row]=await query('recruit_candidates',{select:'id,radar_image_file_id,winner_report_file_id',id:'eq.'+m[1],deleted_at:'is.null',limit:1});
@@ -25,8 +26,8 @@ function makeHandler({query,stage,object}){
  }
  if(e.op==='begin'){
   const {bucket,path,bytes}=e;if(!Number.isSafeInteger(bytes)||bytes<=0||bytes>MAX)reject();
-  await check(bucket,path,'upload',bytes);
-  const type=types.has(e.type)?e.type:'application/octet-stream';
+  const sourceType=await check(bucket,path,'upload',bytes);
+  const type=sourceType || (types.has(e.type)?e.type:'application/octet-stream');
   return call('begin',{bucket,path,type,bytes});
  }
  if(e.op==='part'){if(typeof e.part!=='string'||e.part.length>PART*4/3||!/^[A-Za-z0-9+/]+={0,2}$/.test(e.part))reject();await call('put',{id:e.id,i:e.i,part:e.part});return {ok:true};}

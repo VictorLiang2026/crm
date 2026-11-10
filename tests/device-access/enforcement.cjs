@@ -54,9 +54,13 @@ const {makeHandler}=require('../../cloudfunctions/person_360/device-attachment')
  process.env.CRM_KNOWLEDGE_MCP_OWNER_UID=uid;
  assert.equal((await worker(await signed('assistant',{action:'knowledgeMcpAuthorize'}))).ok,true);
  for(const {name} of require('../../cloudbaserc.json').functions){
-  if(name==='knowledge_mcp')continue;
+  if(name==='knowledge_mcp'||name==='activity_registration_public')continue;
   const js=fs.readFileSync('cloudfunctions/'+name+'/index.js','utf8');
-  assert.ok(js.trimEnd().endsWith("require('./device-runtime').protect('"+name+"', exports.main);"),name);
+  if(name==='assistant'){
+    assert.ok(js.includes("const protectedAssistant = require('./device-runtime').protect('assistant', exports.main);"));
+    assert.ok(js.trimEnd().endsWith('return protectedAssistant(event, context);\n};') ||
+      js.replace(/\r\n/g,'\n').trimEnd().endsWith('return protectedAssistant(event, context);\n};'));
+  }else assert.ok(js.trimEnd().endsWith("require('./device-runtime').protect('"+name+"', exports.main);"),name);
   const handler=entry(name,()=>{throw Error('private handler reached before authorization')});
   assert.equal((await handler({action:'list',confirmed:true,actorUid:uid})).error,'DEVICE_ACCESS_DENIED',name);
  }

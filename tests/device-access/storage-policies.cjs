@@ -14,7 +14,7 @@ const {PGlite}=require(process.env.CRM_PGLITE_MODULE||'@electric-sql/pglite'),as
  const expr="(bucket_id='knowledge' AND (storage.foldername(name))[1]=auth.uid())";
  for(const op of ['select','insert','update','delete'])await db.exec('CREATE POLICY knowledge_objects_'+op+'_own ON storage.objects FOR '+op+' TO authenticated '+(op==='insert'?'':'USING '+expr)+(op==='insert'||op==='update'?' WITH CHECK '+expr:''));
  const visible=async role=>{await q('SET ROLE '+role);try{return (await q('SELECT bucket_id FROM storage.objects ORDER BY bucket_id')).rows.map(v=>v.bucket_id);}finally{await q('RESET ROLE');}};
- const source=s=>fs.readFileSync('cloudbase/migrations/20261110153200_device_file_storage'+s+'.sql','utf8');
+ const source=s=>fs.readFileSync('cloudbase/migrations/20261110160100_device_file_storage'+s+'.sql','utf8');
  assert.deepEqual(await visible('authenticated'),['knowledge','recruit','unrelated']);
  await db.exec(source(''));assert.deepEqual(await visible('authenticated'),['unrelated']);assert.deepEqual(await visible('service_role'),['knowledge','recruit','unrelated']);
  await q('SET ROLE authenticated');await assert.rejects(q("INSERT INTO storage.objects VALUES('recruit','x')"),/row-level security/);await q('RESET ROLE');

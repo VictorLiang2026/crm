@@ -1,6 +1,6 @@
 import {createDeviceClient} from './client.js';
 const sessions=new WeakMap();
-function denied(code){return ['DEVICE_NOT_APPROVED','DEVICE_ACCESS_DENIED','DEVICE_STORAGE_UNAVAILABLE'].includes(code);}
+function denied(code){return ['DEVICE_MEMBER_REQUIRED','DEVICE_NOT_APPROVED','DEVICE_ACCESS_DENIED','DEVICE_STORAGE_UNAVAILABLE','UNAUTHORIZED'].includes(code);}
 function requireSetup(code){
   if(denied(code)){document.body.hidden=true;location.replace(new URL('device-access.html',document.baseURI).href);}
   throw Error(code||'DEVICE_CONNECTION_FAILED');

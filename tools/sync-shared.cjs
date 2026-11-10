@@ -44,7 +44,12 @@ function syncShared(root, mode = 'check') {
     if (!fs.statSync(directory, { throwIfNoEntry: false })?.isDirectory() || fs.lstatSync(directory).isSymbolicLink()) {
       throw new Error(`Missing or unsafe function directory: ${name}`);
     }
-    for (const module of (['knowledge_mcp','activity_registration'].includes(name)?COMMON:MODULES)) {
+    if (name === 'activity_registration') {
+      const entry = fs.readFileSync(path.join(directory, 'index.js'), 'utf8');
+      if (!entry.includes("require('./device-runtime').protect('activity_registration', exports.main)"))
+        throw new Error('Private activity registration must verify a device before deployment');
+    }
+    for (const module of (['knowledge_mcp','activity_registration_public'].includes(name)?COMMON:MODULES)) {
       checked++;
       const target = path.join(directory, module);
       const same = regularFile(target) && sha256(target) === sourceHashes.get(module);
