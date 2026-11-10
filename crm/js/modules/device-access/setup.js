@@ -9,7 +9,7 @@ async function start(){
  const app=window.cloudbase.init({env,timeout:30000}),auth=app.auth({persistence:'local'});
  const client=createDeviceClient(env,async input=>{const {action,...args}=input;
  const res=await app.callFunction({name:'person_360',data:{action:action==='request'?'requestBrowserDevice':'issueBrowserChallenge',...args}});
- if(res?.error||res?.result?.error)throw Error(res?.result?.error||'DEVICE_ACCESS_DENIED');return res.result;});
+ if(res?.error||res?.result?.error)throw Error(res?.result?.error||'DEVICE_SERVICE_UNAVAILABLE');return res.result;});
  const show=async()=>{ref('device').hidden=true;ref('login').hidden=false;
  const r=await auth.getSession();const trusted=!r?.error&&Boolean(r?.data?.session)&&r.data.session.user?.is_anonymous!==true;
  ref('login').hidden=trusted;ref('device').hidden=!trusted;return trusted;};
@@ -18,7 +18,9 @@ async function start(){
  ref('request').onclick=async()=>{ref('request').disabled=true;ref('fingerprint').textContent='';status('device_wait');
  try{const result=await client.enroll(ref('label').value.trim());ref('fingerprint').textContent=t('device_fingerprint')+' '+result.fingerprint.toUpperCase().match(/.{1,8}/g).join(' ');
  const states={pending:'device_pending',approved:'device_approved',revoked:'device_revoked'};status(states[result.state]||'device_error');
- }catch(e){status(e.message==='DEVICE_REQUEST_LIMIT'?'device_limit':'device_error');}finally{ref('request').disabled=false;}};
+ }catch(e){status(({DEVICE_REQUEST_LIMIT:'device_limit',DEVICE_MEMBER_REQUIRED:'device_member_required',
+   UNAUTHORIZED:'device_session_required',DEVICE_STORAGE_UNAVAILABLE:'device_local_storage',
+   DEVICE_ACCESS_DENIED:'device_proof_rejected',DEVICE_NOT_APPROVED:'device_proof_rejected'})[e.message]||'device_service_unavailable');}finally{ref('request').disabled=false;}};
  await show();
 }
-start().catch(()=>status('device_error'));
+start().catch(e=>status(e?.message==='DEVICE_STORAGE_UNAVAILABLE'?'device_local_storage':'device_service_unavailable'));

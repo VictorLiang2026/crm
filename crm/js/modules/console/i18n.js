@@ -2,6 +2,11 @@
 const DEFAULT = 'zh-CN';
 
 const DICT = {
+  device_member_required: {'zh-CN':'当前登录账号不在已启用的 CRM 成员名单中。请管理员核对这个账号的 UID。','en':'This account is not an enabled CRM member. Ask the administrator to verify its UID.'},
+  device_session_required: {'zh-CN':'登录已失效。请重新用 CRM 用户名和密码登录。','en':'Your session expired. Sign in again with your CRM username and password.'},
+  device_local_storage: {'zh-CN':'此浏览器无法安全保存设备密钥。请用 Safari 普通窗口打开申请页，并允许保存站点数据。','en':'This browser cannot store the device key. Use a regular Safari window and allow website data.'},
+  device_proof_rejected: {'zh-CN':'服务端未接受此设备的凭据。请核对申请状态与设备码。','en':'The server rejected this device credential. Check the request status and device code.'},
+  device_service_unavailable: {'zh-CN':'未能从设备登记服务取得结果。请稍后在本浏览器重试；无需清除站点数据。','en':'The device registry did not return a result. Retry in this browser; keep your website data.'},
   device_setup_title: {"zh-CN":"此设备的访问申请","en":"Device access request"},
   device_setup_intro: {"zh-CN":"先登录你的 CRM，再申请此浏览器的访问权限。只有 CloudBase 后台可以批准。","en":"Sign in to your CRM and request access for this browser. Approval is available only in CloudBase."},
   device_sign_in: {"zh-CN":"登录","en":"Sign in"},

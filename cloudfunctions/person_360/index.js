@@ -1030,7 +1030,12 @@ exports.main = async event => {
     if (typeof uid !== 'string' || !uid.trim() ||
         identity.isAnonymous === true || identity.is_anonymous === true) return { error: 'UNAUTHORIZED' };
     if (event?.action === 'requestBrowserDevice' || event?.action === 'issueBrowserChallenge') {
-      return await require('./device-control').makeControl(app,process.env.TCB_ENV).control(event,identity);
+      try { return await require('./device-control').makeControl(app,process.env.TCB_ENV).control(event,identity); }
+      catch(e) {
+        const code=['DEVICE_MEMBER_REQUIRED','DEVICE_NOT_APPROVED','DEVICE_REQUEST_LIMIT','DEVICE_ACCESS_DENIED'].includes(e?.message)?e.message:'DEVICE_SERVICE_UNAVAILABLE';
+        console.warn('CRM_DEVICE_REQUEST_FAILED',event.action,code);
+        return {error:code};
+      }
     }
     const service = createService();
     switch (event?.action) {

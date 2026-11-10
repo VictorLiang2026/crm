@@ -17,7 +17,7 @@ async function pair(env){
 }
 export function createDeviceClient(env,callControl){
  let ready;
- const identity=()=>{if(!ready)ready=(async()=>{const keys=await pair(env);
+ const identity=()=>{if(!ready)ready=(async()=>{const keys=await pair(env).catch(()=>{throw Error('DEVICE_STORAGE_UNAVAILABLE');});
  if(!keys?.privateKey||keys.privateKey.extractable)throw Error('DEVICE_STORAGE_UNAVAILABLE');
  const {kty,crv,x,y}=await crypto.subtle.exportKey('jwk',keys.publicKey),key={kty,crv,x,y};return {key,priv:keys.privateKey,fingerprint:await hash(key)};})().catch(e=>{ready=null;throw e;});return ready;};
  return {

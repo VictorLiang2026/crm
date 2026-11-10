@@ -1,0 +1,23 @@
+'use strict';
+const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
+const {webcrypto}=require('node:crypto'),{PGlite}=require(process.env.CRM_PGLITE_MODULE||'@electric-sql/pglite');
+const {makeControl}=require('../../cloudfunctions/person_360/device-control');
+(async()=>{const db=new PGlite(),q=(sql,args)=>db.query(sql,args),sql=name=>fs.readFileSync(path.join(__dirname,'../../cloudbase/migrations/'+name+'.sql'),'utf8');
+try{await db.exec('CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role BYPASSRLS;');
+await db.exec(sql('20261109194000_device_registry'));await db.exec(sql('20261110081000_device_member_gateway'));
+await q("INSERT INTO public.crm_access_members(uid) VALUES ('synthetic')");
+async function invoke(role,body){assert(['anon','authenticated','service_role'].includes(role));await q('BEGIN');
+try{await q('SET LOCAL ROLE '+role);await q("SELECT set_config('request.jwt.claims',$1,true)",[JSON.stringify({role})]);
+const r=await q('SELECT public.crm_device_member_gateway_v1($1,$2,$3,$4::jsonb) AS result',[body.p_op,body.p_uid,body.p_fingerprint,body.p_args]);await q('COMMIT');return {data:r.rows[0].result};
+}catch(e){await q('ROLLBACK');return {error:{message:e.message}};}}
+const key=await webcrypto.subtle.exportKey('jwk',(await webcrypto.subtle.generateKey({name:'ECDSA',namedCurve:'P-256'},false,['sign','verify'])).publicKey);
+const control=makeControl(null,'fixture',body=>invoke('service_role',body));
+const event={action:'requestBrowserDevice',key,label:'test'};
+await assert.rejects(control.control(event,{uid:'stranger'}),/DEVICE_MEMBER_REQUIRED/);
+const enrolled=await control.control(event,{uid:'synthetic'});assert.equal(enrolled.state,'pending');
+for(const role of ['anon','authenticated'])assert.match((await invoke(role,{p_op:'request',p_uid:'synthetic',p_fingerprint:enrolled.fingerprint,p_args:{}})).error.message,/permission denied/);
+await assert.rejects(control.control({action:'issueBrowserChallenge',fingerprint:enrolled.fingerprint,audience:'customers',payloadHash:'a'.repeat(64)},{uid:'synthetic'}),/DEVICE_NOT_APPROVED/);
+await q('SET ROLE service_role');await assert.rejects(q("UPDATE public.crm_browser_devices SET state='approved'"),/permission denied/);await q('RESET ROLE');
+await db.exec(sql('20261110081000_device_member_gateway.rollback'));assert.equal((await q('SELECT state FROM public.crm_browser_devices')).rows[0].state,'pending');
+console.log('PASS service-only member transport: pending only, nonmember denial, browser roles denied, service cannot approve, rollback retains devices');
+}finally{await db.close();}})().catch(e=>{console.error(e.message);process.exitCode=1;});

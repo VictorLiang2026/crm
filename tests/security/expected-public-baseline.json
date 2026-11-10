@@ -2998,6 +2998,16 @@
     },
     {
       "kind": "routine",
+      "name": "crm_device_member_gateway_v1(p_op text, p_uid text, p_fingerprint text, p_args jsonb)",
+      "detail": {
+        "anon_execute": false,
+        "service_execute": true,
+        "security_definer": true,
+        "authenticated_execute": false
+      }
+    },
+    {
+      "kind": "routine",
       "name": "crm_file_import_v1(p_actor_uid text, p_operation text, p_data jsonb)",
       "detail": {
         "anon_execute": false,
