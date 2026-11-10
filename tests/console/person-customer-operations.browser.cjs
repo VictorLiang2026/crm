@@ -62,7 +62,9 @@ test('People directory customer view is additive, keeps the full directory, and 
     await b.evaluate(`(async()=>{
       const {renderPeople}=await import('/crm/js/modules/console/pages/people.js');
       window.peopleRequests=[];
-      renderPeople({main:document.getElementById('view'),toast(){},api:{call:async(name,args)=>{
+      const directoryRoot=document.createElement('main');
+      document.body.append(directoryRoot);
+      renderPeople({main:directoryRoot,toast(){},api:{call:async(name,args)=>{
         window.peopleRequests.push({name,args});
         const customerOnly=args.roles?.length===1&&args.roles[0]==='customer';
         return {rows:[{id:71,display_name:'【系统测试·勿联系】客户甲',roles:['customer'],customer_stage:'关系维护',

@@ -27,8 +27,11 @@ function compactColumnLabel(label, key) {
   return word;
 }
 
-const SORT_COLUMNS = (customerView = false, showConversions = true) => ([
+const SORT_COLUMNS = (customerView, showConversions, participantView) => ([
   { key: 'name', field: 'display_name', label: t('col_name') },
+  ...(participantView ? ['activity_count', 'latest_activity', 'activity_status'].map(key => ({
+    key, label: t('directory_' + key), sortable: false,
+  })) : []),
   ...(customerView ? [
     { key: 'customer_stage', field: 'customer_stage', label: t('customer_view_stage'), sortable: false },
     { key: 'wb_status', field: 'wb_status', label: t('l01_status') },
@@ -70,7 +73,6 @@ export function renderPeople(ctx) {
   const nextBtn = h('button', { class: 'btn btn-ghost btn-sm', type: 'button' }, t('btn_next'));
   const pageInfo = h('span', { class: 'pager-info' }, '');
   const filterButton = h('button', { class: 'btn btn-dark people-filter-trigger', type: 'button' });
-  const customerViewButton = h('button', { class: 'btn btn-soft', type: 'button' });
   const filterPanel = h('div', { class: 'people-filter-panel', hidden: true });
   const priorityFilters = h('div', { class: 'people-filter-priorities' });
   const worklistFilter = h('select', { 'aria-label': t('l01_status'), onchange: () => {
@@ -95,6 +97,7 @@ export function renderPeople(ctx) {
     cancelQuery = loadInto(listEl, async () => {
       const customerView = state.filters.roles.length === 1 && state.filters.roles[0] === 'customer';
       const recruitView = state.filters.roles.length === 1 && state.filters.roles[0] === 'recruit';
+      const participantView = state.filters.roles.length === 1 && state.filters.roles[0] === 'participant';
       const showConversions = !customerView && !recruitView;
       worklistTools.hidden = !customerView;
       worklistTools.style.display = customerView ? '' : 'none';
@@ -121,7 +124,7 @@ export function renderPeople(ctx) {
         return h('div', { class: 'card-body' }, [emptyNote(t('empty_no_people'), referrerOnly
           ? t('referrer_filter_empty') : state.keyword ? t('empty_people_hint') : t('empty_people_note'))]);
       }
-      const columns = SORT_COLUMNS(customerView, showConversions);
+      const columns = SORT_COLUMNS(customerView, showConversions, participantView);
       const thead = h('thead', {}, h('tr', {}, columns.map((col) => {
         const th = h('th', {
           class: `people-col-${col.key}${col.sortable === false ? '' : ' sortable-th'}`,
@@ -168,6 +171,14 @@ export function renderPeople(ctx) {
         };
         const cells = [
           cell('name', h('a', { href: `#/person/${p.id}` }, p.display_name)),
+          ...(participantView ? [
+            cell('activity_count', String(p.activity_count ?? '—')),
+            cell('latest_activity', p.latest_activity_id ? h('a', {
+              href: `#/activity/${p.latest_activity_id}`, onclick: event => event.stopPropagation(),
+            }, [p.latest_activity_name, p.latest_activity_date].filter(Boolean).join(' · ')) : '—'),
+            cell('activity_status', ['invited', 'attended', 'absent'].includes(p.latest_activity_status)
+              ? t('part_' + p.latest_activity_status) : '—'),
+          ] : []),
           ...(customerView ? [
             cell('customer_stage', p.customer_stage ? translateEnum('customer_stage', p.customer_stage) : '-'),
             cell('wb_status', bdg(p.wb_status === 'overdue' && p.next_followup_date
@@ -204,7 +215,7 @@ export function renderPeople(ctx) {
     state.page = 1;
     filterPanel.hidden = true;
     updateFilterButton();
-    updateCustomerViewButton();
+    updateViewButtons();
     runQuery();
   };
   input.addEventListener('keydown', (e) => { if (e.key === 'Enter') doSearch(); });
@@ -212,7 +223,7 @@ export function renderPeople(ctx) {
   const roles = ['customer', 'recruit', 'referrer', 'speaker', 'participant', 'partner', 'alumni', 'other'];
   const roleLabels = {
     customer: t('customer'), recruit: t('recruit'), referrer: t('role_referrer'),
-    speaker: t('speaker'), participant: t('participant'), partner: t('role_partner'),
+    speaker: t('speaker'), participant: t('directory_participant'), partner: t('role_partner'),
     alumni: t('role_alumni'), other: t('role_other'),
   };
   function checkboxGroup(values, options, onChange) {
@@ -250,24 +261,32 @@ export function renderPeople(ctx) {
     );
     filterButton.setAttribute('aria-expanded', String(!filterPanel.hidden));
   }
-  function updateCustomerViewButton() {
-    const active = state.filters.roles.length === 1 && state.filters.roles[0] === 'customer';
-    customerViewButton.textContent = active ? t('people_all_view') : t('people_customer_view');
-    customerViewButton.className = active ? 'btn btn-dark' : 'btn btn-soft';
-    customerViewButton.setAttribute('aria-pressed', String(active));
+  const viewButtons = new Map([
+    ['', 'people_all_view'], ['customer', 'people_customer_view'], ['recruit', 'recruit'],
+    ['referrer', 'role_referrer'], ['speaker', 'speaker'], ['participant', 'directory_participant'],
+  ].map(([role, key]) => [role, h('button', { type: 'button', 'data-directory-view': role,
+    onclick: () => selectView(role) }, t(key))]));
+  function updateViewButtons() {
+    for (const [role, button] of viewButtons) {
+      const selected = role ? state.filters.roles.length === 1 && state.filters.roles[0] === role
+        : state.filters.roles.length === 0;
+      button.className = selected ? 'btn btn-dark' : 'btn btn-soft';
+      button.setAttribute('aria-pressed', String(selected));
+    }
   }
-  customerViewButton.onclick = () => {
-    const active = state.filters.roles.length === 1 && state.filters.roles[0] === 'customer';
-    const next = active ? emptyFilters() : { ...emptyFilters(), roles: ['customer'] };
+  function selectView(role) {
+    const next = { ...emptyFilters(), roles: role ? [role] : [] };
     state.filters = next;
-    if (!active) { state.sortField = 'wb_status'; state.sortDir = 'asc'; }
+    state.keyword = input.value.trim().slice(0, 40);
+    state.sortField = role === 'customer' ? 'wb_status' : 'id';
+    state.sortDir = role === 'customer' ? 'asc' : 'desc';
     state.pendingFilters = Object.fromEntries(Object.entries(next).map(([key, values]) => [key, [...values]]));
     state.page = 1;
     filterPanel.hidden = true;
     updateFilterButton();
-    updateCustomerViewButton();
+    updateViewButtons();
     runQuery();
-  };
+  }
   function renderFilterPanel() {
     const roleFilters = checkboxGroup(state.pendingFilters.roles, roles.map(role => [role, roleLabels[role]]), (value, checked) => {
       const set = new Set(state.pendingFilters.roles);
@@ -314,7 +333,6 @@ export function renderPeople(ctx) {
         h('button', { class: 'btn btn-primary btn-sm', type: 'button', onclick: doSearch }, t('btn_search')),
       ]),
       h('div', { class: 'people-filter-anchor' }, [filterButton, filterPanel]),
-      customerViewButton,
       h('a',{class:'btn btn-soft people-toolbar-link',href:'#/people/import'},t('l04_import_title')),
       h('a', {
         class: 'btn btn-soft people-toolbar-link', href: '#/people-trash',
@@ -324,6 +342,7 @@ export function renderPeople(ctx) {
         onclick: () => openPersonNew(ctx, { onDone: (newId) => { if (newId) location.hash = `#/person/${newId}`; else runQuery(); } }),
       }, [ic('plus'), t('btn_new_person')]),
     ]),
+    h('div', { class: 'toolbar people-directory-views', role: 'group', 'aria-label': t('title_people') }, [...viewButtons.values()]),
     worklistTools,
     h('section', { class: 'card' }, [
       listEl,
@@ -333,6 +352,6 @@ export function renderPeople(ctx) {
       ]),
     ]),
   );
-  updateCustomerViewButton();
+  updateViewButtons();
   runQuery();
 }

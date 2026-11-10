@@ -4,7 +4,15 @@ const assert = require('node:assert/strict');
 const Module = require('node:module');
 
 const originalLoad = Module._load;
+let directoryHandler;
 Module._load = function(name, parent, main) {
+  if (name === './device-runtime' && parent.filename.endsWith('index.js')) {
+    const runtime = originalLoad.call(this, name, parent, main);
+    return { ...runtime, protect(scope, handler) {
+      directoryHandler = handler;
+      return runtime.protect(scope, handler);
+    } };
+  }
   if (name === '@cloudbase/node-sdk') return { init: () => ({ auth: () => ({ getUserInfo: () => ({ uid: '' }) }) }) };
   return originalLoad.call(this, name, parent, main);
 };
@@ -102,5 +110,6 @@ test('opportunity directory maps explicit Person links before legacy customer li
 });
 
 test('unauthenticated directory request is rejected before database access', async () => {
-  assert.deepEqual(await main({ action: 'listPeople' }), { error: 'UNAUTHORIZED' });
+  assert.deepEqual(await main({ action: 'listPeople' }), { ok: false, error: 'DEVICE_ACCESS_DENIED' });
+  assert.deepEqual(await directoryHandler({ action: 'listPeople' }), { error: 'UNAUTHORIZED' });
 });

@@ -67,7 +67,7 @@ test('customer edit labels are bilingual and legacy entry points stay untouched'
   ]) {
     assert.match(i18n, new RegExp(`'${key}': \\{ 'zh-CN': '[^']+', 'en': '[^']+' \\}`), `missing bilingual key ${key}`);
   }
-  assert.match(read('crm/js/modules/console/pages/people.js'), /roles: \['customer'\]/);
+  assert.match(read('crm/js/modules/console/pages/people.js'), /\['customer', 'people_customer_view'\]/);
   assert.match(read('crm/js/modules/console/pages/person.js'), /openPersonEdit\(ctx, \{ personId: String\(id\)/);
   assert.match(read('admin.html'), /location\.hash\s*=\s*'?#\/customer\//);
 });
