@@ -2,6 +2,8 @@
 const DEFAULT = 'zh-CN';
 
 const DICT = {
+  device_signature_verified: {'zh-CN':'此浏览器已获后台批准，设备签名验证通过。','en':'This browser is approved and its device signature has been verified.'},
+  device_signature_failed: {'zh-CN':'设备签名验证未通过。请核对后台批准状态，再在本浏览器重试。','en':'Device signature verification failed. Check approval and retry in this browser.'},
   device_member_required: {'zh-CN':'当前登录账号不在已启用的 CRM 成员名单中。请管理员核对这个账号的 UID。','en':'This account is not an enabled CRM member. Ask the administrator to verify its UID.'},
   device_session_required: {'zh-CN':'登录已失效。请重新用 CRM 用户名和密码登录。','en':'Your session expired. Sign in again with your CRM username and password.'},
   device_local_storage: {'zh-CN':'此浏览器无法安全保存设备密钥。请用 Safari 普通窗口打开申请页，并允许保存站点数据。','en':'This browser cannot store the device key. Use a regular Safari window and allow website data.'},
