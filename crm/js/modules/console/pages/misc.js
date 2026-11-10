@@ -5,6 +5,7 @@ import { data } from '../data.js';
 import { wpTag, pageHead, card, emptyNote, loadInto, sk, bdg, sectionTitle } from '../ui.js';
 import { t } from '../i18n.js';
 import { openQuickCapture } from '../write.js';
+import { isPhoneViewport } from '../shell.js';
 
 function searchExamples() {
   return [
@@ -294,7 +295,7 @@ export function renderMore(ctx) {
     ['home', 'today'], ['users', 'people'], ['target', 'opportunities'],
     ['calendar', 'activities'], ['recruit', 'recruit'], ['sparkle', 'ai'],
   ].map(([icon, name]) => ({ kind: 'native', icon, key: 'nav_' + name, descKey: 'tile_' + name + '_desc', hash: '#/' + name }));
-  const shortcuts = h('details', { class: 'more-section more-workspaces', open: window.innerWidth < 768 }, [
+  const shortcuts = h('details', { class: 'more-section more-workspaces', open: isPhoneViewport() }, [
     h('summary', { class: 'section-title', style: 'cursor:pointer;display:list-item;list-style-position:inside;min-height:44px;padding:10px 0' }, t('m17_workspaces')),
     h('p', { class: 'foot-note' }, t('m17_workspaces_note')),
     h('div', { class: 'tile-grid' }, [

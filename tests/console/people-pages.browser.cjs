@@ -170,6 +170,8 @@ test('People directory uses 30-row pages on phone and iPad with an unlocked cont
     await b.evaluate("document.head.insertAdjacentHTML('beforeend','<link rel=stylesheet href=/crm/css/console.css>')");
     await b.wait("!!document.querySelector('link[href=\"/crm/css/console.css\"]')?.sheet && getComputedStyle(document.querySelector('.people-directory-table')).minWidth==='0px'");
     assert.equal(await b.evaluate('window.peopleRequests[0].args.pageSize'), 30);
+    assert.equal(await b.evaluate("getComputedStyle(document.querySelector('.people-directory-table tbody td.people-col-name a')).fontWeight"), '400',
+      'iPhone name weight matches the standard directory typography');
     const mobile = await b.evaluate(`(async()=>{
       const scroller=document.querySelector('.people-directory-scroll');
       const table=document.querySelector('.people-directory-table');
@@ -198,6 +200,8 @@ test('People directory uses 30-row pages on phone and iPad with an unlocked cont
     await b.send('Emulation.setDeviceMetricsOverride', { width: 1024, height: 768, deviceScaleFactor: 1, mobile: true });
     await b.evaluate('document.body.replaceChildren();window.renderPeopleForViewport()');
     await b.wait("window.peopleRequests.at(-1)?.args.pageSize===30");
+    assert.equal(await b.evaluate("getComputedStyle(document.querySelector('.people-directory-table tbody td.people-col-name a')).fontWeight"), '400',
+      'iPad name weight matches the standard directory typography');
     assert.equal(await b.evaluate("getComputedStyle(document.querySelector('.people-date-full')).display"), 'inline');
     assert.equal(await b.evaluate("getComputedStyle(document.querySelector('.people-date-mobile')).display"), 'none');
     assert.equal(await b.evaluate("document.querySelector('.people-directory-table th.people-col-updated_at .people-header-full').textContent"), '最近更新日期');
@@ -207,5 +211,7 @@ test('People directory uses 30-row pages on phone and iPad with an unlocked cont
     await b.send('Emulation.setTouchEmulationEnabled', { enabled: false });
     await b.evaluate('document.body.replaceChildren();window.renderPeopleForViewport()');
     await b.wait("window.peopleRequests.at(-1)?.args.pageSize===20");
+    assert.equal(await b.evaluate("getComputedStyle(document.querySelector('.people-directory-table tbody td.people-col-name a')).fontWeight"), '400',
+      'desktop name weight matches the standard directory typography');
   } finally { await b.close(); }
 });

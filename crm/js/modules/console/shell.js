@@ -15,6 +15,10 @@ function navItems() {
     { hash: '#/more', label: t('nav_more'), icon: 'grid' },
   ];
 }
+export function isPhoneViewport() {
+  return typeof window.matchMedia === 'function' &&
+    window.matchMedia('(max-width: 820px), (max-height: 520px) and (pointer: coarse)').matches;
+}
 // 手机底栏五格：今日 / 人物 / [记录] / 机会 / 更多；活动、招募、AI 由「更多」进入。
 function phoneTabs() {
   const NAV = navItems();
@@ -49,7 +53,13 @@ export function mountShell({ appRoot, operator, onQuickCapture }) {
     main,
     setActive(navHash) {
       document.querySelectorAll('[data-nav]').forEach((n) => {
-        n.classList.toggle('active', n.getAttribute('data-nav') === navHash);
+        const isPhoneTab = n.closest('.console-tabbar');
+        const phoneNavHash = ['#/today', '#/people', '#/opportunities', '#/more'].includes(navHash)
+          ? navHash : '#/more';
+        const active = n.getAttribute('data-nav') === (isPhoneTab ? phoneNavHash : navHash);
+        n.classList.toggle('active', active);
+        if (active) n.setAttribute('aria-current', 'page');
+        else n.removeAttribute('aria-current');
       });
     },
   };
