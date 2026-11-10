@@ -96,9 +96,9 @@ class Browser {
         res.setHeader('Content-Type', 'text/css; charset=utf-8');
         res.end(fs.readFileSync(path.join(this.root, pathname.slice(1))));
       }
-      else if (pathname.startsWith('/crm/js/modules/console/') || pathname.startsWith('/crm/js/core/')) {
+      else if (pathname.startsWith('/crm/js/modules/console/') || pathname.startsWith('/crm/js/modules/device-access/') || pathname.startsWith('/crm/js/core/')) {
         const file = path.resolve(this.root, pathname.slice(1));
-        const allowedRoot = path.resolve(this.root, pathname.startsWith('/crm/js/core/') ? 'crm/js/core' : 'crm/js/modules/console') + path.sep;
+        const allowedRoot = path.resolve(this.root, pathname.startsWith('/crm/js/core/') ? 'crm/js/core' : pathname.startsWith('/crm/js/modules/device-access/') ? 'crm/js/modules/device-access' : 'crm/js/modules/console') + path.sep;
         if (!file.startsWith(allowedRoot) || !fs.existsSync(file) || !fs.statSync(file).isFile()) { res.writeHead(404); res.end(); }
         else { res.setHeader('Content-Type', 'text/javascript; charset=utf-8'); res.end(fs.readFileSync(file)); }
       }

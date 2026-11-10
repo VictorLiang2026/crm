@@ -249,3 +249,6 @@ async function remove(event, consoleScoped) {
   const r = assertOk(await query.select('id'));
   return (r.data || []).length === 1 ? { ok: true } : { error: 'task changed or unavailable' };
 }
+
+// Verify the caller before dispatching any private business operation.
+exports.main = require('./device-runtime').protect('activity_tasks', exports.main);

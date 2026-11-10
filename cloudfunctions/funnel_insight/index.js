@@ -347,3 +347,6 @@ exports.main = async function (event) {
     return { ok: false, error: String(e && e.message || e) };
   }
 };
+
+// Verify the caller before dispatching any private business operation.
+exports.main = require('./device-runtime').protect('funnel_insight', exports.main);

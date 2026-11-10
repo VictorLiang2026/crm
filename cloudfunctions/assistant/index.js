@@ -546,3 +546,13 @@ function getIdentity() {
 exports.main = createMain(getIdentity);
 exports.createMain = createMain;
 exports.aiExperienceInput = aiExperienceInput;
+
+// Verify the caller before dispatching any private business operation.
+const protectedAssistant = require('./device-runtime').protect('assistant', exports.main);
+exports.main = function(event, context, callback) {
+  if (typeof callback === 'function' && requestsEarlyResponse(event?.__deviceRequest)) {
+    if (context) context.callbackWaitsForEmptyEventLoop = false;
+    return protectedAssistant(event, context, callback);
+  }
+  return protectedAssistant(event, context);
+};

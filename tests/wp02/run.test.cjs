@@ -40,6 +40,7 @@ function load(name,data,ledger=[]) {
  require(dep){
   if(dep==='./db')return db;
   if(dep==='./test-data')return testData;
+  if(dep==='./device-runtime')return {protect:(_name,main)=>main,internalCall:(target,request)=>target.callFunction(request)};
   if(dep==='./action-facts')return {...require('../../cloudfunctions/today_coach/action-facts'),readOpenActions:async()=>({rows:data.actions||[],persons:data.persons||[]})};
   if(dep.startsWith('./'))return require(path.join(root,'cloudfunctions',name,dep));
   if(dep==='crypto')return require('node:crypto');

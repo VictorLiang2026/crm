@@ -432,7 +432,7 @@ async function recruitReport(event) {
   try {
     const startMonth = start.slice(0, 7);
     const endMonth = end.slice(0, 7);
-    const res = await app.callFunction({
+    const res = await require('./device-runtime').internalCall(app,{
       name: 'recruit_goals',
       data: { action: 'getProgress', startMonth, endMonth },
     });
@@ -499,3 +499,6 @@ exports.main = async (event, context) => {
     return { error: e.message };
   }
 };
+
+// Verify the caller before dispatching any private business operation.
+exports.main = require('./device-runtime').protect('activity_reports', exports.main);

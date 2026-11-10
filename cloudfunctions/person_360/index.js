@@ -1025,25 +1025,10 @@ function createService({ request = pgRequest, rpc = pgRpc, disclosure = disclose
 
 exports.main = async event => {
   try {
-    const identity = app.auth().getUserInfo();
+    const identity = require('./device-runtime').callerIdentity(app);
     const uid = identity && identity.uid;
     if (typeof uid !== 'string' || !uid.trim() ||
         identity.isAnonymous === true || identity.is_anonymous === true) return { error: 'UNAUTHORIZED' };
-    if (Object.hasOwn(event || {}, '__deviceRequest')) {
-      const request = event.__deviceRequest;
-      if (request?.action !== 'verifyBrowserDevice' ||
-          Object.keys(request).some(key => !['action', '__deviceProof'].includes(key))) {
-        return { error: 'DEVICE_ACCESS_DENIED' };
-      }
-      try {
-        const { protocol } = require('./device-control').makeControl(app, process.env.TCB_ENV);
-        await protocol.authorize(identity, 'person_360', request);
-        console.info('CRM_DEVICE_PILOT_SIGNATURE_VERIFIED');
-        return { ok: true, deviceSignatureVerified: true };
-      } catch {
-        return { error: 'DEVICE_ACCESS_DENIED' };
-      }
-    }
     if (event?.action === 'requestBrowserDevice' || event?.action === 'issueBrowserChallenge') {
       try { return await require('./device-control').makeControl(app,process.env.TCB_ENV).control(event,identity); }
       catch(e) {
@@ -1199,7 +1184,7 @@ exports.main = async event => {
           let timer;
           try {
             const response=await Promise.race([
-              app.callFunction({name:'ai_parse',data}),
+              require('./device-runtime').internalCall(app,{name:'ai_parse',data}),
               new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error('PARSE_FAILED')),60000);}),
             ]);
             return typeof response.result==='string'?JSON.parse(response.result):response.result;
@@ -1324,3 +1309,6 @@ exports.main = async event => {
 };
 
 exports.createService = createService;
+
+// Verify the caller before dispatching any private business operation.
+exports.main = require('./device-runtime').protect('person_360', exports.main);

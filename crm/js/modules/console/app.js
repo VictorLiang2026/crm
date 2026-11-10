@@ -1,5 +1,7 @@
 // Console 引导层：复用 admin.html 相同的 CloudBase 认证与会话语义（5 分钟无操作重登录）。
 // 仅新增文件，不改动 admin.html；业务调用经 core/createApi 包装（校验函数名、拒绝 pr_*）。
+import {deviceFiles} from '../device-access/files.js';
+import {deviceCall, verifyDevice, guardResume} from '../device-access/transport.js';
 import { createApi } from '../../core/index.js';
 import { h, toast } from './dom.js';
 import { renderLogin, renderReloginOverlay } from './login.js';
@@ -48,10 +50,11 @@ function checkAuthResult(result) {
 }
 async function signIn(username, password) {
   checkAuthResult(await authInst.signInWithPassword({ username, password }));
+  await verifyDevice(app,CONFIG.envId);
 }
 async function callFn(name, data) {
   await ensureSession(); // 超过 5 分钟无操作时，先要求重新登录再继续原操作
-  const res = await app.callFunction({ name, data });
+  const res = await deviceCall(app,CONFIG.envId,name,data);
   return res.result;
 }
 
@@ -111,14 +114,8 @@ function route() {
     main: shell.main,
     api,
     callFn,
-    recruitFiles: {
-      upload: (path, file, options) => app.storage.from('recruit').upload(path, file, options),
-      createSignedUrl: (path, expiresIn) => app.storage.from('recruit').createSignedUrl(path, expiresIn),
-      remove: paths => app.storage.from('recruit').remove(paths),
-    },
-    knowledgeFiles: {
-      upload: (path, file, options) => app.storage.from('knowledge').upload(path, file, options),
-    },
+    recruitFiles: deviceFiles(callFn,'recruit'),
+    knowledgeFiles: deviceFiles(callFn,'knowledge'),
     operator: CONFIG.operator || {},
     toast,
     signOut: signOutCurrentAccount,
@@ -168,6 +165,7 @@ async function init() {
   }
   app = cloudbase.init({ env: CONFIG.envId, timeout: 120000 });
   authInst = app.auth({ persistence: 'local' });
+  guardResume(()=>loginReady,()=>verifyDevice(app,CONFIG.envId));
   api = createApi(callFn);
   // 跨刷新 / 后台回收的超时检查（与 admin.html 相同语义）
   try {
@@ -179,7 +177,8 @@ async function init() {
     }
   } catch (e) { console.warn(e); }
   try {
-    if (authInst.hasLoginState && authInst.hasLoginState()) { enterApp(appRoot); return; }
+    const session=(await authInst.getSession())?.data?.session;
+    if (session?.user && !session.user.is_anonymous) { await verifyDevice(app,CONFIG.envId); enterApp(appRoot); return; }
   } catch (e) { console.warn(e); }
   showLogin(appRoot);
 }

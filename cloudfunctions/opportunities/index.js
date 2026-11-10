@@ -155,3 +155,6 @@ async function remove(event) {
     .update({ deleted_at: nowIso(), updated_at: nowIso() }).eq('id', id).select('id'));
   return { ok: (r.data || []).length === 1 };
 }
+
+// Verify the caller before dispatching any private business operation.
+exports.main = require('./device-runtime').protect('opportunities', exports.main);

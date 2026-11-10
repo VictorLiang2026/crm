@@ -123,7 +123,7 @@ async function runReadIntent(event, dependencies = {}) {
   } else if (parsed.intent === 'prepare') {
     result = await (dependencies.prepare || (input=>require('./meeting-prep-service').runMeetingPrep(input)))({personId:selectedPersonId});
   } else if (parsed.intent === 'plan') {
-    const call = dependencies.plan || (async()=>app.callFunction({name:'today_coach',data:{action:'daily_review',view:'morning'}}));
+    const call = dependencies.plan || (async()=>require('./device-runtime').internalCall(app,{name:'today_coach',data:{action:'daily_review',view:'morning'}}));
     result = unwrapCall(await withTimeout(call(),35000));
     if (result.view !== 'morning' || !result.sections || !Array.isArray(result.sections.topActions)) fail('INVALID_RESULT','Today brief result is incomplete');
   }

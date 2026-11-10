@@ -67,6 +67,11 @@ const SYSTEM_VISION = [
 
 exports.main = async (event, context) => {
   try {
+    if (event?.__crmDelegation) {
+      const delegated=await require('./device-internal-delegation').unwrap(app,event,context,'ai_parse');
+      event=delegated.event;
+      context=delegated.context;
+    }
     const action = (event && event.action) || 'parse';
     if (action === 'ocr_knowledge_source') {
       return await createKnowledgeOcr({app,rdb,generateText,assertOk,visionModel:VISION_MODEL}).run(event);

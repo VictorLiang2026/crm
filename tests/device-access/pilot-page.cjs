@@ -28,10 +28,16 @@ const root = path.resolve(__dirname, '../..');
     assert.equal(body.p_op,'consume'); ticket = null; return {data:{ok:true}};
   }
   const entry = path.join(root, 'cloudfunctions/person_360/index.js');
+  const deviceControlModule=require('../../cloudfunctions/person_360/device-control');
+  const originalMakeControl=deviceControlModule.makeControl;
+  deviceControlModule.makeControl=()=>makeControl(app,env,database);
+  const runtime=require('../../cloudfunctions/person_360/device-runtime');
+  const runtimeAdapter={...runtime,protect:(name,main)=>runtime.protect(name,main,()=>app)};
   const mod = new Module(entry);
   mod.require = id => {
     if (id === '@cloudbase/node-sdk') return {init:() => app};
     if (id === './device-control') return {makeControl:() => makeControl(app, env, database)};
+    if (id === './device-runtime') return runtimeAdapter;
     return {};
   };
   mod._compile(fs.readFileSync(entry, 'utf8'), entry);
@@ -70,5 +76,5 @@ const root = path.resolve(__dirname, '../..');
     bareReceipt = true;
     assert.match(await clickAndRead(),/签名验证未通过/);
     console.log('PASS: real application page and function handler verify an approved browser signature; a replay and a bare success receipt fail');
-  } finally {if(browser) await browser.close();await new Promise(ok=>server.close(ok));}
+  } finally {deviceControlModule.makeControl=originalMakeControl;if(browser) await browser.close();await new Promise(ok=>server.close(ok));}
 })().catch(e=>{console.error(e);process.exitCode=1;});

@@ -1245,7 +1245,14 @@ async function testSummary(data, facts, extra) {
 exports.main = async (event, context) => {
   const startedAt = Date.now();
   try {
-    const identity = app.auth().getUserInfo();
+    if(event?.__crmDelegation){
+      const delegated=await require('./device-internal-delegation').unwrap(app,event,context,'today_coach');
+      event=delegated.event;
+      context=delegated.context;
+    }
+    const trusted=context?.__crmInternalDelegation;
+    const identity=trusted?.audience==='today_coach'&&trusted.origin==='browser'&&event?.action==='daily_review'&&event?.view==='morning'
+      ?{uid:trusted.actor,isAnonymous:false}:app.auth().getUserInfo();
     if (!identity || typeof identity.uid !== 'string' || !identity.uid.trim() || identity.isAnonymous === true) {
       return { error: 'UNAUTHORIZED' };
     }

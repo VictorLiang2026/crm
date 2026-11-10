@@ -486,6 +486,7 @@ function installFixtures() {
   window.cloudbase = { init() { return {
     auth() { return {
       hasLoginState: () => loggedIn,
+      async getSession() { return { data: { session: loggedIn ? { user: { uid: 'fixture', is_anonymous: false } } : null }, error: null }; },
       async signOut() {
         window.__crmTest.signOutAttempts++;
         if (sessionStorage.getItem('crm_fixture_fail_signout') === '1')
@@ -513,6 +514,14 @@ function installFixtures() {
       }
     }; },
     async callFunction({ name, data }) {
+      if (name === 'person_360' && data.action === 'issueBrowserChallenge')
+        return { result: { challenge: '11111111-1111-4111-8111-111111111111' } };
+      if (data.__deviceRequest) {
+        data = { ...data.__deviceRequest };
+        delete data.__deviceProof;
+        if (name === 'person_360' && data.action === 'verifyBrowserDevice')
+          return { result: { ok: true, deviceSignatureVerified: true } };
+      }
       const key = name + ':' + data.action;
       if (key === 'assistant:knowledgeLibrary' && data.operation === 'list') {
         calls.push({ name, action: data.action, operation: data.operation });

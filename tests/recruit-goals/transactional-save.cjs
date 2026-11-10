@@ -21,6 +21,12 @@ function invoke(event, response) {
     module, exports: module.exports,
     require(name) {
       if (name === './test-data') return require('../../cloudfunctions/_shared/test-data');
+      if (name === './device-runtime') {
+        return { protect(functionName, handler) {
+          if (functionName !== 'recruit_goals') throw new Error('Unexpected protected function: ' + functionName);
+          return handler;
+        } };
+      }
       if (name !== './db') throw new Error('Unexpected module: ' + name);
       return {
         rdb,

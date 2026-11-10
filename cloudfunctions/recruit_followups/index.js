@@ -78,3 +78,6 @@ async function remove(event) {
   const r = assertOk(await rdb.from('recruit_followups').delete().eq('id', id).select('id'));
   return { ok: (r.data || []).length === 1 };
 }
+
+// Verify the caller before dispatching any private business operation.
+exports.main = require('./device-runtime').protect('recruit_followups', exports.main);

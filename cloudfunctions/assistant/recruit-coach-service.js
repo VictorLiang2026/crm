@@ -81,7 +81,7 @@ function coachOutput(raw, context) {
 }
 
 async function p360(action, personId, candidateId, client) {
-  const cloudApp = client || require('./db').app;
+  const cloudApp = client || require('./device-runtime').scopedApp(require('./db').app);
   const response = await cloudApp.callFunction({ name:'person_360', data:{ action, personId, candidateId } });
   const result = response?.result;
   if (!result || result.error || !result.candidate || !Array.isArray(result.recruit_followups) || !Array.isArray(result.sourceRefs)) {

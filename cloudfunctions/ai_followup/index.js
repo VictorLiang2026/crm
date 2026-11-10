@@ -452,3 +452,6 @@ exports.main = async (event, context) => {
     return { error: e.message };
   }
 };
+
+// Verify signed browser requests before loading person history or generating advice.
+exports.main = require('./device-runtime').protect('ai_followup', exports.main);

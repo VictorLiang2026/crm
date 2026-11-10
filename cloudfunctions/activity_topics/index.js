@@ -208,3 +208,6 @@ async function search(event) {
     });
   return { rows: rows };
 }
+
+// Verify the caller before dispatching any private business operation.
+exports.main = require('./device-runtime').protect('activity_topics', exports.main);

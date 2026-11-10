@@ -128,7 +128,7 @@ async function main(args = process.argv.slice(2)) {
   // A permission drift stops subsequent test calls and publishing.
   if (!checks.some(c => c.status === 'FAIL')) {
     for (const [id, args] of [
-      ['guard-tests', ['--test','tests/security/run.test.cjs','tests/wp01/gate.test.cjs','tests/tooling/cloudbase-sdk-pins.cjs','tests/recruit-goals/transactional-save.cjs']],
+      ['guard-tests', ['--test','tests/security/run.test.cjs','tests/security/device-delegation.test.cjs','tests/wp01/gate.test.cjs','tests/tooling/cloudbase-sdk-pins.cjs','tests/recruit-goals/transactional-save.cjs']],
       ['wp02-fixtures', ['--test','tests/wp02/run.test.cjs','tests/wp02/browser.test.cjs']],
       ['wp03-fixtures', ['--test','tests/wp03/run.test.cjs','tests/wp03/browser.test.cjs']],
       ['wp04-identity', ['tests/wp04/run.cjs']],
