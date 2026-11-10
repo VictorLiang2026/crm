@@ -1245,7 +1245,7 @@ async function testSummary(data, facts, extra) {
 exports.main = async (event, context) => {
   const startedAt = Date.now();
   try {
-    const identity = app.auth().getUserInfo();
+    const identity = require('./device-runtime').callerIdentity(app);
     if (!identity || typeof identity.uid !== 'string' || !identity.uid.trim() || identity.isAnonymous === true) {
       return { error: 'UNAUTHORIZED' };
     }
@@ -1346,3 +1346,6 @@ exports.main = async (event, context) => {
 };
 
 exports.__test = { buildActionCandidates, normTodayFive, todayFiveToLegacy, allActionsFact, buildFingerprint };
+
+// Verify the caller before dispatching any private business operation.
+exports.main = require('./device-runtime').protect('today_coach', exports.main);

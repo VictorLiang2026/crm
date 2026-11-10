@@ -83,7 +83,7 @@ exports.main = async (event, context) => {
     Object.assign(customer, ident);
 
     const [fol, prod, gif, parts, refOpp] = await Promise.all([
-      customerHistory(app, rdb, customer, 8),
+      customerHistory(require('./device-runtime').scopedApp(app), rdb, customer, 8),
       rdb.from('products').select('ap_all').eq('customer_id', customerId),
       rdb.from('gifts').select('gift_name, given_date').eq('customer_id', customerId)
         .order('given_date', { ascending: false, nullsFirst: false }).limit(5),
@@ -219,3 +219,6 @@ exports.main = async (event, context) => {
     return { error: e.message };
   }
 };
+
+// Verify the caller before dispatching any private business operation.
+exports.main = require('./device-runtime').protect('ai_referral', exports.main);

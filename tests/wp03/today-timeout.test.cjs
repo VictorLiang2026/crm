@@ -55,6 +55,7 @@ function loadToday(ai,empty=false) {
   const TD=require('../../cloudfunctions/today_coach/test-data');
   const context={exports,process:{env:{}},console,Date,Buffer,Map,Set,setTimeout,clearTimeout,
     require(name){
+      if(name==='./device-runtime')return {protect:(_,handler)=>handler,callerIdentity:app=>app.auth().getUserInfo(),internalCall:(app,request)=>app.callFunction(request)};
       if(name==='./db')return db;
       if(name==='./test-data')return {...TD,disclose:async()=>disclosure};
       if(name==='./action-facts')return {...require(path.join(directory,name)),readOpenActions:async()=>({rows:[],persons:[]})};

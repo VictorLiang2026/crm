@@ -265,7 +265,7 @@ async function extractImageText(fileName,mime,bytes,{app:client,sourceId,uploadI
   let response;
   const data=sourceId!=null?{action:'ocr_knowledge_source',sourceId:String(sourceId),uploadId:String(uploadId||'')}:
     {action:'ocr_knowledge_source',fileName,contentType:mime,base64:bytes.toString('base64')};
-  try{response=await (client||require('./db').app).callFunction({name:'ai_parse',data});}catch(_){fail('OCR_FAILED');}
+  try{response=await (client||require('./device-runtime').scopedApp(require('./db').app)).callFunction({name:'ai_parse',data});}catch(_){fail('OCR_FAILED');}
   const result=response?.result;
   if(!result||result.error||typeof result.ocrText!=='string')fail(result?.error||'OCR_FAILED');
   return boundedText(result.ocrText);
@@ -274,7 +274,7 @@ async function extractPdfImageText(bytes,{app:client,pdfPageRenderer,ocrPdfBatch
   const render=pdfPageRenderer||require('./knowledge-pdf-render').renderPdfPages;
   const callOcr=ocrPdfBatch|| (async images=>{
     let response;
-    try{response=await (client||require('./db').app).callFunction({name:'ai_parse',data:{action:'ocr_knowledge_source',images}});}
+    try{response=await (client||require('./device-runtime').scopedApp(require('./db').app)).callFunction({name:'ai_parse',data:{action:'ocr_knowledge_source',images}});}
     catch(_){fail('OCR_FAILED');}
     const result=response?.result;
     if(!result||result.error||typeof result.ocrText!=='string')fail(result?.error||'OCR_FAILED');
@@ -329,7 +329,7 @@ function metadataForSource(row) {
 
 function createKnowledgeLibrary(options={}) {
   const env=options.env??process.env.TCB_ENV,key=options.key??process.env.CRM_ASSISTANT_DB_API_KEY;
-  const fetchImpl=options.fetchImpl||fetch,client=options.client||require('./db').app;
+  const fetchImpl=options.fetchImpl||fetch,client=options.client||require('./device-runtime').scopedApp(require('./db').app);
   const gatewayFactory=options.gatewayFactory||createAIGateway;
   const searchDataFactory=options.searchDataFactory||createSearchData;
   const testDataReader=options.testDataReader||testData.disclose;

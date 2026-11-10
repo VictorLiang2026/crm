@@ -1,0 +1,23 @@
+'use strict';
+const {PGlite}=require(process.env.CRM_PGLITE_MODULE||'@electric-sql/pglite'),assert=require('node:assert/strict'),fs=require('node:fs');
+(async()=>{const db=new PGlite(),q=(s,args)=>db.query(s,args);try{
+ await db.exec(`CREATE ROLE anon;CREATE ROLE authenticated;CREATE ROLE service_role BYPASSRLS;CREATE SCHEMA storage;CREATE SCHEMA auth;
+ CREATE TABLE storage.objects(bucket_id text,name text);
+ CREATE FUNCTION storage.foldername(text) RETURNS text[] LANGUAGE sql IMMUTABLE AS $$ SELECT string_to_array($1,'/') $$;
+ CREATE FUNCTION auth.uid() RETURNS text LANGUAGE sql STABLE AS $$ SELECT 'owner'::text $$;
+ GRANT USAGE ON SCHEMA storage,auth TO authenticated,anon,service_role;
+ ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
+ GRANT SELECT,INSERT,UPDATE,DELETE ON storage.objects TO authenticated,service_role;
+ CREATE POLICY recruit_auth_rw ON storage.objects FOR ALL TO authenticated USING(bucket_id='recruit') WITH CHECK(bucket_id='recruit');
+ CREATE POLICY unrelated ON storage.objects FOR SELECT TO authenticated USING(bucket_id='unrelated');
+ INSERT INTO storage.objects VALUES ('recruit','item'),('knowledge','owner/item'),('unrelated','item');`);
+ const expr="(bucket_id='knowledge' AND (storage.foldername(name))[1]=auth.uid())";
+ for(const op of ['select','insert','update','delete'])await db.exec('CREATE POLICY knowledge_objects_'+op+'_own ON storage.objects FOR '+op+' TO authenticated '+(op==='insert'?'':'USING '+expr)+(op==='insert'||op==='update'?' WITH CHECK '+expr:''));
+ const visible=async role=>{await q('SET ROLE '+role);try{return (await q('SELECT bucket_id FROM storage.objects ORDER BY bucket_id')).rows.map(v=>v.bucket_id);}finally{await q('RESET ROLE');}};
+ const source=s=>fs.readFileSync('cloudbase/migrations/20261110153200_device_file_storage'+s+'.sql','utf8');
+ assert.deepEqual(await visible('authenticated'),['knowledge','recruit','unrelated']);
+ await db.exec(source(''));assert.deepEqual(await visible('authenticated'),['unrelated']);assert.deepEqual(await visible('service_role'),['knowledge','recruit','unrelated']);
+ await q('SET ROLE authenticated');await assert.rejects(q("INSERT INTO storage.objects VALUES('recruit','x')"),/row-level security/);await q('RESET ROLE');
+ await db.exec(source('.rollback'));assert.deepEqual(await visible('authenticated'),['knowledge','recruit','unrelated']);
+ console.log('PASS: five dedicated policies switched and restored, unrelated access retained; no actual storage files accessed');
+ }finally{await db.close();}})().catch(e=>{console.error(e.message);process.exitCode=1});

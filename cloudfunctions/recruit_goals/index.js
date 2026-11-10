@@ -286,3 +286,6 @@ async function saveBenchmarks(event) {
   }
   return { ok: true, updated: updated };
 }
+
+// Verify the caller before dispatching any private business operation.
+exports.main = require('./device-runtime').protect('recruit_goals', exports.main);

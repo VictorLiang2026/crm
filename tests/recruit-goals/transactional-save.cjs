@@ -20,6 +20,8 @@ function invoke(event, response) {
   vm.runInNewContext(source, {
     module, exports: module.exports,
     require(name) {
+      // Unit test of the already-authorized transactional handler; boundary has its own integration suite.
+      if (name === './device-runtime') return {protect:(_,handler)=>handler};
       if (name === './test-data') return require('../../cloudfunctions/_shared/test-data');
       if (name !== './db') throw new Error('Unexpected module: ' + name);
       return {

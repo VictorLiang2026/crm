@@ -604,9 +604,12 @@ async function getActivityData(event) {
   if (!id) return { error: 'id required' };
   const cloudbase = require('@cloudbase/node-sdk');
   const app = cloudbase.init({ env: process.env.TCB_ENV });
-  const res = await app.callFunction({
+  const res = await require('./device-runtime').internalCall(app,{
     name: 'person_360',
     data: { action: 'listActivityData', activityId: String(id) },
   });
   return res.result;
 }
+
+// Verify the caller before dispatching any private business operation.
+exports.main = require('./device-runtime').protect('activities', exports.main);

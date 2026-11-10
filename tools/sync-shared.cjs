@@ -4,7 +4,9 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 
-const MODULES = ['db.js', 'ai.js'];
+const COMMON = ['db.js', 'ai.js'];
+const DEVICE = ['device-proof.js','device-control.js','device-runtime.js'];
+const MODULES = [...COMMON,...DEVICE];
 
 function sha256(file) {
   return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
@@ -36,12 +38,14 @@ function syncShared(root, mode = 'check') {
 
   const drift = [];
   const updated = [];
+  let checked=0;
   for (const name of names) {
     const directory = path.join(functionRoot, name);
     if (!fs.statSync(directory, { throwIfNoEntry: false })?.isDirectory() || fs.lstatSync(directory).isSymbolicLink()) {
       throw new Error(`Missing or unsafe function directory: ${name}`);
     }
-    for (const module of MODULES) {
+    for (const module of (['knowledge_mcp','activity_registration'].includes(name)?COMMON:MODULES)) {
+      checked++;
       const target = path.join(directory, module);
       const same = regularFile(target) && sha256(target) === sourceHashes.get(module);
       if (same) continue;
@@ -54,7 +58,7 @@ function syncShared(root, mode = 'check') {
     }
   }
   if (drift.length) throw new Error(`Shared module drift (${drift.length}): ${drift.join(', ')}`);
-  return { functions: names.length, files: names.length * MODULES.length, updated, hashes: Object.fromEntries(sourceHashes) };
+  return { functions: names.length, files: checked, updated, hashes: Object.fromEntries(sourceHashes) };
 }
 
 if (require.main === module) {

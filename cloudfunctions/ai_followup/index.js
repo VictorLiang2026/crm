@@ -142,7 +142,7 @@ async function analyzeProfile(event) {
     Object.assign(customer, ident);
 
   // 最近 50 条跟进（先按时间倒序取 50 条，再反转为正序供 AI 通读演变）
-  var rows = assertOk(await customerHistory(app, rdb, customer, 50)).data || [];
+  var rows = assertOk(await customerHistory(require('./device-runtime').scopedApp(app), rdb, customer, 50)).data || [];
   var folRows = rows.slice().reverse();
 
   var curProfile = {};
@@ -357,7 +357,7 @@ exports.main = async (event, context) => {
     Object.assign(customer, ident);
 
     // 最近 5 条跟进：仅作上下文（避免把旧事当新信息），不照抄
-    var folRows = assertOk(await customerHistory(app, rdb, customer, 5)).data || [];
+    var folRows = assertOk(await customerHistory(require('./device-runtime').scopedApp(app), rdb, customer, 5)).data || [];
 
     var today = todayStr();
 
@@ -452,3 +452,6 @@ exports.main = async (event, context) => {
     return { error: e.message };
   }
 };
+
+// Verify the caller before dispatching any private business operation.
+exports.main = require('./device-runtime').protect('ai_followup', exports.main);

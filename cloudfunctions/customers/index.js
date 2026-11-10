@@ -502,3 +502,6 @@ function rpcResult(response) {
   const data = assertOk(response).data;
   return Array.isArray(data) && data.length === 1 ? data[0] : data;
 }
+
+// Verify the caller before dispatching any private business operation.
+exports.main = require('./device-runtime').protect('customers', exports.main);

@@ -172,3 +172,6 @@ exports.main = async (event, context) => {
     return { error: e.message };
   }
 };
+
+// Verify the caller before dispatching any private business operation.
+exports.main = require('./device-runtime').protect('recruit_recommend', exports.main);

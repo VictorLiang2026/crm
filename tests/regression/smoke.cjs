@@ -141,7 +141,7 @@ module.exports = async function smoke(root, test, options = {}) {
       assert.equal(await b.evaluate("sessionStorage.getItem('crm_fixture_pw_changed')"), '1');
       assert.equal(await b.evaluate("sessionStorage.getItem('crm_fixture_signed_out')"), '1');
       await b.evaluate("document.querySelector('[name=username]').value='[CRM_TEST_ONLY]'; document.querySelector('[name=password]').value='NewTestPass123!'; document.querySelector('form').requestSubmit()");
-      await b.wait("document.getElementById('console-main') || document.querySelector('#app form')", 10000);
+      await b.wait("document.getElementById('console-main')?.innerText.includes('TODAY') || document.querySelector('#app .form-msg')?.textContent", 10000);
       const loginState = await b.evaluate("({main:document.getElementById('console-main')?.innerText,login:document.querySelector('#app .form-msg')?.textContent})");
       assert.ok(loginState.main?.includes('TODAY'), `Console sign-in did not complete: ${JSON.stringify(loginState)}`);
       await b.evaluate("location.hash='#/today'");
@@ -305,6 +305,7 @@ module.exports = async function smoke(root, test, options = {}) {
     });
     await check('person360.details', 'Person 360 显示已确认成员与重要家庭事实', async () => {
       await open('#/person/980001', 'Person 360', 'mode=family');
+      await b.wait("document.querySelector('.person360-facts') && document.querySelector('.person360-member')");
       assert.equal(await b.evaluate("document.querySelector('.person360-facts').value"), '[CRM_TEST_ONLY]周末一起探望父母');
       assert.equal(await b.evaluate("document.querySelector('.person360-member').innerText.includes('[CRM_TEST_ONLY]家人乙')"), true);
       await open('#/customer/910001', '[CRM_TEST_ONLY]预约沟通');
@@ -322,6 +323,7 @@ module.exports = async function smoke(root, test, options = {}) {
     });
     await check('customer.photos', '旧照片附件页签保留直接上传入口且进入时不写入', async () => {
       await b.click('.tab', '照片/附件');
+      await b.wait("Array.from(document.querySelectorAll('#view button')).some(b=>b.textContent.includes('+ 添加照片/资料'))");
       await b.click('#view button', '+ 添加照片/资料');
       await b.wait("document.getElementById('modal-root').innerText.includes('直接上传照片/附件')");
       assert.equal(await b.evaluate("window.__crmTest.calls.some(c=>c.name==='photos' && c.action==='create')"), false);

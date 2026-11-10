@@ -102,3 +102,6 @@ async function remove(event) {
   const r = assertOk(await rdb.from('ocr_records').delete().eq('id', id));
   return { ok: (r.data || []).length === 1, customer_snapshot: snapshot, personSnapshot };
 }
+
+// Verify the caller before dispatching any private business operation.
+exports.main = require('./device-runtime').protect('ocr_records', exports.main);

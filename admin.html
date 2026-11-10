@@ -544,6 +544,9 @@ function checkAuthResult(result){
   if(result && result.error) throw result.error;
   return result;
 }
+const deviceTransport=()=>import('/crm/js/modules/device-access/transport.js');
+const legacyDeviceCall=async(name,data)=>(await deviceTransport()).deviceCall(app,CONFIG.envId,name,data);
+const verifyLegacyDevice=async()=>(await deviceTransport()).verifyDevice(app,CONFIG.envId);
 async function initSdk(){
   setLoginReady(false);
   if(!CONFIG.envId){
@@ -553,6 +556,7 @@ async function initSdk(){
   document.getElementById('env-label').textContent = 'PersonalAIOperatingSystemforRelationship,Sales&Growth';
   app = cloudbase.init({ env: CONFIG.envId, timeout: 120000 });
   authInst = app.auth({persistence:'local'});
+  (await deviceTransport()).guardResume(()=>loginReady, verifyLegacyDevice);
   // 跨刷新/后台回收的超时检查：距上次活动超过 5 分钟则清除登录态，要求重新登录（iOS Safari 回收页面场景）
   try {
     var _stored = parseInt(localStorage.getItem('crm_last_activity')||'0',10);
@@ -563,7 +567,7 @@ async function initSdk(){
     }
   } catch(e0){ console.warn(e0); }
   // 已有登录态（本地持久化）则直接进入
-  try { if(authInst.hasLoginState && authInst.hasLoginState()){ setLoginReady(true); return true; } } catch(e){ console.warn(e); }
+  try { var sessionResult=await authInst.getSession(); if(!sessionResult?.error && sessionResult?.data?.session?.user && !sessionResult.data.session.user.is_anonymous){ await verifyLegacyDevice(); setLoginReady(true); return true; } } catch(e){ console.warn(e); }
   await showLogin();
   return true;
 }
@@ -588,7 +592,7 @@ function showLogin(){
       btn.disabled = true; btn.textContent = '登录中…'; msg.textContent = '';
       try {
         checkAuthResult(await authInst.signInWithPassword({ username: u.value.trim(), password: p.value }));
-        setLoginReady(true);
+        await verifyLegacyDevice(); setLoginReady(true);
         lastActivity = Date.now(); persistActivity(true);
         resolve();
       } catch(e){
@@ -709,9 +713,9 @@ function reloadLatestVersion(){
 // ==================== API 封装 ====================
 async function callFn(name, data){
   await ensureSession(); // 超过 5 分钟无操作时，先要求重新登录再继续原操作
-  var res = await app.callFunction({ name: name, data: data });
+  var res = await legacyDeviceCall(name,data);
   if(name === 'recruit_candidates' && data && data.action === 'get' && res.result && res.result.error === 'not found'){
-    var personOnly = await app.callFunction({name:'person_360', data:{action:'getPersonOnlyRecruit', id:data.id}});
+    var personOnly = await legacyDeviceCall('person_360',{action:'getPersonOnlyRecruit', id:data.id});
     return personOnly.result;
   }
   return res.result;
@@ -7002,14 +7006,14 @@ async function genRecruitScore(candidateId){
 // bucket: recruit（私有，RLS 仅 authenticated 可读写）
 // 对象路径：candidate_{id}/radar_*.{ext} | candidate_{id}/winner_report_*.{ext}
 // 表中存对象路径 + 原文件名，展示/下载用 createSignedUrl 临时签名链接
-var RC_BUCKET = 'recruit';
+const legacyFiles=async()=>(await import('/crm/js/modules/device-access/files.js')).deviceFiles(callFn,'recruit');
 var RC_FILE_KINDS = {
   radar:  { fileId: 'radar_image_file_id',   name: 'radar_image_name',   label: '竞争力评估雷达图', prefix: 'radar',         accept: 'image/*' },
   report: { fileId: 'winner_report_file_id', name: 'winner_report_name', label: '天生赢家报告',     prefix: 'winner_report', accept: '.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.jpg,.png' },
 };
 
 async function rcGetTempUrl(storedPath){
-  var res = await app.storage.from(RC_BUCKET).createSignedUrl(storedPath, 3600);
+  var res = await (await legacyFiles()).createSignedUrl(storedPath, 3600);
   if(res.error) throw new Error(res.error.message || '获取链接失败');
   var d = res.data;
   var url = (typeof d === 'string') ? d : (d && (d.signedUrl || d.fullUrl || d.url));
@@ -7021,7 +7025,7 @@ async function rcUploadFile(candidateId, kind, file){
   var cfg = RC_FILE_KINDS[kind];
   var ext = (file.name.split('.').pop() || 'bin').toLowerCase();
   var objectPath = 'candidate_' + candidateId + '/' + cfg.prefix + '_' + Date.now() + '.' + ext;
-  var res = await app.storage.from(RC_BUCKET).upload(objectPath, file, {
+  var res = await (await legacyFiles()).upload(objectPath, file, {
     contentType: file.type || 'application/octet-stream',
     upsert: true,
   });
@@ -7044,7 +7048,7 @@ async function rcDeleteFile(candidateId, kind){
   var r = await callFn('recruit_candidates', { action:'update', id: candidateId, data: data });
   if(r.error) throw new Error(r.error);
   if(storedPath){
-    try{ await app.storage.from(RC_BUCKET).remove([storedPath]); }catch(e2){ console.warn(e2); }
+    try{ await (await legacyFiles()).remove([storedPath]); }catch(e2){ console.warn(e2); }
   }
 }
 

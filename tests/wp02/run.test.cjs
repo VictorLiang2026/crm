@@ -38,6 +38,7 @@ function load(name,data,ledger=[]) {
  const testData={...TD,disclose:(refs,options={})=>TD.disclose(refs,{...options,rdb})};
  const context={exports,module:{exports},console,setTimeout,clearTimeout,process:{env:{}},Date,Map,Set,Buffer,
  require(dep){
+  if(dep==='./device-runtime')return {protect:(_,handler)=>handler,callerIdentity:app=>app.auth().getUserInfo(),internalCall:(app,request)=>app.callFunction(request)}; // isolated business fixtures; device chain has a separate integration suite
   if(dep==='./db')return db;
   if(dep==='./test-data')return testData;
   if(dep==='./action-facts')return {...require('../../cloudfunctions/today_coach/action-facts'),readOpenActions:async()=>({rows:data.actions||[],persons:data.persons||[]})};

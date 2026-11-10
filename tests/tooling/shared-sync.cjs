@@ -18,14 +18,16 @@ try {
   }));
   fs.writeFileSync(path.join(shared, 'db.js'), 'source db\n');
   fs.writeFileSync(path.join(shared, 'ai.js'), 'source ai\n');
+  const deviceFiles=['device-proof.js','device-control.js','device-runtime.js'];
+  for(const file of deviceFiles)fs.writeFileSync(path.join(shared,file),'fixture '+file);
   fs.writeFileSync(path.join(target, 'db.js'), 'old db\n');
   fs.writeFileSync(path.join(target, 'index.js'), 'unchanged handler\n');
 
   assert.throws(() => syncShared(root, 'check'), /customers\/db\.js.*customers\/ai\.js/);
   assert.equal(fs.readFileSync(path.join(target, 'db.js'), 'utf8'), 'old db\n');
   const result = syncShared(root, 'sync');
-  assert.deepEqual(result.updated, ['customers/db.js', 'customers/ai.js']);
-  assert.equal(syncShared(root, 'check').files, 2);
+  assert.deepEqual(result.updated, ['customers/db.js', 'customers/ai.js',...deviceFiles.map(f=>'customers/'+f)]);
+  assert.equal(syncShared(root, 'check').files, 5);
   assert.equal(fs.readFileSync(path.join(target, 'index.js'), 'utf8'), 'unchanged handler\n');
 
   fs.writeFileSync(path.join(target, 'ai.js'), 'drift\n');

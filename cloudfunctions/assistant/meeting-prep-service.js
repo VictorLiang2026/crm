@@ -35,7 +35,7 @@ async function runMeetingPrep(event, options = {}) {
     throw e;
   }
 
-  const p360 = await (options.callFunction || (payload => app.callFunction(payload)))({
+  const p360 = await (options.callFunction || (payload => require('./device-runtime').internalCall(app,payload)))({
     name: 'person_360',
     data: { action: 'getMeetingPrepContext', personId },
   });

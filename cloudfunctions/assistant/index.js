@@ -546,3 +546,6 @@ function getIdentity() {
 exports.main = createMain(getIdentity);
 exports.createMain = createMain;
 exports.aiExperienceInput = aiExperienceInput;
+
+// Verify the caller before dispatching any private business operation.
+exports.main = require('./device-runtime').protect('assistant', exports.main);

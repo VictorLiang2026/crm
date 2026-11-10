@@ -101,3 +101,6 @@ async function remove(event) {
   const r = assertOk(await q.select('Id'));
   return { ok: (r.data || []).length === 1 };
 }
+
+// Verify the caller before dispatching any private business operation.
+exports.main = require('./device-runtime').protect('gifts', exports.main);

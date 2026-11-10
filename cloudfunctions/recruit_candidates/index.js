@@ -267,3 +267,6 @@ async function rcMap(event) {
     .select('id, customer_id, deleted_at'));
   return { rows: res.data || [] };
 }
+
+// Verify the caller before dispatching any private business operation.
+exports.main = require('./device-runtime').protect('recruit_candidates', exports.main);

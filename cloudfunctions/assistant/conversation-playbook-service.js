@@ -25,7 +25,7 @@ async function runConversationPlaybook(event) {
   }
   if (scenario.length > 256) { const e = new Error('scenario is too long'); e.code = 'INVALID_INPUT'; throw e; }
 
-  const p360 = await app.callFunction({
+  const p360 = await require('./device-runtime').internalCall(app,{
     name: 'person_360',
     data: { action: 'getMeetingPrepContext', personId, objection, scenario },
   });

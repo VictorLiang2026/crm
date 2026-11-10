@@ -53,6 +53,7 @@ class Browser {
           ? html.replace('quick_capture_v2: false', 'quick_capture_v2: true') : html);
       }
       else if (pathname === '/console.html') { res.setHeader('Content-Type', 'text/html; charset=utf-8'); res.end(consoleHtml); }
+      else if (/^\/crm\/js\/modules\/device-access\/(client|transport|files)\.js$/.test(pathname)) { res.setHeader('Content-Type','text/javascript');res.end(fs.readFileSync(path.join(this.root,pathname.slice(1)))); }
       else if (pathname === '/fixtures.js') { res.setHeader('Content-Type', 'text/javascript; charset=utf-8'); res.end('(' + installFixtures.toString() + ')();'); }
       else if (pathname === '/crm/js/modules/person-360.js') { res.setHeader('Content-Type', 'text/javascript; charset=utf-8'); res.end(fs.readFileSync(path.join(this.root, 'crm/js/modules/person-360.js'))); }
       else if (pathname === '/crm/js/modules/work-items.js') { res.setHeader('Content-Type', 'text/javascript; charset=utf-8'); res.end(fs.readFileSync(path.join(this.root, 'crm/js/modules/work-items.js'))); }

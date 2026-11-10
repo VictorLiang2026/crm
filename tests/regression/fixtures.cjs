@@ -483,9 +483,11 @@ function installFixtures() {
       stages: [{ stage: marker + '阶段', count: 1, entered_30d: 1, moved_30d: null, overdue: 0, dwell_median_days: null, stuck: 0 }]
     })) })
   };
+  const deviceChallenges = new Map();
   window.cloudbase = { init() { return {
     auth() { return {
       hasLoginState: () => loggedIn,
+      async getSession(){return {data:{session:loggedIn?{user:{id:'fixture',is_anonymous:false}}:null}};},
       async signOut() {
         window.__crmTest.signOutAttempts++;
         if (sessionStorage.getItem('crm_fixture_fail_signout') === '1')
@@ -513,6 +515,15 @@ function installFixtures() {
       }
     }; },
     async callFunction({ name, data }) {
+      if (name==='person_360' && data.action==='issueBrowserChallenge') {
+        if(!loggedIn)return {result:{error:'DEVICE_ACCESS_DENIED'}};
+        const challenge=crypto.randomUUID();deviceChallenges.set(challenge,data);return {result:{challenge}};
+      }
+      const {__deviceProof:proof,...payload}=data.__deviceRequest||{};
+      const ticket=deviceChallenges.get(proof?.challenge);
+      if(!loggedIn||!ticket||ticket.audience!==name||ticket.fingerprint!==proof.fingerprint||!proof.signature)return fail('MISSING_DEVICE_PROOF');
+      deviceChallenges.delete(proof.challenge);data=payload;
+      if(name==='person_360'&&data.action==='verifyBrowserDevice')return {result:{ok:true}};
       const key = name + ':' + data.action;
       if (key === 'assistant:knowledgeLibrary' && data.operation === 'list') {
         calls.push({ name, action: data.action, operation: data.operation });

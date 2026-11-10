@@ -299,3 +299,6 @@ async function quickCapture(event) {
 
   return { parsed: parsed, match: match, today: today, raw: res.text };
 }
+
+// Verify the caller before dispatching any private business operation.
+exports.main = require('./device-runtime').protect('ai_parse', exports.main);

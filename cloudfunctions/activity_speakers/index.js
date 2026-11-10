@@ -290,3 +290,6 @@ async function search(event) {
     .limit(10));
   return { rows: await enrichIdentity(r.data || []) };
 }
+
+// Verify the caller before dispatching any private business operation.
+exports.main = require('./device-runtime').protect('activity_speakers', exports.main);

@@ -236,3 +236,6 @@ async function updateStatus(event) {
   assertOk(await rdb.from('ai_recommendations').update({ nba: nba, updated_at: nowIso() }).eq('id', id).select('id'));
   return { ok: true };
 }
+
+// Verify the caller before dispatching any private business operation.
+exports.main = require('./device-runtime').protect('ai_recommendations', exports.main);

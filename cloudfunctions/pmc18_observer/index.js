@@ -44,3 +44,6 @@ async function listRecent(event) {
     .limit(limit));
   return { rows: res.data || [], total: res.data?.length || 0 };
 }
+
+// Verify the caller before dispatching any private business operation.
+exports.main = require('./device-runtime').protect('pmc18_observer', exports.main);

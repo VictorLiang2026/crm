@@ -1637,3 +1637,6 @@ async function learning(event) {
     return { error: e.message };
   }
 }
+
+// Verify the caller before dispatching any private business operation.
+exports.main = require('./device-runtime').protect('ai_activity', exports.main);

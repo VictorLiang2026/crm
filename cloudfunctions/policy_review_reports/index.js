@@ -324,3 +324,6 @@ async function generate(event) {
   const full = assertOk(await rdb.from('policy_review_reports').select().eq('id', id).maybeSingle());
   return { id: id, report: full.data, raw: raw, identity: ident.identity };
 }
+
+// Verify the caller before dispatching any private business operation.
+exports.main = require('./device-runtime').protect('policy_review_reports', exports.main);

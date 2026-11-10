@@ -1,3 +1,4 @@
+import {deviceCall,verifyDevice} from '../device-access/transport.js';
 import { t, getLang, setLang } from './i18n.js';
 
 const SESSION_TIMEOUT = 5 * 60 * 1000;
@@ -71,7 +72,7 @@ export async function initKnowledgeMcpConsent() {
   }
   async function callFn(name, data) {
     if (name !== 'assistant') throw new Error('Function is outside the consent flow allowlist');
-    const result = await state.app.callFunction({ name, data });
+    const result = await deviceCall(state.app,CONFIG.envId,name,data);
     return result?.result;
   }
   async function authorize() {
@@ -91,7 +92,7 @@ export async function initKnowledgeMcpConsent() {
     const sessionResult = await state.auth.getSession();
     const hasSession = sessionIsTrusted(sessionResult);
     if (hasSession && lastActivity > 0 && Date.now() - lastActivity <= SESSION_TIMEOUT) {
-      state.lastActivity = lastActivity; state.locked = false; showConsent();
+      await verifyDevice(state.app,CONFIG.envId); state.lastActivity = lastActivity; state.locked = false; showConsent();
     }
     else {
       if (hasSession) state.auth.signOut().catch(() => {});
@@ -103,7 +104,7 @@ export async function initKnowledgeMcpConsent() {
     try {
       const result = await state.auth.signInWithPassword({ username: byId('username').value.trim(), password: byId('password').value });
       if (result?.error || !sessionIsTrusted(result)) throw result?.error||new Error('Authenticated session required');
-      state.lastActivity = Date.now(); state.locked = false; localStorage.setItem('crm_last_activity', String(state.lastActivity)); showConsent();
+      await verifyDevice(state.app,CONFIG.envId); state.lastActivity = Date.now(); state.locked = false; localStorage.setItem('crm_last_activity', String(state.lastActivity)); showConsent();
     } catch (_) { byId('error').textContent = t('kmcp_signin_error'); button.disabled = false; button.textContent = t('kmcp_signin'); }
   });
   byId('allow').onclick = async () => {
