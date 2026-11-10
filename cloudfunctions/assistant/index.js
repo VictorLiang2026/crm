@@ -45,6 +45,12 @@ function aiExperienceInput(event) {
   return Object.fromEntries(allowed.filter(key=>Object.hasOwn(event,key)).map(key=>[key,event[key]]));
 }
 
+function requestsEarlyResponse(event) {
+  return event?.action === 'assistantReadTask' ||
+    ((event?.action === 'summarize' || event?.action === 'meetingPrep') && event.asyncWait === true) ||
+    (event?.action === 'knowledgeLibrary' && ['dualGenerate','adviceGenerate'].includes(event.operation) && event.data?.asyncWait === true);
+}
+
 function createEarlyResponse(callback, context, continueInBackground) {
   let sent = false;
   return {
@@ -513,10 +519,7 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
       triggerSecret.length>=32&&event.Message===triggerSecret) {
       return knowledgeLibraryRunner({action:'knowledgeLibrary',operation:'processOcrQueue'},'knowledge-ocr-worker',{internalOcrQueue:true});
     }
-    const asyncRequested = typeof callback === 'function' &&
-      (event?.action === 'assistantReadTask' ||
-       ((event?.action === 'summarize' || event?.action === 'meetingPrep') && event.asyncWait === true) ||
-       (event?.action === 'knowledgeLibrary' && ['dualGenerate','adviceGenerate'].includes(event.operation) && event.data?.asyncWait === true));
+    const asyncRequested = typeof callback === 'function' && requestsEarlyResponse(event);
     const earlyResponse = createEarlyResponse(callback, context, asyncRequested);
     if (asyncRequested) console.log('AI_ASYNC_CALLBACK_MODE');
     const work = run(event, context, callback, earlyResponse);
