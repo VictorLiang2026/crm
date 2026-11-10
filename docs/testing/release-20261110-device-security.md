@@ -23,9 +23,9 @@
 - Production wrappers and device runtime/control/proof helpers for CRM entrypoints are source-reconciled; wrappers copied without function business logic changes were not redeployed.
 - Syntax checks passed for all changed runtime and entry files. Targeted meeting-prep/conversation-playbook, OCR queue, follow-up advice, and activity regressions passed.
 - WP01: `PASS_WITH_LIMITATIONS`; catalog 1,399 checks, anonymous gateway 92/92, WP02/WP03/WP04/WP05/WP06 and PC34 passed, regression 104 PASS / 0 FAIL / 5 SKIP. WP04 retained 3 declared participant exceptions. Release gate open items remain login, service-runtime, live-writes, and mobile acceptance.
-- The full CloudBase functions will be deployed individually, followed by cloud-only source sync and post-release three-end verification.
+- Functions deployed individually after the service-role restriction: `person_360`, `ai_parse`, `today_coach`, `assistant`, `ai_followup`, `ai_recommend`, and `ai_referral`. Other device-protected functions already matched their production wrappers and were source-reconciled without redeployment. `ai_recommendations` was also source-only.
 - Live database verification uses only `public` catalog metadata. No production business rows, real customer records, or storage objects are used for test fixtures.
 
 ## Release record
 
-Pending: deploy `person_360`, `ai_parse`, `today_coach`, `assistant`, `ai_followup`, `ai_recommend`, and `ai_referral` in dependency order. `ai_recommendations` is source-only reconciliation. Then run cloud-only source sync, commit/push/tag, and verify local/GitHub/production consistency.
+Released to `master` as commit `bc99502b5645c9d49809da8d2e36490aa81db0d0` with tag `release-20261110-2257`. The seven functions listed above were deployed individually through the guarded deployment script. Post-release verification confirmed GitHub branch/tag, online `admin.html`, 101 static assets, and all 30 CloudBase functions (331 source/config files) match the local release. The final automated verification was rerun after preserving out-of-scope untracked artifacts in a local stash.

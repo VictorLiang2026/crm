@@ -141,7 +141,7 @@ module.exports = async function smoke(root, test, options = {}) {
       assert.equal(await b.evaluate("sessionStorage.getItem('crm_fixture_pw_changed')"), '1');
       assert.equal(await b.evaluate("sessionStorage.getItem('crm_fixture_signed_out')"), '1');
       await b.evaluate("document.querySelector('[name=username]').value='[CRM_TEST_ONLY]'; document.querySelector('[name=password]').value='NewTestPass123!'; document.querySelector('form').requestSubmit()");
-      await b.wait("document.getElementById('console-main')?.innerText.includes('TODAY') || document.querySelector('#app form')", 10000);
+      await b.wait("document.getElementById('console-main')?.innerText.includes('TODAY') === true", 15000);
       const loginState = await b.evaluate("({main:document.getElementById('console-main')?.innerText,login:document.querySelector('#app .form-msg')?.textContent})");
       assert.ok(loginState.main?.includes('TODAY'), `Console sign-in did not complete: ${JSON.stringify(loginState)}`);
       await b.evaluate("location.hash='#/today'");
