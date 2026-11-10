@@ -1029,6 +1029,21 @@ exports.main = async event => {
     const uid = identity && identity.uid;
     if (typeof uid !== 'string' || !uid.trim() ||
         identity.isAnonymous === true || identity.is_anonymous === true) return { error: 'UNAUTHORIZED' };
+    if (Object.hasOwn(event || {}, '__deviceRequest')) {
+      const request = event.__deviceRequest;
+      if (request?.action !== 'verifyBrowserDevice' ||
+          Object.keys(request).some(key => !['action', '__deviceProof'].includes(key))) {
+        return { error: 'DEVICE_ACCESS_DENIED' };
+      }
+      try {
+        const { protocol } = require('./device-control').makeControl(app, process.env.TCB_ENV);
+        await protocol.authorize(identity, 'person_360', request);
+        console.info('CRM_DEVICE_PILOT_SIGNATURE_VERIFIED');
+        return { ok: true, deviceSignatureVerified: true };
+      } catch {
+        return { error: 'DEVICE_ACCESS_DENIED' };
+      }
+    }
     if (event?.action === 'requestBrowserDevice' || event?.action === 'issueBrowserChallenge') {
       try { return await require('./device-control').makeControl(app,process.env.TCB_ENV).control(event,identity); }
       catch(e) {

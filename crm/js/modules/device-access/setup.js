@@ -17,7 +17,15 @@ async function start(){
  try{const r=await auth.signInWithPassword({username:form.elements.username.value.trim(),password:form.elements.password.value});if(r?.error)throw Error();form.elements.password.value='';if(!await show())throw Error('LOGIN_FAILED');status('device_ready');}catch{status('device_login_failed');}finally{ref('sign').disabled=false;}};
  ref('request').onclick=async()=>{ref('request').disabled=true;ref('fingerprint').textContent='';status('device_wait');
  try{const result=await client.enroll(ref('label').value.trim());ref('fingerprint').textContent=t('device_fingerprint')+' '+result.fingerprint.toUpperCase().match(/.{1,8}/g).join(' ');
- const states={pending:'device_pending',approved:'device_approved',revoked:'device_revoked'};status(states[result.state]||'device_error');
+ if (result.state === 'approved') {
+   const request = await client.sign('person_360', {action:'verifyBrowserDevice'});
+   const check = await app.callFunction({name:'person_360', data:{__deviceRequest:request}});
+   const verified = !check?.error && check?.result?.ok === true && check.result.deviceSignatureVerified === true;
+   status(verified ? 'device_signature_verified' : 'device_signature_failed');
+ } else {
+   const states = {pending:'device_pending', revoked:'device_revoked'};
+   status(states[result.state] || 'device_error');
+ }
  }catch(e){status(({DEVICE_REQUEST_LIMIT:'device_limit',DEVICE_MEMBER_REQUIRED:'device_member_required',
    UNAUTHORIZED:'device_session_required',DEVICE_STORAGE_UNAVAILABLE:'device_local_storage',
    DEVICE_ACCESS_DENIED:'device_proof_rejected',DEVICE_NOT_APPROVED:'device_proof_rejected'})[e.message]||'device_service_unavailable');}finally{ref('request').disabled=false;}};
