@@ -226,6 +226,28 @@ test('private storage upload accepts an attached industry source without a publi
   assert.equal(rows.knowledge_items[0].metadata.summary,'行业摘要');
 });
 
+test('private storage upload accepts international filenames without passing them into object keys',async()=>{
+  const {service,writes}=setup();
+  const names=['资料＋风险-part01-of03-pages001-030.pdf','资料＋风险-part02-of03-pages031-060.pdf',
+    'Policy (final) #1.pdf','资料%20说明.docx','节日分享😀.txt','notes.md'];
+  const keys=new Set();
+  for(const fileName of names){
+    const prepared=await service.uploadPrepare({categories:['other'],title:'[CRM_TEST_ONLY]Upload',
+      fileName,fileSizeBytes:10},'operator-1');
+    const source=writes.at(-1).body[0];
+    assert.match(prepared.storageKey,/^operator-1\/[0-9a-f-]{36}\/[A-Za-z0-9][A-Za-z0-9._-]*$/);
+    assert.equal(prepared.storageKey.split('/').length,3);
+    assert.equal(source.file_name,fileName,'original filename and part markers remain available to the UI');
+    assert.equal(source.storage_key,prepared.storageKey,'authorization and upload must use the same stored key');
+    assert.equal(prepared.contentType,source.content_type);
+    assert.equal(source.metadata.upload.phase,'receiving');
+    assert.equal(source.lifecycle_status,'draft');
+    assert.equal(keys.has(prepared.storageKey),false,'separate volumes must not share an object');
+    keys.add(prepared.storageKey);
+    if(fileName==='notes.md')assert.ok(prepared.storageKey.endsWith('/notes.md'),'existing ASCII uploads retain their key format');
+  }
+});
+
 test('private storage upload rejects files above the CloudBase PG limit before creating a source row',async()=>{
   const {service,writes}=setup();
   await assert.rejects(service.uploadPrepare({categories:['other'],title:'Too big',fileName:'large.pdf',
