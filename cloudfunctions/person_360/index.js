@@ -156,7 +156,7 @@ async function pgRpc(name, body) {
     'person_identity_preview_v1', 'person_identity_execute_v1',
     'crm_person_only_recruit_delete_v1', 'crm_work_item_preview_v1',
     'crm_work_item_execute_v1', 'crm_opportunity_directory_v1', 'crm_opportunity_preview_v1',
-    'crm_opportunity_execute_v1','crm_activity_review_preview_v1',
+    'crm_opportunity_execute_v1','crm_pipeline_stage_v1','crm_activity_review_preview_v1',
     'crm_activity_review_execute_v1','crm_person_delete_preview_v1',
     'crm_person_delete_execute_v1','crm_person_restore_v1',
     'crm_context_item_preview_v1','crm_context_item_execute_v1',
@@ -192,6 +192,10 @@ async function pgRpc(name, body) {
       const code = typeof problem?.code === 'string' && /^(?:PGRST\d{3}|[0-9A-Z]{5})$/.test(problem.code)
         ? problem.code : '';
       if (name === 'crm_person_interaction_v1' && /^INTERACTION_[A-Z_]+$/.test(message)) throw new Error(message);
+      if (name === 'crm_pipeline_stage_v1') {
+        if (message === 'Pipeline preview expired' || message.startsWith('Pipeline record changed')) throw new Error('PIPELINE_REVIEW_AGAIN');
+        if (code === 'P0002') throw new Error('PIPELINE_TARGET_UNAVAILABLE');
+      }
       if (code === '42501' && name.startsWith('crm_context_item_')) {
         throw new Error('Context item permission denied');
       }
@@ -1131,6 +1135,12 @@ exports.main = async event => {
       }
       case 'getOpportunityDirectoryDetails': return await new OpportunityWorkflowService({request:pgRequest,rpc:pgRpc})
         .details(event.id,uid);
+      case 'getPipelineState':
+      case 'previewPipelineStage':
+      case 'confirmPipelineStage': {
+        const op = {getPipelineState:'state',previewPipelineStage:'preview',confirmPipelineStage:'confirm'}[event.action];
+        return await pgRpc('crm_pipeline_stage_v1',{p_actor_uid:uid,p_operation:op,p_data:event.data});
+      }
       case 'listPendingOpportunityCandidates': return await new OpportunityWorkflowService({request:pgRequest,rpc:pgRpc}).listPending(uid);
       case 'listOpportunities': return await service.listOpportunities(event.personId);
       case 'getOpportunityLinks': return await new OpportunityWorkflowService({request:pgRequest,rpc:pgRpc})

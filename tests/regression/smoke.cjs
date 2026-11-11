@@ -322,6 +322,7 @@ module.exports = async function smoke(root, test, options = {}) {
     });
     await check('customer.photos', '旧照片附件页签保留直接上传入口且进入时不写入', async () => {
       await b.click('.tab', '照片/附件');
+      await b.wait("[...document.querySelectorAll('#view button')].some(button=>button.textContent.trim()==='+ 添加照片/资料')");
       await b.click('#view button', '+ 添加照片/资料');
       await b.wait("document.getElementById('modal-root').innerText.includes('直接上传照片/附件')");
       assert.equal(await b.evaluate("window.__crmTest.calls.some(c=>c.name==='photos' && c.action==='create')"), false);

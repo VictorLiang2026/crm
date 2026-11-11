@@ -8,6 +8,8 @@ const TYPES = new Set(['insurance','recruit','referral','activity','speaker',
 const LEGACY_TYPES = new Set(['医疗保障','重疾保障','养老规划','教育规划','财富规划','家庭保障','转介绍']);
 const STATUSES = new Set(['active','terminal','发现','沟通','方案','成交','关闭','潜在线索','已介绍','已联系','已建立关系']);
 const OPERATIONS = new Set(['create','edit','stage','close','link_action']);
+const PIPELINE_FILTERS = new Set(['review','需求线索','需求已核实','保障分析','方案沟通','等待决定','已成交','暂缓','未达成',
+  '关系建立','兴趣了解','双向评估','职业沟通','决策跟进','已加入','继续培养','暂不推进']);
 function id(value) {
   if (!ID.test(String(value)) || !Number.isSafeInteger(Number(value))) throw new Error('Invalid Opportunity ID');
   return Number(value);
@@ -109,8 +111,9 @@ class OpportunityWorkflowService {
     const personId=input.personId==null||input.personId===''?null:id(input.personId);
     const query=input.query==null||input.query===''?null:String(input.query).trim();
     if(!Number.isInteger(page)||page<1||page>1000||!Number.isInteger(pageSize)||pageSize<1||pageSize>50||
-       !['all','person','customer'].includes(kind)||(status&&!STATUSES.has(status))||
-       (type&&!TYPES.has(type)&&!LEGACY_TYPES.has(type))||
+       !['all','person','customer','protection','recruitment','due','records'].includes(kind)||
+       (status&&!STATUSES.has(status)&&!(PIPELINE_FILTERS.has(status)&&['protection','recruitment','due','records'].includes(kind)))||
+       (type&&!TYPES.has(type)&&!LEGACY_TYPES.has(type)&&!(type==='source_referral'&&['protection','recruitment','due','records'].includes(kind)))||
        (query!=null&&(!query||query.length>120))) throw new Error('Invalid Opportunity directory query');
     return this.rpc('crm_opportunity_directory_v1',{
       p_actor_uid:actorUid,p_page:page,p_page_size:pageSize,p_kind:kind,

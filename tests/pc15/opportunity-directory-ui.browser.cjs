@@ -4,7 +4,7 @@ const assert=require('node:assert/strict');
 const path=require('node:path');
 const {Browser}=require('../regression/browser.cjs');
 
-test('PC15 directory filters, history, analysis drill-through, details, edit preview, and iPad layout',async()=>{
+test('WP3 pipeline lists, paging, identity filter, detail preview and responsive layout',async()=>{
   const browser=new Browser(path.resolve(__dirname,'../..'));
   try{
     await browser.start();
@@ -19,9 +19,11 @@ test('PC15 directory filters, history, analysis drill-through, details, edit pre
       window.pc15={calls:[],executions:[],directoryResult:{rows:[open],page:1,pageSize:20,total:2,hasMore:true,countsByStatus:{'发现':3,'成交':1,'关闭':1}},
         async call(name,args){this.calls.push({name,args});
           if(name==='person_360'&&args.action==='listPendingOpportunityCandidates')return {rows:[]};
+          if(name==='person_360'&&args.action==='getPipelineState')return {stage:'需求线索'};
           if(name==='person_360'&&args.action==='listOpportunityDirectory'){
-            const query=args.status==='terminal'?{...this.directoryResult,rows:[legacy],hasMore:false}:
-              {...this.directoryResult,rows:[open]};return query;
+            const row=args.kind==='recruitment' ? {id:92,entity:'candidate',track:'recruitment',raw_stage:'互动暖客',record_type:'recruit'} :
+              {id:91,entity:'opportunity',track:'protection',raw_stage:'发现',mapped_stage:'需求线索',record_type:'insurance'};
+            return {...this.directoryResult,rows:[{...row,person_id:71,person_name:person.display_name}],page:args.page};
           }
           if(name==='funnel_insight')return {funnels:[{key:'opportunity',stages:[{stage:'发现',count:4},{stage:'关闭',count:2}]}]};
           if(name==='person_360'&&args.action==='getOpportunityDirectoryDetails')return {opportunity:open,actions:[
@@ -37,13 +39,14 @@ test('PC15 directory filters, history, analysis drill-through, details, edit pre
       window.pc15ctx=ctx;await renderOpportunities(ctx);
     })()`);
     await browser.wait("document.querySelector('#pc15-host .opp-row-main')");
-    assert.ok((await browser.evaluate("document.querySelector('#pc15-host').innerText")).includes('机会分析与旧漏斗对照'));
-    assert.ok((await browser.evaluate("document.querySelector('#pc15-host').innerText")).includes('Person-only 机会'));
-
-    await browser.evaluate(`(()=>{const s=document.querySelector('#pc15-host .opp-filter-bar select');s.value='customer';s.dispatchEvent(new Event('change',{bubbles:true}))})()`);
-    await browser.wait("window.pc15.calls.some(c=>c.args.action==='listOpportunityDirectory'&&c.args.kind==='customer')");
-    await browser.evaluate(`(()=>{const s=document.querySelector('#pc15-host .opp-filter-bar select');s.value='all';s.dispatchEvent(new Event('change',{bubbles:true}))})()`);
-    await browser.wait("document.querySelector('#pc15-host .opp-row-main')");
+    assert.doesNotMatch(await browser.evaluate("document.querySelector('#pc15-host').innerText"), /Person-only|旧漏斗/);
+    for(const view of ['recruitment','due','records','protection']) {
+      await browser.evaluate(`document.querySelector('#pc15-host [data-view="${view}"]').click()`);
+      await browser.wait(`window.pc15.calls.filter(c=>c.args.action==='listOpportunityDirectory').at(-1)?.args.kind==='${view}'`);
+      await browser.wait("!!document.querySelector('#pc15-host .opp-row-main')");
+      assert.equal(await browser.evaluate("document.querySelector('#pc15-host [aria-pressed=true]').dataset.view"),view);
+      if(view==='recruitment') assert.match(await browser.evaluate("document.querySelector('.opp-row-note').innerText"), /互动暖客.*待核实/s);
+    }
     await browser.evaluate(`(()=>document.querySelector('#pc15-host .opp-pagination button:last-child').click())()`);
     await browser.wait("window.pc15.calls.some(c=>c.args.action==='listOpportunityDirectory'&&c.args.page===2)");
 
@@ -72,8 +75,8 @@ test('PC15 directory filters, history, analysis drill-through, details, edit pre
     await browser.wait('window.pc15.executions.length===1');
 
     await browser.evaluate(`(()=>{window.pc15I18n.setLang('en');return import('/crm/js/modules/console/pages/opportunities.js').then(m=>m.renderOpportunities(window.pc15ctx))})()`);
-    await browser.wait("document.querySelector('#pc15-host').innerText.includes('Opportunity Directory')");
-    for(const [width,height] of [[820,1180],[1180,820]]){
+    await browser.wait("document.querySelector('#pc15-host').innerText.includes('Customer Protection')");
+    for(const [width,height] of [[390,844],[844,390],[820,1180],[1180,820],[1440,900]]){
       await browser.send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:false});
       const metrics=await browser.evaluate(`(()=>({width:innerWidth,doc:document.documentElement.scrollWidth,host:document.querySelector('#pc15-host').scrollWidth,client:document.querySelector('#pc15-host').clientWidth}))()`);
       assert.ok(metrics.doc<=width+1,`document overflow ${JSON.stringify(metrics)}`);

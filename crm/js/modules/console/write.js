@@ -542,8 +542,9 @@ export function openOpportunityAdvance(ctx, { opportunity, personName, onDone })
 }
 
 // ---------- 机会：编辑 Person-only opportunity ----------
-export function openOpportunityEdit(ctx, { opportunity, personName, onDone }) {
-  const typeSel = sel(OPP_TYPES.map((key) => [key, oppTypeLabel(key)]), opportunity.opportunity_type);
+export function openOpportunityEdit(ctx, { opportunity, personName, protectionOnly = false, onDone }) {
+  const types=protectionOnly?[opportunity.opportunity_type]:OPP_TYPES;
+  const typeSel = sel(types.map((key) => [key, oppTypeLabel(key)]), opportunity.opportunity_type);
   const progressTa = h('textarea', { class: 'sheet-textarea' }, opportunity.last_progress || '');
   const nextInput = h('input', { class: 'sheet-input', value: opportunity.next_action || '' });
   const dateInput = h('input', { class: 'sheet-input', type: 'date', value: opportunity.next_action_date || '' });
@@ -603,11 +604,11 @@ export function openOpportunityEdit(ctx, { opportunity, personName, onDone }) {
 }
 
 // ---------- 机会：新建 ----------
-export function openOpportunityCreate(ctx, { onDone }) {
+export function openOpportunityCreate(ctx, { onDone, protectionOnly = false }) {
   const nameInput = h('input', { class: 'sheet-input', placeholder: t('search_person') });
   const searchBtn = h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => doSearch() }, t('search_person'));
   const candBox = h('div', {});
-  const typeSel = sel(OPP_TYPES.map((k) => [k, oppTypeLabel(k)]), 'insurance');
+  const typeSel = sel((protectionOnly ? ['insurance'] : OPP_TYPES).map((k) => [k, oppTypeLabel(k)]), 'insurance');
   const progressTa = h('textarea', { class: 'sheet-textarea', placeholder: t('placeholder_progress') });
   const nextInput = h('input', { class: 'sheet-input', placeholder: t('placeholder_next_action') });
   const dateInput = h('input', { class: 'sheet-input', type: 'date' });

@@ -1,6 +1,7 @@
 import { h } from './dom.js';
 import { ic } from './icons.js';
 import { openSheet, openWorkItemEditor, openRecruitCandidateRemove } from './write.js';
+import { openPipelineStage, stageLabel as pipelineStageLabel } from './pipeline-stage.js';
 import { data } from './data.js';
 import { t, getLang, translateEnum } from './i18n.js';
 import { emptyNote, fmtDate, sectionTitle } from './ui.js';
@@ -472,12 +473,21 @@ export async function renderRecruitSection(ctx, personId, onDone) {
       } catch (error) { ctx.toast(error.message || t('write_failed'), 'err'); button.disabled = false; }
     } }, t('recruit_stage_save'));
     const followups = detail.followups || [];
+    const flowTarget={track:'recruitment',personId:String(personId),recordId:String(candidate.id)};
+    const flowStatus=h('span',{class:'row-sub'},t('loading'));
+    const refreshFlow=()=>data.pipelineState(ctx,flowTarget).then(state=>{
+      flowStatus.textContent=[pipelineStageLabel('recruitment',state.stage),state.confirmedAt?.slice(0,10),state.reason].filter(Boolean).join(' · ');
+    }).catch(()=>{flowStatus.textContent=t('pipeline_review');});
+    refreshFlow();
     nodes.push(h('section', { class: 'card', style: 'overflow:hidden' }, [
       h('div', { class: 'card-head' }, [
         ic('recruit'), h('b', {}, t('recruit_candidate_title')),
         h('span', { style: 'margin-left:auto' }, translateEnum('recruit_stage', candidate.stage)),
       ]),
       h('div', { class: 'card-body tab-stack' }, [
+        h('div',{class:'stack-head'},[h('b',{},t('pipeline_stage')),flowStatus,
+          h('button',{class:'btn btn-soft btn-sm',type:'button',onclick:()=>openPipelineStage(ctx,flowTarget,refreshFlow)},t('pipeline_change'))]),
+        h('b',{},t('pipeline_milestone')),
         h('div', { class: 'recruit-stage-editor' }, [stageControl, noteControl, stageButton]),
         h('div', { class: 'recruit-candidate-actions' }, [
           h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => openProfileEditor(ctx, candidate, reload) }, t('recruit_profile_edit')),
