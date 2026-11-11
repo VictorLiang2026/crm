@@ -294,6 +294,10 @@ button.btn[aria-pressed="true"] { background: var(--red); border-color: var(--re
 }
 .tabs .tab.active { color: #fff; background: var(--red); border-bottom-color: var(--red); }
 .tabs .tab.active:hover { color: #fff; background: var(--red-600); border-bottom-color: var(--red-600); }
+.person-sections { flex-wrap: wrap; mask-image: none; -webkit-mask-image: none; }
+.person-sections .tab, .person-subsections button { min-height: 44px; }
+.person-subsections[hidden] { display: none; }
+.person-subsections { margin: 0; padding: 8px; background: var(--card); }
 
 /* ---------- Person OCR review (PC14) ---------- */
 .ocr-review { gap: 14px; }

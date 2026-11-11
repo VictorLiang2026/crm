@@ -9,7 +9,7 @@ test('legacy interaction forms remain callable after unified launcher migration'
   try {
     await browser.start();
     await browser.openConsole('#/person/980001');
-    await browser.wait("document.querySelectorAll('.tab').length>=8");
+    await browser.wait("document.querySelector('.person-sections')");
     await browser.click('.tab', '互动时间线');
     await browser.wait("document.querySelectorAll('.tab-stack').length>0");
     const timelineReady = await browser.evaluate("({text:document.getElementById('app')?.innerText, buttons:[...document.querySelectorAll('.tab-stack button')].map(button=>button.textContent), calls:window.__crmTest.calls, errors:window.__crmTest.errors})");
@@ -39,7 +39,7 @@ test('legacy interaction forms remain callable after unified launcher migration'
     assert.equal(interaction.payload.summary, '[CRM_TEST_ONLY]午夜前后的人工沟通');
 
     // Preload the activity-linked tab so the follow-up must invalidate its cached view.
-    await browser.click('.tab', '活动');
+    await browser.click('.tab', '嘉宾与活动');
     await browser.wait("document.querySelectorAll('.tab-stack').length>0");
     await browser.click('.tab', '互动时间线');
     await browser.wait("[...document.querySelectorAll('.tab-stack button')].some(button=>button.textContent.includes('记录互动'))");
@@ -83,7 +83,7 @@ test('legacy interaction forms remain callable after unified launcher migration'
     assert.equal(create.payload.next_action_date, '2026-10-21');
     assert.equal(create.payload.customer_id, 910001);
 
-    await browser.click('.tab', '活动');
+    await browser.click('.tab', '嘉宾与活动');
     await new Promise(resolve => setTimeout(resolve, 300));
     const activityState = await browser.evaluate("({text:document.getElementById('app')?.innerText,calls:window.__crmTest.calls.filter(call=>call.action==='getTimelinePage'),tabs:[...document.querySelectorAll('.tab')].map(tab=>[tab.textContent,tab.classList.contains('active')])})");
     assert.ok(activityState.text.includes('[CRM_TEST_ONLY]客户反馈摘要'), JSON.stringify(activityState));
@@ -125,7 +125,7 @@ test('legacy interaction forms remain callable after unified launcher migration'
     await browser.evaluate("localStorage.setItem('crm_lang','en'); location.reload()");
     await browser.wait("window.__crmTest && document.getElementById('app')?.innerText.includes('Today')");
     await browser.evaluate("location.hash='#/person/980001'");
-    await browser.wait("location.hash==='#/person/980001' && document.querySelectorAll('.tab').length>=8");
+    await browser.wait("location.hash==='#/person/980001' && document.querySelector('.person-sections')");
     await browser.evaluate("document.querySelectorAll('.tab')[1]?.click()");
     await browser.wait("document.querySelectorAll('.tab-stack').length>0");
     const english = await browser.evaluate("[...document.querySelectorAll('.tab-stack button')].map(button=>button.textContent)");

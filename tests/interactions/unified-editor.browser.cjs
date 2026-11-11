@@ -5,7 +5,7 @@ test('one bilingual iPad entry creates and edits general and customer interactio
  const b=new Browser(path.resolve(__dirname,'../..'));
  try{
   await b.start();await b.openConsole('#/person/980001');
-  await b.wait("document.querySelectorAll('.tab').length>=8");await b.click('.tab','互动时间线');
+  await b.wait("document.querySelector('.person-sections')");await b.click('.tab','互动时间线');
   await b.wait("document.querySelector('.tab-stack .stack-head button')");
   assert.deepEqual(await b.evaluate("[...document.querySelectorAll('.tab-stack .stack-head button')].map(x=>x.textContent).filter(x=>/互动|跟进/.test(x))"),['记录互动']);
   await b.click('.stack-head button','记录互动');await b.wait("document.querySelector('[name=summary]')");
@@ -34,7 +34,7 @@ test('one bilingual iPad entry creates and edits general and customer interactio
   assert.equal(await b.evaluate("document.querySelector('[name=next_action_date]').value"),'2026-11-02');
   await b.click('.sheet button','永久删除跟进');await b.click('.sheet button','永久删除跟进');await b.wait("!document.querySelector('.sheet')");
   await b.wait("![...document.querySelectorAll('.tl-item')].some(x=>x.textContent.includes('[CRM_TEST_ONLY] sales'))");
-  await b.evaluate("localStorage.setItem('crm_lang','en');location.reload()");await b.wait("document.querySelectorAll('.tab').length>=8");await b.evaluate("document.querySelectorAll('.tab')[1].click()");
+  await b.evaluate("localStorage.setItem('crm_lang','en');location.reload()");await b.wait("document.querySelector('.person-sections')");await b.evaluate("document.querySelectorAll('.tab')[1].click()");
   await b.wait("[...document.querySelectorAll('.tab-stack .stack-head button')].some(x=>x.textContent==='Record interaction')");
   await b.click('.stack-head button','Record interaction');await b.wait("document.querySelector('[name=scene]')");
   assert.equal(await b.evaluate("document.querySelector('[name=scene] option').textContent"),'General conversation');

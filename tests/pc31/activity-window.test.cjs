@@ -28,7 +28,7 @@ test('PC31 activities use valid pages, retry without skipping, reveal older reco
       window.pc31.render = () => renderPerson(ctx,'71');
       i18n.setLang('zh-CN'); window.pc31.render();
     })()`);
-    await browser.click('.tab', '活动');
+    await browser.click('.tab', '嘉宾与活动');
     await browser.wait("document.querySelector('.person-activities-more')");
     assert.match(await browser.evaluate("document.querySelector('.person-activity-list').textContent"), /已加载/);
     await browser.click('.person-activities-more', '');
@@ -46,7 +46,7 @@ test('PC31 activities use valid pages, retry without skipping, reveal older reco
     assert.match(await browser.evaluate("document.querySelector('.person-activities-more').parentElement.textContent"), /400 条/);
     assert.equal(await browser.evaluate("document.querySelectorAll('.person-activity-list a').length"), 19);
     await browser.evaluate("window.pc31.i18n.setLang('en');window.pc31.render()");
-    await browser.click('.tab', 'Activities');
+    await browser.click('.tab', 'Speakers & Events');
     await browser.wait("document.querySelector('.person-activities-more')");
     assert.match(await browser.evaluate("document.querySelector('.person-activities-more').parentElement.textContent"), /20 at a time/);
     for (const [width,height] of [[820,1180],[1180,820]]) {

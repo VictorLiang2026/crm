@@ -73,7 +73,7 @@ export function openIdentityExceptions(ctx,onDone) {
   document.body.appendChild(sheet.overlay);load();
 }
 
-function openOpportunityDetails(ctx, row, onDone) {
+export function openOpportunityDetails(ctx, row, onDone) {
   const body = h('div', { class: 'opp-detail-body' }, h('p', { class: 'sheet-note' }, t('opp_detail_loading')));
   const personName = row.person?.display_name || t('opp_no_link_person');
   const sheet = openSheet({ title: t('opp_detail_title'), sub: `${typeLabel(row.opportunity_type)} · ${personName}`, body });

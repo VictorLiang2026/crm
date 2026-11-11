@@ -9,8 +9,8 @@ test('PC06 Person and Today share preview-confirmed Action and Commitment operat
   try {
     await browser.start();
     await browser.openConsole('#/person/980001');
-    await browser.wait("document.querySelectorAll('.tab').length>=8");
-    await browser.click('.tab', '机会与行动');
+    await browser.wait("document.querySelector('.person-sections')");
+    await browser.click('.person-subsections button', '机会与行动');
     await browser.wait("[...document.querySelectorAll('.tab-stack button')].some(button=>button.textContent.includes('新建行动'))");
 
     const personView = await browser.evaluate("({text:[...document.querySelectorAll('.tab-stack')].map(node=>node.innerText).join('\\n'),workCalls:window.__crmTest.calls.filter(call=>call.action==='listPersonWorkItems').length})");
@@ -44,7 +44,7 @@ test('PC06 Person and Today share preview-confirmed Action and Commitment operat
     await browser.send('Emulation.clearDeviceMetricsOverride');
     await browser.click('.sheet button', '确认并执行');
     await browser.wait("window.__crmTest.calls.some(call=>call.action==='executeWorkItem')");
-    await browser.click('.tab', '机会与行动');
+    await browser.click('.person-subsections button', '机会与行动');
     await new Promise(resolve => setTimeout(resolve, 300));
     const afterCreate = await browser.evaluate("({text:[...document.querySelectorAll('.tab-stack')].map(node=>node.innerText).join('\\n'),items:window.__crmTest.getWorkItems(),calls:window.__crmTest.calls.filter(call=>['listPersonWorkItems','executeWorkItem'].includes(call.action)),errors:window.__crmTest.errors})");
     assert.ok(afterCreate.items.some(row=>row.title?.includes('PC06新建行动')), JSON.stringify(afterCreate));
@@ -84,7 +84,7 @@ test('PC06 Person and Today share preview-confirmed Action and Commitment operat
     await browser.wait("[...document.querySelectorAll('.toast')].some(node=>node.innerText.includes('补记本次结果'))");
     assert.equal(await browser.evaluate("window.__crmTest.calls.filter(call=>call.action==='executeWorkItem'&&!call.rejected).length"), 3);
 
-    await browser.click('.tab', '机会与行动');
+    await browser.click('.person-subsections button', '机会与行动');
     const commitmentRows = await browser.evaluate("({active:document.querySelector('.tab.active')?.textContent,rows:[...document.querySelectorAll('.list-row')].filter(node=>node.innerText.includes('核对资料')).map(node=>({text:node.innerText,buttons:[...node.querySelectorAll('button')].map(button=>button.textContent)}))})");
     assert.ok(commitmentRows.rows.some(row=>row.buttons.some(button=>button.includes('撤销'))), JSON.stringify(commitmentRows));
     await browser.evaluate(`(() => {
@@ -151,8 +151,8 @@ test('PC06 Person and Today share preview-confirmed Action and Commitment operat
     await browser.evaluate("localStorage.setItem('crm_lang','en'); location.reload()");
     await browser.wait("window.__crmTest && document.getElementById('app')?.innerText.includes('Today')");
     await browser.evaluate("location.hash='#/person/980001'");
-    await browser.wait("document.querySelectorAll('.tab').length>=8");
-    await browser.click('.tab', 'Opps');
+    await browser.wait("document.querySelector('.person-sections')");
+    await browser.click('.person-subsections button', 'Opps');
     await browser.wait("[...document.querySelectorAll('.tab-stack button')].some(button=>button.textContent.includes('Create Action'))");
     assert.equal(await browser.evaluate("[...document.querySelectorAll('.tab-stack button')].some(button=>button.textContent.includes('Create Commitment'))"), true);
     await browser.healthy();

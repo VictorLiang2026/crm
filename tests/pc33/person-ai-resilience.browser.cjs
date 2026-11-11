@@ -25,7 +25,7 @@ test('PC33 Person AI suppresses duplicate clicks and shows bilingual failure/his
       data.summarizePerson=async()=>{window.pc33.summaryCalls++;return await new Promise((resolve,reject)=>{window.pc33.summaryResolve=resolve;window.pc33.summaryReject=reject;});};
       data.meetingPrep=async()=>{window.pc33.prepCalls++;return await new Promise((resolve,reject)=>{window.pc33.prepResolve=resolve;window.pc33.prepReject=reject;});};
       window.pc33I18n=i18n;
-      window.pc33Render=()=>renderPerson({main:document.querySelector('.console-main'),api:{call:async()=>({})},toast:()=>{}},'783');
+      window.pc33Render=()=>renderPerson({main:document.querySelector('.console-main'),api:{call:async()=>({})},toast:()=>{}},'783','ai');
       window.pc33Render();
     })()`);
     await browser.wait("[...document.querySelectorAll('.console-main button')].some(x=>x.textContent.trim()==='AI 摘要')");

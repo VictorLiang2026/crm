@@ -32,10 +32,10 @@ test('Person family page handles bilingual multi-household review flows at iPad 
         if(name==='person_360'&&args.action==='executeHousehold'){window.familyExec.push(args);return {ok:true}};
         throw Error('Unexpected call '+name+' '+args.action);
       }}};
-      window.renderFamilyPerson=()=>renderPerson(ctx,'71'); await window.renderFamilyPerson();
+      window.renderFamilyPerson=()=>renderPerson(ctx,'71','family'); await window.renderFamilyPerson();
     })()`);
-    await browser.wait("document.querySelectorAll('.tab').length>=8");
-    await browser.evaluate(`(()=>[...document.querySelectorAll('.tab')].find(x=>x.textContent.trim()==='家庭与关系').click())()`);
+    await browser.wait("document.querySelector('.person-subsections')");
+    await browser.evaluate(`(()=>[...document.querySelectorAll('.person-subsections button')].find(x=>x.textContent.trim()==='家庭与关系').click())()`);
     await browser.wait("document.querySelector('.family-household')?.innerText.includes('legacy unreviewed')");
     assert.equal(await browser.evaluate("document.querySelector('.console-main').innerText.includes('待核实')"), true);
     assert.equal(await browser.evaluate("window.familyCalls.some(call=>call.action==='previewHousehold'||call.action==='executeHousehold')"), false);

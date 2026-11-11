@@ -24,7 +24,7 @@ test('Person objection response and citations are collapsed until requested in b
         responseLogic:'【系统测试·勿联系】先了解保障重点与预算，再比较方案。',nextObjective:'【系统测试·勿联系】确认优先保障项目',
         doNotSay:['【系统测试·勿联系】不承诺收益'],evidenceSources:[{schema:'public',table:'knowledge_items',id:'11',label:'虚构知识引用'}],taskId:'fixture'});
       window.pc37I18n=i18n;
-      window.pc37Render=()=>renderPerson({main:document.querySelector('.console-main'),api:{call:async()=>({})},toast:()=>{}},'783');
+      window.pc37Render=()=>renderPerson({main:document.querySelector('.console-main'),api:{call:async()=>({})},toast:()=>{}},'783','ai');
       window.pc37Render();
     })()`);
     await browser.wait("document.querySelector('.summary-card details.playbook-response-details')?.querySelector('summary')");

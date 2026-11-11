@@ -20,7 +20,8 @@ test('Person facts show provenance and require a reviewed preview before execute
         sourceType:'ai_quick_capture_v2',sourceId:301,interactionId:301,
         sourceInteraction:{id:301,type:'meeting',at:'2026-10-10T10:00:00Z',summary:'【系统测试·勿联系】原始来源文字',rawNote:'原始备忘'},
         confirmed:false,validity:'current',updatedAt:'2026-10-10T10:00:00Z',needsReview:false};
-      const ctx={main:document.getElementById('view'),toast(){},api:{call:async(name,args)=>{
+      const main=document.createElement('main');main.id='facts-fixture';document.body.append(main);
+      const ctx={main,toast(){},api:{call:async(name,args)=>{
         window.contextCalls.push({name,args});
         if(name==='person_360'&&args.action==='get')return {person:{id:71,display_name:'【系统测试·勿联系】虚构人物'},members:[]};
         if(name==='person_360'&&args.action==='getCustomerProfile')return {status:'person_only',fields:{}};
@@ -34,10 +35,10 @@ test('Person facts show provenance and require a reviewed preview before execute
         if(name==='person_360'&&args.action==='executeContextItem'){window.contextWrites++;return {ok:true};}
         throw Error('unexpected call '+name+' '+args.action);
       }}};
-      window.renderContextPerson=()=>renderPerson(ctx,'71');window.renderContextPerson();
+      window.renderContextPerson=()=>renderPerson(ctx,'71','facts');window.renderContextPerson();
     })()`);
     await b.wait("document.querySelector('.person-tabs') || document.querySelector('.tabs')");
-    await b.evaluate(`(()=>[...document.querySelectorAll('button')].find(x=>x.textContent.trim()==='事实与洞察').click())()`);
+    await b.wait("document.querySelector('#facts-fixture [data-person-section=facts][aria-pressed=true]')");
     await b.wait("document.querySelector('.list-row')?.innerText.includes('候选事实')");
     assert.deepEqual(await b.evaluate('window.contextEnglish'),{confirm:'Confirm fact',source:'Original source'});
     assert.equal(await b.evaluate("document.querySelector('.list-row').innerText.includes('原始来源文字')"), true);

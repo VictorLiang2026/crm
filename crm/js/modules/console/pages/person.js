@@ -1,7 +1,7 @@
-// Person 360（WP2）：多页签；关系边通过服务端预览与人工确认维护，
-// 「机会与行动」页签接入写入闭环（完成行动/承诺、推进/关闭机会）。
+// Person 360：按人物经营场景组织导航，业务操作复用各模块的编辑和确认流程。
 // 「活动」页签按 G5 证据口径：activities.listByPerson 仅支持 legacy 数字 ID，
 // 故 canonical 人物的活动参与记录取 getTimelinePage 已合并的 activity_participants 数据。
+import { openOpportunityDetails } from './opportunities.js';
 import { h } from '../dom.js';
 import { ic } from '../icons.js';
 import { data } from '../data.js';
@@ -16,7 +16,7 @@ import { openUnifiedInteraction } from '../person-interaction.js';
 import { renderOcrReview } from '../ocr-review.js';
 import { renderInsuranceEditor } from '../insurance-editor.js';
 import { renderInsuranceReports } from '../insurance-reports.js';
-import { openWorkItemEditor, openWorkItemTransition, openOpportunityAdvance, openQuickCapture, openPersonEdit, openPersonDelete,
+import { openWorkItemEditor, openWorkItemTransition, openQuickCapture, openPersonEdit, openPersonDelete,
   openPersonInteraction, openPersonFollowup, openPersonCustomerRemove, openReferrerRoleAction } from '../write.js';
 import {
   wpTag, pageHead, emptyNote, loadInto, bdg, kvGrid, sectionTitle,
@@ -24,7 +24,6 @@ import {
 } from '../ui.js';
 import { t, translateEnum } from '../i18n.js';
 
-const TABS = () => [t('tab_overview'), t('tab_timeline'), t('tab_facts'), t('tab_family'), t('tab_relationships'), t('tab_insurance'), t('tab_opportunities'), t('tab_recruit'), t('tab_activities'), t('tab_care_materials'), t('tab_ocr_review')];
 const TYPE_LABEL = () => ({
   followup: t('type_followup'), recruit_followup: t('type_recruit_followup'), activity_participant: t('type_activity_participant'),
   meeting: t('type_meeting'), call: t('type_call'), message: t('type_message'), note: t('type_note'),
@@ -112,7 +111,7 @@ function aiHistoryNode(ctx, id, result) {
 function overviewNode(ctx, id, setName) {
   return Promise.all([
     data.personHome(ctx, id),
-    data.customerProfile(ctx, id),
+    ctx.readProfile(),
     data.personWorkItems(ctx, id),
     data.personInteractions(ctx, id, 5),
   ]).then(([home, profile, works, interactions]) => {
@@ -129,27 +128,18 @@ function overviewNode(ctx, id, setName) {
       [t('field_referral_priority'), translateEnum('sales_priority', f.referral_priority)],
       [t('field_marital'), translateEnum('marital_status', f.marital_status)],
       [t('field_first_contact_date'), fmtDate(f.first_contact_date)],
-      [t('field_income'), f.annual_income], [t('field_updated'), fmtDate(f.person_updated_at || f.updated_at)],
+      [t('field_updated'), fmtDate(f.person_updated_at || f.updated_at)],
     ];
     const activeWorks = (works.rows || []).filter((r) =>
       (r.kind === 'action' && (r.status === 'open' || r.status === 'in_progress')) ||
       (r.kind === 'commitment' && r.status === 'open'));
-    const businessProfile = f.profile && typeof f.profile === 'object' ? f.profile : {};
-    const customerInfoPairs = [
-      [t('field_customer_tags'), f.tags], [t('field_customer_notes'), f.additional_info],
-      [t('field_income'), f.annual_income], [t('field_household_income'), f.household_income],
-      [t('field_properties'), f.properties_info], [t('field_mbti'), f.mbti],
-      ...['family', 'children', 'parents', 'career', 'needs', 'relationship'].map(key => [t(`profile_${key}`), businessProfile[key]]),
-      [t('field_customer_profile_json'), Array.isArray(businessProfile.events)
-        ? businessProfile.events.map(event => typeof event === 'string' ? event : JSON.stringify(event)).join(' · ')
-        : ''],
-    ];
     return h('div', { class: 'tab-stack' }, [
       h('div', { class: 'stack-head' }, [
         sectionTitle(t('sec_person_info')),
-        profile.status === 'person_only' ? bdg(t('badge_person_only'), 'gray')
-          : profile.status === 'customer_unavailable' ? bdg(t('badge_customer_unavailable'), 'red')
-          : bdg(t('badge_customer_linked'), 'jade'),
+        profile.status === 'linked' ? bdg(t('badge_customer_linked'), 'jade') : null,
+        profile.status === 'customer_unavailable' ? bdg(t('badge_customer_unavailable'), 'red') : null,
+        f.recruit_id ? bdg(t('recruit'), 'gold') : null,
+        (profile.roles || []).some(role => role.role === 'speaker') ? bdg(t('speaker'), 'ink') : null,
       ]),
       kvGrid(infoPairs),
       h('div', { class: 'summary-section' }, [
@@ -165,17 +155,7 @@ function overviewNode(ctx, id, setName) {
         h('p', { class: 'foot-note' }, t('referrer_role_explain')),
       ]),
       personCadence(ctx, id),
-      profile.status === 'linked' ? h('div', { class: 'tab-stack' }, [
-        h('div', { class: 'stack-head' }, [
-          sectionTitle(t('sec_customer_specific_info')),
-          h('button', { class: 'btn btn-soft btn-sm', type: 'button',
-            onclick: () => openPersonEdit(ctx, { personId: String(id), onDone: ctx.onWriteDone }) }, t('btn_edit_customer_profile')),
-          h('button', { class: 'btn btn-ghost btn-sm', type: 'button', style: 'color:var(--red)',
-            onclick: () => openPersonCustomerRemove(ctx, { customerId: profile.customerId, onDone: ctx.onWriteDone }) }, t('customer_role_remove')),
-        ]),
-        kvGrid(customerInfoPairs),
-      ]) : profile.status === 'customer_unavailable'
-        ? h('p', { class: 'sheet-note' }, t('customer_profile_unavailable_note')) : null,
+      profile.status === 'customer_unavailable' ? h('p', { class: 'sheet-note' }, t('customer_profile_unavailable_note')) : null,
       sectionTitle(t('sec_todos')),
       rowsBlock(activeWorks.slice(0, 8), (r) => h('div', { class: 'list-row' }, [
         h('div', { style: 'flex:1;min-width:0' }, [
@@ -320,6 +300,30 @@ function provenanceRow(title, sub, badge) {
   ]);
 }
 
+async function customerNode(ctx, id) {
+    const profile = await ctx.readProfile();
+    const f = profile.fields || {};
+    const businessProfile = f.profile && typeof f.profile === 'object' ? f.profile : {};
+    const customerInfoPairs = [
+      [t('field_customer_tags'), f.tags], [t('field_customer_notes'), f.additional_info],
+      [t('field_income'), f.annual_income], [t('field_household_income'), f.household_income],
+      [t('field_properties'), f.properties_info], [t('field_mbti'), f.mbti],
+      ...['family', 'children', 'parents', 'career', 'needs', 'relationship'].map(key => [t(`profile_${key}`), businessProfile[key]]),
+      [t('field_customer_profile_json'), Array.isArray(businessProfile.events)
+        ? businessProfile.events.map(event => typeof event === 'string' ? event : JSON.stringify(event)).join(' · ')
+        : ''],
+    ];
+    return h('div', { class: 'tab-stack' }, [
+        h('div', { class: 'stack-head' }, [
+          sectionTitle(t('sec_customer_specific_info')),
+          h('button', { class: 'btn btn-ghost btn-sm', type: 'button', style: 'color:var(--red)',
+            onclick: () => openPersonCustomerRemove(ctx, { customerId: profile.customerId, onDone: ctx.onWriteDone }) }, t('customer_role_remove')),
+        ]),
+        kvGrid(customerInfoPairs),
+        h('a', { class: 'btn btn-soft', href: `#/person/${id}/opportunities` }, t('tab_opportunities')),
+      ]);
+}
+
 function insuranceNode(ctx, id) {
   return Promise.all([data.insurance(ctx, id), renderInsuranceEditor(ctx, id)]).then(([d, editor]) => {
     const blocks = [];
@@ -421,10 +425,9 @@ function opportunitiesNode(ctx, id) {
             h('div', { class: 'row-sub' }, `${t('label_next_action')}：${textOf(r.next_action) || t('label_none')}${r.next_action_date ? ' · ' + dueLabel(r.next_action_date) : ''} · ${t('label_discovered')} ${fmtDate(r.discovered_at)}`),
           ]),
           bdg(oppStatusLabel(r.status) || t('opp_status_default'), r.status === '成交' ? 'jade' : r.status === '关闭' ? 'gray' : 'gold'),
-          r.status !== '成交' && r.status !== '关闭' ? h('button', {
-            class: 'btn btn-ghost btn-sm', type: 'button',
-            onclick: () => openOpportunityAdvance(ctx, { opportunity: r, onDone }),
-          }, t('btn_advance_close')) : null,
+          h('button', { class: 'btn btn-ghost btn-sm', type: 'button',
+            onclick: () => openOpportunityDetails(ctx, r, onDone),
+          }, t('opp_details')),
         ]), t('empty_no_opps')),
         sectionTitle(t('sec_actions_commitments')),
         h('div', { class: 'sheet-actions' }, [
@@ -490,41 +493,107 @@ function relationshipsNode(ctx, id) {
     .then(([management, network]) => { management.append(network); return management; });
 }
 
-const BUILDERS = [overviewNode, timelineNode, factsNode, familyNode, relationshipsNode, insuranceNode, opportunitiesNode, recruitNode, activitiesNode,
-  (ctx, id) => careMaterialsNode(ctx, id, { onDone: ctx.onWriteDone }), renderOcrReview];
+const PERSON_SECTIONS = [
+  { key: 'overview', label: 'p360_overview', parts: ['summary', 'opportunities'] },
+  { key: 'timeline', label: 'tab_timeline', parts: ['timeline'] },
+  { key: 'relationships', label: 'p360_relationships', parts: ['relationships', 'family'] },
+  { key: 'customer', label: 'p360_customer', parts: ['customer', 'insurance'] },
+  { key: 'team', label: 'p360_team', parts: ['recruit'] },
+  { key: 'events', label: 'p360_events', parts: ['activities'] },
+  { key: 'materials', label: 'p360_materials', parts: ['ai', 'facts', 'care', 'ocr'] },
+];
 
-// ---------- 页面 ----------
 export function renderPerson(ctx, id, initialSection) {
   const titleNode = h('span', {}, `Person #${id}`);
-  const tabs = TABS();
-  const bodies = tabs.map(() => h('div', {}));
-  const loaded = new Set();
-  let cur = 0;
-  const btns = tabs.map((name, i) => h('button', {
-    class: 'tab' + (i === 0 ? ' active' : ''), type: 'button',
-    title: name === t('tab_opportunities') ? t('tab_opportunities_full') : undefined,
-    onclick: () => select(i),
-  }, name));
-
-  function select(i) {
-    cur = i;
-    btns.forEach((b, j) => b.classList.toggle('active', i === j));
-    bodies.forEach((b, j) => { b.style.display = i === j ? '' : 'none'; });
-    if (!loaded.has(i)) {
-      loaded.add(i);
-      const setName = i === 0 ? (n) => { titleNode.textContent = n; } : () => {};
-      loadInto(bodies[i], async () => h('div', { class: 'card-body' }, [await BUILDERS[i](wctx, id, setName)]));
+  const navigation = h('div', { class: 'tabs person-sections', role: 'group', 'aria-label': t('title_people') });
+  const subnav = h('div', { class: 'toolbar person-subsections' });
+  const content = h('section', { class: 'card tabs-body' });
+  const roleStatus = h('div', {});
+  const speakerRole = h('span');
+  let profileRequest, profile, activePart, pendingPart = initialSection;
+  let cancelContent = () => {};
+  let cancelRoles = () => {};
+  function readProfile() {
+    if (!profileRequest) {
+      const request = data.customerProfile(ctx, id).catch(error => {
+        if (profileRequest === request) profileRequest = null;
+        throw error;
+      });
+      profileRequest = request;
     }
+    return profileRequest;
   }
-
-  // A Person write can affect the overview, timeline and activity-linked view.
-  // Refresh the active tab now and invalidate the other affected tabs for next visit.
-  const wctx = Object.assign({}, ctx, {
-    onWriteDone: () => {
-      [0, 1, 8, 9, 10, cur].forEach((index) => loaded.delete(index));
-      select(cur);
-    },
-  });
+  const wctx = { ...ctx, readProfile, onWriteDone() {
+    profileRequest = null;
+    profile = null;
+    pendingPart = activePart;
+    if (visible(sectionOf(activePart))) { pendingPart = null; select(activePart); }
+    else waitForRoles();
+    refreshRoles();
+  } };
+  function refreshRoles() {
+    cancelRoles();
+    cancelRoles = loadInto(roleStatus, async () => {
+      const request = readProfile();
+      const result = await request;
+      if (request !== profileRequest) return h('span');
+      profile = result;
+      speakerRole.replaceChildren(...((result.roles || []).some(role => role.role === 'speaker')
+        ? [bdg(t('speaker'), 'gold')] : []));
+      titleNode.textContent = result.fields?.customer_name || `Person #${id}`;
+      const target = pendingPart;
+      pendingPart = null;
+      if (target) {
+        if (visible(sectionOf(target))) select(target);
+        else {
+          select('summary');
+          return h('p', { class: 'sheet-note' }, t(sectionOf(target).key === 'team' ? 'p360_inactive_team' : 'p360_inactive_customer'));
+        }
+      } else drawNavigation();
+      return h('span');
+    }, h('span'));
+  }
+  function sectionOf(part) {
+    return PERSON_SECTIONS.find(section => section.parts.includes(part) || section.key === part) || PERSON_SECTIONS[0];
+  }
+  function visible(section) {
+    if (section.key === 'customer') return profile?.status === 'linked' && !!profile.customerId;
+    if (section.key === 'team') return !!profile?.fields?.recruit_id;
+    return true;
+  }
+  function navButton(key, label, selected, primary) {
+    return h('button', { type: 'button', 'data-person-section': key, 'aria-pressed': String(selected),
+      class: primary ? 'tab' + (selected ? ' active' : '') : 'btn btn-sm ' + (selected ? 'btn-dark' : 'btn-soft'),
+      onclick: () => {
+        pendingPart = null; roleStatus.querySelector('.sheet-note')?.remove(); select(key);
+        (primary ? navigation : subnav).querySelector('[aria-pressed="true"]')?.focus();
+      },
+    }, t(label));
+  }
+  function drawNavigation() {
+    const current = sectionOf(activePart);
+    navigation.replaceChildren(...PERSON_SECTIONS.filter(visible).map(section =>
+      navButton(section.key, section.label, current === section, true)));
+    subnav.replaceChildren(...(current.parts.length > 1 ? current.parts.map(part =>
+      navButton(part, parts[part][0], activePart === part, false)) : []));
+    subnav.hidden = !subnav.childElementCount;
+  }
+  function waitForRoles() {
+    activePart = 'summary';
+    drawNavigation();
+    cancelContent();
+    content.replaceChildren(h('p', { class: 'card-body muted', role: 'status' }, t('loading')));
+  }
+  function select(key) {
+    const section = sectionOf(key);
+    if (!visible(section)) return select('summary');
+    activePart = section.parts.includes(key) ? key : section.parts[0];
+    drawNavigation();
+    cancelContent();
+    const build = parts[activePart][1];
+    cancelContent = loadInto(content, async () => h('div', { class: 'card-body' }, await build(wctx, id,
+      name => { titleNode.textContent = name; })));
+  }
 
   // AI 人物摘要（WP3.2b）
   const aiBusy = { summary: false, prep: false };
@@ -786,13 +855,11 @@ export function renderPerson(ctx, id, initialSection) {
       ]));
     }
   }
-  loadPlaybookHistory();
-
-  ctx.main.replaceChildren(
-    pageHead({
-      kicker: t('kicker_person'), title: titleNode, tag: wpTag(t('wp3_ai')),
-      sub: t('person_sub'),
-      actions: [
+  let historyLoaded = false;
+  function aiNode() {
+    if (!historyLoaded) { historyLoaded = true; loadPlaybookHistory(); }
+    return h('div', { class: 'tab-stack' }, [
+      h('div', { class: 'toolbar' }, [
         h('button', {
           class: 'btn btn-soft', type: 'button', onclick: openSummary,
         }, [ic('sparkle'), t('btn_ai_summary')]),
@@ -806,6 +873,27 @@ export function renderPerson(ctx, id, initialSection) {
         h('button', {
           class: 'btn btn-soft', type: 'button', onclick: () => { location.hash = `#/ai/followup/${id}`; },
         }, [ic('sparkle'), t('btn_dual_followup')]),
+        h('button', { class: 'btn btn-soft btn-sm', type: 'button', onclick: openAIHistory }, t('btn_ai_history')),
+      ]),
+      summaryPanel, prepPanel, playbookPanel, aiHistoryPanel,
+    ]);
+  }
+  const parts = {
+    summary: ['sec_person_info', overviewNode], opportunities: ['tab_opportunities', opportunitiesNode],
+    timeline: ['tab_timeline', timelineNode], relationships: ['tab_relationships', relationshipsNode],
+    family: ['tab_family', familyNode], customer: ['sec_customer_specific_info', customerNode],
+    insurance: ['tab_insurance', insuranceNode], recruit: ['tab_recruit', recruitNode],
+    activities: ['tab_activities', async (context, personId) => h('div', { class: 'tab-stack' }, [
+      h('div', { class: 'stack-head' }, [speakerRole,
+        h('a', { class: 'btn btn-soft', href: '#/activity-speakers' }, t('resource_directory_speakers_tab')),
+      ]),
+      await activitiesNode(context, personId),
+    ])], ai: ['nav_ai', aiNode], facts: ['tab_facts', factsNode],
+    care: ['tab_care_materials', (context, personId) => careMaterialsNode(context, personId, { onDone: context.onWriteDone })],
+    ocr: ['tab_ocr_review', renderOcrReview],
+  };
+  ctx.main.replaceChildren(
+    pageHead({ kicker: t('kicker_person'), title: titleNode, tag: wpTag(t('wp3_ai')), sub: t('person_sub'), actions: [
         h('button', {
           class: 'btn btn-soft', type: 'button',
           onclick: () => openPersonEdit(wctx, { personId: String(id), onDone: wctx.onWriteDone }),
@@ -824,16 +912,11 @@ export function renderPerson(ctx, id, initialSection) {
         }, [ic('trash'), t('btn_delete_person')]),
       ],
     }),
-    h('div', { class: 'ai-history-toolbar', style: 'display:flex;justify-content:flex-end;margin-bottom:10px' }, [
-      h('button', { class: 'btn btn-soft btn-sm', type: 'button', onclick: openAIHistory }, [ic('clock'), t('btn_ai_history')]),
-    ]),
-    summaryPanel,
-    prepPanel,
-    playbookPanel,
-    aiHistoryPanel,
-    h('div', { class: 'tabs' }, btns),
-    h('section', { class: 'card tabs-body' }, bodies),
+    navigation, roleStatus, subnav, content,
   );
-  const initialIndex = { timeline: 1, insurance: 5, opportunities: 6, relationships: 4, recruit: 7, care: 9, ocr: 10 }[initialSection] ?? 0;
-  select(initialIndex);
+  if (visible(sectionOf(initialSection))) {
+    pendingPart = null;
+    select(initialSection || 'summary');
+  } else waitForRoles();
+  refreshRoles();
 }

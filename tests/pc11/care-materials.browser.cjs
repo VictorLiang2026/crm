@@ -29,7 +29,8 @@ test('Person care materials stores gifts on a Person and keeps files customer-sc
         if(name==='photos'&&args.action==='remove')return{ok:true};
         throw Error('unexpected '+name+'.'+args.action);
       }}};
-      document.getElementById('view').replaceChildren(await careMaterialsNode(window.pc11Ctx,'783'));
+      window.careFixture = document.createElement('main');document.body.append(window.careFixture);
+      window.careFixture.replaceChildren(await careMaterialsNode(window.pc11Ctx,'783'));
       window.pc11OnlyCtx={toast:()=>{},api:{call:async(name,args)=>{
         window.pc11Calls.push({name,args});
         if(name==='person_360'&&args.action==='getCustomerProfile')return{status:'person_only',customerId:null};
@@ -101,8 +102,8 @@ test('Person care materials stores gifts on a Person and keeps files customer-sc
     assert.match(en.delete,/permanent/);
 
     const beforePersonOnly = await browser.evaluate("window.pc11Calls.filter(c=>c.name==='photos').length");
-    await browser.evaluate("document.getElementById('view').replaceChildren('')");
-    await browser.evaluate(`(async()=>document.getElementById('view').replaceChildren(await careMaterialsNode(window.pc11OnlyCtx,'785')))()`);
+    await browser.evaluate("window.careFixture.replaceChildren('')");
+    await browser.evaluate(`(async()=>window.careFixture.replaceChildren(await careMaterialsNode(window.pc11OnlyCtx,'785')))()`);
     await browser.wait("document.querySelector('.care-materials')?.innerText.includes('人物礼品')");
     assert.equal(await browser.evaluate("window.pc11Calls.filter(c=>c.name==='photos').length"), beforePersonOnly);
     const personOnlyCreateReady = await browser.evaluate("document.querySelector('.care-materials-section:first-child .care-section-head button.btn-primary')?.textContent.trim()");
@@ -114,7 +115,7 @@ test('Person care materials stores gifts on a Person and keeps files customer-sc
     const personOnlyGift = await browser.evaluate("window.pc11Calls.find(c=>c.name==='gifts'&&c.args.action==='create'&&c.args.data.person_id==='785').args.data");
     assert.equal(personOnlyGift.customer_id,null);
 
-    await browser.evaluate(`(async()=>document.getElementById('view').replaceChildren(await careMaterialsNode(window.pc11Ctx,'783')))()`);
+    await browser.evaluate(`(async()=>window.careFixture.replaceChildren(await careMaterialsNode(window.pc11Ctx,'783')))()`);
     await browser.wait("document.querySelector('.care-materials')");
     for (const [width,height] of [[820,1180],[1180,820]]) {
       await browser.send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:false});

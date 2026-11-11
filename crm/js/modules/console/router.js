@@ -48,7 +48,7 @@ const PATTERNS = [
     const params = new URLSearchParams(query || '');
     return renderActivityReport(ctx, 'customer', { startDate: params.get('startDate'), endDate: params.get('endDate') });
   } },
-  { re: /^#\/person\/(\d+)(?:\/(timeline|insurance|opportunities|relationships|recruit|care|ocr))?$/, nav: '#/people', render: (ctx, id, section) => renderPerson(ctx, id, section) },
+  { re: /^#\/person\/(\d+)(?:\/(overview|timeline|insurance|opportunities|relationships|recruit|care|ocr|customer|team|events|materials|family|activities|facts|ai))?$/, nav: '#/people', render: (ctx, id, section) => renderPerson(ctx, id, section) },
   { re: /^#\/ai\/followup\/(\d+)$/, nav: '#/people', render: (ctx, id) => renderFollowupAdvice(ctx, id) },
   { re: /^#\/activity\/(\d+)$/, nav: '#/activities', render: renderActivity },
   { re: /^#\/activity-report\/(customer|recruit)(?:\?(.*))?$/, nav: '#/today', render: (ctx, type, query) => {

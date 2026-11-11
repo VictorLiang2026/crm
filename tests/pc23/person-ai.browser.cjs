@@ -21,7 +21,7 @@ test('Person AI history shows sourced outputs and legacy advice on iPad in both 
       data.conversationPlaybookHistory=async()=>({ok:true,hasResult:false});
       window.historyCalls=0;
       data.personAIHistory=async()=>{window.historyCalls++;if(window.historyCalls===1)return {ok:false,error:{message:'temporary history error'}};return {ok:true,generated:[{id:'1',taskType:'meeting_prep',skillVersion:'2.0.0',createdAt:'2026-10-16',result:{brief30Seconds:'Review verified source'},sources:[{schema:'public',table:'knowledge_items',id:'11',label:'Verified clause'}]}],legacy:[{id:'9',createdAt:'2026-10-15',recommendationDate:'2026-10-15',suggestedMessage:'Ask before sending',suggestedStrategy:'Confirm the need',source:{schema:'public',table:'ai_recommendations',id:'9'}}]};};
-      window.personI18n=i18n;window.renderTestPerson=()=>renderPerson({main:document.querySelector('.console-main'),api:{call:async()=>({})},toast:()=>{}},'783');
+      window.personI18n=i18n;window.renderTestPerson=()=>renderPerson({main:document.querySelector('.console-main'),api:{call:async()=>({})},toast:()=>{}},'783','ai');
       window.renderTestPerson();
     })()`);
     await browser.wait("document.querySelector('.console-main button')");
