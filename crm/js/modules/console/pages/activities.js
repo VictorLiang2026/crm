@@ -180,8 +180,11 @@ function flowNode(ctx, id) {
 }
 
 function attendanceNode(ctx, id, onDone) {
-  return data.activityDetail(ctx, id).then((detail) => {
-    const parts = detail.participants || [];
+  return Promise.all([data.activityDetail(ctx, id), data.participantResponses(ctx, id)]).then(([detail, registration]) => {
+    const parts = (detail.participants || []).map(row => ({...row,
+      response: registration.responses?.[row.id]?.response || 'unrecorded',
+      responseVersion: registration.responses?.[row.id]?.version || null,
+    }));
     if (!detail.activity) throw new Error(t('act_activity_not_found'));
     return renderActivityParticipants(ctx, detail.activity, parts, onDone);
   });

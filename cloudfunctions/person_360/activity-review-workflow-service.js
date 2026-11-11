@@ -113,12 +113,17 @@ class ActivityReviewWorkflowService {
       throw new Error('Invalid activity candidate reference');
     if (candidateIndex!=null && (!Number.isInteger(candidateIndex) || candidateIndex<0 || candidateIndex>11))
       throw new Error('Invalid activity candidate index');
-    return this.rpc('crm_activity_review_preview_v1',{
+    const preview = await this.rpc('crm_activity_review_preview_v1',{
       p_actor_uid:actorUid,p_idempotency_key:data.idempotencyKey,
       p_operation:data.operation,p_activity_id:activityId,
       p_ai_result_id:resultId,p_candidate_index:candidateIndex,
       p_payload:payload(data.operation,data.draft),
     });
+    if (data.operation !== 'action' && data.operation !== 'opportunity') return preview;
+    const personId = id(preview.personId);
+    const [person] = await this.request('persons','GET',{select:'id,display_name',id:'eq.'+personId,deleted_at:'is.null',limit:1});
+    if (!person || String(person.id)!==String(personId)) throw new Error('Person unavailable');
+    return {...preview,personName:person.display_name};
   }
   async execute(previewId,actorUid) {
     if (typeof actorUid!=='string' || !actorUid.trim() || !UUID.test(String(previewId||'')))

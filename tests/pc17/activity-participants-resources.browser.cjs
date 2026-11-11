@@ -22,6 +22,7 @@ test('PC17 resolves and confirms Person links, stages names explicitly, and mana
           if(name==='person_360'&&args.action==='linkCanonicalParticipant'){this.writes.push(args.data);const row=this.participants.find(x=>x.id===Number(args.data.participantId));row.canonical_person_id=Number(args.data.canonicalPersonId);row.person_name=args.data.selectedDisplayName;row.updated_at='2026-10-16T04:11:00.000Z';return {ok:true};}
           if(name==='activities'&&args.action==='addParticipant'){this.participants.push({id:11,activity_id:42,person_type:args.data.person_type,person_id:null,person_name:args.data.person_name,status:'invited',updated_at:'2026-10-16T04:12:00.000Z'});return {id:11,linked:false};}
           if(name==='activities'&&args.action==='updateParticipantConsole'){this.writes.push(args);const row=this.participants.find(x=>x.id===args.id);if(row){row.status=args.status;row.updated_at='2026-10-16T04:13:00.000Z';}return {ok:true};}
+          if(name==='person_360'&&args.action==='saveParticipantResponse'){const row=this.participants.find(x=>x.id===args.data.participantId);if(!row)throw Error('Unknown participant');this.writes.push(args);row.response=args.data.response;row.status=args.data.status;row.responseVersion='v1';return {ok:true};}
           if(name==='activities'&&args.action==='get')return {activity:this.activity,participants:this.participants};
           if(name==='activity_speakers'&&args.action==='list')return {rows:this.speakers};
           if(name==='person_360'&&args.action==='createSpeakerProfile'){this.writes.push(args.data);this.speakers.push({id:9,name:args.data.selectedDisplayName,person_id:Number(args.data.personId),linked_person:{id:Number(args.data.personId),name:args.data.selectedDisplayName},status:'active',relationship_stage:'new',cooperation_count:0});return {id:9};}
@@ -61,6 +62,10 @@ test('PC17 resolves and confirms Person links, stages names explicitly, and mana
     await browser.wait("document.querySelector('.sheet select')");
     await browser.evaluate(`(()=>{document.querySelector('.sheet select').value='invited';document.querySelector('.sheet .btn-primary').click()})()`);
     await browser.wait("window.pc17.writes.some(x=>x.action==='updateParticipantConsole'&&x.expectedStatus==='attended'&&x.status==='invited')");
+    await browser.click('#pc17-host button','更改状态');
+    await browser.wait("document.querySelectorAll('.sheet select').length===2");
+    await browser.evaluate("document.querySelectorAll('.sheet select')[1].value='registered';document.querySelector('.sheet .btn-primary').click()");
+    await browser.wait("window.pc17.writes.some(x=>x.action==='saveParticipantResponse'&&x.data.response==='registered'&&x.data.status==='invited')");
     await browser.click('#pc17-host button','关联 Person');
     await browser.wait("document.querySelector('.sheet input[type=search]')");
     await browser.evaluate(`(()=>{const i=document.querySelector('.sheet input[type=search]');i.value='李四';i.dispatchEvent(new Event('input',{bubbles:true}));[...document.querySelectorAll('.sheet .btn-ghost')].find(x=>x.innerText.includes('解析 Person')).click()})()`);

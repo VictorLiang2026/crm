@@ -59,6 +59,8 @@ test('PC18 displays review history and requires server preview then explicit con
     assert.equal(await browser.evaluate("window.pc18.preview.operation"),'action');
     assert.equal(await browser.evaluate("window.pc18.preview.candidateIndex"),1,
       'the visible candidate must use its original AI result index');
+    assert.ok(await browser.evaluate("document.querySelector('.event-intent-check').parentElement.parentElement.querySelector('.sheet-actions .btn-primary').disabled"));
+    await browser.evaluate("document.querySelector('.event-intent-check').click()");
     await browser.click('#pc18-host button','Confirm & Execute');
     await browser.wait("document.querySelector('#pc18-host .form-msg.error')");
     assert.equal(await browser.evaluate("window.pc18.writes.includes('action')"),false,'stale execution must fail without a write');
@@ -66,6 +68,7 @@ test('PC18 displays review history and requires server preview then explicit con
     await browser.click('#pc18-host button','Cancel');
     await browser.click('#pc18-host button','Review & Preview');
     await browser.wait("window.pc18.calls.filter(c=>c.args.action==='previewActivityReview').length===2");
+    await browser.evaluate("document.querySelector('.event-intent-check').click()");
     await browser.click('#pc18-host button','Confirm & Execute');
     await browser.wait("window.pc18.writes.includes('action')");
     assert.ok((await browser.evaluate("document.querySelector('#pc18-host').innerText")).includes('71'));
@@ -93,7 +96,7 @@ test('PC18 displays review history and requires server preview then explicit con
     assert.equal(await browser.evaluate("window.pc18.history.versions.length"),2);
     await browser.evaluate(`(async()=>{const i=await import('/crm/js/modules/console/i18n.js');i.setLang('zh-CN');document.querySelector('#pc18-host').replaceChildren(await window.pc18render(window.pc18ctx,42))})()`);
     await browser.wait("document.querySelector('#pc18-host').innerText.includes('复盘版本历史')");
-    for(const [width,height] of [[820,1180],[1180,820]]){
+    for(const [width,height] of [[390,844],[844,390],[820,1180],[1180,820],[1440,900]]){
       await browser.send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:false});
       const m=await browser.evaluate(`(()=>({doc:document.documentElement.scrollWidth,host:document.querySelector('#pc18-host').scrollWidth,client:document.querySelector('#pc18-host').clientWidth}))()`);
       assert.ok(m.doc<=width+1&&m.host<=m.client+1,`iPad overflow ${JSON.stringify(m)}`);

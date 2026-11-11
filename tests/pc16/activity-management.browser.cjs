@@ -17,6 +17,7 @@ test('PC16 activity create/edit/delete and task CRUD retain review, legacy repor
         priority:'high',due_date:'2026-10-18',note:'虚构备注',source:'manual',updated_at:'2026-10-16T01:05:00.000Z'};
       window.pc16={calls:[],activity,task,created:[],updated:[],removed:[],
         async call(name,args){this.calls.push({name,args});
+          if(name==='person_360'&&args.action==='listActionCenter')return {rows:[],total:0};
           if(name==='activities'&&args.action==='directory')return {rows:[this.activity],page:1,pageSize:30,hasMore:false,total:null};
           if(name==='activities'&&args.action==='create'){this.created.push(args.data);return {id:43};}
           if(name==='activities'&&args.action==='get')return {activity:this.activity,participants:[]};
@@ -53,7 +54,7 @@ test('PC16 activity create/edit/delete and task CRUD retain review, legacy repor
     await browser.wait("window.pc16.created.some(x=>x.task_title?.includes('新任务'))");
     const taskCreate=await browser.evaluate("window.pc16.created.find(x=>x.task_title)");
     assert.equal(taskCreate.source,'manual');assert.equal(taskCreate.related_type,'none');
-    assert.equal(await browser.evaluate("window.pc16.calls.some(c=>c.name==='person_360'&&/Action/i.test(JSON.stringify(c.args)))"),false);
+    assert.equal(await browser.evaluate("window.pc16.calls.some(c=>c.name==='person_360'&&c.args.action!=='listActionCenter'&&/Action/i.test(JSON.stringify(c.args)))"),false);
     await browser.evaluate(`(()=>{const b=[...document.querySelectorAll('#pc16-host .act-task-actions button')].find(x=>x.innerText==='编辑');b.click()})()`);
     await browser.wait("document.querySelector('.sheet input[type=text]')");
     await browser.evaluate(`(()=>{document.querySelector('.sheet input[type=text]').value='【系统测试·勿联系】更新任务';document.querySelector('.sheet .btn-primary').click()})()`);

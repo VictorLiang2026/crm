@@ -169,8 +169,9 @@ function openLinkParticipant(ctx, activity, participant, onDone) {
 
 function openParticipantStatus(ctx, activity, participant, onDone) {
   const status = select(PARTICIPANT_STATUSES.map(value => [value, t(`part_${value}`)]), participant.status || 'invited');
+  const response = select(['unrecorded','registered','cancelled'].map(key => [key,t('event_response_'+key)]), participant.response || 'unrecorded');
   const sheet = openSheet({ title: t('act_participant_status_title'), sub: participant.person_name || `#${participant.id}`, body: h('div', { class: 'sheet-stack' }, [
-    field(t('act_participant_status'), status), h('div', { class: 'sheet-note' }, t('act_attendance_not_interaction')),
+    field(t('act_participant_status'), status), field(t('event_response'), response), h('div', { class: 'sheet-note' }, t('act_attendance_not_interaction')),
     actions(() => sheet.overlay.remove(), save, t('btn_save')),
   ]) });
   document.body.appendChild(sheet.overlay);
@@ -178,11 +179,14 @@ function openParticipantStatus(ctx, activity, participant, onDone) {
   async function save() {
     setBusy(button, true, t('saving'));
     try {
-      const result = await data.updateActivityParticipant(ctx, participant.id, activity.id, participant.updated_at,
-        participant.status || 'invited', status.value);
+      const result = participant.updated_at && response.value === (participant.response || 'unrecorded')
+        ? await data.updateActivityParticipant(ctx, participant.id, activity.id, participant.updated_at, participant.status || 'invited', status.value)
+        : await data.saveParticipantResponse(ctx, {activityId:activity.id,participantId:participant.id,
+          version:participant.responseVersion || null,updatedAt:participant.updated_at || null,
+          expectedStatus:participant.status || 'invited',status:status.value,response:response.value});
       if (result.ok !== true) throw new Error(result.error || t('act_participant_conflict'));
       sheet.overlay.remove(); ctx.toast(t('act_participant_status_saved'), 'ok'); onDone?.();
-    } catch (error) { setBusy(button, false, t('btn_save')); sheet.showErr(errorText(error)); }
+    } catch (error) { setBusy(button, false, t('btn_save')); sheet.showErr(error.message === 'PARTICIPATION_CHANGED' ? t('act_participant_conflict') : errorText(error)); }
   }
 }
 
@@ -208,6 +212,7 @@ export function renderActivityParticipants(ctx, activity, participants, onDone) 
         : h('span', {}, name);
       return h('article', { class: 'list-row act-resource-row' }, [
         h('div', { class: 'act-resource-main' }, [h('div', { class: 'row-title' }, [bdg(label, participant.person_type === 'recruit' ? 'gold' : 'ink'), person]),
+          participant.response && participant.response !== 'unrecorded' ? h('div', { class: 'row-sub' }, t('event_response')+' · '+t('event_response_'+participant.response)) : null,
           participant.relationship_note ? h('div', { class: 'row-sub' }, participant.relationship_note) : null,
           participant.canonical_person_id ? h('div', { class: 'row-sub' }, `Person #${participant.canonical_person_id}`) : null]),
         h('div', { class: 'act-resource-actions' }, [

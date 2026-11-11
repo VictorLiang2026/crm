@@ -1,6 +1,5 @@
 // Person 360：按人物经营场景组织导航，业务操作复用各模块的编辑和确认流程。
-// 「活动」页签按 G5 证据口径：activities.listByPerson 仅支持 legacy 数字 ID，
-// 故 canonical 人物的活动参与记录取 getTimelinePage 已合并的 activity_participants 数据。
+// 活动参与按已确认人物和有效活动汇总；历史互动继续由时间线提供。
 import { openOpportunityDetails } from './opportunities.js';
 import { actionDay } from '../action-center.js';
 import { h } from '../dom.js';
@@ -454,6 +453,32 @@ function recruitNode(ctx, id) {
   return renderRecruitSection(ctx, id, ctx.onWriteDone);
 }
 
+function participationNode(ctx, id) {
+  const host = h('div', {class:'event-participation'});
+  function load(page) {
+    loadInto(host, async () => {
+      const res = await data.personEvents(ctx, id, page);
+      return h('div', {}, [
+        h('h3', {}, t('event_participation')),
+        h('p', {class:'row-sub'}, t('event_summary').replace('{total}',res.total).replace('{attended}',res.attended)),
+        ...res.rows.map(row => h('article', {class:'list-row'}, [
+          h('div', {style:'min-width:0;overflow-wrap:anywhere'}, [
+            h('a', {class:'row-title',href:'#/activity/'+row.activity_id}, row.name),
+            h('div', {class:'row-sub'}, [fmtDate(row.activity_date),t('part_'+row.status),t('event_response_'+row.response)].join(' · ')),
+            row.action_id ? h('a', {href:'#/actions/'+row.action_id}, row.action_title+' · '+translateEnum('work_status',row.action_status)) : null,
+          ]),
+        ])),
+        page > 1 || res.hasMore ? h('div', {class:'toolbar'}, [
+          h('button',{class:'btn btn-soft btn-sm',type:'button',disabled:page===1,onclick:()=>load(page-1)},t('btn_prev')),
+          h('button',{class:'btn btn-soft btn-sm',type:'button',disabled:!res.hasMore,onclick:()=>load(page+1)},t('btn_next')),
+        ]) : null,
+      ]);
+    });
+  }
+  load(1);
+  return host;
+}
+
 function activitiesNode(ctx, id) {
   let page = 0;
   const seen = new Set();
@@ -892,7 +917,8 @@ export function renderPerson(ctx, id, initialSection) {
       h('div', { class: 'stack-head' }, [speakerRole,
         h('a', { class: 'btn btn-soft', href: '#/activity-speakers' }, t('resource_directory_speakers_tab')),
       ]),
-      await activitiesNode(context, personId),
+      participationNode(context, personId),
+      h('h3', {}, t('event_timeline')), await activitiesNode(context, personId),
     ])], ai: ['nav_ai', aiNode], facts: ['tab_facts', factsNode],
     care: ['tab_care_materials', (context, personId) => careMaterialsNode(context, personId, { onDone: context.onWriteDone })],
     ocr: ['tab_ocr_review', renderOcrReview],

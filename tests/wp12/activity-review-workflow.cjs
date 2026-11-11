@@ -6,12 +6,13 @@ const key='11111111-1111-4111-8111-111111111111';
 
 test('activity candidate preview sends only a scoped draft to the service-only command',async()=>{
   const calls=[];
-  const service=new ActivityReviewWorkflowService({request:async()=>[],
-    rpc:async(name,args)=>{calls.push([name,args]);return {previewId:key,businessDataWritten:false};}});
+  const service=new ActivityReviewWorkflowService({request:async(table,method,query)=>{assert.equal(table,'persons');assert.equal(query.id,'eq.783');return [{id:783,display_name:'Test Person'}];},
+    rpc:async(name,args)=>{calls.push([name,args]);return {previewId:key,personId:783,businessDataWritten:false};}});
   const result=await service.preview({idempotencyKey:key,operation:'action',activityId:11,
     resultId:21,candidateIndex:0,draft:{title:'【系统测试·勿联系】核对虚构反馈',
       description:'仅作测试',dueAt:null,priority:'medium'}},'test-uid');
   assert.equal(result.previewId,key);
+  assert.equal(result.personName,'Test Person');
   assert.equal(calls[0][0],'crm_activity_review_preview_v1');
   assert.deepEqual(calls[0][1].p_payload,{title:'【系统测试·勿联系】核对虚构反馈',
     description:'仅作测试',dueAt:null,priority:'medium'});

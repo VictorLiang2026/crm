@@ -157,7 +157,7 @@ async function pgRpc(name, body) {
     'person_identity_preview_v1', 'person_identity_execute_v1',
     'crm_person_only_recruit_delete_v1', 'crm_work_item_preview_v1',
     'crm_work_item_execute_v1', 'crm_opportunity_directory_v1', 'crm_opportunity_preview_v1',
-    'crm_opportunity_execute_v1','crm_pipeline_stage_v1','crm_action_center_v1','crm_action_context_v1','crm_activity_review_preview_v1',
+    'crm_opportunity_execute_v1','crm_pipeline_stage_v1','crm_event_participation_v1','crm_action_center_v1','crm_action_context_v1','crm_activity_review_preview_v1',
     'crm_activity_review_execute_v1','crm_person_delete_preview_v1',
     'crm_person_delete_execute_v1','crm_person_restore_v1',
     'crm_context_item_preview_v1','crm_context_item_execute_v1',
@@ -193,6 +193,7 @@ async function pgRpc(name, body) {
       const code = typeof problem?.code === 'string' && /^(?:PGRST\d{3}|[0-9A-Z]{5})$/.test(problem.code)
         ? problem.code : '';
       if (name === 'crm_person_interaction_v1' && /^INTERACTION_[A-Z_]+$/.test(message)) throw new Error(message);
+      if (name === 'crm_event_participation_v1' && (message === 'Participation changed' || code === 'P0002')) throw new Error('PARTICIPATION_CHANGED');
       if (name === 'crm_pipeline_stage_v1') {
         if (message === 'Pipeline preview expired' || message.startsWith('Pipeline record changed')) throw new Error('PIPELINE_REVIEW_AGAIN');
         if (code === 'P0002') throw new Error('PIPELINE_TARGET_UNAVAILABLE');
@@ -1142,6 +1143,12 @@ exports.main = async event => {
       }
       case 'getOpportunityDirectoryDetails': return await new OpportunityWorkflowService({request:pgRequest,rpc:pgRpc})
         .details(event.id,uid);
+      case 'listPersonEvents':
+      case 'listParticipantResponses':
+      case 'saveParticipantResponse': {
+        const op = {listPersonEvents:'person',listParticipantResponses:'responses',saveParticipantResponse:'save'}[event.action];
+        return await pgRpc('crm_event_participation_v1',{p_actor_uid:uid,p_op:op,p_input:event.data});
+      }
       case 'listActionCenter': return await pgRpc('crm_action_center_v1',{p_actor_uid:uid,p_query:event.query});
       case 'previewActionContext':
       case 'confirmActionContext': return await pgRpc('crm_action_context_v1',{

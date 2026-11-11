@@ -54,7 +54,7 @@ function decisionFor(version, kind, index) {
 }
 function resultId(value) { return String(value ?? ''); }
 
-function buildPreview(ctx, activityId, resultIdValue, operation, candidateIndex, draft, host, onDone) {
+function buildPreview(ctx, activityId, resultIdValue, operation, candidateIndex, draft, host, onDone, expectedPersonId) {
   host.replaceChildren(h('p', { class: 'sheet-note' }, t('pc18_preview_loading')));
   (async () => {
     try {
@@ -64,21 +64,30 @@ function buildPreview(ctx, activityId, resultIdValue, operation, candidateIndex,
       });
       const preview = response.preview || response;
       if (!preview.previewId) throw new Error(t('pc18_preview_invalid'));
+      const needsReview = operation === 'action' || operation === 'opportunity';
+      if (needsReview && (!preview.personName || String(preview.personId) !== String(expectedPersonId) || !preview.after)) throw new Error(t('pc18_preview_invalid'));
+      const intent = h('input', {type:'checkbox', class:'event-intent-check'});
+      const after = preview.after || {};
+      const intentFields = operation === 'action' ? [[t('field_title'),after.title],[t('field_description'),after.description],[t('field_due'),after.dueAt && formatTime(after.dueAt)],[t('field_priority'),after.priority && t('priority_'+after.priority)]]
+        : [[t('pc18_opportunity_type'),translateEnum('opportunity_type',after.type)],[t('pc18_reason'),after.reason],[t('pc18_next_action'),after.nextAction]];
       const rows = [
         h('div', { class: 'sheet-preview' }, [
           h('div', { class: 'kv-line' }, [h('span', { class: 'kv-k' }, t('pc18_review_person')),
-            h('span', {}, preview.personName ? `${preview.personName} · #${preview.personId}` : t('pc18_activity_scope'))]),
+            h('span', {}, preview.personId ? `${preview.personName || t('person')} · #${preview.personId}` : t('pc18_activity_scope'))]),
           h('div', { class: 'kv-line' }, [h('span', { class: 'kv-k' }, t('pc18_preview_after')),
-            h('span', {}, JSON.stringify(preview.after || draft))]),
+            needsReview ? h('div',{},intentFields.filter(([,value])=>value).map(([label,value])=>h('div',{},label+' · '+value))) : h('span', {}, JSON.stringify(preview.after || draft))]),
           h('div', { class: 'kv-line' }, [h('span', { class: 'kv-k' }, t('pc18_sources')),
             h('span', {}, (preview.sourceRefs || []).join(', ') || t('pc18_no_source'))]),
           preview.expiresAt ? h('div', { class: 'sheet-note' }, `${t('pc18_preview_expires')}: ${formatTime(preview.expiresAt)}`) : null,
           preview.replayed ? h('div', { class: 'sheet-note' }, t('pc18_replayed')) : null,
           h('div', { class: 'sheet-note' }, t('pc18_preview_guard')),
         ]),
+        needsReview ? h('label',{class:'sheet-note'},[intent,' '+t('event_verify_intent')]) : null,
         h('div', { class: 'sheet-actions' }, [
           h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => host.replaceChildren() }, t('btn_cancel')),
-          h('button', { class: 'btn btn-primary btn-sm', type: 'button', onclick: async event => {
+          h('button', { class: 'btn btn-primary btn-sm', type: 'button', disabled:needsReview, onclick: async event => {
+            if (needsReview && !intent.checked) return;
+            intent.disabled = true;
             const button = event.currentTarget;
             button.disabled = true;
             button.textContent = t('writing');
@@ -87,6 +96,7 @@ function buildPreview(ctx, activityId, resultIdValue, operation, candidateIndex,
               host.replaceChildren(h('p', { class: 'sheet-note' }, resultSummary(executed)));
               onDone?.();
             } catch (error) {
+              intent.disabled = false;
               button.disabled = false;
               button.textContent = t('confirm_write');
               host.append(h('p', { class: 'form-msg error' }, `${t('pc18_execute_failed')}: ${error.message}`));
@@ -95,6 +105,7 @@ function buildPreview(ctx, activityId, resultIdValue, operation, candidateIndex,
         ]),
       ];
       host.replaceChildren(...rows);
+      intent.onchange = () => { host.querySelector('.sheet-actions .btn-primary').disabled = !intent.checked; };
     } catch (error) {
       host.replaceChildren(h('p', { class: 'form-msg error' }, `${t('pc18_preview_failed')}: ${error.message}`));
     }
@@ -157,7 +168,7 @@ function candidateCard(ctx, activityId, version, kind, candidate, index, refresh
           const payload = draft();
           if (!payload.title && kind === 'action') throw new Error(t('pc18_title_required'));
           if (kind === 'opportunity' && (!payload.reason || !payload.nextAction)) throw new Error(t('pc18_fields_required'));
-          buildPreview(ctx, activityId, version.id, operation, sourceIndex, payload, previewHost, refresh);
+          buildPreview(ctx, activityId, version.id, operation, sourceIndex, payload, previewHost, refresh, candidate.personId);
         } catch (e) { error.textContent = e.message; }
       } }, t('pc18_preview_candidate'));
       const rejectButton = h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => {

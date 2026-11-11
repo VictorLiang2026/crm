@@ -17,6 +17,7 @@ test('PC31 activities use valid pages, retry without skipping, reveal older reco
       const ctx = {main:document.getElementById('console-main'),toast(){},api:{call:async (name,args) => {
         window.pc31.calls.push(args);
         if (args.action === 'get') return {person:{id:71,display_name:'Fictional PC31'}};
+        if (args.action === 'listPersonEvents') return {rows:[{activity_id:12,name:'Fictional workshop',activity_date:'2026-11-11',status:'invited',response:'cancelled',action_id:91,action_title:'Test call',action_status:'completed'}],total:1,attended:0,hasMore:false};
         if (args.action === 'getTimelinePage') {
           if (args.pageSize !== 20) throw Error('Invalid timeline page size');
           if (args.page === 2 && window.pc31.fail) {window.pc31.fail=false;throw Error('Temporary failure');}
@@ -31,6 +32,9 @@ test('PC31 activities use valid pages, retry without skipping, reveal older reco
     await browser.click('.tab', '嘉宾与活动');
     await browser.wait("document.querySelector('.person-activities-more')");
     assert.match(await browser.evaluate("document.querySelector('.person-activity-list').textContent"), /已加载/);
+    await browser.wait("document.querySelector('.event-participation a[href=\"#/actions/91\"]')");
+    assert.match(await browser.evaluate("document.querySelector('.event-participation').innerText"),/关联 1 场，实际到场 0 场/);
+    assert.match(await browser.evaluate("document.querySelector('.event-participation').innerText"),/已取消报名/);
     await browser.click('.person-activities-more', '');
     await browser.wait("document.querySelector('.person-activities-more').parentElement.querySelector('[role=alert]').textContent.length>0");
     await browser.click('.person-activities-more', '');
@@ -49,7 +53,7 @@ test('PC31 activities use valid pages, retry without skipping, reveal older reco
     await browser.click('.tab', 'Speakers & Events');
     await browser.wait("document.querySelector('.person-activities-more')");
     assert.match(await browser.evaluate("document.querySelector('.person-activities-more').parentElement.textContent"), /20 at a time/);
-    for (const [width,height] of [[820,1180],[1180,820]]) {
+    for (const [width,height] of [[390,844],[844,390],[820,1180],[1180,820],[1440,900]]) {
       await browser.send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:false});
       assert.ok(await browser.evaluate('document.documentElement.scrollWidth<=innerWidth+1'));
     }
