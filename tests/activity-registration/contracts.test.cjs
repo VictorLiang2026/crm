@@ -4,7 +4,6 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const path=require('node:path');
 const {pathToFileURL}=require('node:url');
-const vm=require('node:vm');
 const root=path.resolve(__dirname,'../..');
 const read=relative=>fs.readFileSync(path.join(root,relative),'utf8');
 
@@ -28,19 +27,18 @@ test('public API uses a server-side hashed management token and keeps applicant 
   const source=read('cloudfunctions/activity_registration/index.js');
   assert.match(source,/const PUBLIC_ACTIONS = new Set\(\['getPublishedPage', 'submit', 'getMyRegistration', 'updateMyRegistration'\]\)/);
   assert.match(source,/exports\.main = event => dispatch\(event, false\)/);
-  assert.match(source,/exports\.publicMain = event => dispatch\(event, true\)/);
-  assert.match(source,/crypto\.randomBytes\(32\)/);
-  assert.match(source,/createHash\('sha256'\)/);
-  assert.match(source,/CRM_ACTIVITY_REGISTRATION_DB_API_KEY/);
-  assert.match(source,/'Accept-Profile': 'public', 'Content-Profile': 'public'/);
-  assert.ok(source.includes("typeof info.uid !== 'string'"));
-  assert.match(source,/getUserInfo exposes uid but no anonymous flag/);
-  assert.match(read('cloudbase/migrations/20261111230000_activity_registration_write.sql'),/sub.status<>'approved'/);
-  assert.ok(source.includes('return { registrations }'));
-  assert.ok(source.includes('management_token_hash'));
-  assert.ok(source.includes('suppliedToken'));
+  assert.ok(source.includes('return dispatch(event,true)'));
+  const signed=read('cloudfunctions/activity_registration/registration-signed.js');
+  const db=read('cloudbase/migrations/20261111235500_activity_registration_signed.sql');
+  assert.match(source,/registrationStaff/);
+  assert.match(source,/ownerHash=crypto/);
+  assert.doesNotMatch(source+signed,/CRM_ACTIVITY_REGISTRATION_DB_API_KEY/);
+  assert.match(signed,/CRM_REGISTRATION_SIGNING_KEY/);
+  assert.match(db,/s.management_token_hash=h/);
+  assert.match(db,/public.crm_registration_public_data_v1/);
+  assert.match(db,/public.crm_registration_staff_data_v1/);
   assert.doesNotMatch(source,/signInAnonymously|auth\.sign|app\.rdb\(\)|pr_/i);
-  assert.match(read('crm/js/modules/activity-registration-public.js'),/name: 'activity_registration_public'/);
+  assert.ok(read('crm/js/modules/activity-registration-public.js').includes('fetch(config.registrationEndpoint'));
 });
 
 test('one bearer credential can span registrations while rollback preserves uniqueness safely',()=>{
@@ -65,7 +63,7 @@ test('anonymous gateway reaches only the public function, while CRM actions requ
   assert.doesNotMatch(policy,/"\/v1\/functions\/activity_registration": "POST"/);
   assert.match(policy,/not mcp_public_request/);
   assert.doesNotMatch(rollback,/activity_registration_public/);
-  assert.match(backend,/publicOnly \? !PUBLIC_ACTIONS\.has\(action\) : PUBLIC_ACTIONS\.has\(action\)/);
+  assert.ok(backend.includes('publicOnly ? !PUBLIC_ACTIONS.has(action) : !STAFF_ACTIONS.has(action)'));
 });
 
 test('new public and Console labels resolve in both supported locales',async()=>{
@@ -84,13 +82,8 @@ test('new public and Console labels resolve in both supported locales',async()=>
   i18n.setLang('zh-CN');
 });
 
-test('public page uses only the browser-safe publishable key, never a service key',()=>{
+test('public browser uses the dedicated HTTPS route with no SDK login or environment key',()=>{
   const html=read('crm/activity-registration.html');
-  const script=html.match(/<script>(window\.APP_CONFIG = \{[^<]+\});<\/script>/)?.[1];
-  assert.ok(script,'public app configuration exists');
-  const context={window:{}};vm.runInNewContext(script,context);
-  assert.equal(context.window.APP_CONFIG.envId,'crm-d1gkae8ddc930d151');
-  assert.equal(typeof context.window.APP_CONFIG.accessKey,'string');
-  assert.ok(context.window.APP_CONFIG.accessKey.length>=20);
-  assert.doesNotMatch(script,/CRM_ACTIVITY_REGISTRATION_DB_API_KEY|service_role/i);
+  assert.ok(html.includes('https://crm-d1gkae8ddc930d151.ap-shanghai.app.tcloudbase.com/v1/functions/activity_registration_public'));
+  assert.doesNotMatch(html,/accessKey|service_role|cloudbase.full.js/);
 });

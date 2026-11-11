@@ -28,11 +28,11 @@
 
 Migrations `20261110110000_activity_registration.sql` 与 `20261110160000_activity_registration_shared_token.sql` 仅在 `public` 创建四表并支持一凭证多报名；配套 rollback 在存在跨活动共享凭证时拒绝恢复唯一约束，首迁移的 rollback 有报名数据时拒绝删表。报名表、页面、关系和审计记录均启用并强制 RLS，撤销 `PUBLIC`、`anon`、`authenticated`，只向 `service_role` 授权。浏览器不直连 PostgreSQL。
 
-专用 `activity_registration`（员工后台）和 `activity_registration_public`（客户公开页）云函数使用仅存于函数配置的 `CRM_ACTIVITY_REGISTRATION_DB_API_KEY`，REST profile 固定为 `public`，资源访问采用固定表白名单。两个函数包共享报名业务和回包加密代码，员工入口额外校验设备；公开 handler 只允许页面读取、提交、凭证管理 action。OPA 只把公开函数路径加入匿名 allowlist，后台函数路径仍由匿名 deny 拦截；员工后台操作还校验 CloudBase 调用者身份。浏览器只使用可公开发布密钥调用公开函数，不登录、不匿名登录、不创建 CloudBase 用户。
+公开函数 activity_registration_public 与设备保护的员工函数 activity_registration 各持有独立的报名签名凭证，通过固定的 public RPC 传送经加密并绑定受众、时间和 nonce 的请求。数据库再次核对员工成员资格和已批准设备。签名凭证可分别停用。公开页面走精确的 HTTPS 网关 POST 路径，不需要登录或使用 CloudBase API Key。浏览器请求和返回中的报名资料与管理链接采用加密传输。
 
 网关 OPA 仅新增默认 HTTPSERVICE 域名上的 `POST /v1/functions/activity_registration_public` 匿名例外；后台函数及其他函数不开放匿名访问，现有知识服务路径规则保持原样。公开报名页不上传文件，图片通过 HTTPS URL 配置。
 
-2026-11-11 候选版本新增 `20261111230000_activity_registration_write.sql` 和配套 rollback。报名写入、容量检查、审核、手工关联人物以及同组凭证轮换在数据库事务中处理。该函数使用调用者权限，仅授予 `service_role` 执行权限。编辑已建页面时保留其活动归属。
+2026-11-11 候选版本新增 `20261111235400_activity_registration_write.sql` 和配套 rollback。报名写入、容量检查、审核、手工关联人物以及同组凭证轮换在数据库事务中处理。该函数使用调用者权限，仅授予 `service_role` 执行权限。编辑已建页面时保留其活动归属。
 
 涉及管理链接、联系方式及员工数据的成功结果使用当前页面生成的公钥加密。浏览器在本次页面会话中解密。公开活动介绍仍可直接读取。
 
@@ -40,7 +40,7 @@ Migrations `20261110110000_activity_registration.sql` 与 `20261110160000_activi
 
 - 新增公开静态文件 `/crm/activity-registration.html`、样式和公开脚本。
 - 新增 `activity_registration` 后台和 `activity_registration_public` 公开云函数与函数配置；既有页面仅新增 Console router/module/i18n/活动入口，不改 `admin.html`。
-- 新增四张 `public` 表和服务端 API key；不改现有业务字段、视图、Person 创建流程或历史活动参与者。
+- 新增四张报名业务表和三张受保护的签名身份、nonce 与幂等回执表；不改现有业务字段、视图、Person 创建流程或历史活动参与者。
 - 回滚前需先停止公开入口/函数并评估是否有真实报名数据；migration rollback 会在发现数据时失败，不自动删除报名数据。
 
 ## 验收记录

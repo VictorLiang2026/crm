@@ -65,8 +65,13 @@ function evaluate(actual, approved = baseline) {
       if (d.type === 'r' || d.type === 'p') {
         counts.tables++;
         check(d.rls === true, `RLS disabled: ${id}`);
-        check(Array.isArray(d.policies) && d.policies.length > 0, `No RLS policy: ${id}`);
-        check(grants.service_role?.includes('SELECT'), `Service read grant missing: ${id}`);
+        if (['activity_registration_signers','activity_registration_nonces','activity_registration_receipts'].includes(item.name)) {
+          check(d.force_rls && d.policies?.length === 0 && requiredRoles.every(role => grants[role]?.length === 0),
+            `Signing state must deny all three application roles: ${id}`);
+        } else {
+          check(Array.isArray(d.policies) && d.policies.length > 0, `No RLS policy: ${id}`);
+          check(grants.service_role?.includes('SELECT'), `Service read grant missing: ${id}`);
+        }
         if (prior.detail.privileges.anon.length === 0) {
           check(grants.anon?.length === 0, `Server-only table exposed to anon: ${id}`);
           check(d.policies?.every(policy => policy.roles?.length === 1 && policy.roles[0] === 'service_role'),

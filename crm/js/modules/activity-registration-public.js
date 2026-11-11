@@ -4,10 +4,14 @@ import { getLang, setLang, t } from './console/i18n.js';
 const config = window.APP_CONFIG || {};
 const root = document.getElementById('activity-registration');
 document.title = t('ar_title');
-const app = window.cloudbase.init({ env: config.envId, accessKey: config.accessKey, timeout: 20000 });
 const api = (action, data = {}) => registrationCall(async payload=>{
-  const reply=await app.callFunction({name: 'activity_registration_public',data:payload});
-  return reply?.result ?? reply;
+  const response=await fetch(config.registrationEndpoint,{
+    method:'POST',credentials:'omit',referrerPolicy:'no-referrer',redirect:'error',
+    headers:{'Content-Type':'text/plain;charset=UTF-8'},body:JSON.stringify(payload),
+    signal:AbortSignal.timeout(20000),
+  });
+  if(!response.ok) throw Error('REGISTRATION_UNAVAILABLE');
+  return response.json();
 },action,data);
 const safeImage = value => { try { const u = new URL(value); return u.protocol === 'https:' ? u.href : ''; } catch { return ''; } };
 const statusKeys = { pending: 'ar_status_pending', approved: 'ar_status_approved', rejected: 'ar_status_rejected', waitlisted: 'ar_status_waitlisted' };
@@ -193,7 +197,7 @@ function extractManagementToken(value) {
 }
 
 async function load() {
-  if (!config.envId) return showUnavailable(t('ar_service_unavailable'));
+  if (!config.registrationEndpoint) return showUnavailable(t('ar_service_unavailable'));
   const params = new URLSearchParams(location.search);
   const token = new URLSearchParams(location.hash.slice(1)).get('manage');
   if (token) {

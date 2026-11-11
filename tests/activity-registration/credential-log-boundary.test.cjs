@@ -6,7 +6,24 @@ const crypto = require('node:crypto');
 const { registrationCall } = require('../../crm/js/modules/console/registration-call.js');
 const { seal, recipient } = require('../../cloudfunctions/activity_registration/registration-reply.js');
 
-// Mirrors the SDK payload passed to the CloudBase gateway. Markers have no
+test('public HTTP event accepts POST JSON and rejects an invalid transport or method',async()=>{
+  const previousScope=process.env.CRM_REGISTRATION_SCOPE,previousKey=process.env.CRM_REGISTRATION_REQUEST_PRIVATE_PEM;
+  try {
+    process.env.CRM_REGISTRATION_SCOPE='public';
+    process.env.CRM_REGISTRATION_REQUEST_PRIVATE_PEM=crypto.generateKeyPairSync('rsa',{modulusLength:2048}).privateKey.export({type:'pkcs8',format:'pem'});
+    const {publicMain}=require('../../cloudfunctions/activity_registration_public/index');
+    const body=JSON.stringify({action:'getRegistrationTransportKey'});
+    const key=await publicMain({httpMethod:'POST',body});
+    assert.ok(recipient(key.publicKey));
+    assert.deepEqual(await publicMain({httpMethod:'POST',body:'{' }),{error:'INVALID_REQUEST'});
+    assert.deepEqual(await publicMain({httpMethod:'GET',body}),{error:'INVALID_REQUEST'});
+  }finally{
+    if(previousScope===undefined)delete process.env.CRM_REGISTRATION_SCOPE;else process.env.CRM_REGISTRATION_SCOPE=previousScope;
+    if(previousKey===undefined)delete process.env.CRM_REGISTRATION_REQUEST_PRIVATE_PEM;else process.env.CRM_REGISTRATION_REQUEST_PRIVATE_PEM=previousKey;
+  }
+});
+
+// Mirrors the browser payload passed to the CloudBase gateway. Markers have no
 // relationship to an account, valid management link, or service credential.
 test('private requests and responses exclude reusable management links and applicant fields at the SDK boundary', async () => {
   const token = 'fixture-' + crypto.randomBytes(32).toString('hex');

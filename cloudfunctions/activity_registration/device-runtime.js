@@ -106,4 +106,9 @@ function protect(name,main,resolveApp=()=>require('./db').app){
    work.then(result=>{if(result!==undefined)cb(null,result);});return undefined;
  };
 }
-module.exports={protect,scopedApp,callerIdentity,internalCall,permitted};
+function registrationStaff() {
+ const s=scope.getStore();
+ if(s?.name!=='activity_registration'||s.origin!=='browser'||!s.actor||!s.fingerprint)throw deny();
+ return {actor:s.actor,fingerprint:s.fingerprint};
+}
+module.exports={protect,scopedApp,callerIdentity,internalCall,permitted,registrationStaff};

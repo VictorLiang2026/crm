@@ -59,6 +59,416 @@
         "authenticated_execute": false
       },
       "reason": "Trigger only; disabling a member revokes that member's devices. No API execution grant."
+    },
+    {
+      "id": "routine:armor(bytea)",
+      "expectedDetail": {
+        "anon_execute": false,
+        "service_execute": false,
+        "security_definer": false,
+        "authenticated_execute": false
+      },
+      "reason": "Restricted pgcrypto member; no application role may execute it directly."
+    },
+    {
+      "id": "routine:armor(bytea, text[], text[])",
+      "expectedDetail": {
+        "anon_execute": false,
+        "service_execute": false,
+        "security_definer": false,
+        "authenticated_execute": false
+      },
+      "reason": "Restricted pgcrypto member; no application role may execute it directly."
+    },
+    {
+      "id": "routine:crm_registration_handle_v1(expected_scope text, p_envelope text, p_mac text)",
+      "expectedDetail": {
+        "anon_execute": false,
+        "service_execute": false,
+        "security_definer": false,
+        "authenticated_execute": false
+      },
+      "reason": "Private registration helper; called only inside signed registration RPCs."
+    },
+    {
+      "id": "routine:crm_registration_public_data_v1(op text, d jsonb)",
+      "expectedDetail": {
+        "anon_execute": false,
+        "service_execute": false,
+        "security_definer": false,
+        "authenticated_execute": false
+      },
+      "reason": "Private registration helper; called only inside signed registration RPCs."
+    },
+    {
+      "id": "routine:crm_registration_public_v1(p_envelope text, p_mac text)",
+      "expectedDetail": {
+        "anon_execute": true,
+        "service_execute": false,
+        "security_definer": true,
+        "authenticated_execute": false
+      },
+      "reason": "Single-scope HMAC-authenticated registration RPC; signed audience, freshness and nonce required."
+    },
+    {
+      "id": "routine:crm_registration_staff_data_v1(op text, d jsonb, actor text)",
+      "expectedDetail": {
+        "anon_execute": false,
+        "service_execute": false,
+        "security_definer": false,
+        "authenticated_execute": false
+      },
+      "reason": "Private registration helper; called only inside signed registration RPCs."
+    },
+    {
+      "id": "routine:crm_registration_staff_v1(p_envelope text, p_mac text)",
+      "expectedDetail": {
+        "anon_execute": true,
+        "service_execute": false,
+        "security_definer": true,
+        "authenticated_execute": false
+      },
+      "reason": "Single-scope HMAC-authenticated registration RPC; signed audience, freshness and nonce required."
+    },
+    {
+      "id": "routine:crypt(text, text)",
+      "expectedDetail": {
+        "anon_execute": false,
+        "service_execute": false,
+        "security_definer": false,
+        "authenticated_execute": false
+      },
+      "reason": "Restricted pgcrypto member; no application role may execute it directly."
+    },
+    {
+      "id": "routine:dearmor(text)",
+      "expectedDetail": {
+        "anon_execute": false,
+        "service_execute": false,
+        "security_definer": false,
+        "authenticated_execute": false
+      },
+      "reason": "Restricted pgcrypto member; no application role may execute it directly."
+    },
+    {
+      "id": "routine:decrypt(bytea, bytea, text)",
+      "expectedDetail": {
+        "anon_execute": false,
+        "service_execute": false,
+        "security_definer": false,
+        "authenticated_execute": false
+      },
+      "reason": "Restricted pgcrypto member; no application role may execute it directly."
+    },
+    {
+      "id": "routine:decrypt_iv(bytea, bytea, bytea, text)",
+      "expectedDetail": {
+        "anon_execute": false,
+        "service_execute": false,
+        "security_definer": false,
+        "authenticated_execute": false
+      },
+      "reason": "Restricted pgcrypto member; no application role may execute it directly."
+    },
+    {
+      "id": "routine:digest(bytea, text)",
+      "expectedDetail": {
+        "anon_execute": false,
+        "service_execute": false,
+        "security_definer": false,
+        "authenticated_execute": false
+      },
+      "reason": "Restricted pgcrypto member; no application role may execute it directly."
+    },
+    {
+      "id": "routine:digest(text, text)",
+      "expectedDetail": {
+        "anon_execute": false,
+        "service_execute": false,
+        "security_definer": false,
+        "authenticated_execute": false
+      },
+      "reason": "Restricted pgcrypto member; no application role may execute it directly."
+    },
+    {
+      "id": "routine:encrypt(bytea, bytea, text)",
+      "expectedDetail": {
+        "anon_execute": false,
+        "service_execute": false,
+        "security_definer": false,
+        "authenticated_execute": false
+      },
+      "reason": "Restricted pgcrypto member; no application role may execute it directly."
+    },
+    {
+      "id": "routine:encrypt_iv(bytea, bytea, bytea, text)",
+      "expectedDetail": {
+        "anon_execute": false,
+        "service_execute": false,
+        "security_definer": false,
+        "authenticated_execute": false
+      },
+      "reason": "Restricted pgcrypto member; no application role may execute it directly."
+    },
+    {
+      "id": "routine:gen_random_bytes(integer)",
+      "expectedDetail": {
+        "anon_execute": false,
+        "service_execute": false,
+        "security_definer": false,
+        "authenticated_execute": false
+      },
+      "reason": "Restricted pgcrypto member; no application role may execute it directly."
+    },
+    {
+      "id": "routine:gen_random_uuid()",
+      "expectedDetail": {
+        "anon_execute": false,
+        "service_execute": false,
+        "security_definer": false,
+        "authenticated_execute": false
+      },
+      "reason": "Restricted pgcrypto member; no application role may execute it directly."
+    },
+    {
+      "id": "routine:gen_salt(text)",
+      "expectedDetail": {
+        "anon_execute": false,
+        "service_execute": false,
+        "security_definer": false,
+        "authenticated_execute": false
+      },
+      "reason": "Restricted pgcrypto member; no application role may execute it directly."
+    },
+    {
+      "id": "routine:gen_salt(text, integer)",
+      "expectedDetail": {
+        "anon_execute": false,
+        "service_execute": false,
+        "security_definer": false,
+        "authenticated_execute": false
+      },
+      "reason": "Restricted pgcrypto member; no application role may execute it directly."
+    },
+    {
+      "id": "routine:hmac(bytea, bytea, text)",
+      "expectedDetail": {
+        "anon_execute": false,
+        "service_execute": false,
+        "security_definer": false,
+        "authenticated_execute": false
+      },
+      "reason": "Restricted pgcrypto member; no application role may execute it directly."
+    },
+    {
+      "id": "routine:hmac(text, text, text)",
+      "expectedDetail": {
+        "anon_execute": false,
+        "service_execute": false,
+        "security_definer": false,
+        "authenticated_execute": false
+      },
+      "reason": "Restricted pgcrypto member; no application role may execute it directly."
+    },
+    {
+      "id": "routine:pgp_armor_headers(text, OUT key text, OUT value text)",
+      "expectedDetail": {
+        "anon_execute": false,
+        "service_execute": false,
+        "security_definer": false,
+        "authenticated_execute": false
+      },
+      "reason": "Restricted pgcrypto member; no application role may execute it directly."
+    },
+    {
+      "id": "routine:pgp_key_id(bytea)",
+      "expectedDetail": {
+        "anon_execute": false,
+        "service_execute": false,
+        "security_definer": false,
+        "authenticated_execute": false
+      },
+      "reason": "Restricted pgcrypto member; no application role may execute it directly."
+    },
+    {
+      "id": "routine:pgp_pub_decrypt(bytea, bytea)",
+      "expectedDetail": {
+        "anon_execute": false,
+        "service_execute": false,
+        "security_definer": false,
+        "authenticated_execute": false
+      },
+      "reason": "Restricted pgcrypto member; no application role may execute it directly."
+    },
+    {
+      "id": "routine:pgp_pub_decrypt(bytea, bytea, text)",
+      "expectedDetail": {
+        "anon_execute": false,
+        "service_execute": false,
+        "security_definer": false,
+        "authenticated_execute": false
+      },
+      "reason": "Restricted pgcrypto member; no application role may execute it directly."
+    },
+    {
+      "id": "routine:pgp_pub_decrypt(bytea, bytea, text, text)",
+      "expectedDetail": {
+        "anon_execute": false,
+        "service_execute": false,
+        "security_definer": false,
+        "authenticated_execute": false
+      },
+      "reason": "Restricted pgcrypto member; no application role may execute it directly."
+    },
+    {
+      "id": "routine:pgp_pub_decrypt_bytea(bytea, bytea)",
+      "expectedDetail": {
+        "anon_execute": false,
+        "service_execute": false,
+        "security_definer": false,
+        "authenticated_execute": false
+      },
+      "reason": "Restricted pgcrypto member; no application role may execute it directly."
+    },
+    {
+      "id": "routine:pgp_pub_decrypt_bytea(bytea, bytea, text)",
+      "expectedDetail": {
+        "anon_execute": false,
+        "service_execute": false,
+        "security_definer": false,
+        "authenticated_execute": false
+      },
+      "reason": "Restricted pgcrypto member; no application role may execute it directly."
+    },
+    {
+      "id": "routine:pgp_pub_decrypt_bytea(bytea, bytea, text, text)",
+      "expectedDetail": {
+        "anon_execute": false,
+        "service_execute": false,
+        "security_definer": false,
+        "authenticated_execute": false
+      },
+      "reason": "Restricted pgcrypto member; no application role may execute it directly."
+    },
+    {
+      "id": "routine:pgp_pub_encrypt(text, bytea)",
+      "expectedDetail": {
+        "anon_execute": false,
+        "service_execute": false,
+        "security_definer": false,
+        "authenticated_execute": false
+      },
+      "reason": "Restricted pgcrypto member; no application role may execute it directly."
+    },
+    {
+      "id": "routine:pgp_pub_encrypt(text, bytea, text)",
+      "expectedDetail": {
+        "anon_execute": false,
+        "service_execute": false,
+        "security_definer": false,
+        "authenticated_execute": false
+      },
+      "reason": "Restricted pgcrypto member; no application role may execute it directly."
+    },
+    {
+      "id": "routine:pgp_pub_encrypt_bytea(bytea, bytea)",
+      "expectedDetail": {
+        "anon_execute": false,
+        "service_execute": false,
+        "security_definer": false,
+        "authenticated_execute": false
+      },
+      "reason": "Restricted pgcrypto member; no application role may execute it directly."
+    },
+    {
+      "id": "routine:pgp_pub_encrypt_bytea(bytea, bytea, text)",
+      "expectedDetail": {
+        "anon_execute": false,
+        "service_execute": false,
+        "security_definer": false,
+        "authenticated_execute": false
+      },
+      "reason": "Restricted pgcrypto member; no application role may execute it directly."
+    },
+    {
+      "id": "routine:pgp_sym_decrypt(bytea, text)",
+      "expectedDetail": {
+        "anon_execute": false,
+        "service_execute": false,
+        "security_definer": false,
+        "authenticated_execute": false
+      },
+      "reason": "Restricted pgcrypto member; no application role may execute it directly."
+    },
+    {
+      "id": "routine:pgp_sym_decrypt(bytea, text, text)",
+      "expectedDetail": {
+        "anon_execute": false,
+        "service_execute": false,
+        "security_definer": false,
+        "authenticated_execute": false
+      },
+      "reason": "Restricted pgcrypto member; no application role may execute it directly."
+    },
+    {
+      "id": "routine:pgp_sym_decrypt_bytea(bytea, text)",
+      "expectedDetail": {
+        "anon_execute": false,
+        "service_execute": false,
+        "security_definer": false,
+        "authenticated_execute": false
+      },
+      "reason": "Restricted pgcrypto member; no application role may execute it directly."
+    },
+    {
+      "id": "routine:pgp_sym_decrypt_bytea(bytea, text, text)",
+      "expectedDetail": {
+        "anon_execute": false,
+        "service_execute": false,
+        "security_definer": false,
+        "authenticated_execute": false
+      },
+      "reason": "Restricted pgcrypto member; no application role may execute it directly."
+    },
+    {
+      "id": "routine:pgp_sym_encrypt(text, text)",
+      "expectedDetail": {
+        "anon_execute": false,
+        "service_execute": false,
+        "security_definer": false,
+        "authenticated_execute": false
+      },
+      "reason": "Restricted pgcrypto member; no application role may execute it directly."
+    },
+    {
+      "id": "routine:pgp_sym_encrypt(text, text, text)",
+      "expectedDetail": {
+        "anon_execute": false,
+        "service_execute": false,
+        "security_definer": false,
+        "authenticated_execute": false
+      },
+      "reason": "Restricted pgcrypto member; no application role may execute it directly."
+    },
+    {
+      "id": "routine:pgp_sym_encrypt_bytea(bytea, text)",
+      "expectedDetail": {
+        "anon_execute": false,
+        "service_execute": false,
+        "security_definer": false,
+        "authenticated_execute": false
+      },
+      "reason": "Restricted pgcrypto member; no application role may execute it directly."
+    },
+    {
+      "id": "routine:pgp_sym_encrypt_bytea(bytea, text, text)",
+      "expectedDetail": {
+        "anon_execute": false,
+        "service_execute": false,
+        "security_definer": false,
+        "authenticated_execute": false
+      },
+      "reason": "Restricted pgcrypto member; no application role may execute it directly."
     }
   ]
 }

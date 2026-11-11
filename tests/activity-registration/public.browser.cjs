@@ -19,9 +19,12 @@ test(device+' public registration, shared link and pending edit',async()=>{
   const mock=`(()=>{const pages=${JSON.stringify(pages)};const rows=JSON.parse(localStorage.getItem('ar_rows')||'[]');
     const token=localStorage.getItem('ar_token')||'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_AB';
     localStorage.setItem('ar_token',token);window.__ar={rows,calls:[],token};
-    window.cloudbase={init:()=>({callFunction:async({name,data})=>{
-      if(name!=='activity_registration_public')throw Error('Wrong public function');
-      if(data.action==='getRegistrationTransportKey')return {result:await window.openRequest(data)};
+    const originalFetch=window.fetch.bind(window);
+    window.fetch=async(url,options)=>{
+      if(url!==window.APP_CONFIG.registrationEndpoint)return originalFetch(url,options);
+      if(options.method!=='POST'||options.credentials!=='omit'||options.headers['Content-Type']!=='text/plain;charset=UTF-8')throw Error('Wrong public transport');
+      const name='activity_registration_public';let data=JSON.parse(options.body);
+      if(data.action==='getRegistrationTransportKey')return Response.json(await window.openRequest(data));
       if(data.action!=='getPublishedPage')data=await window.openRequest(data);
       window.__ar.calls.push({name,data});let value;
       if(data.action==='getPublishedPage')value={page:pages[data.slug]};
@@ -38,8 +41,8 @@ test(device+' public registration, shared link and pending edit',async()=>{
         if(!row)throw Error('REGISTRATION_NOT_FOUND');Object.assign(row,{attendeeName:data.attendeeName,phone:data.phone,wechat:data.wechat,answers:data.answers});localStorage.setItem('ar_rows',JSON.stringify(rows));
         value={ok:true,status:row.status,submissionId:row.id};
       }else throw Error('Unexpected action '+data.action);
-      return {result:data.action==='getPublishedPage'?value:await window.sealReply(data.replyKey,value)};
-    }})};
+      return Response.json(data.action==='getPublishedPage'?value:await window.sealReply(data.replyKey,value));
+    };
   })();`;
   const server=http.createServer((req,res)=>{
     const url=new URL(req.url,'http://127.0.0.1');
@@ -48,8 +51,7 @@ test(device+' public registration, shared link and pending edit',async()=>{
     if(url.pathname==='/crm/activity-registration.html'){
       res.writeHead(200,{'Content-Type':'text/html; charset=utf-8'});
       res.end(fs.readFileSync(path.join(root,'crm/activity-registration.html'),'utf8').replace(
-        '<script src="https://static.cloudbase.net/cloudbase-js-sdk/3.10.1/cloudbase.full.js"></script>',
-        '<script src="/cloudbase.js"></script>'));return;
+        '<script type="module"', '<script src="/cloudbase.js"></script><script type="module"'));return;
     }
     const rel=url.pathname.replace(/^\//,'');file=path.resolve(root,rel);
     if(!file.startsWith(root+path.sep)||!fs.existsSync(file)){res.writeHead(404);res.end();return;}
@@ -97,7 +99,7 @@ test(device+' public registration, shared link and pending edit',async()=>{
     await page.click('button[type="submit"]');
     await page.waitForFunction(()=>window.__ar.calls.some(x=>x.data.action==='updateMyRegistration'));
     const state=await page.evaluate(()=>({updated:window.__ar.rows[1].attendeeName,
-      browserAuthMethods:Object.keys(window.cloudbase).filter(k=>/auth|sign/i.test(k)),
+      browserAuthMethods:Object.keys(window.cloudbase || {}).filter(k=>/auth|sign/i.test(k)),
       history:document.querySelectorAll('.ar-registration-history-item').length}));
     assert.equal(state.updated,'【系统测试·勿联系】已修改');
     assert.deepEqual(state.browserAuthMethods,[]);

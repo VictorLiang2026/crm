@@ -19,7 +19,9 @@ function requestTransport(privatePem) {
       decoder.setAAD(Buffer.from(protectedHeader,'ascii'));
       decoder.setAuthTag(tag);
       const request = JSON.parse(Buffer.concat([decoder.update(ciphertext),decoder.final()]).toString('utf8'));
-      if (!request || request.action !== action || typeof request.replyKey !== 'string') throw Error();
+      if (!request || request.action !== action || typeof request.replyKey !== 'string' ||
+          !Number.isSafeInteger(request.issued) || Math.abs(Date.now()-request.issued)>120000 ||
+          !/^[a-f0-9-]{36}$/.test(request.requestId||'')) throw Error();
       return request;
     } catch { throw Error('INVALID_PRIVATE_REQUEST'); }
   }

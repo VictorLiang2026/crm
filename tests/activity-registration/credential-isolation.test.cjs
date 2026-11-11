@@ -22,7 +22,7 @@ test('independent application credentials authorize only their registration work
       INSERT INTO public.activities VALUES (1, NULL);
       GRANT SELECT, UPDATE ON public.activities, public.persons TO service_role;
     `);
-    for (const version of ['20261110110000_activity_registration', '20261110160000_activity_registration_shared_token', '20261111230000_activity_registration_write']) {
+    for (const version of ['20261110110000_activity_registration', '20261110160000_activity_registration_shared_token', '20261111235400_activity_registration_write']) {
       await db.exec(readFileSync(path.resolve(__dirname, '../../cloudbase/migrations', version + '.sql'), 'utf8'));
     }
     await db.exec(`

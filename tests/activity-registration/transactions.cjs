@@ -1,7 +1,7 @@
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 const {PGlite}=require(process.env.CRM_PGLITE_MODULE||'@electric-sql/pglite');
-const versions=['20261110110000_activity_registration','20261110160000_activity_registration_shared_token','20261111230000_activity_registration_write'];
+const versions=['20261110110000_activity_registration','20261110160000_activity_registration_shared_token','20261111235400_activity_registration_write'];
 const sql=(name,rollback=false)=>fs.readFileSync(path.join(__dirname,'../../cloudbase/migrations',name+(rollback?'.rollback':'')+'.sql'),'utf8');
 require('node:test')('registration writes and audit are atomic, scoped and reversible in an isolated database',async()=>{
   const db=new PGlite();
