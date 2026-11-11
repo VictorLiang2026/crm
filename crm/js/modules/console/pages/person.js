@@ -530,6 +530,7 @@ const PERSON_SECTIONS = [
   { key: 'customer', label: 'p360_customer', parts: ['customer', 'insurance'] },
   { key: 'team', label: 'p360_team', parts: ['recruit'] },
   { key: 'events', label: 'p360_events', parts: ['activities'] },
+  { key: 'gifts', label: 'care_gifts_title', parts: ['gifts'] },
   { key: 'materials', label: 'p360_materials', parts: ['ai', 'facts', 'care', 'ocr'] },
 ];
 
@@ -921,6 +922,7 @@ export function renderPerson(ctx, id, initialSection) {
       h('h3', {}, t('event_timeline')), await activitiesNode(context, personId),
     ])], ai: ['nav_ai', aiNode], facts: ['tab_facts', factsNode],
     care: ['tab_care_materials', (context, personId) => careMaterialsNode(context, personId, { onDone: context.onWriteDone })],
+    gifts: ['care_gifts_title', (context, personId) => careMaterialsNode(context, personId, { giftsOnly: true })],
     ocr: ['tab_ocr_review', renderOcrReview],
   };
   ctx.main.replaceChildren(

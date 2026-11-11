@@ -16,7 +16,7 @@ import {
   fmtDate, weekdayCN,
 } from '../ui.js';
 
-const ACT_TABS = ['act_tab_flow', 'act_tab_attend', 'act_tab_acts', 'act_tab_candidates', 'act_tab_gifts', 'act_tab_photos', 'act_tab_review', 'act_tab_resources'];
+const ACT_TABS = ['act_tab_flow', 'act_tab_attend', 'act_tab_acts', 'act_tab_candidates', 'act_tab_photos', 'act_tab_review', 'act_tab_resources'];
 
 // 枚举翻译统一走 i18n.js 集中注册表
 const actStatusLabel = (s) => translateEnum('activity_status', s);
@@ -191,8 +191,7 @@ function attendanceNode(ctx, id, onDone) {
 }
 
 const PLACEHOLDER = {
-  4: ['act_gifts_title', 'act_gifts_note'],
-  5: ['act_photos_title', 'act_photos_note'],
+  4: ['act_photos_title', 'act_photos_note'],
 };
 
 function interactionNode(ctx, id) {
@@ -278,10 +277,10 @@ export function renderActivity(ctx, id) {
     else if (i === 1) loadInto(bodies[i], async () => h('div', { class: 'card-body' }, [await attendanceNode(ctx, id, () => {
       loaded.delete(1); select(1);
     })]));
-    else if (i === 6) loadInto(bodies[i], async () => h('div', { class: 'card-body' }, [await reviewNode(ctx, id)]));
+    else if (i === 5) loadInto(bodies[i], async () => h('div', { class: 'card-body' }, [await reviewNode(ctx, id)]));
     else if (i === 2) loadInto(bodies[i], async () => h('div', { class: 'card-body' }, [await interactionNode(ctx, id)]));
     else if (i === 3) loadInto(bodies[i], async () => h('div', { class: 'card-body' }, [await candidateNode(ctx, id)]));
-    else if (i === 7) loadInto(bodies[i], async () => h('div', { class: 'card-body' }, [await renderActivityResources(ctx, id)]));
+    else if (i === 6) loadInto(bodies[i], async () => h('div', { class: 'card-body' }, [await renderActivityResources(ctx, id)]));
     else bodies[i].replaceChildren(h('div', { class: 'card-body' }, placeholder(i)));
   }
 

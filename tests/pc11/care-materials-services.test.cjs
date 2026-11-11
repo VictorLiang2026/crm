@@ -71,6 +71,8 @@ function loadService(folder, initial) {
     exports: moduleObject.exports,
     require(name) {
       if (name === './db') return fakeDb;
+      // Exercise the CRUD handler in isolation. Device enforcement has its own integration suite.
+      if (name === './device-runtime') return {protect: (service, handler) => { assert.equal(service, folder); return handler; }};
       throw new Error(`Unexpected dependency ${name}`);
     },
     console,

@@ -10,6 +10,7 @@ test('M04 same-Person insurance, attachments and OCR links preserve review and c
    data.insurance=async()=>({legacyCustomerId:null,evidenceStatus:'recorded',existingCoverage:[],gaps:[]});
    data.personProducts=async()=>({customerId:null,rows:[]});
    data.customerProfile=async()=>({status:'linked',customerId:71,fields:{customer_name:'[CRM_TEST_ONLY]客户甲'}});
+   window.m04LinkedProfile=data.customerProfile;
    for(const method of ['gifts','photos','ocrRecords'])data[method]=async(ctx,id)=>{window.m04Reads.push({method,id});return{rows:[],hasMore:false}};
    data.ocrParseCommands=async()=>[];
    data.fileImports=async(ctx,id)=>{if(String(id)!=='980001')throw Error('Wrong import Person');return{rows:[],hasMore:false}};
@@ -36,6 +37,11 @@ test('M04 same-Person insurance, attachments and OCR links preserve review and c
   assert.equal(await b.evaluate("document.querySelector('.care-workspace-links')"),null);
   assert.equal(await b.evaluate('window.m04Reads.length'),readCount);
   await b.evaluate(`(async()=>{const {setLang}=await import('/crm/js/modules/console/i18n.js');setLang('en');location.hash='#/person/980001/insurance'})()`);
+  await b.wait("document.querySelector('[data-person-section=overview][aria-pressed=true]') && !document.querySelector('[data-person-section=customer]')");
+  assert.equal(await b.evaluate("!!document.querySelector('.insurance-workspace-links')"),false);
+  await b.evaluate("window.m04Data.customerProfile=window.m04LinkedProfile;location.hash='#/person/980001/care'");
+  await b.wait("document.querySelector('.care-workspace-links')");
+  await b.evaluate("location.hash='#/person/980001/insurance'");
   await b.wait("document.querySelector('.insurance-workspace-links')");
   assert.match(await b.evaluate("document.querySelector('.tabs-body').textContent"),/existing coverage/);
   assert.equal(await b.evaluate(`import('/crm/js/modules/console/i18n.js').then(m=>m.t('legacy_products'))`),'Customer Coverage');

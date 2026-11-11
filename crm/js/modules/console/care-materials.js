@@ -43,7 +43,7 @@ function readBase64(file) {
   });
 }
 
-export async function careMaterialsNode(ctx, personId, { onDone } = {}) {
+export async function careMaterialsNode(ctx, personId, { onDone, giftsOnly = false } = {}) {
   const profile = await data.customerProfile(ctx, personId);
   if (profile.status !== 'linked' && profile.status !== 'person_only') throw new Error(t('care_load_failed'));
   const personKey = String(profile.personId || personId);
@@ -340,20 +340,20 @@ export async function careMaterialsNode(ctx, personId, { onDone } = {}) {
     return button;
   }));
 
-  root.append(
-    h('div', { class: 'more-actions care-workspace-links' }, [
+  root.append(...[
+    !giftsOnly ? h('div', { class: 'more-actions care-workspace-links' }, [
       h('a', { class: 'btn btn-ghost btn-sm', href: `#/person/${personId}/insurance` }, t('tab_insurance')),
       h('a', { class: 'btn btn-ghost btn-sm', href: `#/person/${personId}/ocr` }, t('tab_ocr_review')),
-    ]),
-    h('p', { class: 'foot-note' }, t('care_review_workflow_note')),
-    h('a', { class: 'btn btn-soft', href: `#/person/${personId}/ocr` }, t('file_import_entry')),
-    h('div', { class: 'care-materials-grid' }, [
+    ]) : null,
+    !giftsOnly ? h('p', { class: 'foot-note' }, t('care_review_workflow_note')) : null,
+    !giftsOnly ? h('a', { class: 'btn btn-soft', href: `#/person/${personId}/ocr` }, t('file_import_entry')) : null,
+    h('div', { class: giftsOnly ? 'tab-stack' : 'care-materials-grid' }, [
       h('section', { class: 'care-materials-section' }, [
         h('div', { class: 'care-section-head' }, [sectionTitle(t('care_gifts_title')), giftAdd]),
         h('p', { class: 'care-section-note' }, t('care_gifts_note')),
         giftStatus, giftList, giftMore,
       ]),
-      customerId ? h('section', { class: 'care-materials-section' }, [
+      giftsOnly ? null : customerId ? h('section', { class: 'care-materials-section' }, [
         h('div', { class: 'care-section-head' }, [sectionTitle(t('care_files_title')), photoAdd]),
         h('p', { class: 'care-section-note' }, t('care_files_note')),
         h('p', { class: 'care-status' }, [t('care_upload_limit')]),
@@ -363,7 +363,7 @@ export async function careMaterialsNode(ctx, personId, { onDone } = {}) {
         emptyNote(t('care_customer_required'), t('care_customer_required_note')),
       ]),
     ]),
-  );
-  await Promise.all([refreshGifts(true), customerId ? refreshPhotos(true) : Promise.resolve()]);
+  ].filter(Boolean));
+  await Promise.all([refreshGifts(true), !giftsOnly && customerId ? refreshPhotos(true) : Promise.resolve()]);
   return root;
 }

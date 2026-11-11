@@ -29,13 +29,13 @@ test('Person routes preserve the selected content and expose business sections f
     for(const [customer,recruit] of [[true,true],[false,false],[true,false],[false,true]]) {
       await b.evaluate(`wp2('',${customer},${recruit})`);
       await b.wait("document.querySelector('.page-head')?.innerText.includes('Demo') || document.querySelector('.console-main').innerText.includes('Demo')");
-      assert.equal(await b.evaluate("document.querySelectorAll('.person-sections button').length"),5+Number(customer)+Number(recruit));
+      assert.equal(await b.evaluate("document.querySelectorAll('.person-sections button').length"),6+Number(customer)+Number(recruit));
       assert.equal(await b.evaluate("!!document.querySelector('.person-sections [data-person-section=customer]')"),customer);
       assert.equal(await b.evaluate("!!document.querySelector('.person-sections [data-person-section=team]')"),recruit);
       assert.equal(await b.evaluate("window.wp2calls.filter(x=>x==='getCustomerProfile').length"),1);
     }
     for(const [route,group,part] of [['timeline','timeline'],['insurance','customer','insurance'],['relationships','relationships','relationships'],
-      ['opportunities','overview','opportunities'],['recruit','team'],['care','materials','care'],['ocr','materials','ocr']]) {
+      ['opportunities','overview','opportunities'],['recruit','team'],['care','materials','care'],['gifts','gifts'],['ocr','materials','ocr']]) {
       await b.evaluate(`wp2('/${route}',true,true)`);
       await b.wait(`document.querySelector('.person-sections [aria-pressed=true]')?.dataset.personSection==='${group}'`);
       if(part) await b.wait(`document.querySelector('.person-subsections [aria-pressed=true]')?.dataset.personSection==='${part}'`);

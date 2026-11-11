@@ -1988,7 +1988,7 @@ const DICT = {
   'care_materials_title': { 'zh-CN': '关怀与资料', 'en': 'Care & Materials' },
   'care_customer_required': { 'zh-CN': '资料附件需要客户关联', 'en': 'Files require a customer link' },
   'care_customer_required_note': { 'zh-CN': '伴手礼可直接归属此人物；照片和附件仍归档在客户资料中。关联或恢复客户后即可使用。', 'en': 'Gifts belong directly to this Person. Photos and files remain under customer records; link or restore a customer to use them.' },
-  'care_gifts_title': { 'zh-CN': '关怀礼品', 'en': 'Care Gifts' },
+  'care_gifts_title': { 'zh-CN': '伴手礼', 'en': 'Gifts' },
   'care_files_title': { 'zh-CN': '照片与附件', 'en': 'Photos & Attachments' },
   'care_gifts_note': { 'zh-CN': '记录给过此人物什么伴手礼，按赠送日期查看。', 'en': 'Track gifts given to this Person, ordered by gift date.' },
   'care_files_note': { 'zh-CN': '文件仅按客户归档；打开或下载时才读取文件内容。', 'en': 'Files are customer-scoped; content loads only when previewed or downloaded.' },
