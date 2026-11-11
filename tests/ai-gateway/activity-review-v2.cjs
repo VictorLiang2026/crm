@@ -13,7 +13,7 @@ const context = {
   activity_interactions: [source('interactions', 13, { id: 13, person_id: 7, importance: 4 })],
   recent_interactions: [], current_actions: [], open_opportunities: [], relationships: [],
 };
-const result = { summary: '仅供核实', whoMattered: [claim('值得联系', ['public.persons#7'])],
+const result = { summary: '仅供核实', questionsToVerify:['是否同意下一次沟通？'], whoMattered: [claim('值得联系', ['public.persons#7'])],
   whatChanged: [claim('无证据推断', [])], relationshipsImproved: [], signalsAppeared: [], opportunitiesAppeared: [],
   followUpPeople: [claim('虚构依据', ['public.persons#999'])],
   actionCandidates: [
@@ -55,6 +55,7 @@ test('review uses Gateway, checks the activity state and emits only sourced Pers
   assert.match(calls[1][1].input.focus, /7:public.interactions#13/);
   assert.match(calls[1][1].input.focus, /Opportunity 候选至少包含同一 Person 的本场重要互动/);
   assert.ok(calls[1][1].input.focus.length <= 500);
+  assert.deepEqual(response.review.questionsToVerify,result.questionsToVerify);
   assert.equal(response.review.actionCandidates.length, 1);
   assert.equal(response.review.actionCandidates[0].personName, '测试人物');
   assert.equal(response.review.opportunityCandidates.length, 1);

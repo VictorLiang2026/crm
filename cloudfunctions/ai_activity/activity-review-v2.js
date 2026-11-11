@@ -40,7 +40,7 @@ function candidateEvidenceHint(context) {
 }
 
 function reviewFocus(context) {
-  const rule = '只依据给定来源回答六项问题；缺证据时说明不足。引用 public.表#ID，不猜身份或期限。Action 候选仅关联已确认 Person，sourceRefs 至少包含同一 Person 的本场重要互动或已到场记录；Opportunity 候选至少包含同一 Person 的本场重要互动。缺少合格来源则返回空候选，不以旧互动或既有行动替代。本场到场本身不能推出机会。候选待人工审核，不写业务事实。';
+  const rule = '只依据给定来源回答六项问题；缺证据时说明不足。引用 public.表#ID，不猜身份或期限。Action 候选仅关联已确认 Person，sourceRefs 至少包含同一 Person 的本场重要互动或已到场记录；Opportunity 候选至少包含同一 Person 的本场重要互动。缺少合格来源则返回空候选，不以旧互动或既有行动替代。本场到场本身不能推出机会。将待人工核实的问题单列在 questionsToVerify，最多六项；无待核实事项时返回空数组。知识仅用于跟进方法，不证明人物意向。候选待人工审核，不写业务事实。';
   const hint = candidateEvidenceHint(context);
   return rule.length + hint.length <= 500 ? rule + hint : rule;
 }
@@ -57,7 +57,7 @@ function reviewForDisplay(result, context) {
   let discarded = 0;
   const knownRefs = item => Array.isArray(item?.sourceRefs) && item.sourceRefs.length > 0 &&
     item.sourceRefs.every(ref => refs.has(ref));
-  const review = { summary: result.summary };
+  const review = { summary: result.summary, questionsToVerify: result.questionsToVerify };
   for (const section of SECTIONS) {
     review[section] = result[section].filter(item => {
       const valid = knownRefs(item);
@@ -97,6 +97,9 @@ async function run(event, { app, rdb, gateway, engine } = {}) {
   if (!['ended', 'reviewed'].includes(activity.status)) return { error: 'ACTIVITY_NOT_ENDED' };
   if (!built.context.persons.length) return { error: 'NO_CANONICAL_PERSON',
     message: '本场活动暂无已确认的 Person 关联，无法生成关系复盘。' };
+  const knowledge=await require('./scenario-knowledge').knowledgeSnapshot('activity',{key:process.env.CRM_ACTIVITY_REVIEW_DB_API_KEY});
+  built.context={...built.context,reviewed_knowledge:knowledge};
+  built.context_snapshot={...built.context_snapshot,reviewed_knowledge:knowledge};
   const aiGateway = gateway || createAIGateway({ app, rdb: database, timeoutMs: 80000, maxAttempts: 1 });
   const task = await aiGateway.runAITask({
     taskType: 'activity_review', skill: 'activity_review', capability: 'analysis',

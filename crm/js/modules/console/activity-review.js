@@ -1,4 +1,5 @@
 // PC18：活动复盘版本、人工候选审核与 Outcome；所有写入须经服务端预览。
+import { evidencePanel, versionFeedback } from './advice-evidence.js';
 import { h } from './dom.js';
 import { data } from './data.js';
 import { t, translateEnum } from './i18n.js';
@@ -205,6 +206,10 @@ function reviewVersion(ctx, activityId, version, refresh) {
     ]),
     sectionTitle(t('act_review_summary')), h('p', { class: 'summary-text' }, version.summary || t('pc18_summary_missing')),
   ];
+  body.push(evidencePanel({facts:(version.recordedSources||[]).map(v=>[v.ref,v.date,v.text].filter(Boolean).join(' · ')),
+    inference:[review.summary].filter(Boolean),unknown:Array.isArray(review.questionsToVerify)?review.questionsToVerify:[],
+    next:[...(version.actionCandidates||[]).map(c=>c.title),...(version.opportunityCandidates||[]).map(c=>c.nextAction)].filter(Boolean),knowledge:version.knowledge||{}}),
+    versionFeedback(ctx,{lane:'activity',adviceId:version.id,subjectId:activityId}));
   sections.forEach(([key, items]) => body.push(sectionTitle(t(key)), itemList(items)));
   for (const [key, kind, candidates] of [
     ['act_action_candidates', 'action', version.actionCandidates],

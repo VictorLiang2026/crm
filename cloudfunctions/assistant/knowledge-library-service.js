@@ -972,6 +972,7 @@ function createKnowledgeLibrary(options={}) {
       const id=String(row.id);allowed.set(id,{schema:'public',table:'knowledge_items',id,sourceId:row.source_id?String(row.source_id):null,
         title:row.source||source?.title||'Knowledge item',domain:row.metadata?.domain||null,sourceDate:row.source_date||source?.published_at||null,
         categories:Array.isArray(row.metadata?.categories)?row.metadata.categories:[],
+        checkedOn:todayShanghai(),reviewStatus:'verified',contentDigest:createHash('sha256').update(JSON.stringify([row.content,row.metadata?.summary||''])).digest('hex'),
         publishedAt:row.metadata?.published_at||source?.published_at||null,versionNo:row.version_no||1,locator:row.metadata?.locator||null});
       Object.assign(allowed.get(id),row.contentReference||{});
       refs.push({...allowed.get(id),excerpt:String(row.content||'').slice(0,2200),summary:row.metadata?.summary||''});
@@ -1055,6 +1056,12 @@ function createKnowledgeLibrary(options={}) {
       selectionNotice:'选择仅表示采用此建议作为工作参考，不表示已经联系客户或执行任何业务动作。',
       execution:{modelCalled:!task.reused,businessDataRead:true,businessDataWritten:false}};
   }
+  async function protectionItems(domains) {
+    return (await activeItems(domains)).filter(({row})=>{
+      const tags=row.metadata?.categories||[];
+      return tags.length ? tags.some(tag=>!['recruitment_policy','recruitment_case'].includes(tag)) : row.metadata?.domain!=='recruitment';
+    });
+  }
   async function followupAdviceContext(personId,focus='') {
     const response=await callFunction({name:'person_360',data:{action:'getMeetingPrepContext',personId}});
     const person=response?.result;
@@ -1063,7 +1070,8 @@ function createKnowledgeLibrary(options={}) {
       customer_level:person.person.customer_level||null,sales_priority:person.person.sales_priority||null,
       referral_priority:person.person.referral_priority||null,relationship_stage:person.person.relationship_stage||null};
     const interactions=(person.recent_interactions||[]).slice(0,6).map(row=>({
-      date:row.date||row.interaction_date||row.created_at||null,
+      date:row.at||row.date||row.interaction_date||row.created_at||null,
+      source:row.source||null,
       type:row.type||row.interaction_type||null,
       summary:redactForTask(row.summary||row.followup_notes||row.notes||row.content||'',person.person),
     }));
@@ -1074,9 +1082,9 @@ function createKnowledgeLibrary(options={}) {
       relevant_playbook:person.relevant_playbook||null};
     const query=`${safePerson.occupation||''} ${safePerson.customer_stage||''} ${focus} ${JSON.stringify(customerSnapshot)} ${JSON.stringify(interactions)}`;
     const strategyEntries=await excludeTestKnowledgeEntries(rankEvidence(
-      await activeItems(new Set(['industry','top_performer_sharing','playbook','case','story','evidence'])),query,8));
+      await protectionItems(new Set(['industry','top_performer_sharing','playbook','case','story','evidence'])),query,8));
     const productEntries=await excludeTestKnowledgeEntries(rankEvidence(
-      await activeItems(new Set(['product','company','service','recruitment','campaign',
+      await protectionItems(new Set(['product','company','service','recruitment','campaign',
         'health_wealth_seminar','legal_tax','case','playbook','regulation','evidence','story','other'])),query,10));
     const strategy=sourceContext(strategyEntries),products=sourceContext(productEntries);
     return {customerSnapshot,interactions,strategy,products,context:{customer_snapshot:customerSnapshot,
@@ -1342,6 +1350,7 @@ function createKnowledgeLibrary(options={}) {
           open_opportunities:context.customerSnapshot.open_opportunities.map(item=>({type:item.type||item.opportunity_type||null,
             stage:item.stage||item.status||null,updated_at:item.updated_at||null})),
           insurance_context:context.customerSnapshot.insurance_context?{status:context.customerSnapshot.insurance_context.status||null,
+            review:{latest:redactTaskData(context.customerSnapshot.insurance_context.review?.latest||null,context.redactionPerson)},
             verified_products:redactTaskData(context.customerSnapshot.insurance_context.verified_products||[])}:null,
           open_actions:redactTaskData(context.customerSnapshot.open_actions||[]),
           commitments:redactTaskData(context.customerSnapshot.commitments||[]),
@@ -1352,8 +1361,9 @@ function createKnowledgeLibrary(options={}) {
           currentSystemAdvice:{title:redactForTask(row.system_title||row.title,context.redactionPerson),overallStrategy:redactForTask(row.system_strategy,context.redactionPerson),
             productServiceAdvice:redactForTask(currentAdvice.productAdvice,context.redactionPerson),
             wechatMessage:redactForTask(currentAdvice.messageDraft,context.redactionPerson)},
-          customerSnapshot:safeSnapshot,recentInteractions:context.interactions,
+          customerSnapshot:safeSnapshot,recentInteractions:context.interactions.map(({date,type,summary})=>({date,type,summary})),
           strategySources:safeSources(context.strategy.refs),productSources:safeSources(context.products.refs),
+          guidance:'Use separate labelled lines for AI interpretation, questions to confirm, and next step in overallStrategy, in the requested language. Cite recorded facts only with their source. Only cite the supplied reviewed sources. A policy review is eligible only when review.latest is present.',
           outputContract:{adviceId:'copy exact value',personId:'copy exact value',systemVersion:'copy exact value',
           gptAdvice:{title:'string',overallStrategy:'string',productServiceAdvice:'string',wechatMessage:'string',
             strategySourceIds:'integer[]',productSourceIds:'integer[]'}}});
@@ -1370,8 +1380,8 @@ function createKnowledgeLibrary(options={}) {
     const actor=actorUid(actorValue),items=input?.rows;
     if(!Array.isArray(items)||!items.length||items.length>10)fail('INVALID_INPUT');
     await rejectTestKnowledgeRefs(followupSourceRefs(items));
-    const strategyEntries=await activeItems(new Set(['industry','top_performer_sharing','playbook','case','story','evidence']));
-    const productEntries=await activeItems(new Set(['product','company','service','recruitment','campaign',
+    const strategyEntries=await protectionItems(new Set(['industry','top_performer_sharing','playbook','case','story','evidence']));
+    const productEntries=await protectionItems(new Set(['product','company','service','recruitment','campaign',
       'health_wealth_seminar','legal_tax','case','playbook','regulation','evidence','story','other']));
     const strategyMap=sourceContext(strategyEntries).allowed,productMap=sourceContext(productEntries).allowed;
     const previewRows=[];
@@ -1415,6 +1425,15 @@ function createKnowledgeLibrary(options={}) {
       deleted_at:'is.null',gpt_strategy:'is.null',gpt_product_advice:'is.null',limit:1}))[0];
     if(!current||Number(current.system_version)!==version||Date.parse(current.gpt_preview_expires_at||'')<=Date.now())fail('STALE');
     const payload=current.gpt_preview_payload;if(!object(payload)||Number(payload.systemVersion)!==version)fail('STALE');
+    const cited=[...(payload.strategySources||[]),...(payload.productSources||[])];
+    if(cited.length){
+      await rejectTestKnowledgeRefs(cited.map(({id})=>({schema:'public',table:'knowledge_items',id:String(id)})));
+      const live=sourceContext(await protectionItems(new Set(Object.values(CATEGORY_DOMAIN).concat(['story','evidence','regulation'])))).allowed;
+      for(const ref of cited){
+        const now=live.get(String(ref.id));
+        if(!now || !ref.contentDigest || ['sourceId','versionNo','contentSource','contentVersion','contentDigest'].some(k=>now[k]!==ref[k]))fail('STALE');
+      }
+    }
     const rows=await request('person_followup_advice','PATCH',{id:`eq.${id}`,person_id:`eq.${personId}`,
       system_version:`eq.${version}`,gpt_preview_id:`eq.${previewId}`,gpt_preview_actor:`eq.${actor}`,
       deleted_at:'is.null',system_status:'eq.ready',gpt_strategy:'is.null',gpt_product_advice:'is.null'},
@@ -1434,8 +1453,8 @@ function createKnowledgeLibrary(options={}) {
       seen.add(String(item.adviceId));
     }
     await rejectTestKnowledgeRefs(followupSourceRefs(items));
-    const strategyEntries=await activeItems(new Set(['industry','top_performer_sharing','playbook','case','story','evidence']));
-    const productEntries=await activeItems(new Set(['product','company','service','recruitment','campaign',
+    const strategyEntries=await protectionItems(new Set(['industry','top_performer_sharing','playbook','case','story','evidence']));
+    const productEntries=await protectionItems(new Set(['product','company','service','recruitment','campaign',
       'health_wealth_seminar','legal_tax','case','playbook','regulation','evidence','story','other']));
     const strategyMap=sourceContext(strategyEntries).allowed,productMap=sourceContext(productEntries).allowed;
     const results=[],plans=[];

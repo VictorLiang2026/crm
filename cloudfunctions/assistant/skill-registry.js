@@ -148,9 +148,9 @@ const SKILLS = [
     confirmationLevel: 'confirm_before_write', timeoutClass: 'long',
   },
   {
-    name: 'activity_review', version: '2.1.0', capability: 'analysis',
+    name: 'activity_review', version: '2.2.0', capability: 'analysis',
     contextRecipe: recipe(['activity', 'participants', 'tasks', 'persons', 'activity_interactions',
-      'recent_interactions', 'current_actions', 'open_opportunities', 'relationships'], [],
+      'recent_interactions', 'current_actions', 'open_opportunities', 'relationships'], ['reviewed_knowledge'],
     { participants: 20, tasks: 20, persons: 20, activity_interactions: 20,
       recent_interactions: 20, current_actions: 20, open_opportunities: 5, relationships: 20 }),
     inputSchema: object({ activityId: text(80), focus: text(500) }, ['activityId']),
@@ -169,7 +169,7 @@ const SKILLS = [
         'insurance','recruit','referral','activity','speaker','partnership','service','relationship',
       ] }, reason: text(600), nextAction: text(500), sourceRefs: { ...refs, minItems: 1 } },
       ['personId', 'opportunityType', 'reason', 'nextAction', 'sourceRefs']);
-      return object({ summary: text(2000), whoMattered: claims, whatChanged: claims,
+      return object({ summary: text(2000), questionsToVerify: strings(6,300), whoMattered: claims, whatChanged: claims,
         relationshipsImproved: claims, signalsAppeared: claims,
         opportunitiesAppeared: claims, followUpPeople: claims,
         actionCandidates: { type: 'array', maxItems: 12, items: candidate },

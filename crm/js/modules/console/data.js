@@ -26,6 +26,7 @@ const aiTask = (ctx, startPayload, taskType, personId, options) => resolveAITask
 
 export const data = {
   // ---------- 今日 ----------
+  adviceFeedback: (ctx, operation, data) => p360(ctx, 'adviceFeedback', {operation,data}),
   todayWorkItems: (ctx) => p360(ctx, 'listTodayWorkItems'),
   actionCenter: (ctx, query) => p360(ctx, 'listActionCenter', {query}),
   previewActionContext: (ctx, data) => p360(ctx, 'previewActionContext', {data}),

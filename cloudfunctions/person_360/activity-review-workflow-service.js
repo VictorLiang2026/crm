@@ -191,7 +191,11 @@ class ActivityReviewWorkflowService {
       const candidates=historyCandidates(raw,task.context_snapshot,idValue,decisions);
       const review={...raw,...candidates};
       return {id:row.id,taskId:row.task_id,createdAt:row.created_at,
-        summary:review.summary||'',review,
+        summary:review.summary||'',review,knowledge:task.context_snapshot?.reviewed_knowledge,
+        recordedSources:[task.context_snapshot?.activity,...(Array.isArray(task.context_snapshot?.activity_interactions)?task.context_snapshot.activity_interactions:[])].filter(v=>v?.source?.schema==='public').map(v=>({
+          ref:'public.'+v.source.table+'#'+v.source.id,date:v.data?.interaction_at||v.data?.interaction_date||v.data?.activity_date||null,
+          text:String(v.data?.summary||v.data?.name||'').slice(0,500)
+        })),
         ...candidates,
         decisions};
     }).filter(Boolean);

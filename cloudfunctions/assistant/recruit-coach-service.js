@@ -18,7 +18,7 @@ function idOf(value) { const text = String(value ?? ''); if (!ID.test(text) || !
 function createReader({ env = process.env.TCB_ENV, key = process.env.CRM_ASSISTANT_DB_API_KEY, fetchImpl = fetch } = {}) {
   if (!/^crm-[a-z0-9]+$/.test(env || '') || !key) { const error=new Error('Recruit Coach database is not configured');error.code='INVALID_CONFIG';throw error; }
   return async function request(table, method = 'GET', filters = {}, body) {
-    if (!['ai_tasks','ai_results'].includes(table) || !['GET','PATCH'].includes(method)) invalid();
+    if (!(method==='GET' && ['ai_tasks','ai_results','outcomes'].includes(table)) && !(method==='PATCH' && table==='ai_results')) invalid();
     const url = new URL(`https://${env}.api.tcloudbasegateway.com/v1/rdb/rest/${table}`);
     for (const [name, value] of Object.entries(filters)) url.searchParams.set(name, String(value));
     const response = await fetchImpl(url, { method, headers: { Authorization: `Bearer ${key}`,
@@ -53,14 +53,14 @@ function coachOutput(raw, context) {
     context.candidate,
   ];
   const evidenceRefs = new Set(dimensions.flatMap(item => item.evidenceRefs));
-  const evidenceSources = sourceLines.map(line => {
+  const evidenceSources = sourceLines.filter(line=>line?.source).map(line => {
     const ref = `${line.source.schema}.${line.source.table}#${line.source.id}`;
     if (!evidenceRefs.has(ref)) return null;
     const data = line.data || {};
     const fields=Object.entries(data).filter(([,value])=>value!=null&&String(value).trim())
       .map(([key,value])=>({key,value:String(value).slice(0,240)})).slice(0,12);
     return { ref, sourceType:line.source.table === 'recruit_candidates'?'candidate':'followup',
-      date:data.followup_date||null, fields };
+      date:data.followup_date||line.updatedAt||null, fields };
   }).filter(Boolean);
   const suggestion = raw.contactSuggestion || {};
   const assumptionReasons = (suggestion.assumptionReasons || []).filter(Boolean).slice(0, 8).map(String).map(x=>x.slice(0,400));
@@ -96,8 +96,8 @@ async function generate(event, { gateway, contextLoader, request, app: appOverri
   const candidate = context.candidate;
   const language = event.language === 'en' ? 'en' : 'zh-CN';
   const contextBody = { candidate, recruit_followups: context.recruit_followups,
-    guidance: { weighting: Object.fromEntries(DIMENSIONS),
-      language, instruction:'Score only with cited records. A missing or conflicting fact stays unknown. No score or suggestion may change candidate stage or compatibility fields. Contact assumptions are hypotheses; include questions and prohibited phrasing. Return all human-readable content in the requested language.' } };
+    guidance: { reviewedKnowledge: await require('./scenario-knowledge').knowledgeSnapshot('recruitment',{key:process.env.CRM_ASSISTANT_DB_API_KEY}), weighting: Object.fromEntries(DIMENSIONS),
+      language, instruction:'Use reviewed knowledge as coaching guidance only. Never infer individual intent or score from knowledge. Score only with cited candidate records. A missing or conflicting fact stays unknown. No score or suggestion may change candidate stage or compatibility fields. Contact assumptions are hypotheses; include questions and prohibited phrasing. Return all human-readable content in the requested language.' } };
   const database = gateway ? null : createSearchData({ env:process.env.TCB_ENV, key:process.env.CRM_ASSISTANT_DB_API_KEY });
   const ai = gateway || createAIGateway({ app:appOverride || require('./db').app, rdb:database.auditRdb, timeoutMs:60000, maxAttempts:1 });
   const task = await ai.runAITask({ taskType:'recruit_coach', skill:'recruit_coach', capability:'coaching',
@@ -112,18 +112,27 @@ async function generate(event, { gateway, contextLoader, request, app: appOverri
 
 async function history(event, { request = createReader(), contextLoader = p360 } = {}) {
   const personId=idOf(event.personId), candidateId=idOf(event.candidateId);
-  const context=await contextLoader('getRecruitCoachContext',personId,candidateId);
+  await contextLoader('getRecruitCoachContext',personId,candidateId);
   const tasks=await request('ai_tasks','GET',{select:'id,created_at,context_snapshot',task_type:'eq.recruit_coach',
     skill_name:'eq.recruit_coach',subject_type:'eq.candidate',subject_id:`eq.${candidateId}`,
     status:'eq.completed',order:'created_at.desc,id.desc',limit:10});
   const ids=tasks.map(row=>idOf(row.id));
   const results=ids.length?await request('ai_results','GET',{select:'id,task_id,result_json,final_result_json,user_selected,user_edited,feedback,created_at',
     task_id:`in.(${ids.join(',')})`,order:'created_at.desc,id.desc',limit:10}):[];
+  const resultIds=results.map(row=>idOf(row.id));
+  const outcomes=resultIds.length?await request('outcomes','GET',{select:'id,ai_result_id,result,occurred_at',
+    recruit_candidate_id:`eq.${candidateId}`,ai_result_id:`in.(${resultIds.join(',')})`,
+    order:'occurred_at.desc,id.desc',limit:100}):[];
   const byTask=new Map(results.map(row=>[String(row.task_id),row]));
   return {ok:true,personId,candidateId,history:tasks.map(task=>{
     const result=byTask.get(String(task.id)); if(!result)return null;
     let decision=null; if(typeof result.feedback==='string'&&result.feedback.startsWith('PC20:')) decision=result.feedback.slice(5);
-    return {taskId:String(task.id),resultId:String(result.id),createdAt:result.created_at||task.created_at,
+    const snapshot=task.context_snapshot || {};
+    const candidate=snapshot.candidate?.source?.table==='recruit_candidates' && String(snapshot.candidate.source.id)===candidateId ? snapshot.candidate : null;
+    const followups=candidate && Array.isArray(snapshot.recruit_followups) ? snapshot.recruit_followups.filter(v=>v?.source?.table==='recruit_followups') : [];
+    const context={candidate,recruit_followups:followups,sourceRefs:[candidate,...followups].filter(Boolean).map(line=>line.source)};
+    return {taskId:String(task.id),resultId:String(result.id),knowledge:snapshot.guidance?.reviewedKnowledge,createdAt:result.created_at||task.created_at,
+      outcomes:outcomes.filter(outcome=>String(outcome.ai_result_id)===String(result.id)).map(o=>({id:String(o.id),result:o.result,date:o.occurred_at})),
       result:coachOutput(result.final_result_json||result.result_json,context),decision,userEdited:result.user_edited===true};
   }).filter(Boolean),execution:{modelCalled:false,businessDataWritten:false}};
 }
@@ -145,7 +154,7 @@ async function decide(event,{request=createReader(),contextLoader=p360}={}) {
   const personId=idOf(event.personId), candidateId=idOf(event.candidateId), resultId=idOf(event.resultId);
   if(!DECISIONS.has(event.decision))invalid();
   await contextLoader('getRecruitCoachContext',personId,candidateId);
-  const results=await request('ai_results','GET',{select:'id,task_id,result_json,user_selected,user_edited,final_result_json',id:`eq.${resultId}`,limit:1});
+  const results=await request('ai_results','GET',{select:'id,task_id,result_json,user_selected,user_edited,final_result_json,feedback',id:`eq.${resultId}`,limit:1});
   const row=results[0]; if(!row)invalid('INVALID_RESULT');
   const tasks=await request('ai_tasks','GET',{select:'id,task_type,skill_name,subject_type,subject_id',id:`eq.${row.task_id}`,limit:1});
   const task=tasks[0]; if(!task||task.task_type!=='recruit_coach'||task.skill_name!=='recruit_coach'||
@@ -155,10 +164,16 @@ async function decide(event,{request=createReader(),contextLoader=p360}={}) {
   else if(event.decision==='modified'){
     selected=true;edited=true;finalResult=editedContactSuggestion(event.contactSuggestion,row.result_json);
   }
-  const updated=await request('ai_results','PATCH',{id:`eq.${resultId}`,select:'id'},
+  const sameDecision=record=>record?.feedback==='PC20:'+event.decision &&
+    (event.decision!=='modified'||require('node:util').isDeepStrictEqual(record.final_result_json,finalResult));
+  if(row.feedback && !sameDecision(row))invalid('STALE');
+  const updated=row.feedback ? [row] : await request('ai_results','PATCH',{feedback:'is.null',id:`eq.${resultId}`,select:'id'},
     {user_selected:selected,user_edited:edited,feedback:`PC20:${event.decision}`,
       final_result_json:finalResult});
-  if(!Array.isArray(updated)||updated.length!==1)invalid('PERSISTENCE_ERROR');
+  if(!updated?.length){
+    const [saved]=await request('ai_results','GET',{select:'feedback,final_result_json',id:`eq.${resultId}`,limit:1});
+    if(!sameDecision(saved))invalid('STALE');
+  }
   return {ok:true,status:'decided',resultId,decision:event.decision,
     execution:{modelCalled:false,businessDataWritten:false}};
 }

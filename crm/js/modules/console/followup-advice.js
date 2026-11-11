@@ -1,3 +1,4 @@
+import { knowledgeLine, strategyEvidence, versionFeedback } from './advice-evidence.js';
 import { h } from './dom.js';
 import { ic } from './icons.js';
 import { pageHead } from './ui.js';
@@ -14,10 +15,8 @@ const generationErrorKey = code => ({
   AI_REQUEST_FAILED: 'generate_failed',
 }[code] || 'generate_failed');
 const sourceList = (items = []) => items.length ? h('ul', { class: 'fa-sources' }, items.map(source =>
-  h('li', {}, [h('a', { href: `#/knowledge-governance?item=${encodeURIComponent(source.id)}`,
-    title: `${source.title || text('knowledge_source')} · ${text('source_id')} ${source.id}` },
-    `${source.title || text('knowledge_source')} · ${text('source_id')} ${source.id}`),
-    source.sourceDate ? h('small', {}, source.sourceDate) : null]))) : h('p', { class: 'fa-muted' }, text('no_sources'));
+  h('li', {}, h('a', { href: '#/knowledge-governance?item='+encodeURIComponent(source.id??source) },
+    knowledgeLine(source))))) : h('p', { class: 'fa-muted' }, text('no_sources'));
 
 function section(titleKey, content, sources) {
   return h('section', { class: 'fa-section' }, [h('h4', {}, text(titleKey)),
@@ -76,7 +75,7 @@ function editDialog(row, onClose, onSave) {
   return h('div', { class: 'fa-modal-overlay', onclick: event => { if (event.target === event.currentTarget) onClose(); } }, panel);
 }
 
-function compareLane(label, lane, variant, statusText, emptyText) {
+function compareLane(label, lane, variant, statusText, emptyText, ctx, row) {
   const available = lane.status === 'ready' || lane.status === 'manual' || lane.status === 'stale' || lane.status === 'kept';
   return h('article', { class: `fa-lane fa-lane-${variant}` }, [
     h('header', { class: 'fa-lane-head' }, [h('div', {}, [h('h3', {}, label),
@@ -85,6 +84,10 @@ function compareLane(label, lane, variant, statusText, emptyText) {
     available ? h('div', {}, [section('overall_strategy', lane.strategy, lane.strategySources),
       section('product_service_advice', lane.productAdvice, lane.productSources),
       lane.messageDraft ? section('wechat_message', lane.messageDraft, []) : null,
+      versionFeedback(ctx,{lane:variant,adviceId:row.id,subjectId:row.personId,updatedAt:row.updatedAt},{
+        ...strategyEvidence(lane.strategy),
+        knowledge:{status:'referenced',sources:[...new Map([...(lane.strategySources||[]),...(lane.productSources||[])].map(s=>[s.id??s,s])).values()]}
+      }),
       lane.basedOnSystemVersion ? h('p', { class: 'fa-muted' }, `${text('based_on_version')} ${lane.basedOnSystemVersion}`) : null]) :
       h('p', { class: 'fa-empty fa-lane-empty' }, emptyText || text('gpt_skill_pending')),
   ]);
@@ -221,8 +224,8 @@ export function renderFollowupAdvice(ctx, personId) {
         ]) : null]),
       h('div', { class: 'fa-compare' }, [
         compareLane(text('cloudbase_ai'), row.system, 'system', text(`system_${row.system.status}`),
-          text(row.system.status === 'failed' ? 'system_failed' : 'system_generating')),
-        compareLane(text('gpt'), row.gpt, 'gpt', text(`gpt_${row.gpt.status}`), text('gpt_skill_pending')),
+          text(row.system.status === 'failed' ? 'system_failed' : 'system_generating'),ctx,row),
+        compareLane(text('gpt'), row.gpt, 'gpt', text(`gpt_${row.gpt.status}`), text('gpt_skill_pending'),ctx,row),
       ]),
     ])) : [h('p', { class: 'fa-empty' }, text('empty'))]));
     if (modal) main.append(modal);

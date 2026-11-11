@@ -1,3 +1,4 @@
+import { evidencePanel } from './advice-evidence.js';
 import { h } from './dom.js';
 import { ic } from './icons.js';
 import { openSheet, openWorkItemEditor, openRecruitCandidateRemove } from './write.js';
@@ -105,6 +106,9 @@ function renderCoachHistory(ctx, host, personId, candidate, personName, onDone) 
           h('b',{},`${t('pc20_result_version')} · ${fmtDate(item.createdAt)}`),
           h('span',{class:'row-sub'},`${t('pc20_result_id')} #${item.resultId} · ${decisionLabel}`),
         ]),
+        evidencePanel({facts:(resultData.evidenceSources||[]).map(s=>[s.ref,s.date,...(s.fields||[]).map(f=>t('pc20_field_'+f.key)+' · '+f.value)].filter(Boolean).join(' · ')),
+          inference:resultData.contactSuggestion?.assumptionReasons,unknown:resultData.contactSuggestion?.clarifyingQuestions,
+          next:[resultData.contactSuggestion?.nextStep].filter(Boolean),knowledge:item.knowledge||{}}),
         resultData.totalScore!=null?h('div',{class:'row-title'},`${t('pc20_total_score')}: ${resultData.totalScore}/100`):
           h('div',{class:'sheet-note'},t('pc20_score_unavailable')),
         resultData.totalScoreNoteCode?h('div',{class:'sheet-note'},t(resultData.totalScoreNoteCode)):null,
@@ -126,6 +130,8 @@ function renderCoachHistory(ctx, host, personId, candidate, personName, onDone) 
           resultData.contactSuggestion?.nextStep?h('div',{class:'row-sub'},`${t('pc20_next_step')}: ${resultData.contactSuggestion.nextStep}`):null,
         ]),
       ]);
+      if(item.outcomes?.length)card.append(h('section',{},[h('strong',{},t('advice_review_outcome')),
+        ...item.outcomes.map(outcome=>h('p',{},[fmtDate(outcome.date),outcome.result].filter(Boolean).join(' · ')))]));
       if(!item.decision){
         const next=field('pc20_next_step',resultData.contactSuggestion?.nextStep||'');
         const editPanel=h('div',{class:'tab-stack'},[
