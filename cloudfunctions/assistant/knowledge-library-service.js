@@ -699,7 +699,9 @@ function createKnowledgeLibrary(options={}) {
     if(!/^[A-Za-z0-9_-]{1,128}$/.test(actor))fail('INVALID_ACTOR');
     if(!Number.isSafeInteger(fileSizeBytes)||fileSizeBytes<1||fileSizeBytes>MAX_FILE_BYTES)fail('FILE_TOO_LARGE');
     const uploadId=randomUUID(),placeholderDigest=createHash('sha256').update(`knowledge-upload:${uploadId}`).digest('hex');
-    const fileName=meta.fileName.replace(/[\\/\u0000-\u001f]/g,'_').replace(/^\.+/,'_');
+    // Keep the display name in metadata; PG storage rejects some Unicode/special-character keys.
+    const fileName=/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(meta.fileName)
+      ? meta.fileName : `document${extensionOf(meta.fileName)}`;
     const storageKey=`${actor}/${uploadId}/${fileName}`;
     const upload={upload_id:uploadId,phase:'receiving',file_size_bytes:fileSizeBytes,storage_bucket:KNOWLEDGE_BUCKET};
     const rows=await request('knowledge_sources','POST',{select:'id,updated_at'},[{
