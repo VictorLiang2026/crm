@@ -7,11 +7,31 @@ async function makeRecipient() {
   const replyKey = btoa(String.fromCharCode(...bytes)).replace(/=+$/,'').replace(/\+/g,'-').replace(/\//g,'_');
   return {replyKey,privateKey:keys.privateKey};
 }
+function encode(bytes) {
+  let binary = '';
+  for (const byte of new Uint8Array(bytes)) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');
+}
+async function sealRequest(publicKey, payload) {
+  const key = await crypto.subtle.importKey('spki',fromBase64(publicKey),{name:'RSA-OAEP',hash:'SHA-256'},false,['encrypt']);
+  const transportKey = await crypto.subtle.generateKey({name:'AES-GCM',length:256},true,['encrypt']);
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const raw = await crypto.subtle.exportKey('raw',transportKey);
+  const wrapped = await crypto.subtle.encrypt({name:'RSA-OAEP'},key,raw);
+  const encrypted = new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv,additionalData:new TextEncoder().encode(header)},transportKey,new TextEncoder().encode(JSON.stringify(payload))));
+  return [header,encode(wrapped),encode(iv),encode(encrypted.slice(0,-16)),encode(encrypted.slice(-16))].join('.');
+}
 export async function registrationCall(send, action, data = {}) {
   const privateReply = action !== 'getPublishedPage';
   if (privateReply && !recipient) recipient=makeRecipient().catch(error=>{recipient=null;throw error;});
   const target = privateReply ? await recipient : null;
-  const reply = await send({action,...data,...(target?{replyKey:target.replyKey}:{})});
+  let payload = { ...data,action };
+  if (target) {
+    const transport = await send({action:'getRegistrationTransportKey'});
+    if (!transport?.publicKey) throw Error('REGISTRATION_TRANSPORT_UNAVAILABLE');
+    payload = { action,sealedRequest:await sealRequest(transport.publicKey,{...payload,replyKey:target.replyKey}) };
+  }
+  const reply = await send(payload);
   if (reply?.error) throw Error(typeof reply.error==='string'?reply.error:reply.error.code||'REQUEST_FAILED');
   if (!target) return reply;
   const parts=typeof reply?.sealed==='string'?reply.sealed.split('.'):[];

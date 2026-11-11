@@ -332,10 +332,17 @@ async function ownerRegistration(event, update = false) {
   return writeRegistration('edit',{id:submission.id,hash,schema:page.form_schema,name,phone,wechat,answers});
 }
 
+let transport;
+function configuredTransport() {
+  if (!transport) transport = require('./registration-request').requestTransport(process.env.CRM_REGISTRATION_REQUEST_PRIVATE_PEM);
+  return transport;
+}
 async function dispatch(event, publicOnly) {
   try {
     const action = text(event?.action, 40);
+    if (action === 'getRegistrationTransportKey') return {publicKey:configuredTransport().publicKey};
     if (publicOnly ? !PUBLIC_ACTIONS.has(action) : PUBLIC_ACTIONS.has(action)) fail('UNKNOWN_ACTION');
+    if (action !== 'getPublishedPage') event = configuredTransport().open(action,event.sealedRequest);
     if (!PUBLIC_ACTIONS.has(action)) caller();
     const key = action==='getPublishedPage' ? null : recipient(event.replyKey);
     const value=await perform(action,event);

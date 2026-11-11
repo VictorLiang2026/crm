@@ -6,11 +6,14 @@ test('private registration responses are readable by the requesting browser with
   for(const result of [{managementToken:'fixture-management-link'}, {registrations:[{phone:'TEST-PRIVATE',answers:{answer:'synthetic answer'}}]}]){
     let logged;
     const actual=await registrationCall(async input=>{
-      const reply=seal(result,recipient(input.replyKey));logged=JSON.stringify(reply);return reply;
+      const transport=require('./transport-fixture.cjs');
+      if(input.action==='getRegistrationTransportKey')return {publicKey:transport.publicKey};
+      const request=transport.open(input.action,input.sealedRequest);
+      const reply=seal(result,recipient(request.replyKey));logged=JSON.stringify(reply);return reply;
     },'submit');
     assert.deepEqual(actual,result);assert.doesNotMatch(logged,/fixture-management-link|TEST-PRIVATE|synthetic answer/);
   }
-  await assert.rejects(registrationCall(async()=>({managementToken:'unexpected'}),'submit'),/INVALID_PRIVATE_REPLY/);
+  await assert.rejects(registrationCall(async p=>p.action==='getRegistrationTransportKey'?{publicKey:require('./transport-fixture.cjs').publicKey}:{managementToken:'unexpected'},'submit'),/INVALID_PRIVATE_REPLY/);
   assert.throws(()=>recipient(''),/INVALID_REPLY_KEY/);
   for(const folder of ['activity_registration','activity_registration_public']){
     const f=path.resolve(__dirname,'../../cloudfunctions',folder,'registration-reply.js');

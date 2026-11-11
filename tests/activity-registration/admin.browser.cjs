@@ -18,8 +18,9 @@ test(device+' registration management, review and explicit Person linking',async
       const packet=JSON.parse(String(message.data));
       if(packet.method!=='Runtime.bindingCalled'||packet.params.name!=='registrationFixture')return;
       try{
-        const {id,key,value}=JSON.parse(packet.params.payload);
-        const reply=seal(value,recipient(key));
+        const {id,key,value,inbound}=JSON.parse(packet.params.payload);
+        const transport=require('./transport-fixture.cjs');
+        const reply=inbound ? (inbound.action==='getRegistrationTransportKey'?{publicKey:transport.publicKey}:transport.open(inbound.action,inbound.sealedRequest)) : seal(value,recipient(key));
         await browser.evaluate('window.finishRegistrationFixture('+id+','+JSON.stringify(reply)+')');
       }catch(error){browser.runtimeErrors.push(error.message);}
     });
@@ -43,6 +44,11 @@ test(device+' registration management, review and explicit Person linking',async
       let serial=0;const pending=new Map();
       window.finishRegistrationFixture=(id,reply)=>{pending.get(id)(reply);pending.delete(id);};
       window.arAdminRender=renderActivityRegistrations;window.arAdminCtx={main:host,callFn:async(name,data)=>{
+        if(name==='activity_registration'){
+          const unwrapped=await new Promise(resolve=>{const id=++serial;pending.set(id,resolve);registrationFixture(JSON.stringify({id,inbound:data}));});
+          if(data.action==='getRegistrationTransportKey')return unwrapped;
+          data=unwrapped;
+        }
         const value=await window.arTest.call(name,data);
         if(name!=='activity_registration')return value;
         const id=++serial;return new Promise(resolve=>{pending.set(id,resolve);window.registrationFixture(JSON.stringify({id,key:data.replyKey,value}));});

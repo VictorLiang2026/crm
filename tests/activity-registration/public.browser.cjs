@@ -21,6 +21,8 @@ test(device+' public registration, shared link and pending edit',async()=>{
     localStorage.setItem('ar_token',token);window.__ar={rows,calls:[],token};
     window.cloudbase={init:()=>({callFunction:async({name,data})=>{
       if(name!=='activity_registration_public')throw Error('Wrong public function');
+      if(data.action==='getRegistrationTransportKey')return {result:await window.openRequest(data)};
+      if(data.action!=='getPublishedPage')data=await window.openRequest(data);
       window.__ar.calls.push({name,data});let value;
       if(data.action==='getPublishedPage')value={page:pages[data.slug]};
       else if(data.action==='submit'){
@@ -62,6 +64,8 @@ test(device+' public registration, shared link and pending edit',async()=>{
     const page=await browser.newPage();
     await page.setViewport({width:viewportWidth,height:viewportHeight,isMobile:device==='iPhone',deviceScaleFactor:1});
     const {recipient,seal}=require('../../cloudfunctions/activity_registration_public/registration-reply');
+    const transport=require('./transport-fixture.cjs');
+    await page.exposeFunction('openRequest',data=>data.action==='getRegistrationTransportKey'?{publicKey:transport.publicKey}:transport.open(data.action,data.sealedRequest));
     await page.exposeFunction('sealReply',(key,value)=>seal(value,recipient(key)));
     const browserErrors=[];
     page.on('pageerror',error=>browserErrors.push(error.message));
