@@ -12,6 +12,9 @@ const generationErrorKey = code => ({
   TEST_DATA_OUTPUT_BLOCKED: 'generation_output_blocked',
   AI_TASK_TIMEOUT: 'generation_timeout',
   AI_AUDIT_UNKNOWN: 'generation_status_unknown',
+  ADVICE_START_FAILED: 'generation_start_failed',
+  ADVICE_CONTEXT_ACCESS_DENIED: 'generation_context_denied',
+  ADVICE_CONTEXT_UNAVAILABLE: 'generation_context_unavailable',
   AI_REQUEST_FAILED: 'generate_failed',
 }[code] || 'generate_failed');
 const sourceList = (items = []) => items.length ? h('ul', { class: 'fa-sources' }, items.map(source =>

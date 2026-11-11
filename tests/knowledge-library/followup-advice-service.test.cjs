@@ -314,7 +314,7 @@ test('follow-up advice status reports a pre-task failure instead of polling fore
   const service=createKnowledgeLibrary({env:'crm-test123',key:'test-key',fetchImpl,
     client:{callFunction:async()=>({result:{}})}});
   const result=await service.run({operation:'adviceStatus',data:{personId:'42',startedAt:'2026-11-04T01:00:00.000Z'}},'operator');
-  assert.deepEqual(result,{ok:false,status:'failed',taskId:'',personId:'42',adviceId:'91',error:{code:'AI_REQUEST_FAILED'}});
+  assert.deepEqual(result,{ok:false,status:'failed',taskId:'',personId:'42',adviceId:'91',error:{code:'ADVICE_START_FAILED'}});
   assert.equal(adviceFilter.get('created_at'),'gte.2026-11-04T01:00:00.000Z');
 });
 

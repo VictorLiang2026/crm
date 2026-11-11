@@ -35,8 +35,13 @@ async function internalCall(app,request){
  let token;
  if(s.origin==='browser'){
    if(!s.attestation||!['assistant','ai_followup'].includes(s.name))throw deny();
-   const issued=await app.callFunction({name:'person_360',data:{action:'issueInternalDelegation',attestation:s.attestation,payload}});
+   const command={attestation:s.attestation,payload};
+   const data=request.name==='person_360' && payload.action==='getMeetingPrepContext'
+     ? {action:'issueInternalDelegation',contextRead:command}
+     : {action:'issueInternalDelegation',...command};
+   const issued=await app.callFunction({name:'person_360',data});
    token=issued?.result?.token;
+   if(data.contextRead && !token)console.warn('FOLLOWUP_CONTEXT_DELEGATION_DENIED');
  }else{
    if(s.name!=='assistant')throw deny();
    token=(await delegate(app,'issue',args))?.token;

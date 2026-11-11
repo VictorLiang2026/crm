@@ -1063,9 +1063,15 @@ function createKnowledgeLibrary(options={}) {
     });
   }
   async function followupAdviceContext(personId,focus='') {
-    const response=await callFunction({name:'person_360',data:{action:'getMeetingPrepContext',personId}});
-    const person=response?.result;
-    if(!person||person.error||!object(person)||!person.person)fail('NOT_FOUND');
+    let person;
+    try {
+      const response=await callFunction({name:'person_360',data:{action:'getMeetingPrepContext',personId}});
+      person=response?.result;
+    }catch(error){
+      fail(error?.code==='DEVICE_ACCESS_DENIED'?'ADVICE_CONTEXT_ACCESS_DENIED':'ADVICE_CONTEXT_UNAVAILABLE');
+    }
+    if(person?.error==='DEVICE_ACCESS_DENIED'||person?.error?.code==='DEVICE_ACCESS_DENIED')fail('ADVICE_CONTEXT_ACCESS_DENIED');
+    if(!object(person)||person.error||!object(person.person))fail('ADVICE_CONTEXT_UNAVAILABLE');
     const safePerson={occupation:person.person.occupation||null,customer_stage:person.person.customer_stage||null,
       customer_level:person.person.customer_level||null,sales_priority:person.person.sales_priority||null,
       referral_priority:person.person.referral_priority||null,relationship_stage:person.person.relationship_stage||null};
@@ -1203,7 +1209,7 @@ function createKnowledgeLibrary(options={}) {
           deleted_at:'is.null',order:'created_at.desc.nullslast,id.desc',limit:5});
         const advice=adviceRows[0];
         if(advice?.system_status==='failed')return {ok:false,status:'failed',taskId:'',personId,
-          adviceId:String(advice.id),error:{code:'AI_REQUEST_FAILED'}};
+          adviceId:String(advice.id),error:{code:advice.system_task_id?'AI_REQUEST_FAILED':'ADVICE_START_FAILED'}};
         if(advice?.system_status==='ready')return {ok:true,status:'completed',taskId:'',personId,
           adviceId:String(advice.id),advice:adviceDto(advice)};
         return {ok:true,status:'pending',taskId:'',personId,...(advice?.id?{adviceId:String(advice.id)}:{})};

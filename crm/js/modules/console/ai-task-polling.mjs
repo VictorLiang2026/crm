@@ -31,8 +31,15 @@ export async function resolveAITask(startRequest, statusRequest, taskType, perso
   }
   const startedAt = new Date().toISOString();
   const deadline = Date.now() + timeoutMs;
+  let backgroundReadError;
   const startup = Promise.resolve().then(startRequest).then(
-    value => ({ value }), error => ({ error }));
+    value => ({ value }), error => ({ error })).then(reply => {
+      const code=reply.error?.code || reply.value?.error?.code;
+      if(taskType==='person_followup_advice' && ['ADVICE_CONTEXT_ACCESS_DENIED','ADVICE_CONTEXT_UNAVAILABLE'].includes(code)) {
+        backgroundReadError=failure(code);
+      }
+      return reply;
+    });
   let startupTimer;
   const startupWait = new Promise(resolve => {
     startupTimer = setTimeout(() => resolve({ timedOut: true }),
@@ -49,6 +56,7 @@ export async function resolveAITask(startRequest, statusRequest, taskType, perso
   if (!first.timedOut && !/^[1-9][0-9]*$/.test(taskId)) throw failure('AI_AUDIT_UNKNOWN');
   while (Date.now() < deadline) {
     await sleep(Math.min(intervalMs, Math.max(0, deadline - Date.now())));
+    if(backgroundReadError) throw backgroundReadError;
     const remaining = deadline - Date.now();
     if (remaining <= 0) break;
     let statusTimer;
@@ -61,6 +69,7 @@ export async function resolveAITask(startRequest, statusRequest, taskType, perso
     });
     const checked = await Promise.race([statusPromise, statusWait]);
     clearTimeout(statusTimer);
+    if(backgroundReadError) throw backgroundReadError;
     if (checked.timedOut) continue;
     if (checked.error) throw checked.error;
     const status = checked.value;

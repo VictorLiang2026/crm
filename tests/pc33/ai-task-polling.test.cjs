@@ -41,3 +41,14 @@ test('dual task polling falls back to the durable Person task when startup respo
   assert.equal(calls[1].taskId,'47');
   assert.equal('startedAt' in calls[1],false);
 });
+
+test('late context denial remains visible after startup polling begins',async()=>{
+  const error=Object.assign(new Error('context unavailable'),{code:'ADVICE_CONTEXT_ACCESS_DENIED'});
+  let rejectStart;
+  await assert.rejects(resolveAITask(()=>new Promise((_,reject)=>{rejectStart=reject;}),async()=>{
+    rejectStart(error);
+    await new Promise(resolve=>setTimeout(resolve,1));
+    return {ok:false,status:'failed',error:{code:'ADVICE_START_FAILED'}};
+  },'person_followup_advice','783',{intervalMs:0,timeoutMs:200,startupTimeoutMs:2,recoverStartup:true}),
+  e=>e.code===error.code);
+});

@@ -150,6 +150,13 @@ async function dispatch(name,main,event,ctx,callback,app){
    return require('./device-verifier').verifyOnly(event,app);
  }
  if(name==='person_360'&&event?.action==='issueInternalDelegation'){
+   // Keep SDK transport metadata outside the validated customer-context command.
+   if(Object.hasOwn(event,'contextRead')){
+     const command=event.contextRead;
+     if(!exactKeys(command,['attestation','payload'])||command.payload?.action!=='getMeetingPrepContext'||
+        ['attestation','payload','__deviceRequest','__crmDelegation'].some(key=>Object.hasOwn(event,key)))throw deny();
+     return issueInternalDelegation(app,{action:'issueInternalDelegation',attestation:command.attestation,payload:command.payload});
+   }
    return issueInternalDelegation(app,event);
  }
  if(name==='person_360'&&event?.action==='consumeInternalDelegation'){

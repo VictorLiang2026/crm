@@ -201,6 +201,7 @@ test('assistant, follow-up, recommend and referral receive only fixed browser de
  };
  try{
   for(const [source,audience,payload,expectedAudience] of [
+   ['assistant','assistant',{action:'getMeetingPrepContext',personId:'783'},'person_360'],
    ['assistant','assistant',{action:'ocr_knowledge_source',fileName:'page-1.jpg',contentType:'image/jpeg',base64:'AA=='},'ai_parse'],
    ['assistant','assistant',{action:'daily_review',view:'morning'},'today_coach'],
    ['ai_followup','ai_followup',{action:'listInteractions',personId:'17',limit:5},'person_360'],
@@ -209,6 +210,23 @@ test('assistant, follow-up, recommend and referral receive only fixed browser de
   ]){
    const request={action:'parse',__deviceProof:{fingerprint,challenge:crypto.randomUUID(),signature:'unused-by-stub'}};
    const attested=await verifyOnly({audience,request},{},async()=>actor,{protocol:{authorize:async()=>({ok:true})}});
+   if(payload.action==='getMeetingPrepContext'){
+     const assistant=require('../../cloudfunctions/assistant/device-runtime');
+     const person=runtime.protect('person_360',async input=>({person:{id:input.personId}}),()=>({}));
+     const client={auth:()=>({getUserInfo:()=>({uid:actor,isAnonymous:false})}),callFunction:async({data})=>{
+       if(data.action==='verifyBusinessDeviceOnly')return {result:attested};
+       const result=await person({...data,userInfo:{uid:actor},requestId:'fixture-request'});
+       return {result};
+     }};
+     const read=assistant.protect('assistant',async()=>assistant.scopedApp(client).callFunction({name:expectedAudience,data:payload}),()=>client);
+     const response=await read({__deviceRequest:request});
+     assert.deepEqual(response,{result:{person:{id:'783'}}});
+     assert.deepEqual(issued.slice(-2).map(r=>r.p_op),['issue','consume']);
+     const invalid=await person({action:'issueInternalDelegation',contextRead:{attestation:attested.attestation,
+       payload:{action:'getMeetingPrepContext'}}});
+     assert.equal(invalid.error,'DEVICE_ACCESS_DENIED');
+     continue;
+   }
    const result=await runtime.issueInternalDelegation({}, {action:'issueInternalDelegation',attestation:attested.attestation,payload});
    assert.match(result.token,/^[a-f0-9-]{36}$/);
    assert.equal(issued.at(-1).p_args.audience,expectedAudience);
@@ -222,7 +240,7 @@ test('assistant, follow-up, recommend and referral receive only fixed browser de
   const rejected=await runtime.protect('person_360',async()=>({ok:true}),()=>({auth:()=>({getUserInfo:()=>({uid:actor})})}))(
    {action:'issueInternalDelegation',attestation:attested.attestation,payload:{action:'deletePerson',personId:'17'}});
   assert.equal(rejected.error,'DEVICE_ACCESS_DENIED');
-  assert.equal(issued.filter(row=>row.p_op==='issue').length,5);
+  assert.equal(issued.filter(row=>row.p_op==='issue').length,6);
   assert.equal(followup.limit,5);
  }finally{
   global.fetch=previous.fetch;

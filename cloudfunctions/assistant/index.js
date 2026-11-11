@@ -499,6 +499,7 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
           'NOT_FOUND','INVALID_OPERATION','PERSISTENCE_ERROR','UNAUTHORIZED',
           'PERMISSION_DENIED','DUPLICATE_SOURCE','AI_IN_PROGRESS','AI_RETRY_LATER','AI_AUDIT_UNKNOWN',
           'TEST_DATA_BLOCKED','TEST_DATA_SCOPE_UNVERIFIED','TEST_DATA_OUTPUT_BLOCKED',
+          'ADVICE_CONTEXT_ACCESS_DENIED','ADVICE_CONTEXT_UNAVAILABLE',
           'INVALID_RESULT','INVALID_CONFIG','TIMEOUT','UPSTREAM_UNAVAILABLE','AI_REQUEST_FAILED'].includes(error?.code) || /^CONTENT_[A-Z_]{1,64}$/.test(error?.code||'')
           ? error.code : 'KNOWLEDGE_LIBRARY_FAILED';
         return {ok:false,error:{code,message:'Knowledge library operation could not be completed'}};
@@ -530,7 +531,7 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
       if (!earlyResponse.sent) earlyResponse.send(result);
     }, error => {
       const code=['INVALID_INPUT','NOT_FOUND','PERSISTENCE_ERROR','STALE','TIMEOUT','UPSTREAM_UNAVAILABLE',
-        'AI_TASK_TIMEOUT','AI_AUDIT_UNKNOWN','AI_REQUEST_FAILED','TEST_DATA_BLOCKED',
+        'AI_TASK_TIMEOUT','AI_AUDIT_UNKNOWN','AI_REQUEST_FAILED','ADVICE_CONTEXT_ACCESS_DENIED','ADVICE_CONTEXT_UNAVAILABLE','TEST_DATA_BLOCKED',
         'TEST_DATA_SCOPE_UNVERIFIED','TEST_DATA_OUTPUT_BLOCKED']
         .includes(error?.code)?error.code:'AI_BACKGROUND_FAILED';
       if (!earlyResponse.sent) earlyResponse.send({ok:false,error:{code,
