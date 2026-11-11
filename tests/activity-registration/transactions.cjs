@@ -1,0 +1,43 @@
+'use strict';
+const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
+const {PGlite}=require(process.env.CRM_PGLITE_MODULE||'@electric-sql/pglite');
+const versions=['20261110110000_activity_registration','20261110160000_activity_registration_shared_token','20261111230000_activity_registration_write'];
+const sql=(name,rollback=false)=>fs.readFileSync(path.join(__dirname,'../../cloudbase/migrations',name+(rollback?'.rollback':'')+'.sql'),'utf8');
+require('node:test')('registration writes and audit are atomic, scoped and reversible in an isolated database',async()=>{
+  const db=new PGlite();
+  try{
+    await db.exec(`CREATE ROLE anon;CREATE ROLE authenticated;CREATE ROLE service_role;
+      CREATE TABLE public.activities(id bigint primary key,deleted_at timestamptz);
+      CREATE TABLE public.persons(id bigint primary key,deleted_at timestamptz);
+      GRANT SELECT,UPDATE ON public.activities,public.persons TO service_role;
+      INSERT INTO public.activities VALUES(1,null),(2,null); INSERT INTO public.persons VALUES(3,null);`);
+    for(const name of versions)await db.exec(sql(name));
+    for(const name of [...versions].reverse())await db.exec(sql(name,true));
+    for(const name of versions)await db.exec(sql(name));
+    await db.exec('SET ROLE service_role');
+    const pages=(await db.query("insert into public.activity_registration_pages(activity_id,slug,status,capacity) values(1,'first','published',2),(2,'second','published',null) returning id")).rows;
+    const run=async(op,data)=>(await db.query('select public.crm_activity_registration_write_v1($1,$2) as response',[op,JSON.stringify(data)])).rows[0].response;
+    const base={name:'Fixture',wechat:'TEST',phone:'',schema:[],answers:{},reuse:false,pageId:pages[0].id,hash:'a'.repeat(64)};
+    const first=await run('submit',base);
+    await assert.rejects(run('submit',{...base,reuse:true}),/ALREADY_REGISTERED/);
+    const second=await run('submit',{...base,hash:'b'.repeat(64)});
+    await assert.rejects(run('submit',{...base,hash:'c'.repeat(64)}),/REGISTRATION_FULL/);
+    const shared=await run('submit',{...base,pageId:pages[1].id,reuse:true});
+    await run('edit',{...base,id:shared.submissionId,name:'Edit'});
+    const op={id:first.submissionId,actor:'fixture'};
+    await run('review',{...op,status:'approved'});await run('link',{...op,personId:3});
+    assert.equal((await run('link',{...op,personId:3})).unchanged,true);
+    await run('review',{id:second.submissionId,actor:'fixture',status:'approved'});
+    await assert.rejects(run('link',{id:second.submissionId,actor:'fixture',personId:3}),/PERSON_ALREADY_LINKED_TO_EVENT/);
+    await assert.rejects(run('edit',{...base,id:first.submissionId}),/REGISTRATION_LOCKED/);
+    await run('notify',op);assert.equal((await run('rotate',{...op,newHash:'d'.repeat(64)})).slug,'first');
+    await assert.rejects(run('edit',{...base,id:shared.submissionId}),/REGISTRATION_NOT_FOUND/);
+    await run('edit',{...base,id:shared.submissionId,hash:'d'.repeat(64)});
+    await run('review',{...op,status:'waitlisted'});
+    assert.equal((await db.query("select count(*)::int as n from public.activity_registration_people")).rows[0].n,0);
+    assert.equal((await db.query("select count(*)::int as n from public.activity_registration_audit where action='management_link_reissued'")).rows[0].n,2);
+    await db.exec('SET ROLE anon');await assert.rejects(run('submit',base),/permission denied/);
+    await db.exec('RESET ROLE');await db.exec(sql(versions[2],true));
+    await assert.rejects(db.exec(sql(versions[1],true)),/uniqueness/);
+  }finally{await db.close();}
+});

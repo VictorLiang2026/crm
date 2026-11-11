@@ -9,6 +9,7 @@ import {
   renderTestScenario, renderTestAction,
   renderFollowupAdvice, renderFollowupAdviceTasks,
   renderKnowledgeEditor, renderKnowledgeTrash,
+  renderActivityRegistrations,
 } from './views.js';
 
 import { renderFollowupList } from './business-report.js';
@@ -26,6 +27,7 @@ const EXACT = new Map([
   ['#/recycle/recruit', renderRecruitTrash],
   ['#/opportunities', renderOpportunities],
   ['#/activities', renderActivities],
+  ['#/activity-registrations', renderActivityRegistrations],
   ['#/activity-resources', renderResourceDirectory],
   ['#/activity-speakers', renderSpeakerDirectory],
   ['#/activity-topics', renderTopicDirectory],
@@ -83,6 +85,7 @@ const NAV_OF = {
   '#/recycle/recruit': '#/more',
   '#/opportunities': '#/opportunities',
   '#/activities': '#/activities',
+  '#/activity-registrations': '#/activities',
   '#/activity-resources': '#/activities',
   '#/activity-speakers': '#/activities',
   '#/activity-topics': '#/activities',

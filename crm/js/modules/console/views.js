@@ -8,6 +8,7 @@ export { renderCustomerTrash, renderRecruitTrash, renderRecycleHub } from './pag
 export { renderPerson } from './pages/person.js';
 export { renderOpportunities } from './pages/opportunities.js';
 export { renderActivities, renderActivity } from './pages/activities.js';
+export { renderActivityRegistrations } from './activity-registrations.js';
 export { renderResourceDirectory, renderSpeakerDirectory, renderTopicDirectory } from './activity-people.js';
 export { renderRecruit } from './pages/recruit.js';
 export { renderRecruitGoals } from './recruit-goals.js';

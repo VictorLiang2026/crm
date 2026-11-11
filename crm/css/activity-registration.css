@@ -1,0 +1,73 @@
+:root {
+  color-scheme: light;
+  --ar-paper: #f7f4ee;
+  --ar-ink: #222321;
+  --ar-muted: #706e68;
+  --ar-accent: #a34e3d;
+  --ar-accent-dark: #813b2e;
+  --ar-sand: #e5ded2;
+  --ar-white: #fffefa;
+  --ar-line: #d9d1c5;
+  font-family: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+  background: var(--ar-paper);
+  color: var(--ar-ink);
+}
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 320px; background: var(--ar-paper); }
+button, input, textarea, select { font: inherit; }
+button { cursor: pointer; }
+.ar-page { min-height: 100dvh; padding: max(18px, env(safe-area-inset-top)) 18px max(28px, env(safe-area-inset-bottom)); }
+.ar-shell { max-width: 990px; margin: 0 auto; }
+.ar-top { display: flex; justify-content: space-between; align-items: center; padding: 4px 0 18px; color: var(--ar-muted); font-size: 13px; letter-spacing: .08em; text-transform: uppercase; }
+.ar-lang { color: var(--ar-ink); background: transparent; border: 1px solid var(--ar-line); border-radius: 999px; padding: 8px 14px; }
+.ar-hero { position: relative; overflow: hidden; background: var(--ar-ink); color: var(--ar-white); min-height: 210px; display: flex; align-items: end; }
+.ar-hero img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: .63; }
+.ar-hero-copy { position: relative; padding: clamp(26px, 7vw, 66px); width: 100%; background: linear-gradient(0deg, rgba(20,20,19,.72), transparent 78%); }
+.ar-kicker { color: #ead2be; font-size: 12px; letter-spacing: .16em; text-transform: uppercase; }
+.ar-title { max-width: 800px; margin: 12px 0 0; font-family: "Noto Serif SC", "Songti SC", serif; font-size: clamp(30px, 5.2vw, 54px); font-weight: 600; line-height: 1.18; }
+.ar-layout { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(280px, .75fr); gap: clamp(24px, 5vw, 58px); padding: clamp(24px, 5vw, 48px) clamp(0px, 4vw, 36px); align-items: start; }
+.ar-content { min-width: 0; }
+.ar-intro { font-size: 17px; line-height: 1.9; white-space: pre-wrap; margin: 0 0 24px; }
+.ar-facts { display: grid; grid-template-columns: 1fr 1fr; gap: 13px; border-block: 1px solid var(--ar-line); padding: 19px 0; margin: 0 0 26px; }
+.ar-fact { min-width: 0; }
+.ar-label { display: block; color: var(--ar-muted); font-size: 12px; margin-bottom: 5px; }
+.ar-fact strong { font-size: 15px; font-weight: 600; overflow-wrap: anywhere; }
+.ar-highlights { margin: 20px 0; padding-left: 20px; line-height: 1.8; }
+.ar-block { margin: 24px 0; }
+.ar-block p { white-space: pre-wrap; line-height: 1.85; margin: 0; }
+.ar-block img { display: block; width: 100%; max-height: 660px; object-fit: cover; }
+.ar-form { position: sticky; top: 18px; padding: 24px; background: var(--ar-white); border: 1px solid var(--ar-sand); border-top: 4px solid var(--ar-accent); }
+.ar-form h2 { margin: 0 0 6px; font: 600 23px/1.35 "Noto Serif SC", "Songti SC", serif; }
+.ar-note { margin: 0 0 18px; color: var(--ar-muted); font-size: 13px; line-height: 1.65; }
+.ar-field { display: grid; gap: 7px; margin: 15px 0; font-size: 14px; }
+.ar-field input, .ar-field textarea, .ar-field select { width: 100%; min-height: 48px; padding: 12px; border: 1px solid var(--ar-line); border-radius: 2px; color: var(--ar-ink); background: white; }
+.ar-field textarea { min-height: 90px; resize: vertical; }
+.ar-submit { width: 100%; min-height: 52px; padding: 12px 18px; background: var(--ar-accent); color: white; border: 0; font-weight: 700; letter-spacing: .04em; }
+.ar-submit:hover { background: var(--ar-accent-dark); }
+.ar-submit:disabled { opacity: .55; cursor: wait; }
+.ar-error { color: #9b2f24; font-size: 14px; line-height: 1.5; margin: 12px 0; }
+.ar-success { border-left: 3px solid var(--ar-accent); background: #f0e8dd; padding: 16px; line-height: 1.7; }
+.ar-success a { color: var(--ar-accent-dark); overflow-wrap: anywhere; }
+.ar-footer { max-width: 990px; margin: 0 auto; border-top: 1px solid var(--ar-line); padding: 18px 0; color: var(--ar-muted); font-size: 12px; }
+.ar-unavailable { max-width: 580px; margin: 14vh auto; padding: 30px; border-left: 4px solid var(--ar-accent); background: var(--ar-white); }
+.ar-status { display: inline-flex; border: 1px solid var(--ar-line); padding: 5px 9px; font-size: 12px; margin: 3px 0 15px; }
+.ar-manage-link { color: var(--ar-accent-dark); }
+.ar-registration-history { display: grid; gap: 10px; margin: 30px 0; }
+.ar-registration-history h2 { margin: 0 0 3px; font: 600 20px/1.4 "Noto Serif SC", "Songti SC", serif; }
+.ar-registration-history-item { display: grid; gap: 5px; padding: 13px 15px; border: 1px solid var(--ar-line); background: rgba(255,254,250,.72); color: var(--ar-ink); text-decoration: none; }
+.ar-registration-history-item:hover { border-color: var(--ar-accent); }
+.ar-registration-history-item span { color: var(--ar-muted); font-size: 12px; }
+.ar-registration-history-item .ar-status { justify-self: start; margin: 2px 0 0; }
+@media (max-width: 720px) {
+  .ar-page { padding-left: 0; padding-right: 0; }
+  .ar-top, .ar-hero, .ar-footer { margin-left: 18px; margin-right: 18px; }
+  .ar-layout { display: flex; flex-direction: column; padding: 22px 18px 30px; gap: 25px; }
+  .ar-form { position: static; width: 100%; padding: 21px 18px; }
+  .ar-facts { grid-template-columns: 1fr; }
+  .ar-hero { min-height: 250px; }
+}
+@media (min-width: 721px) and (max-width: 1024px) {
+  .ar-shell, .ar-footer { max-width: 900px; }
+  .ar-layout { grid-template-columns: minmax(0, 1.2fr) minmax(300px, .8fr); }
+}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; } }

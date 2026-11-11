@@ -17,7 +17,7 @@ test('browser loads an explicit CloudBase SDK version', () => {
 test('all deployed CRM functions pin the installed CloudBase Node SDK', () => {
   const config = readJson(path.join(root, 'cloudbaserc.json'));
   const functions = config.functions.map(item => item.name);
-  assert.equal(functions.length, 30);
+  assert.equal(functions.length, 32);
   assert.ok(functions.includes('knowledge_mcp'));
   const mcpFunction = config.functions.find(item => item.name === 'knowledge_mcp');
   assert.equal(mcpFunction.type, 'HTTP');

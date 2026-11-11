@@ -109,6 +109,7 @@ export function renderActivities(ctx) {
       kicker: 'ACTIVITIES', title: t('title_activities'), tag: wpTag(t('act_manage_tag')),
       sub: t('sub_activities'),
       actions: [
+        h('a', { class:'btn btn-ghost', href:'#/activity-registrations' }, [ic('calendar'), t('ar_admin_open')]),
         h('a', { class: 'btn btn-ghost', href: '#/activity-speakers' }, t('resource_directory_speakers_tab')),
         h('a', { class: 'btn btn-ghost', href: '#/activity-topics' }, t('resource_directory_topics_tab')),
         h('button', { class: 'btn btn-ghost', type: 'button', title: t('act_daily_report'), onclick: () => {
