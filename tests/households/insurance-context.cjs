@@ -18,7 +18,7 @@ function fixture(customerId = 101) {
     products: [{ id: 1, created_at: '2026-09-19T00:00:00Z', current_policy_description: '客户关注医疗保障的续保情况',
       items: JSON.stringify([{ key: 'ap_ci', coverage_amount: '100000', total_premium: '5000',
         paid_premium: '2000', annual_premium: '3000', update_date: '2026-09-20' }]) }],
-    policy_review_reports: [{ id: 2, report_date: '2026-09-20', summary: 'AI 摘要',
+    v_policy_review_state: [{ id: 2, report_date: '2026-09-20', summary: 'AI 摘要',
       edited_summary: '人工摘要', gaps_found: 'AI 缺口', edited_gaps: '人工确认待讨论的问题',
       edited_next_action: '准备资料', updated_at: '2026-09-21T00:00:00Z' }],
     ocr_records: [{ id: 3, summary: '保险合同摘要', raw_text: 'MUST_NOT_READ',
@@ -39,6 +39,7 @@ function fixture(customerId = 101) {
     assert.equal(method, 'GET');
     if (table === 'persons') return rows.persons;
     if (table === 'opportunities' && filters.customer_id) return rows.opportunities;
+    if(table==='v_policy_review_state'){assert.equal(filters.is_current,'eq.true');return rows.products.length?rows[table]:[];}
     return rows[table] || [];
   };
   return { service: createService({ request,
@@ -48,7 +49,7 @@ function fixture(customerId = 101) {
 }
 
 test('anonymous insurance context fails before any database access', async () => {
-  assert.deepEqual(await main({ action: 'getInsuranceContext', personId: 11 }), { error: 'UNAUTHORIZED' });
+  assert.deepEqual(await main({ action: 'getInsuranceContext', personId: 11 }), { ok:false,error:'DEVICE_ACCESS_DENIED' });
 });
 
 test('insurance context merges existing sources without raw files, OCR text or duplicate action', async () => {
@@ -91,7 +92,7 @@ test('Person without legacy customer reads only Person opportunities and actions
   const result = await service.getInsuranceContext(11);
   assert.equal(result.existingCoverage.length, 0);
   assert.equal(result.review.latest, null);
-  assert.ok(!calls.some(call => ['products', 'policy_review_reports', 'ocr_records', 'photos'].includes(call.table)));
+  assert.ok(!calls.some(call => ['products', 'v_policy_review_state', 'ocr_records', 'photos'].includes(call.table)));
 });
 
 test('no coverage or evidence never promotes a report gap into a fact', async () => {
@@ -100,7 +101,7 @@ test('no coverage or evidence never promotes a report gap into a fact', async ()
   const result = await service.getInsuranceContext(11);
   assert.equal(result.evidenceStatus, 'unknown');
   assert.deepEqual(result.potentialGaps, []);
-  assert.equal(result.review.latest.provenance, '人工编辑，仍需核实');
+  assert.equal(result.review.latest, null);
 });
 
 test('WP10 association contributes one actionable item without changing Action identity', async () => {

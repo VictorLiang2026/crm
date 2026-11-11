@@ -353,8 +353,8 @@ function insuranceNode(ctx, id) {
     if (review.latest) {
       const r = review.latest;
       blocks.push(sectionTitle(t('sec_latest_review')));
-      blocks.push(kvGrid([[t('label_date'), fmtDate(r.report_date)], [t('label_type'), r.report_type],
-        [t('label_summary'), r.edited_summary || r.summary], [t('label_next_step'), r.edited_next_action || r.next_action]]));
+      blocks.push(kvGrid([[t('label_date'), fmtDate(r.date)], [t('label_type'), r.type],
+        [t('label_summary'), r.summary], [t('policy_source'), '#'+r.id+' · '+t('policy_current')]]));
     }
     const needs = d.knownNeeds || [];
     if (needs.length) {

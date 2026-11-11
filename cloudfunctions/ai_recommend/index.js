@@ -48,7 +48,7 @@ function buildSystem(op) {
     '⑤ 险种结构健康度：保障型保额(定期寿+重疾+医疗+意外+长护)占总保额比例应≥70%，低于则提示「偏理财、轻保障」风险。',
     '⑥ 家庭成员覆盖：若客户信息显示有配偶/子女，必须提示「家庭支柱是否裸奔、配偶子女保障是否齐全」的检查项。',
     '【保单检视报告处理规则】',
-    '• 当客户信息中提供了历史保单检视报告(policy_reviews 数组)时：必须逐份引用其中的 gaps_found(缺口)、recommendations(建议)、asset_allocation(资产配置建议)，在 suggested_strategy 中体现递进诊断——已填补的缺口给予正向肯定并进入下一层配置，未填补的要说明原因并给出更务实的替代方案；客户若从未做过保单检视，suggested_strategy 中必须首先建议「安排一次家庭保单检视会面」，话术与约访方式纳入 suggested_message。',
+    '• 当客户信息中提供了人工已审核且版本匹配的保单检视报告(policy_reviews 数组)时：必须逐份引用其中的 gaps_found(缺口)、recommendations(建议)、asset_allocation(资产配置建议)，在 suggested_strategy 中体现递进诊断——已填补的缺口给予正向肯定并进入下一层配置，未填补的要说明原因并给出更务实的替代方案；历史建议和话术不能证明当前保障或保单缺口。未提供可引用的报告时，只能说明资料待核实，可建议安排保单检视。',
     '【保险综合方案与转介绍/招募】',
     '- 结合跟进记录、附加信息中的家庭成员/职业/收入/咨询问题/购买意向/对职业满意度，给出针对性综合保障方案思路（缺口分析、产品组合、家庭保单检视步骤、预算与缴费建议）。',
     '- 同时评估转介绍与招募机会，给出可执行的话术与步骤。',
@@ -141,9 +141,9 @@ exports.main = async (event, context) => {
     const ident = await loadPersonIdentity(rdb, customer);
     Object.assign(customer, ident);
 
-    const [fol, prod, gif, hist, photos, prr] = await Promise.all([
+    const [fol, prod, gif, hist, photos] = await Promise.all([
       customerHistory(require('./device-runtime').scopedApp(app), rdb, customer, 5),
-      rdb.from('products').select().eq('customer_id', customerId),
+      rdb.from('products').select('*,policy_product_id:id::text').eq('customer_id', customerId).is('deleted_at',null),
       rdb.from('gifts').select().eq('customer_id', customerId)
         .order('given_date', { ascending: false, nullsFirst: false })
         .order('Id', { ascending: false })
@@ -160,21 +160,23 @@ exports.main = async (event, context) => {
         .order('created_at', { ascending: false, nullsFirst: false })
         .order('id', { ascending: false })
         .limit(5),
-      // 保单检视报告（最近 3 条，按报告日期倒序）：必须纳入诊断
-      rdb.from('policy_review_reports').select(
-        'id,report_date,report_type,summary,gaps_found,recommendations,asset_allocation,next_action,' +
-        'edited_summary,edited_gaps,edited_recommendations,edited_asset_allocation,edited_next_action'
-      ).eq('customer_id', customerId)
-        .order('report_date', { ascending: false, nullsFirst: false })
-        .order('id', { ascending: false })
-        .limit(3),
+
     ]);
     const folRows = assertOk(fol).data || [];
     const prodRows = assertOk(prod).data || [];
     const gifRows = assertOk(gif).data || [];
     const histRows = assertOk(hist).data || [];
     const photoRows = assertOk(photos).data || [];
-    const prrRows  = assertOk(prr).data  || [];
+    const productBasisId = prodRows[0]?.policy_product_id;
+    const prrRows = productBasisId != null && prodRows[0].version != null
+      ? assertOk(await rdb.from('policy_review_reports').select(
+        'id,report_date,report_type,summary,gaps_found,recommendations,asset_allocation,next_action,' +
+        'edited_summary,edited_gaps,edited_recommendations,edited_asset_allocation,edited_next_action'
+      ).eq('customer_id', customerId).is('deleted_at', null)
+        .eq('review_valid',true).eq('review_basis',String(productBasisId)+':'+prodRows[0].version)
+        .order('report_date', { ascending: false, nullsFirst: false })
+        .order('id', { ascending: false })
+        .limit(3)).data || [] : [];
 
     // 操作员信息（前端传入，用于称呼规则）
     const opIn = (event && event.operator) || {};
@@ -231,10 +233,10 @@ exports.main = async (event, context) => {
       // 保单检视报告（关键输入）：优先编辑后版本
       policy_reviews: prrRows.length ? prrRows.map(function (r) {
         return {
-          date: r.report_date,
+          report_id:r.id, date: r.report_date,
           type: r.report_type || '保单年度检视',
           summary: disp(r, 'summary'),
-          gaps_found: disp(r, 'gaps'),
+          gaps_found: r.edited_gaps || r.gaps_found,
           recommendations: disp(r, 'recommendations'),
           asset_allocation: disp(r, 'asset_allocation'),
           next_action: disp(r, 'next_action'),

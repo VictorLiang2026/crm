@@ -12,8 +12,8 @@ const FIELDS = Object.freeze({
   customers: ['Id', 'person_id', 'customer_stage', 'sales_priority', 'first_contact_date', 'next_action', 'next_action_date'],
   followups: ['Id', 'customer_id', 'followup_date', 'interaction_summary', 'followup_notes', 'next_action', 'next_action_date', 'next_followup_date'],
   opportunities: ['id', 'customer_id', 'person_id', 'opportunity_type', 'status', 'last_progress', 'next_action', 'next_action_date'],
-  products: ['id', 'customer_id', 'items', 'created_at'],
-  policy_review_reports: ['id', 'customer_id', 'report_date', 'report_type', 'edited_summary', 'summary', 'next_action'],
+  products: ['id', 'version', 'customer_id', 'items', 'created_at'],
+  policy_review_reports: ['id', 'customer_id', 'report_date', 'report_type', 'edited_summary', 'summary', 'next_action','review_valid','review_basis'],
   activities: ['id', 'name', 'activity_date', 'activity_type', 'status', 'review_summary', 'review_notes', 'review_score'],
   activity_participants: ['id', 'activity_id', 'canonical_person_id', 'person_type', 'person_id', 'status', 'participant_role', 'followup_status'],
   activity_speakers: ['id', 'person_id', 'position', 'expertise', 'topic_summary'],
@@ -76,7 +76,7 @@ function createContextEngine({ rdb, now = () => new Date() } = {}) {
     // Customer-owned actions stay on customers; Person-owned fields are joined below.
     const selectFields = table === 'customers'
       ? 'Id,person_id,next_action,next_action_date'
-      : FIELDS[table].join(',');
+      : FIELDS[table].map(col => table === 'products' && col === 'id' ? 'id::text' : col).join(',');
     let query = rdb.from(table).select(selectFields);
     for (const [column, value] of Object.entries(filters || {})) {
       if (!FIELDS[table].includes(column) && column !== 'deleted_at') {
@@ -146,10 +146,11 @@ function createContextEngine({ rdb, now = () => new Date() } = {}) {
     ]);
     const context = { person: p, recent_interactions: interactions, open_opportunities: opportunities };
     if (extended) {
-      const [products, reports] = await Promise.all([
-        read('products', { customer_id: id, deleted_at: null }, { order: 'created_at', limit: LIMITS.products }),
-        read('policy_review_reports', { customer_id: id, deleted_at: null }, { order: 'report_date', limit: LIMITS.reports }),
-      ]);
+      const products = await read('products', {customer_id:id,deleted_at:null}, {order:'created_at',limit:LIMITS.products});
+      const product = products[0]?.data;
+      const reports = product?.version != null ? await read('policy_review_reports', {
+        customer_id:id, deleted_at:null, review_valid:true, review_basis:String(product.id)+':'+product.version,
+      }, {order:'report_date',limit:LIMITS.reports}) : [];
       // The Skill Registry accepts meeting_history only; attach compact evidence there.
       context.meeting_history = [...reports, ...products];
     }

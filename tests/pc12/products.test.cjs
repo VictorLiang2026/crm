@@ -73,6 +73,7 @@ function makeHarness() {
   };
   const originalLoad = Module._load;
   Module._load = function (request, parent, isMain) {
+    if (parent?.filename === indexPath && request === './device-runtime') return {protect:(_name,handler)=>handler}; // Isolated business handler; WP01 tests device verification.
     if (parent?.filename === indexPath && request === './db') return fakeDb;
     return originalLoad.call(this, request, parent, isMain);
   };

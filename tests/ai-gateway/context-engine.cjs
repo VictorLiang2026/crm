@@ -11,7 +11,7 @@ function fixture(data = {}) {
     const call = { table, filters: {}, order: null, limit: null };
     calls.push(call);
     const chain = {
-      select(fields) { call.fields = fields.split(','); return this; },
+      select(fields) { call.fields = fields.split(',').map(field=>field.replace('::text','')); return this; },
       eq(field, value) { call.filters[field] = value; return this; },
       is(field, value) { call.filters[field] = value; return this; },
       in(field, values) { call.filters[field] = values; return this; },
@@ -37,8 +37,8 @@ const sample = {
   followups: Array.from({ length: 30 }, (_, index) => ({ Id: index + 1, customer_id: 7,
     followup_date: '2026-09-25', followup_notes: 'x'.repeat(1000), next_followup_date: '2026-09-25', deleted_at: null })),
   opportunities: [{ id: 8, customer_id: 7, person_id: 7, status: 'open', next_action_date: '2026-09-25', deleted_at: null }],
-  products: [{ id: 9, customer_id: 7, items: 'product', deleted_at: null }],
-  policy_review_reports: [{ id: 10, customer_id: 7, summary: 'review', deleted_at: null }],
+  products: [{ id: 9, version:2, customer_id: 7, items: 'product', deleted_at: null }],
+  policy_review_reports: [{ id: 10, customer_id: 7, summary: 'review', review_valid:true,review_basis:'9:2', deleted_at: null }],
   activities: [{ id: 11, name: 'meeting', deleted_at: null }],
   activity_participants: [{ id: 12, activity_id: 11, person_name: 'participant',
     canonical_person_id: 7, deleted_at: null }],
@@ -66,6 +66,7 @@ test('legacy and preparation recipes remain sourced and bounded; Skill contracts
   ];
   for (const [recipe, subjectType, subjectId, skill] of requests) {
     const built = await engine.buildContext({ recipe, subjectType, subjectId });
+    if(recipe==='meeting_prep') assert.ok(built.context.meeting_history.some(row=>row.source.table==='policy_review_reports'));
     if (skill) assert.equal(defaultRegistry.validateContext(skill, built.context), true);
     else assert.deepEqual(Object.keys(built.context).sort(),
       ['person', 'recent_interactions', 'open_opportunities', 'meeting_history'].sort());

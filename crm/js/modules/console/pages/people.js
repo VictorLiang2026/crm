@@ -65,7 +65,7 @@ function fmtDateShort(v) {
 
 export function renderPeople(ctx) {
   const emptyFilters = () => ({ roles: [], customerPriorities: [], recruitPriorities: [], referralPriorities: [] });
-  const state = { page: 1, keyword: '', sortField: 'id', sortDir: 'desc', worklistStatus: 'all', filters: emptyFilters(), pendingFilters: emptyFilters() };
+  const state = { page: 1, keyword: '', sortField: 'id', sortDir: 'desc', worklistStatus: 'all', policyFilter: 'all', filters: emptyFilters(), pendingFilters: emptyFilters() };
   const listEl = h('div', {});
   const metaEl = h('span', { class: 'foot-note' }, '');
   const input = h('input', { placeholder: t('search_name_ph') });
@@ -80,8 +80,12 @@ export function renderPeople(ctx) {
     state.page = 1; state.sortField = 'wb_status'; state.sortDir = 'asc'; runQuery();
   } }, ['all', 'overdue', 'today', 'month', 'stale', 'normal', 'unknown', 'unlinked'].map(value =>
     h('option', { value }, t('l01_' + value))));
+  const policyFilter = h('select',{'aria-label':t('policy_service'),onchange:()=>{
+    state.policyFilter=policyFilter.value;state.page=1;runQuery();
+  }},['all','review','renewal','verify'].map(value=>h('option',{value},t('policy_filter_'+value))));
   const worklistTools = h('div', { class: 'toolbar', hidden: true, style: 'display:none' }, [
     h('label', {}, [t('l01_status'), ' ', worklistFilter]),
+    h('label', {}, [t('policy_service'),' ',policyFilter]),
     h('span', { class: 'foot-note', title: t('l01_basis') }, t('l01_basis')),
   ]);
   let cancelQuery = () => {}, queryVersion = 0;
@@ -102,7 +106,7 @@ export function renderPeople(ctx) {
       worklistTools.hidden = !customerView;
       worklistTools.style.display = customerView ? '' : 'none';
       if (!customerView) {
-        state.worklistStatus = 'all'; worklistFilter.value = 'all';
+        state.worklistStatus = 'all'; worklistFilter.value = 'all'; state.policyFilter='all';policyFilter.value='all';
         if (state.sortField === 'wb_status' || state.sortField === 'customer_id') { state.sortField = 'id'; state.sortDir = 'desc'; }
       }
       const res = await data.listPeople(ctx, {
@@ -110,6 +114,7 @@ export function renderPeople(ctx) {
         sortField: state.sortField, sortDir: state.sortDir,
         ...state.filters, includeCustomerStage: customerView,
         customerWorklist: customerView, worklistStatus: state.worklistStatus,
+        ...(customerView && state.policyFilter!=='all'?{policyFilter:state.policyFilter}:{}),
       });
       if (version !== queryVersion) return h('span', {});
       const rows = res.rows || [];

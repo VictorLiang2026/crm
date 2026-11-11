@@ -195,8 +195,8 @@ async function generate(event) {
   }
 
   // 拉上下文：保单、跟进、礼品、历史检视报告、照片
-  const [prod, fol, gif, hist, photos] = await Promise.all([
-    rdb.from('products').select('id::text,version,items,current_policy_description,ap_ipa::text,ap_ppa::text,ap_ltc::text,ap_ann::text,ap_life::text,ap_term::text,ap_wl::text,ap_pa::text,ap_ci::text,ap_hi::text,ap_all::text').eq('customer_id', customerId),
+  const [prod, fol, gif, photos] = await Promise.all([
+    rdb.from('products').select('id::text,version,items,current_policy_description,ap_ipa::text,ap_ppa::text,ap_ltc::text,ap_ann::text,ap_life::text,ap_term::text,ap_wl::text,ap_pa::text,ap_ci::text,ap_hi::text,ap_all::text').eq('customer_id', customerId).is('deleted_at',null),
     rdb.from('followups').select().eq('customer_id', customerId)
       .order('followup_date', { ascending: false, nullsFirst: false })
       .order('Id', { ascending: false })
@@ -204,12 +204,6 @@ async function generate(event) {
     rdb.from('gifts').select().eq('customer_id', customerId)
       .order('given_date', { ascending: false, nullsFirst: false })
       .order('Id', { ascending: false })
-      .limit(3),
-    rdb.from('policy_review_reports').select(
-      'id,report_date,report_type,summary,gaps_found,recommendations,asset_allocation,next_action,edited_summary,edited_gaps,edited_recommendations,edited_asset_allocation,edited_next_action'
-    ).eq('customer_id', customerId)
-      .order('report_date', { ascending: false, nullsFirst: false })
-      .order('id', { ascending: false })
       .limit(3),
     rdb.from('photos').select('file_name,photo_notes,created_at').eq('customer_id', customerId)
       .order('created_at', { ascending: false, nullsFirst: false })
@@ -219,7 +213,15 @@ async function generate(event) {
   const prodRows = assertOk(prod).data || [];
   const folRows = assertOk(fol).data || [];
   const gifRows = assertOk(gif).data || [];
-  const histRows = assertOk(hist).data || [];
+  const productBasisId = prodRows[0]?.id;
+  const histRows = productBasisId != null && prodRows[0].version != null
+    ? assertOk(await rdb.from('policy_review_reports').select(
+      'id,report_date,report_type,summary,gaps_found,recommendations,asset_allocation,next_action,edited_summary,edited_gaps,edited_recommendations,edited_asset_allocation,edited_next_action'
+    ).eq('customer_id', customerId).is('deleted_at', null)
+        .eq('review_valid',true).eq('review_basis',String(productBasisId)+':'+prodRows[0].version)
+      .order('report_date', { ascending: false, nullsFirst: false })
+      .order('id', { ascending: false })
+      .limit(3)).data || [] : [];
   const photoRows = assertOk(photos).data || [];
 
   // 解析保单 items 明细
@@ -270,7 +272,7 @@ async function generate(event) {
     recent_photos: photoRows.map(function (p) { return { file: p.file_name, notes: p.photo_notes, date: p.created_at }; }),
     history_reports: histRows.map(function (h) {
       return {
-        date: h.report_date, type: h.report_type,
+        report_id:h.id, date: h.report_date, type: h.report_type,
         summary: h.edited_summary || h.summary, gaps: h.edited_gaps || h.gaps_found,
         recs: h.edited_recommendations || h.recommendations,
         asset: h.edited_asset_allocation || h.asset_allocation,

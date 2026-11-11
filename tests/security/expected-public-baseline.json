@@ -4869,6 +4869,122 @@
         "security_definer": false,
         "authenticated_execute": false
       }
+    },
+    {
+      "kind": "relation",
+      "name": "policy_service_action_scopes",
+      "detail": {
+        "rls": true,
+        "type": "r",
+        "policies": [
+          {
+            "name": "policy_service_action_scopes_service",
+            "roles": [
+              "service_role"
+            ],
+            "command": "*",
+            "check_hash": "b326b5062b2f0e69046810717534cb09",
+            "permissive": true,
+            "using_hash": "b326b5062b2f0e69046810717534cb09"
+          }
+        ],
+        "force_rls": true,
+        "privileges": {
+          "anon": [],
+          "service_role": [
+            "INSERT",
+            "SELECT"
+          ],
+          "authenticated": []
+        },
+        "security_invoker": false
+      }
+    },
+    {
+      "kind": "relation",
+      "name": "policy_opportunity_report_links",
+      "detail": {
+        "rls": true,
+        "type": "r",
+        "policies": [
+          {
+            "name": "policy_opportunity_report_links_service",
+            "roles": [
+              "service_role"
+            ],
+            "command": "*",
+            "check_hash": "b326b5062b2f0e69046810717534cb09",
+            "permissive": true,
+            "using_hash": "b326b5062b2f0e69046810717534cb09"
+          }
+        ],
+        "force_rls": true,
+        "privileges": {
+          "anon": [],
+          "service_role": [
+            "INSERT",
+            "SELECT"
+          ],
+          "authenticated": []
+        },
+        "security_invoker": false
+      }
+    },
+    {
+      "kind": "relation",
+      "name": "v_policy_review_state",
+      "detail": {
+        "rls": false,
+        "type": "v",
+        "policies": [],
+        "force_rls": false,
+        "privileges": {
+          "anon": [],
+          "authenticated": [],
+          "service_role": [
+            "SELECT"
+          ]
+        },
+        "security_invoker": true
+      }
+    },
+    {
+      "kind": "relation",
+      "name": "v_policy_service_actions",
+      "detail": {
+        "rls": false,
+        "type": "v",
+        "policies": [],
+        "force_rls": false,
+        "privileges": {
+          "anon": [],
+          "authenticated": [],
+          "service_role": [
+            "SELECT"
+          ]
+        },
+        "security_invoker": true
+      }
+    },
+    {
+      "kind": "routine",
+      "name": "crm_policy_report_guard()",
+      "detail": {
+        "anon_execute": false,
+        "service_execute": true,
+        "security_definer": false,
+        "authenticated_execute": false
+      }
+    },
+    {
+      "kind": "routine",
+      "name": "crm_policy_service_v1(p_actor_uid text, p_op text, p_input jsonb)",
+      "detail": {
+        "anon_execute": false,
+        "service_execute": true,
+        "security_definer": false,
+        "authenticated_execute": false
+      }
     }
   ]
 }

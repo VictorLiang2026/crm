@@ -47,8 +47,8 @@ async function buildCandidateContext(data, personId) {
       read('followups', { select: 'Id,followup_date,interaction_summary,followup_notes',
         customer_id: `eq.${customerId}`, deleted_at: 'is.null',
         order: 'followup_date.desc,Id.desc', limit: 4 }),
-      read('policy_review_reports', { select: 'id,report_date,edited_gaps,edited_recommendations,'+
-        'gaps_found,summary', customer_id: `eq.${customerId}`, deleted_at: 'is.null',
+      read('v_policy_review_state', { select: 'id,report_date,edited_gaps,edited_recommendations,'+
+        'gaps_found,edited_summary,summary', is_current:'eq.true', customer_id: `eq.${customerId}`, deleted_at: 'is.null',
         order: 'report_date.desc,id.desc', limit: 3 }),
       read('products', { select: 'id,items,created_at', customer_id: `eq.${customerId}`,
         deleted_at: 'is.null', order: 'id.desc', limit: 2 }),
@@ -105,9 +105,9 @@ async function buildCandidateContext(data, personId) {
       row.interaction_summary || row.followup_notes,true,row.followup_date,'recruit_followup');
   }
   for (const row of reports) add(evidence,'policy_review_reports',row,
-    row.edited_gaps || row.edited_recommendations || row.gaps_found || row.summary,
+    row.edited_gaps || row.edited_recommendations || row.gaps_found || row.edited_summary || row.summary,
     Boolean(row.edited_gaps || row.edited_recommendations),row.report_date,
-    row.edited_gaps || row.edited_recommendations ? 'human_edited_review' : 'unverified_review');
+    'reviewed_current_policy');
   for (const row of products) add(evidence,'products',row,
     '已有保单产品记录；需要人工检查保障内容，不能据此推断缺口。',false,row.created_at,'coverage_exists');
   for (const row of ocr) add(evidence,'ocr_records',row,

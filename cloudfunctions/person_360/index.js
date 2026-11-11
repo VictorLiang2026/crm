@@ -37,7 +37,7 @@ const LEGACY_INTERACTION_TABLES = new Set([
   'activity_participants', 'activity_speakers', 'activities',
 ]);
 const INSURANCE_READ_TABLES = new Set([
-  'products', 'policy_review_reports', 'ocr_records', 'photos', 'actions',
+  'products', 'policy_review_reports', 'v_policy_review_state', 'ocr_records', 'photos', 'actions',
 ]);
 const RELATIONSHIP_READ_TABLES = new Set(['context_items', 'crm_context_item_commands', 'person_roles', 'relationships']);
 const RECRUIT_READ_TABLES = new Set([
@@ -157,7 +157,7 @@ async function pgRpc(name, body) {
     'person_identity_preview_v1', 'person_identity_execute_v1',
     'crm_person_only_recruit_delete_v1', 'crm_work_item_preview_v1',
     'crm_work_item_execute_v1', 'crm_opportunity_directory_v1', 'crm_opportunity_preview_v1',
-    'crm_opportunity_execute_v1','crm_pipeline_stage_v1','crm_event_participation_v1','crm_action_center_v1','crm_action_context_v1','crm_activity_review_preview_v1',
+    'crm_opportunity_execute_v1','crm_pipeline_stage_v1','crm_event_participation_v1','crm_policy_service_v1','crm_action_center_v1','crm_action_context_v1','crm_activity_review_preview_v1',
     'crm_activity_review_execute_v1','crm_person_delete_preview_v1',
     'crm_person_delete_execute_v1','crm_person_restore_v1',
     'crm_context_item_preview_v1','crm_context_item_execute_v1',
@@ -193,6 +193,7 @@ async function pgRpc(name, body) {
       const code = typeof problem?.code === 'string' && /^(?:PGRST\d{3}|[0-9A-Z]{5})$/.test(problem.code)
         ? problem.code : '';
       if (name === 'crm_person_interaction_v1' && /^INTERACTION_[A-Z_]+$/.test(message)) throw new Error(message);
+      if (name === 'crm_policy_service_v1' && (message === 'Policy review changed' || code === 'P0002')) throw new Error('POLICY_REFRESH');
       if (name === 'crm_event_participation_v1' && (message === 'Participation changed' || code === 'P0002')) throw new Error('PARTICIPATION_CHANGED');
       if (name === 'crm_pipeline_stage_v1') {
         if (message === 'Pipeline preview expired' || message.startsWith('Pipeline record changed')) throw new Error('PIPELINE_REVIEW_AGAIN');
@@ -358,6 +359,7 @@ function createService({ request = pgRequest, rpc = pgRpc, disclosure = disclose
       }
       return rpc('person_customer_worklist_v1', { p_criteria: {
         page, pageSize, keyword, sortField, sortDir, status, customerPriorities,
+        ...(event.policyFilter && event.policyFilter !== 'all' ? {policyFilter:event.policyFilter} : {}),
       } });
     }
     const hasFilters = roles.length || customerPriorities.length || recruitPriorities.length || referralPriorities.length;
@@ -1143,6 +1145,7 @@ exports.main = async event => {
       }
       case 'getOpportunityDirectoryDetails': return await new OpportunityWorkflowService({request:pgRequest,rpc:pgRpc})
         .details(event.id,uid);
+      case 'policyService': return await pgRpc('crm_policy_service_v1',{p_actor_uid:uid,p_op:event.operation,p_input:event.data});
       case 'listPersonEvents':
       case 'listParticipantResponses':
       case 'saveParticipantResponse': {

@@ -1,4 +1,5 @@
 import { h } from './dom.js';
+import { reviewControls,policySchedules } from './policy-service.js';
 import { data } from './data.js';
 import { t } from './i18n.js';
 
@@ -134,6 +135,7 @@ function reportItem(ctx, summaryRow, onSaved) {
       return;
     }
     BLOCKS.forEach((block) => body.appendChild(fieldView(report, block)));
+    body.appendChild(reviewControls(ctx,report,onSaved));
     body.appendChild(h('div', { class: 'policy-report-actions' }, [
       h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => { editing = true; draw(); } },
         t('insurance_report_edit')),
@@ -223,6 +225,7 @@ export function renderInsuranceReports(ctx, customerId) {
       generate.textContent = t('insurance_report_generate');
     }
   };
+  root.appendChild(policySchedules(ctx,customerId));
   loadReports();
   return root;
 }

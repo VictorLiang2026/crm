@@ -71,9 +71,9 @@ class InsuranceContextService {
       actions, links, interactions, facts, householdContext] = await Promise.all([
       customerId ? read('products', { select: 'id::text,items,current_policy_description,created_at,' + Object.keys(CATEGORIES).map(key => `${key}::text`).join(','),
         customer_id: `eq.${customerId}`, deleted_at: 'is.null', order: 'id.desc', limit: 3 }) : [],
-      customerId ? read('policy_review_reports', {
+      customerId ? read('v_policy_review_state', {
         select: 'id,report_date,report_type,summary,edited_summary,gaps_found,edited_gaps,edited_recommendations,next_action,edited_next_action,updated_at',
-        customer_id: `eq.${customerId}`, deleted_at: 'is.null', order: 'report_date.desc,id.desc', limit: 3,
+        customer_id: `eq.${customerId}`, is_current:'eq.true', order: 'report_date.desc,id.desc', limit: 3,
       }) : [],
       customerId ? read('ocr_records', { select: 'id,summary,file_ids,file_names,created_at',
         customer_id: `eq.${customerId}`, deleted_at: 'is.null', order: 'created_at.desc,id.desc', limit: 10 }) : [],
@@ -145,7 +145,7 @@ class InsuranceContextService {
       const content = clip(row.edited_gaps, 500);
       return content ? [{ content, observedAt: row.updated_at || row.report_date,
         source: { type: 'policy_review_reports', id: row.id },
-        provenance: '人工编辑的待核实问题；以原始保障资料复核' }] : [];
+        provenance: '已审核的检视意见；保障条款以原始资料为准' }] : [];
     }) : [];
     return {
       existingCoverage,
@@ -155,7 +155,7 @@ class InsuranceContextService {
       review: { latest: latestReport ? { id: latestReport.id, date: latestReport.report_date,
         type: latestReport.report_type, summary: clip(latestReport.edited_summary || latestReport.summary, 500),
         source: { type: 'policy_review_reports', id: latestReport.id },
-        provenance: latestReport.edited_summary ? '人工编辑，仍需核实' : 'AI 生成内容，尚未经人工复核' } : null,
+        provenance: '已人工审核，匹配当前产品版本' } : null,
       ocr: insuranceOcr.map(row => ({ id: row.id, summary: clip(row.summary, 200), createdAt: row.created_at,
         source: { type: 'ocr_records', id: row.id }, provenance: 'OCR 摘要，待人工核实' })), evidence },
       knownNeeds: knownNeeds.slice(0, 3), potentialGaps: potentialGaps.slice(0, 3),

@@ -12,6 +12,7 @@ import { openLegacyOpportunity, legacyOpportunityTypeLabel } from '../legacy-opp
 import { openLegacyOpportunityMaintenance } from '../legacy-opportunity-maintenance.js';
 import { openRecruitCandidateCreate } from '../recruit-write.js';
 import { FLOW_STAGES, openPipelineStage, protectionTypes, stageLabel } from '../pipeline-stage.js';
+import { opportunityReports } from '../policy-service.js';
 import { actionContextPanel } from '../action-center.js';
 
 const PAGE_SIZE = 20;
@@ -170,6 +171,7 @@ export function openOpportunityDetails(ctx, row, onDone) {
       ]) : null,
     ]);
     body.replaceChildren(core, person ? actionContextPanel(ctx,{kind:'opportunity',targetId:opportunity.id},onDone,opportunity) : actionSection, outcomeSection, controls);
+    if(person && protectionTypes.includes(opportunity.opportunity_type)) body.append(opportunityReports(ctx,opportunity.id));
   }).catch((error) => {
     body.replaceChildren(h('div', { class: 'sheet-err' }, `${t('opp_detail_failed')}: ${error.message || t('try_later')}`));
   });

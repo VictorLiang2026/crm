@@ -196,6 +196,7 @@ function installFixtures() {
         newPerson:false,willCreateSpeaker:true,willCreateCustomer:false},
       expiresAt:'2026-10-04T12:00:00+08:00',status:'preview'}),
     'person_360:executeIdentity': () => ({personId:980001,speakerId:990011}),
+    'person_360:policyService': data => data.operation==='state' ? {review_revision:0,is_valid:true,is_current:false,product_basis:null} : {rows:[]},
     'person_360:listPersonEvents': () => ({rows:[],total:0,attended:0,hasMore:false}),
     'person_360:listParticipantResponses': () => ({responses:{}}),
     'person_360:listActionCenter': ({query}) => rows(workItems.filter(item =>
