@@ -63,7 +63,7 @@ function fmtDateShort(v) {
   return match ? `${match[3]}/${match[2]}` : fmtDate(v);
 }
 
-export function renderPeople(ctx) {
+export function renderPeople(ctx,initialPolicyFilter) {
   const emptyFilters = () => ({ roles: [], customerPriorities: [], recruitPriorities: [], referralPriorities: [] });
   const state = { page: 1, keyword: '', sortField: 'id', sortDir: 'desc', worklistStatus: 'all', policyFilter: 'all', filters: emptyFilters(), pendingFilters: emptyFilters() };
   const listEl = h('div', {});
@@ -357,6 +357,7 @@ export function renderPeople(ctx) {
       ]),
     ]),
   );
-  updateViewButtons();
-  runQuery();
+  if (['review','renewal','verify'].includes(initialPolicyFilter)) {
+    state.policyFilter=initialPolicyFilter;policyFilter.value=initialPolicyFilter;selectView('customer');
+  } else {updateViewButtons();runQuery();}
 }

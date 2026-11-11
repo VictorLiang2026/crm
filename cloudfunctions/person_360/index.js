@@ -157,7 +157,7 @@ async function pgRpc(name, body) {
     'person_identity_preview_v1', 'person_identity_execute_v1',
     'crm_person_only_recruit_delete_v1', 'crm_work_item_preview_v1',
     'crm_work_item_execute_v1', 'crm_opportunity_directory_v1', 'crm_opportunity_preview_v1',
-    'crm_opportunity_execute_v1','crm_pipeline_stage_v1','crm_event_participation_v1','crm_policy_service_v1','crm_action_center_v1','crm_action_context_v1','crm_activity_review_preview_v1',
+    'crm_opportunity_execute_v1','crm_pipeline_stage_v1','crm_event_participation_v1','crm_policy_service_v1','crm_business_report_v1','crm_action_center_v1','crm_action_context_v1','crm_activity_review_preview_v1',
     'crm_activity_review_execute_v1','crm_person_delete_preview_v1',
     'crm_person_delete_execute_v1','crm_person_restore_v1',
     'crm_context_item_preview_v1','crm_context_item_execute_v1',
@@ -1145,6 +1145,7 @@ exports.main = async event => {
       }
       case 'getOpportunityDirectoryDetails': return await new OpportunityWorkflowService({request:pgRequest,rpc:pgRpc})
         .details(event.id,uid);
+      case 'businessReport': return await pgRpc('crm_business_report_v1',{p_actor_uid:uid,p_input:event.query});
       case 'policyService': return await pgRpc('crm_policy_service_v1',{p_actor_uid:uid,p_op:event.operation,p_input:event.data});
       case 'listPersonEvents':
       case 'listParticipantResponses':

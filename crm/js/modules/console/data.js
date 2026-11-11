@@ -202,6 +202,7 @@ export const data = {
   savePersonProducts: (ctx, personId, expectedVersion, payload) => call(ctx, 'products', {
     action: 'upsert', personId: String(personId), expectedVersion: String(expectedVersion), data: payload,
   }),
+  businessReport: (ctx,query) => p360(ctx,'businessReport',{query}),
   policyService: (ctx, operation, data) => p360(ctx,'policyService',{operation,data}),
   policyReports: (ctx, customerId) => call(ctx, 'policy_review_reports', {
     action: 'list', customer_id: Number(customerId),

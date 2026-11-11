@@ -1290,3 +1290,7 @@ body:has(.login), body.is-login { padding-top: env(safe-area-inset-top); }
 .plt-format-label { display: grid; gap: 5px; color: var(--muted); font-size: 12px; }
 .plt-export-result { padding: 10px 12px; border-radius: 9px; background: var(--jade-50); color: var(--jade); font-size: 13px; font-weight: 700; }
 .plt-export-result.hidden { display: none; }
+
+.business-queues.mini-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr)); }
+.business-queues .mini { color: var(--ink-2); text-decoration: none; min-height: 44px; overflow-wrap: anywhere; }
+.business-queues .mini b { font-size: 1.2rem; color: var(--ink); }

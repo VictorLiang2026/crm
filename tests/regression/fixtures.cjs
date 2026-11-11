@@ -196,6 +196,13 @@ function installFixtures() {
         newPerson:false,willCreateSpeaker:true,willCreateCustomer:false},
       expiresAt:'2026-10-04T12:00:00+08:00',status:'preview'}),
     'person_360:executeIdentity': () => ({personId:980001,speakerId:990011}),
+    'person_360:businessReport': ({query}) => {
+      const counts={today:0,overdue:0,waiting:0,protection:0,recruitment:0,event:0,review:0,renewal:0,verify:0};
+      if(query.mode==='home')return {asOf:'2026-11-11',counts};
+      if(query.mode==='list')return {asOf:'2026-11-11',total:0,page:1,hasMore:false,rows:[]};
+      const track={total:0,active:0,stages:[],referral:0,unknownSource:0,dueDated:0,overdue:0,moves:0,movedRecords:0,cohort:0,converted:0,dwellN:0,dwellDays:null,outcomes:[],recentReasons:[]};
+      return {counts,days:query.days,asOf:'2026-11-11',startDay:'2026-10-13',pipeline:{protection:track,recruitment:track},milestones:{},roles:{total:0,multi:0,coverage:{}},events:{heldDates:0,entries:0,registered:0,cancelled:0,attended:0,interactions:0,completed:0,acceptedCandidates:0,acceptedActions:0},actions:{open:0,dated:0,due:0,completed:0,unlinked:0,workload:{}},policy:{customers:0,withProduct:0,described:0,startedItems:0,completeItems:0,withCurrent:0,valid:0,current:0}};
+    },
     'person_360:policyService': data => data.operation==='state' ? {review_revision:0,is_valid:true,is_current:false,product_basis:null} : {rows:[]},
     'person_360:listPersonEvents': () => ({rows:[],total:0,attended:0,hasMore:false}),
     'person_360:listParticipantResponses': () => ({responses:{}}),

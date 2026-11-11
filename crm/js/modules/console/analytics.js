@@ -1,3 +1,4 @@
+import { businessAnalytics } from './business-report.js';
 import { h } from './dom.js';
 import { data } from './data.js';
 import { t, translateEnum, getLang } from './i18n.js';
@@ -17,6 +18,7 @@ function stageDetails(key, row) {
   const value = (stage, field) => {
     if (['dwell_median_days', 'stuck'].includes(field) && stage.kind === 'terminal') return t('l02_na');
     if (key === 'customer' && ['dwell_median_days', 'stuck', 'moved_30d'].includes(field)) return t('l02_unknown');
+    if (key === 'opportunity' && ['dwell_median_days','stuck'].includes(field)) return t('business_insufficient');
     if (key === 'opportunity' && field === 'moved_30d') return t('l02_unknown');
     return count(stage[field]) === '—' ? t('l02_unknown') : count(stage[field]);
   };
@@ -57,10 +59,11 @@ function funnelCard(key, row) {
 }
 
 export function renderAnalytics(ctx) {
+  const business=businessAnalytics(ctx);
   const facts = h('div', { class: 'tab-stack', 'data-analytics-facts': '' });
   const status = h('div', { role: 'status' });
   const explanation = h('div', { 'data-analytics-explanation': '' });
-  const refresh = h('button', { class: 'btn btn-ghost', type: 'button', onclick: load }, t('btn_refresh'));
+  const refresh = h('button', { class: 'btn btn-ghost', type: 'button', onclick: ()=>{business.refresh();load();} }, t('btn_refresh'));
   const explain = h('button', { class: 'btn btn-soft', type: 'button', disabled: true, onclick: explainFacts }, t('m16_explain'));
   let ready = false, reading = false, explaining = false;
   function buttons() { refresh.disabled = reading || explaining; explain.disabled = !ready || reading || explaining; }
@@ -108,9 +111,11 @@ export function renderAnalytics(ctx) {
         h('a', { class: 'btn btn-ghost', href: '#/opportunities' }, t('m16_open_opportunities')),
       ]), h('p', { class: 'foot-note' }, t('m16_workspace_scope')),
     ] }),
+    business.node,
+    h('details', {}, [h('summary',{},t('business_funnel_details')),
     h('p', { class: 'foot-note' }, t('m16_counts_scope')),
     status, facts,
-    card({ title: t('m16_interpretation'), icon: 'sparkle', body: [h('p', { class: 'foot-note' }, t('m16_explain_scope')), explain, explanation] }),
+    card({ title: t('m16_interpretation'), icon: 'sparkle', body: [h('p', { class: 'foot-note' }, t('m16_explain_scope')), explain, explanation] }),]),
   );
   load();
 }

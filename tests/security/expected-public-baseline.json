@@ -4985,6 +4985,52 @@
         "security_definer": false,
         "authenticated_execute": false
       }
+    },
+    {
+      "kind": "relation",
+      "name": "v_business_pipeline_records",
+      "detail": {
+        "rls": false,
+        "type": "v",
+        "policies": [],
+        "force_rls": false,
+        "privileges": {
+          "anon": [],
+          "authenticated": [],
+          "service_role": [
+            "SELECT"
+          ]
+        },
+        "security_invoker": true
+      }
+    },
+    {
+      "kind": "relation",
+      "name": "v_business_followup_queue",
+      "detail": {
+        "rls": false,
+        "type": "v",
+        "policies": [],
+        "force_rls": false,
+        "privileges": {
+          "anon": [],
+          "authenticated": [],
+          "service_role": [
+            "SELECT"
+          ]
+        },
+        "security_invoker": true
+      }
+    },
+    {
+      "kind": "routine",
+      "name": "crm_business_report_v1(p_actor_uid text, p_input jsonb)",
+      "detail": {
+        "anon_execute": false,
+        "service_execute": true,
+        "security_definer": false,
+        "authenticated_execute": false
+      }
     }
   ]
 }

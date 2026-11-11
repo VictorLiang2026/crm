@@ -1,3 +1,4 @@
+import { homeFollowups } from '../business-report.js';
 // 今日页（WP2）：统计、Today 5（纯事实规则排序）、今日节奏、双向承诺、机会速览。
 // WP2 写入闭环：行动/承诺「完成」、候选「审核」经 write.js 服务端 preview→人工确认→execute。
 // 晨间简报（WP3 AI）、关系风险（G1 无批量接口）保留骨架。
@@ -354,6 +355,7 @@ export function renderToday(ctx) {
     h('div', { class: 'today-grid' }, [
       h('div', {}, [
         briefEl,
+        homeFollowups(ctx),
         h('div', { style: 'height:16px' }),
         statsEl,
         h('div', { style: 'height:16px' }),

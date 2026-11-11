@@ -20,7 +20,7 @@ test('M16 fact-first analytics separates source scopes, requires explicit AI req
   })()`);
   await b.wait("document.querySelectorAll('[data-analytics-total]').length===3");
   assert.equal(await b.evaluate("m16.calls.length>=1 && m16.calls.every(x=>x.name==='funnel_insight' && x.action==='stats')"),true);
-  assert.match(await b.evaluate("document.querySelector('[data-analytics-scope=opportunity]').textContent"),/不含Person-only/);
+  assert.match(await b.evaluate("document.querySelector('[data-analytics-scope=opportunity]').textContent"),/客户关联/);
   assert.match(await b.evaluate("document.querySelector('[data-analytics-facts]').textContent"),/测试来源/);
   assert.equal(await b.evaluate("document.querySelectorAll('[data-analytics-total] a').length"),0);
   assert.deepEqual(await b.evaluate("[...document.querySelectorAll('#console-main .more-actions a')].map(x=>x.getAttribute('href'))"),['#/activity-report','#/recruit/goals','#/opportunities']);

@@ -11,6 +11,7 @@ import {
   renderKnowledgeEditor, renderKnowledgeTrash,
 } from './views.js';
 
+import { renderFollowupList } from './business-report.js';
 import { renderActionCenter } from './action-center.js';
 
 const EXACT = new Map([
@@ -47,6 +48,8 @@ const EXACT = new Map([
 ]);
 
 const PATTERNS = [
+  { re: /^#\/today\/list\/(protection|recruitment|event)$/, nav: '#/today', render: renderFollowupList },
+  { re: /^#\/people\/customer\/(review|renewal|verify)$/, nav: '#/people', render: renderPeople },
   { re: /^#\/actions\/([1-9]\d*|today|week|overdue|waiting|completed)$/, nav: '#/more', render: renderActionCenter },
   { re: /^#\/activity-report(?:\?(.*))?$/, nav: '#/today', render: (ctx, query) => {
     const params = new URLSearchParams(query || '');
