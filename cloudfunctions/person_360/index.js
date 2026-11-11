@@ -41,10 +41,11 @@ const INSURANCE_READ_TABLES = new Set([
 ]);
 const RELATIONSHIP_READ_TABLES = new Set(['context_items', 'crm_context_item_commands', 'person_roles', 'relationships']);
 const RECRUIT_READ_TABLES = new Set([
-  'v_recruit_candidates', 'v_recruit_candidates_person_only', 'v_recruit_candidates_person_only_trash',
+  'v_recruit_candidates', 'v_recruit_action_directory', 'v_recruit_candidates_person_only', 'v_recruit_candidates_person_only_trash',
   'recruit_milestones',
 ]);
 const OPPORTUNITY_READ_TABLES = new Set([
+  'v_next_context_action',
   'opportunity_candidates','outcomes','crm_opportunity_action_links',
   'crm_test_batches','crm_test_records',
 ]);
@@ -156,7 +157,7 @@ async function pgRpc(name, body) {
     'person_identity_preview_v1', 'person_identity_execute_v1',
     'crm_person_only_recruit_delete_v1', 'crm_work_item_preview_v1',
     'crm_work_item_execute_v1', 'crm_opportunity_directory_v1', 'crm_opportunity_preview_v1',
-    'crm_opportunity_execute_v1','crm_pipeline_stage_v1','crm_activity_review_preview_v1',
+    'crm_opportunity_execute_v1','crm_pipeline_stage_v1','crm_action_center_v1','crm_action_context_v1','crm_activity_review_preview_v1',
     'crm_activity_review_execute_v1','crm_person_delete_preview_v1',
     'crm_person_delete_execute_v1','crm_person_restore_v1',
     'crm_context_item_preview_v1','crm_context_item_execute_v1',
@@ -754,7 +755,7 @@ function createService({ request = pgRequest, rpc = pgRpc, disclosure = disclose
     });
   }
 
-  async function listOpportunities(personId) {
+  async function listOpportunities(personId, includeActionLinks=false) {
     const person = await findPerson(personId);
     if (!person) throw new Error('Person not found');
     // PMC-19 CL-03: legacy_customer_id removed; resolve customer_id via customers.person_id
@@ -774,6 +775,12 @@ function createService({ request = pgRequest, rpc = pgRpc, disclosure = disclose
     for (const row of own.concat(legacy)) byId.set(String(row.id), row);
     const rows = [...byId.values()].sort((a, b) =>
       String(b.updated_at || '').localeCompare(String(a.updated_at || '')));
+    if (includeActionLinks && rows.length) {
+      const linked=await request('v_next_context_action','GET',{select:'id,target_id,title,due_at,status',kind:'eq.opportunity',
+        person_id:'eq.'+idOf(person.id),target_id:'in.('+rows.map(row=>idOf(row.id)).join(',')+')',limit:rows.length});
+      const next=new Map(linked.map(row=>[String(row.target_id),row]));
+      for(const row of rows) row.linked_action=next.get(String(row.id))||null;
+    }
     return { rows, testData: await disclose(refsForRows('opportunities', rows)) };
   }
 
@@ -1135,6 +1142,11 @@ exports.main = async event => {
       }
       case 'getOpportunityDirectoryDetails': return await new OpportunityWorkflowService({request:pgRequest,rpc:pgRpc})
         .details(event.id,uid);
+      case 'listActionCenter': return await pgRpc('crm_action_center_v1',{p_actor_uid:uid,p_query:event.query});
+      case 'previewActionContext':
+      case 'confirmActionContext': return await pgRpc('crm_action_context_v1',{
+        p_actor_uid:uid,p_step:event.action==='previewActionContext'?'preview':'confirm',p_input:event.data,
+      });
       case 'getPipelineState':
       case 'previewPipelineStage':
       case 'confirmPipelineStage': {
@@ -1142,7 +1154,7 @@ exports.main = async event => {
         return await pgRpc('crm_pipeline_stage_v1',{p_actor_uid:uid,p_operation:op,p_data:event.data});
       }
       case 'listPendingOpportunityCandidates': return await new OpportunityWorkflowService({request:pgRequest,rpc:pgRpc}).listPending(uid);
-      case 'listOpportunities': return await service.listOpportunities(event.personId);
+      case 'listOpportunities': return await service.listOpportunities(event.personId,event.includeActionLinks===true);
       case 'getOpportunityLinks': return await new OpportunityWorkflowService({request:pgRequest,rpc:pgRpc})
         .linked(event.personId,event.id,uid);
       case 'listUnlinkedOpportunityActions': return await new OpportunityWorkflowService({request:pgRequest,rpc:pgRpc})

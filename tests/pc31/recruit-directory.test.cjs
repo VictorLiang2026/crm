@@ -32,8 +32,10 @@ function fixture(count = 75) {
   };
   const request = async (table, method, filters) => {
     calls.push({ table, method, filters });
-    let rows = ordered(sourceRows[table]);
+    assert.equal(table,'v_recruit_action_directory');
+    let rows = ordered(filters.customer_id==='is.null' ? sourceRows.v_recruit_candidates_person_only : sourceRows.v_recruit_candidates);
     if (filters.customer_id === 'not.is.null') rows = rows.filter(row => row.customer_id != null);
+    if (filters.customer_id === 'is.null') rows = rows.filter(row=>row.customer_id==null);
     if (filters.or) {
       const match = /next_action_date\.lt\.(\d{4}-\d{2}-\d{2}),and\(next_action_date\.eq\.\d{4}-\d{2}-\d{2},candidate_id\.lt\.(\d+)\),next_action_date\.is\.null/.exec(filters.or);
       assert.ok(match, `unexpected keyset filter: ${filters.or}`);
@@ -94,17 +96,16 @@ test('PC31 excludes Person-only candidates from the legacy source in cursor and 
   const matchingPageRows = page.rows.filter(row => String(row.person_id) === String(personOnly.person_id));
   assert.deepEqual(matchingPageRows.map(row => `${row.source}:${row.candidate_id}`),
     [`person:${personOnly.candidate_id}`]);
-  assert.equal(f.calls.find(call => call.table === 'v_recruit_candidates').filters.customer_id, 'not.is.null');
-  assert.equal(f.calls.find(call => call.table === 'v_recruit_candidates_person_only').filters.customer_id, undefined);
+  assert.deepEqual(new Set(f.calls.map(call=>call.filters.customer_id)),new Set(['not.is.null','is.null']));
 
   const filtered = await f.service.list({ action: 'listRecruitDirectory', page: 1, pageSize: 30,
     search: personOnly.customer_name, sortField: 'name', sortDir: 'asc' });
   assert.deepEqual(filtered.rows.map(row => `${row.source}:${row.candidate_id}`),
     [`person:${personOnly.candidate_id}`]);
-  const legacyCall = f.calls.filter(call => call.table === 'v_recruit_candidates').at(-1);
-  const personCall = f.calls.filter(call => call.table === 'v_recruit_candidates_person_only').at(-1);
+  const legacyCall = f.calls.filter(call => call.filters.customer_id === 'not.is.null').at(-1);
+  const personCall = f.calls.filter(call => call.filters.customer_id === 'is.null').at(-1);
   assert.equal(legacyCall.filters.customer_id, 'not.is.null');
-  assert.equal(personCall.filters.customer_id, undefined);
+  assert.equal(personCall.filters.customer_id, 'is.null');
 });
 
 test('PC31 marks the bounded directory as truncated at 1,000 rows', async () => {

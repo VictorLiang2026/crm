@@ -8,7 +8,10 @@ const dbPath = require.resolve(path.join(root, 'db.js'));
 let caller = null;
 let modelCalls = 0;
 require.cache[dbPath] = { id: dbPath, filename: dbPath, loaded: true, exports: {
-  app: { auth: () => ({ getUserInfo: () => caller }) },
+  app: { auth: () => ({ getUserInfo: () => caller }), callFunction: async ({name, data}) => {
+    assert.equal(name, 'person_360'); assert.equal(data.action, 'verifyBusinessDeviceOnly');
+    return {result:{verified:true,actor:caller.uid}};
+  } },
   rdb: { from: () => {
     const query = { select: () => query, is: () => query, order: () => query,
       then: resolve => Promise.resolve({ data: [], error: null }).then(resolve) };
@@ -33,10 +36,10 @@ test('morning view rejects anonymous before reading and returns seven empty sect
       assert.equal(options.headers['Accept-Profile'], 'public');
       return { ok: true, json: async () => [] };
     };
-    assert.deepEqual(await coach.main({ action: 'daily_review', view: 'morning' }), { error: 'UNAUTHORIZED' });
+    assert.deepEqual(await coach.main({ action: 'daily_review', view: 'morning' }), { error: 'DEVICE_ACCESS_DENIED' });
     assert.equal(reads, 0);
     caller = { uid: '[CRM_TEST_ONLY]user', isAnonymous: false };
-    const result = await coach.main({ action: 'daily_review', view: 'morning' });
+    const result = await coach.main({ __deviceRequest:{__deviceProof:'fixture',action:'daily_review',view:'morning',guidance:'rules'} });
     assert.equal(result.view, 'morning');
     assert.deepEqual(Object.keys(result.sections).slice(0, 7), ['morningBrief', 'topActions',
       'commitments', 'upcoming', 'risk', 'opportunities', 'needConfirmation']);

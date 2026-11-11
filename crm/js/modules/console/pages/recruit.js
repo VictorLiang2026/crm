@@ -137,6 +137,8 @@ function listNode(ctx) {
         h('td', { class: 'recruit-col-name' }, [
           h('a', { href: '#', onclick: ev => { ev.preventDefault(); ev.stopPropagation(); openPerson(row); } }, row.customer_name || t('unnamed')),
           h('div', { class: 'recruit-row-sub' }, [row.occupation || '', textOf(row.next_action) ? `${t('next_step')}${row.next_action}` : ''].filter(Boolean).join(' · ')),
+          row.action_id ? h('a',{class:'recruit-row-sub',href:'#/actions/'+row.action_id,onclick:e=>e.stopPropagation()},
+            t('label_action')+' #'+row.action_id+' · '+translateEnum('work_status',row.action_status)) : null,
         ]),
         h('td', { class: 'recruit-col-stage' }, bdg(stageLabel(row.stage) || t('stage_unknown'), stageTone(row.stage))),
         h('td', { class: 'recruit-col-recruitment_priority' }, row.recruitment_priority ? bdg(row.recruitment_priority, 'gold') : '-'),

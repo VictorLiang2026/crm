@@ -32,9 +32,9 @@ const ledger = { rows: [{ id: 5, person_id: 99, opportunity_id: 31, action_type:
 persons: [{ id: 99, display_name: '测试人', legacy_customer_id: 10, deleted_at: null }] };
 
 test('unauthenticated request fails before any database or AI work', async () => {
-  assert.deepEqual(await coach.main({ action: 'generate' }), { error: 'UNAUTHORIZED' });
+  assert.deepEqual(await coach.main({ action: 'generate' }), { error: 'DEVICE_ACCESS_DENIED' });
   caller = { uid: 'anonymous-test-user', isAnonymous: true };
-  assert.deepEqual(await coach.main({ action: 'generate' }), { error: 'UNAUTHORIZED' });
+  assert.deepEqual(await coach.main({ action: 'generate' }), { error: 'DEVICE_ACCESS_DENIED' });
   caller = null;
   assert.equal(reads, 0);
 });
@@ -82,4 +82,15 @@ test('Action API stays on public with a server-only bearer token and filters ope
   assert.equal(requests[0].headers['Accept-Profile'], 'public');
   assert.equal(requests[0].headers.Authorization, 'Bearer test-only');
   assert.notEqual(facts.fingerprint(ledger.rows), facts.fingerprint([{...ledger.rows[0], updated_at: '2026-09-28'}]));
+});
+
+test('only explicitly linked reminders disappear after completion, including when titles and dates coincide', async () => {
+  const actions = [base.actions[0], {...base.actions[0],action_id:'opportunity-32'},
+    {...base.actions[0],action_id:'recruit-7',action_type:'recruit',person_type:'recruit'}];
+  const result = await facts.readOpenActions({env:'crm-test',key:'fixture',loadReminders:async()=>actions,
+    fetchImpl:async url=>({ok:true,json:async()=>url.pathname.endsWith('v_next_context_action')
+      ? [{target_id:url.searchParams.get('kind')==='eq.candidate'?7:31}] : []})});
+  assert.deepEqual(result.coveredReminders.sort(),['opportunity-31','recruit-7']);
+  const ranked=coach.__test.buildActionCandidates({...base,actions},{},'2026-09-28',result);
+  assert.deepEqual(ranked.map(item=>item.action_id),['opportunity-32']);
 });

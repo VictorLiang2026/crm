@@ -2,6 +2,7 @@
 // 「活动」页签按 G5 证据口径：activities.listByPerson 仅支持 legacy 数字 ID，
 // 故 canonical 人物的活动参与记录取 getTimelinePage 已合并的 activity_participants 数据。
 import { openOpportunityDetails } from './opportunities.js';
+import { actionDay } from '../action-center.js';
 import { h } from '../dom.js';
 import { ic } from '../icons.js';
 import { data } from '../data.js';
@@ -159,8 +160,9 @@ function overviewNode(ctx, id, setName) {
       sectionTitle(t('sec_todos')),
       rowsBlock(activeWorks.slice(0, 8), (r) => h('div', { class: 'list-row' }, [
         h('div', { style: 'flex:1;min-width:0' }, [
-          h('div', { class: 'row-title' }, r.kind === 'action' ? (r.title || t('unnamed_action')) : (r.content || t('unnamed_commitment'))),
-          h('div', { class: 'row-sub' }, `${r.kind === 'action' ? t('label_action') : t('label_commitment')} · ${dueLabel(String(r.due_at || '').slice(0, 10))}`),
+          r.kind==='action' ? h('a',{class:'row-title',href:'#/actions/'+r.id},r.title||t('unnamed_action'))
+            : h('div',{class:'row-title'},r.content||t('unnamed_commitment')),
+          h('div', { class: 'row-sub' }, `${r.kind === 'action' ? t('label_action') : t('label_commitment')} · ${dueLabel(actionDay(r.due_at))}`),
         ]),
         bdg(r.kind === 'action' ? t('label_action') : t('label_commitment'), r.kind === 'action' ? 'ink' : 'gold'),
       ]), t('empty_no_open_actions')),
@@ -402,8 +404,9 @@ function opportunitiesNode(ctx, id) {
         const r = { ...sourceRow, person_name: works.personName };
         return h('div', { class: 'list-row' }, [
           h('div', { style: 'flex:1;min-width:0' }, [
-            h('div', { class: 'row-title' }, r.kind === 'action' ? (r.title || t('unnamed_action')) : (r.content || t('unnamed_commitment'))),
-            h('div', { class: 'row-sub' }, `${translateEnum('work_status', r.status)} · ${dueLabel(String(r.due_at || '').slice(0, 10))}${r.kind === 'action' ? ` · ${translateEnum('work_priority', r.priority)}` : ''}`),
+            r.kind==='action' ? h('a',{class:'row-title',href:'#/actions/'+r.id},r.title||t('unnamed_action'))
+              : h('div',{class:'row-title'},r.content||t('unnamed_commitment')),
+            h('div', { class: 'row-sub' }, `${translateEnum('work_status', r.status)} · ${dueLabel(actionDay(r.due_at))}${r.kind === 'action' ? ` · ${translateEnum('work_priority', r.priority)}` : ''}`),
             r.completed_at ? h('div', { class: 'row-sub' }, `${t('work_completed_at')} ${fmtDate(r.completed_at)}`) : null,
           ]),
           bdg(r.kind === 'action' ? t('label_action') : translateEnum('commitment_type', r.commitment_type), r.kind === 'action' ? 'ink' : 'gold'),
@@ -422,7 +425,9 @@ function opportunitiesNode(ctx, id) {
         rowsBlock(rows, (r) => h('div', { class: 'list-row' }, [
           h('div', { style: 'flex:1;min-width:0' }, [
             h('div', { class: 'row-title' }, `${oppTypeLabel(r.opportunity_type) || t('opp_default')} · ${textOf(r.last_progress) || t('opp_no_progress')}`),
-            h('div', { class: 'row-sub' }, `${t('label_next_action')}：${textOf(r.next_action) || t('label_none')}${r.next_action_date ? ' · ' + dueLabel(r.next_action_date) : ''} · ${t('label_discovered')} ${fmtDate(r.discovered_at)}`),
+            r.linked_action ? h('a',{class:'row-sub',href:'#/actions/'+r.linked_action.id},[
+              r.linked_action.title,translateEnum('work_status',r.linked_action.status),actionDay(r.linked_action.due_at),
+            ].filter(Boolean).join(' · ')) : h('div', { class: 'row-sub' }, `${t('label_next_action')}：${textOf(r.next_action) || t('label_none')}${r.next_action_date ? ' · ' + dueLabel(r.next_action_date) : ''} · ${t('label_discovered')} ${fmtDate(r.discovered_at)}`),
           ]),
           bdg(oppStatusLabel(r.status) || t('opp_status_default'), r.status === '成交' ? 'jade' : r.status === '关闭' ? 'gray' : 'gold'),
           h('button', { class: 'btn btn-ghost btn-sm', type: 'button',

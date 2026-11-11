@@ -4723,6 +4723,111 @@
         "authenticated_read": true,
         "authenticated_usage": true
       }
+    },
+    {
+      "kind": "relation",
+      "name": "crm_action_context_commands",
+      "detail": {
+        "rls": true,
+        "type": "r",
+        "policies": [
+          {
+            "name": "crm_action_context_service_only",
+            "roles": [
+              "service_role"
+            ],
+            "command": "*",
+            "check_hash": "b326b5062b2f0e69046810717534cb09",
+            "permissive": true,
+            "using_hash": "b326b5062b2f0e69046810717534cb09"
+          }
+        ],
+        "force_rls": true,
+        "privileges": {
+          "anon": [],
+          "service_role": [
+            "INSERT",
+            "SELECT",
+            "UPDATE"
+          ],
+          "authenticated": []
+        },
+        "security_invoker": false
+      }
+    },
+    {
+      "kind": "relation",
+      "name": "v_action_context_links",
+      "detail": {
+        "rls": false,
+        "type": "v",
+        "policies": [],
+        "force_rls": false,
+        "privileges": {
+          "anon": [],
+          "authenticated": [],
+          "service_role": [
+            "SELECT"
+          ]
+        },
+        "security_invoker": true
+      }
+    },
+    {
+      "kind": "relation",
+      "name": "v_next_context_action",
+      "detail": {
+        "rls": false,
+        "type": "v",
+        "policies": [],
+        "force_rls": false,
+        "privileges": {
+          "anon": [],
+          "authenticated": [],
+          "service_role": [
+            "SELECT"
+          ]
+        },
+        "security_invoker": true
+      }
+    },
+    {
+      "kind": "relation",
+      "name": "v_recruit_action_directory",
+      "detail": {
+        "rls": false,
+        "type": "v",
+        "policies": [],
+        "force_rls": false,
+        "privileges": {
+          "anon": [],
+          "authenticated": [],
+          "service_role": [
+            "SELECT"
+          ]
+        },
+        "security_invoker": true
+      }
+    },
+    {
+      "kind": "routine",
+      "name": "crm_action_center_v1(p_actor_uid text, p_query jsonb)",
+      "detail": {
+        "anon_execute": false,
+        "service_execute": true,
+        "security_definer": false,
+        "authenticated_execute": false
+      }
+    },
+    {
+      "kind": "routine",
+      "name": "crm_action_context_v1(p_actor_uid text, p_step text, p_input jsonb)",
+      "detail": {
+        "anon_execute": false,
+        "service_execute": true,
+        "security_definer": false,
+        "authenticated_execute": false
+      }
     }
   ]
 }

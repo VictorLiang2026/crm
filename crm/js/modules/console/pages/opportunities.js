@@ -12,6 +12,7 @@ import { openLegacyOpportunity, legacyOpportunityTypeLabel } from '../legacy-opp
 import { openLegacyOpportunityMaintenance } from '../legacy-opportunity-maintenance.js';
 import { openRecruitCandidateCreate } from '../recruit-write.js';
 import { FLOW_STAGES, openPipelineStage, protectionTypes, stageLabel } from '../pipeline-stage.js';
+import { actionContextPanel } from '../action-center.js';
 
 const PAGE_SIZE = 20;
 const FILTER_TYPES = [
@@ -102,8 +103,8 @@ export function openOpportunityDetails(ctx, row, onDone) {
       person ? h('a', { class: 'opp-person-link', href: `#/person/${person.id}` }, `${person.display_name} · ${t('opp_open_person')}`) : null,
       h('dl', { class: 'opp-detail-facts' }, [
         h('dt', {}, t('opp_detail_progress')), h('dd', {}, opportunity.last_progress || t('empty_no_info')),
-        h('dt', {}, t('opp_detail_next_action')), h('dd', {}, opportunity.next_action || t('empty_no_info')),
-        h('dt', {}, t('opp_detail_next_date')), h('dd', {}, opportunity.next_action_date ? fmtDate(opportunity.next_action_date) : t('no_date')),
+        !person ? h('dt', {}, t('opp_detail_next_action')) : null, !person ? h('dd', {}, opportunity.next_action || t('empty_no_info')) : null,
+        !person ? h('dt', {}, t('opp_detail_next_date')) : null, !person ? h('dd', {}, opportunity.next_action_date ? fmtDate(opportunity.next_action_date) : t('no_date')) : null,
         h('dt', {}, t('opp_detail_discovered')), h('dd', {}, fmtDate(opportunity.discovered_at || opportunity.created_at)),
         opportunity.referred_name ? h('dt', {}, t('opp_referred_name')) : null,
         opportunity.referred_name ? h('dd', {}, opportunity.referred_name) : null,
@@ -168,7 +169,7 @@ export function openOpportunityDetails(ctx, row, onDone) {
           [ic('users'),t('pipeline_customer_record')]),
       ]) : null,
     ]);
-    body.replaceChildren(core, actionSection, outcomeSection, controls);
+    body.replaceChildren(core, person ? actionContextPanel(ctx,{kind:'opportunity',targetId:opportunity.id},onDone,opportunity) : actionSection, outcomeSection, controls);
   }).catch((error) => {
     body.replaceChildren(h('div', { class: 'sheet-err' }, `${t('opp_detail_failed')}: ${error.message || t('try_later')}`));
   });
@@ -192,7 +193,8 @@ function pipelineRow(ctx, row, refresh) {
       row.next_action ? h('span',{class:'opp-row-note'},row.next_action) : null,
     ]),
     h('div',{class:'opp-row-meta'},[
-      row.next_date ? h('span',{},fmtDate(row.next_date)) : null,
+      row.action_id ? h('a',{href:'#/actions/'+row.action_id},t('label_action')+' #'+row.action_id+(row.action_status?' · '+translateEnum('work_status',row.action_status):'')+(row.next_date?' · '+fmtDate(row.next_date):'')) :
+        row.next_date ? h('span',{},fmtDate(row.next_date)) : null,
       FLOW_STAGES[row.track] ? h('button',{class:'btn btn-soft btn-sm',type:'button',onclick:()=>openPipelineStage(ctx,{
         track:row.track,recordId:row.id,personId:row.person_id},refresh)},t('pipeline_change')) : null,
       h('button',{class:'btn btn-ghost btn-sm',type:'button',onclick:open},t('opp_details')),

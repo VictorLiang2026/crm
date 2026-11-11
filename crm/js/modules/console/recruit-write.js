@@ -2,6 +2,7 @@ import { h } from './dom.js';
 import { ic } from './icons.js';
 import { openSheet, openWorkItemEditor, openRecruitCandidateRemove } from './write.js';
 import { openPipelineStage, stageLabel as pipelineStageLabel } from './pipeline-stage.js';
+import { actionContextPanel } from './action-center.js';
 import { data } from './data.js';
 import { t, getLang, translateEnum } from './i18n.js';
 import { emptyNote, fmtDate, sectionTitle } from './ui.js';
@@ -487,6 +488,7 @@ export async function renderRecruitSection(ctx, personId, onDone) {
       h('div', { class: 'card-body tab-stack' }, [
         h('div',{class:'stack-head'},[h('b',{},t('pipeline_stage')),flowStatus,
           h('button',{class:'btn btn-soft btn-sm',type:'button',onclick:()=>openPipelineStage(ctx,flowTarget,refreshFlow)},t('pipeline_change'))]),
+        actionContextPanel(ctx,{kind:'candidate',targetId:String(candidate.id)},null,candidate),
         h('b',{},t('pipeline_milestone')),
         h('div', { class: 'recruit-stage-editor' }, [stageControl, noteControl, stageButton]),
         h('div', { class: 'recruit-candidate-actions' }, [

@@ -106,7 +106,7 @@ function compareRows(a, b, field, direction) {
 
 function postgrestFilters(criteria, field, direction) {
   const filters = {
-    select: 'candidate_id,customer_name,stage,occupation,potential_score,next_action,next_action_date,idle_days,person_id,customer_id,recruitment_priority,updated_at',
+    select: 'candidate_id,customer_name,stage,occupation,potential_score,next_action,next_action_date,action_id,action_status,idle_days,person_id,customer_id,recruitment_priority,updated_at',
     order: `${SORT_FIELDS[field]}.${direction}.nullslast,candidate_id.${direction}`,
     limit: MAX_SOURCE_ROWS,
   };
@@ -137,13 +137,13 @@ class RecruitDirectoryService {
     }
     const boundaries = { legacy: cursorBoundary(cursor.legacy), person: cursorBoundary(cursor.person) };
     const limit = pageSize + 1;
-    const select = 'candidate_id,customer_name,stage,occupation,potential_score,next_action,next_action_date,idle_days,person_id,customer_id';
+    const select = 'candidate_id,customer_name,stage,occupation,potential_score,next_action,next_action_date,action_id,action_status,idle_days,person_id,customer_id';
     const order = 'next_action_date.desc.nullslast,candidate_id.desc';
     const [legacy, personOnly] = await Promise.all([
-      this.request('v_recruit_candidates', 'GET', {
+      this.request('v_recruit_action_directory', 'GET', {
         select, order, limit, ...after(boundaries.legacy), customer_id: 'not.is.null',
       }),
-      this.request('v_recruit_candidates_person_only', 'GET', { select, order, limit, ...after(boundaries.person) }),
+      this.request('v_recruit_action_directory', 'GET', { select, order, limit, customer_id:'is.null', ...after(boundaries.person) }),
     ]);
     const compare = (a, b) => {
       const ad = a.next_action_date == null ? '' : String(a.next_action_date);
@@ -177,8 +177,8 @@ class RecruitDirectoryService {
     const criteria = criteriaOf(event);
     const filters = postgrestFilters(criteria, criteria.sortField, criteria.sortDir);
     const [legacy, personOnly] = await Promise.all([
-      this.request('v_recruit_candidates', 'GET', { ...filters, customer_id: 'not.is.null' }),
-      this.request('v_recruit_candidates_person_only', 'GET', filters),
+      this.request('v_recruit_action_directory', 'GET', { ...filters, customer_id: 'not.is.null' }),
+      this.request('v_recruit_action_directory', 'GET', { ...filters, customer_id:'is.null' }),
     ]);
     const merged = [
       ...(legacy || []).map(row => ({ ...row, _source: 'legacy' })),

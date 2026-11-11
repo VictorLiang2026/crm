@@ -36,7 +36,7 @@ function fingerprint(rows) {
   return hash.digest('hex').slice(0, 20);
 }
 
-async function readOpenActions({ env, key, fetchImpl = fetch }) {
+async function readOpenActions({ env, key, fetchImpl = fetch, loadReminders }) {
   if (!/^crm-[a-z0-9]+$/.test(env || '') || !key) throw new Error('Today Action access is not configured');
   async function get(table, params) {
     const url = new URL(`https://${env}.api.tcloudbasegateway.com/v1/rdb/rest/${table}`);
@@ -76,7 +76,24 @@ async function readOpenActions({ env, key, fetchImpl = fetch }) {
   if (new Set(persons.map(p => Number(p.id))).size !== ids.length) {
     throw new Error('Today Action Person mapping incomplete');
   }
-  return { rows, persons };
+  const coveredReminders=[];
+  if (loadReminders) {
+    const targets={opportunity:new Set(),candidate:new Set()};
+    for (const reminder of await loadReminders()) {
+      const m=/^(opportunity|recruit)-([1-9]\d*)$/.exec(String(reminder.action_id));
+      if(m) targets[m[1]==='recruit'?'candidate':'opportunity'].add(m[2]);
+    }
+    for(const [kind,ids] of Object.entries(targets)) {
+      const list=[...ids];
+      for(let i=0;i<list.length;i+=100) {
+        const linked=await get('v_next_context_action',{select:'target_id',filters:{
+          kind:'eq.'+kind,target_id:'in.('+list.slice(i,i+100).join(',')+')',
+        }});
+        for(const link of linked)coveredReminders.push((kind==='candidate'?'recruit-':'opportunity-')+link.target_id);
+      }
+    }
+  }
+  return { rows, persons, coveredReminders };
 }
 
 function mapActions(data, facts, today, dayKeyOf, diffDays) {

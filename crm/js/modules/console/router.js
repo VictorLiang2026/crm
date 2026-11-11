@@ -11,7 +11,10 @@ import {
   renderKnowledgeEditor, renderKnowledgeTrash,
 } from './views.js';
 
+import { renderActionCenter } from './action-center.js';
+
 const EXACT = new Map([
+  ['#/actions', renderActionCenter],
   ['#/today', renderToday],
   ['#/people', renderPeople],
   ['#/people/import', renderPersonFileImport],
@@ -44,6 +47,7 @@ const EXACT = new Map([
 ]);
 
 const PATTERNS = [
+  { re: /^#\/actions\/([1-9]\d*|today|week|overdue|waiting|completed)$/, nav: '#/more', render: renderActionCenter },
   { re: /^#\/activity-report(?:\?(.*))?$/, nav: '#/today', render: (ctx, query) => {
     const params = new URLSearchParams(query || '');
     return renderActivityReport(ctx, 'customer', { startDate: params.get('startDate'), endDate: params.get('endDate') });
@@ -64,6 +68,7 @@ const PATTERNS = [
 ];
 
 const NAV_OF = {
+  '#/actions': '#/more',
   '#/': '#/today',
   '#/today': '#/today',
   '#/people': '#/people',

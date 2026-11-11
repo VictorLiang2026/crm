@@ -9,6 +9,7 @@ import {
 import { renderActivityParticipants, renderActivityResources } from '../activity-people.js';
 import { renderActivityReview } from '../activity-review.js';
 import { renderActivityPreparation } from '../activity-preparation.js';
+import { actionContextPanel } from '../action-center.js';
 import { t, translateEnum } from '../i18n.js';
 import {
   wpTag, pageHead, emptyNote, loadInto, bdg, kvGrid, sectionTitle,
@@ -300,6 +301,7 @@ export function renderActivity(ctx, id) {
     }),
     h('div', { class: 'tabs' }, btns),
     h('section', { class: 'card tabs-body' }, bodies),
+    actionContextPanel(ctx,{kind:'activity',targetId:String(id)}),
   );
   select(0);
 }

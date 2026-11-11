@@ -209,7 +209,7 @@ function buildFingerprint(d, facts) {
     maxUpd(d.activityTasks || []),
     maxUpd(d.participants || []),
     maxUpd(d.speakers || []),
-    facts ? actionFingerprint(facts.rows) : '',
+    facts ? actionFingerprint(facts.rows) + ':' + [...new Set(facts.coveredReminders || [])].sort().join(',') : '',
   ].join('|');
 }
 
@@ -687,12 +687,11 @@ function buildActionCandidates(d, nbaIdx, today, facts) {
   if (facts) {
     const canonical = mapActions(d, facts, today, dayKeyOf, diffDays);
     const explicitOpportunityIds = new Set(canonical.filter(x => x.opportunity_id).map(x => Number(x.opportunity_id)));
-    const exactKeys = new Set(canonical.map(x => [x.customer_id || '', x.title.trim().toLowerCase(), x.action_date].join('|')));
+    const covered = new Set(facts.coveredReminders || []);
     const filtered = list.filter(x => {
       const opportunityId = String(x.action_id || '').match(/^opportunity-(\d+)$/);
       if (opportunityId && explicitOpportunityIds.has(Number(opportunityId[1]))) return false;
-      return !exactKeys.has([x.person_type === 'customer' ? x.person_id : '',
-        String(x.title || '').trim().toLowerCase(), x.action_date].join('|'));
+      return !covered.has(String(x.action_id));
     });
     list.length = 0;
     list.push(...canonical, ...filtered);
@@ -1264,9 +1263,10 @@ exports.main = async (event, context) => {
       if (event.view !== 'morning') return { error: 'view must be morning' };
       const now = new Date().toISOString();
       const today = dayKeyOf(now);
+      const allData=loadAll();
       const [data, openActions, morningFacts] = await Promise.all([
-        loadAll(),
-        readOpenActions({ env: process.env.TCB_ENV, key: process.env.CRM_TODAY_DB_API_KEY }),
+        allData,
+        readOpenActions({ env: process.env.TCB_ENV, key: process.env.CRM_TODAY_DB_API_KEY, loadReminders:async()=>(await allData).actions }),
         readMorningFacts({ env: process.env.TCB_ENV, key: process.env.CRM_TODAY_DB_API_KEY, today, now }),
       ]);
       if (data.readErrors.length) throw new Error('Morning Brief fact source unavailable');
@@ -1282,10 +1282,11 @@ exports.main = async (event, context) => {
       return { view: 'morning', today, generated_at: nowIso(), sections, testData: disclosure };
     }
 
+    const allData=loadAll();
     const [d, facts] = await Promise.all([
-      loadAll(),
+      allData,
       action === 'generate' || action === 'candidates'
-        ? readOpenActions({ env: process.env.TCB_ENV, key: process.env.CRM_TODAY_DB_API_KEY })
+        ? readOpenActions({ env: process.env.TCB_ENV, key: process.env.CRM_TODAY_DB_API_KEY, loadReminders:async()=>(await allData).actions })
         : Promise.resolve(null),
     ]);
     const today = todayStr();

@@ -147,7 +147,7 @@ module.exports = async function smoke(root, test, options = {}) {
       await b.evaluate("location.hash='#/today'");
       await b.wait("document.getElementById('console-main')?.innerText.includes('[CRM_TEST_ONLY]今日行动') === true");
       await b.click('#console-main .brief-row', '[CRM_TEST_ONLY]今日行动');
-      await b.wait("location.hash==='#/person/980001' && window.__crmTest.calls.some(c=>c.name==='person_360' && c.action==='get')");
+      await b.wait("location.hash==='#/actions/990301' && document.querySelector('#console-main [data-action-id=\"990301\"]')?.innerText.includes('[CRM_TEST_ONLY]整理反馈') && window.__crmTest.calls.some(c=>c.name==='person_360' && c.action==='listActionCenter')");
       await b.evaluate("localStorage.setItem('console-fixture-preserve','1'); location.hash='#/settings'");
       await b.wait("document.getElementById('console-main')?.innerText.includes('当前密码') === true");
       await b.evaluate("[...document.querySelectorAll('#console-main button')].find(x=>x.textContent.includes('English')).click()");

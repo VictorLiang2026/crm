@@ -196,6 +196,8 @@ function installFixtures() {
         newPerson:false,willCreateSpeaker:true,willCreateCustomer:false},
       expiresAt:'2026-10-04T12:00:00+08:00',status:'preview'}),
     'person_360:executeIdentity': () => ({personId:980001,speakerId:990011}),
+    'person_360:listActionCenter': ({query}) => rows(workItems.filter(item =>
+      item.kind === 'action' && query.view === 'item' && String(item.id) === String(query.actionId))),
     'person_360:listOpportunityDirectory': data => ({ rows: mode === 'empty' ? [] : [
       { id: 961001, person_id: 980001, customer_id: null, opportunity_type: 'recruit',
         status: '发现', next_action: marker + '联系候选人',

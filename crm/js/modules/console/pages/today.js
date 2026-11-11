@@ -7,6 +7,7 @@ import { data } from '../data.js';
 import { t, getLang, translateEnum } from '../i18n.js';
 import { openWorkItemEditor, openWorkItemTransition, openCandidate } from '../write.js';
 import { renderProactiveCoach } from '../proactive-coach.js';
+import { actionDay } from '../action-center.js';
 import {
   wpTag, sk, pageHead, card, emptyNote, loadInto, bdg, avatar,
   dueLabel, dayDiffFromToday, textOf,
@@ -61,7 +62,8 @@ function briefCard(sections) {
         ic('sparkle'), h('span', {}, mb.guidance),
       ]) : null,
       ...(actions.length ? actions.map((a, i) =>
-        h('a', { class: 'brief-row data-row', href: a.target || '#/today' }, [
+        h('a', { class: 'brief-row data-row', href: /^action:[1-9]\d*$/.test(a.focus || '')
+          ? '#/actions/'+a.focus.slice(7) : a.target || '#/today' }, [
           h('span', { class: 'brief-num' }, String(i + 1)),
           h('div', { style: 'flex:1;min-width:0' }, [
             h('div', { class: 'row-title' }, a.title || t('unnamed_action')),
@@ -83,7 +85,7 @@ function briefCard(sections) {
 
 function rankActions(rows) {
   const active = rows.filter((r) => r.kind === 'action' && (r.status === 'open' || r.status === 'in_progress'));
-  const dueOf = (r) => r.due_at ? String(r.due_at).slice(0, 10) : '';
+  const dueOf = (r) => actionDay(r.due_at);
   const level = (r) => {
     const diff = dayDiffFromToday(dueOf(r));
     if (diff !== null && diff < 0) return 'M';
@@ -107,7 +109,7 @@ function actionRow(ctx, item, onDone) {
   return h('div', { class: 'list-row' }, [
     avatar(name),
     h('div', { style: 'flex:1;min-width:0' }, [
-      h('div', { class: 'row-title' }, item.title || t('unnamed_action')),
+      h('a', { class: 'row-title', href:'#/actions/'+item.id }, item.title || t('unnamed_action')),
       h('div', { class: 'row-sub' }, `${name} · ${dueLabel(item._due)}`),
     ]),
     bdg(text, tone),
@@ -224,6 +226,7 @@ export function renderToday(ctx) {
     return card({
       title: t('priority_actions'), icon: 'chevron', tag: wpTag(t('fact')),
       body: [
+        h('a',{class:'btn btn-soft',href:'#/actions'},t('ac_title')),
         h('div', { class: 'sheet-actions' }, [
           h('button', { class: 'btn btn-primary btn-sm', type: 'button',
             onclick: () => openWorkItemEditor(ctx, { kind: 'action', onDone: reload }) }, t('create_action')),

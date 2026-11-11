@@ -27,6 +27,9 @@ const aiTask = (ctx, startPayload, taskType, personId, options) => resolveAITask
 export const data = {
   // ---------- 今日 ----------
   todayWorkItems: (ctx) => p360(ctx, 'listTodayWorkItems'),
+  actionCenter: (ctx, query) => p360(ctx, 'listActionCenter', {query}),
+  previewActionContext: (ctx, data) => p360(ctx, 'previewActionContext', {data}),
+  confirmActionContext: (ctx, previewId) => p360(ctx, 'confirmActionContext', {data:{previewId}}),
   proactiveCoachCandidates: (ctx) => p360(ctx, 'listProactiveCoachCandidates'),
   decideProactiveCoachCandidate: (ctx, payload) => p360(ctx, 'recordProactiveCoachDecision', { data: payload }),
   previewWorkItem: (ctx, payload) => p360(ctx, 'previewWorkItem', { data: payload }),
@@ -211,7 +214,7 @@ export const data = {
   updatePolicyReport: (ctx, reportId, payload) => call(ctx, 'policy_review_reports', {
     action: 'update', id: Number(reportId), data: payload,
   }),
-  personOpportunities: (ctx, personId) => p360(ctx, 'listOpportunities', { personId }),
+  personOpportunities: (ctx, personId) => p360(ctx, 'listOpportunities', { personId,includeActionLinks:true }),
   recruitContext: (ctx, personId) => p360(ctx, 'listRecruitContext', { personId }),
   lookupCustomer: (ctx, customerId) => p360(ctx, 'lookupCustomer', { customerId }),
 
