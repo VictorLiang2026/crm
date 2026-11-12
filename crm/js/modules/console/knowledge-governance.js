@@ -19,7 +19,7 @@ const active = row => (row.lifecycle_status || (row.verified ? 'verified' : 'dra
 const titleOf = row => row.table === 'playbooks' ? `${row.scenario || ''}${row.objection ? ` · ${row.objection}` : ''}`
   : row.table === 'knowledge_sources' ? row.title || row.fileName || '' : row.source || '';
 const summaryOf = row => row.contentManaged ? row.metadata?.summary || '' : row.table === 'playbooks' ? row.metadata?.summary || row.response_logic || ''
-  : row.table === 'knowledge_sources' ? (row.ocrProgress ? (row.ocrProgress.stage==='summarize' ? text('ocr_summarizing') : text('ocr_progress').replace('{done}',String(row.ocrProgress.completedPages)).replace('{total}',row.ocrProgress.totalPages?String(row.ocrProgress.totalPages):'…')) : text('source_pending_summary')) : row.metadata?.summary || String(row.content || '').slice(0,220);
+  : row.table === 'knowledge_sources' ? (row.extractionStatus==='failed' ? text('retry_failed') : row.ocrProgress ? (row.ocrProgress.stage==='summarize' ? text('ocr_summarizing') : text('ocr_progress').replace('{done}',String(row.ocrProgress.completedPages)).replace('{total}',row.ocrProgress.totalPages?String(row.ocrProgress.totalPages):'…')) : text('source_pending_summary')) : row.metadata?.summary || String(row.content || '').slice(0,220);
 const errorCodeOf = error => String(error?.message||'').match(/^([A-Z][A-Z0-9_]+)(?::|$)/)?.[1]||'';
 const retryErrorText = error => errorCodeOf(error)==='PDF_NO_TEXT'?text('pdf_no_text')
   : errorCodeOf(error)==='PDF_LIMIT'?text('pdf_file_limit')
@@ -162,6 +162,8 @@ export function renderKnowledgeGovernance(ctx) {
         header('summary',t('kc_original')),h('th',{},text('gpt_content')),header('status',text('status')),header('updated_at',text('updated_at')),h('th',{},text('actions'))])),
       h('tbody',{},pageRows.length?pageRows.map(row=>{
         const live=active(row),isSource=row.table==='knowledge_sources',isPlaybook=row.table==='playbooks',pending=!live&&row.lifecycle_status==='draft';
+        const sourceProcessing=isSource&&row.extractionStatus==='extracting'&&!!row.ocrProgress;
+        const sourceFailed=isSource&&row.extractionStatus==='failed';
         const superseded=row.lifecycle_status==='superseded';
         const editHref=isSource?'':`#/knowledge/edit/${row.table}/${row.id}`;
         const actions=[
@@ -179,7 +181,7 @@ export function renderKnowledgeGovernance(ctx) {
             !isSource?h('small',{class:'kg-table-meta'},`${t('kc_selected')}: ${t(row.selected_content_source==='gpt'?'kc_gpt':'kc_original')}${row.contentPaused?' · '+t('kc_paused'):''}`):null]),
           h('td',{class:'kg-category-tags'},categoriesOf(row).map(category=>h('span',{class:'kg-category-chip'},text(`category_${category}`)))),
           ...contentCells(row),
-          h('td',{},h('span',{class:`kg-status ${live?'kg-verified':'kg-invalidated'}`},text(row.ocrProgress?'status_processing':live?'status_active':pending?'status_pending_review':'status_invalid'))),
+          h('td',{},h('span',{class:`kg-status ${live?'kg-verified':'kg-invalidated'}`},text(sourceFailed?'status_extraction_failed':sourceProcessing?'status_processing':live?'status_active':pending?'status_pending_review':'status_invalid'))),
           h('td',{},row.updated_at?String(row.updated_at).slice(0,10):'—'),
           h('td',{class:'kg-table-actions'},actions),
         ]);

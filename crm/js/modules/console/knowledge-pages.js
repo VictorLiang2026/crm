@@ -270,15 +270,16 @@ export function renderKnowledgeTrash(ctx){
         h('td',{},row.title||row.source||row.scenario||row.file_name||'—'),
         h('td',{class:'kg-category-tags'},categoriesOf({...row,table:row.table}).map(category=>h('span',{class:'kg-category-chip'},text(`category_${category}`)))),
         h('td',{},String(row.deleted_at||'').slice(0,16).replace('T',' ')),
-        h('td',{},h('button',{class:'btn btn-ghost btn-sm',type:'button',onclick:async()=>{
+        h('td',{},h('button',{class:'btn btn-ghost btn-sm',type:'button',onclick:async event=>{
+          const button=event.currentTarget;button.disabled=true;button.setAttribute('aria-busy','true');button.textContent=t('restoring');
           try{await data.knowledgeLibrary(ctx,'restore',{data:{table:row.table,id:row.id}});ctx.toast(text('restore_success'),'ok');await load();}
-          catch(error){status.textContent=error.message||text('restore_failed');}
+          catch(error){button.disabled=false;button.removeAttribute('aria-busy');button.textContent=text('restore');status.textContent=error.message||text('restore_failed');}
         }},text('restore'))),
       ]))),
     ])));
   };
   ctx.main.replaceChildren(pageHead({kicker:text('kicker'),title:text('trash_title'),sub:text('trash_note'),actions:[backLink()]}),
-    h('section',{class:'card'},[h('div',{class:'card-body'},[status,list])]));
+    h('section',{class:'card kg-trash-page'},[h('div',{class:'card-body'},[status,list])]));
   load().catch(error=>{list.replaceChildren(emptyNote(text('load_failed'),String(error.message||'')));});
 }
 import { openKnowledgeContent } from './knowledge-content.js';

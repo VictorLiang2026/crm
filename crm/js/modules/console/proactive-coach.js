@@ -38,6 +38,18 @@ function sourceTag(candidate) {
 
 function resultObject(value) { return Array.isArray(value)?value[0]||{}:value||{}; }
 
+function setBusy(button,labelKey) {
+  const content=[...button.childNodes];
+  button.disabled=true;
+  button.setAttribute('aria-busy','true');
+  button.replaceChildren(t(labelKey));
+  return ()=>{
+    button.disabled=false;
+    button.removeAttribute('aria-busy');
+    button.replaceChildren(...content);
+  };
+}
+
 function localizedDraft(candidate) {
   const source=candidate.actionDraft||{};
   if (typeof source.title==='string') return {title:source.title,description:source.description||'',
@@ -70,7 +82,7 @@ function openCandidateAction(ctx,candidate,onDone) {
   document.body.appendChild(sheet.overlay);
 
   async function preview(button) {
-    button.disabled=true;
+    const restoreButton=setBusy(button,'pc30_previewing');
     try {
       const value=await data.previewWorkItem(ctx,{idempotencyKey:candidate.candidateKey,kind:'action',operation:'create',
         personId:String(candidate.personId),itemId:null,draft});
@@ -92,11 +104,11 @@ function openCandidateAction(ctx,candidate,onDone) {
           h('button',{class:'btn btn-primary',type:'button',onclick:event=>execute(event.currentTarget,result.previewId)},t('pc30_confirm_action')),
         ]),
       ]));
-    } catch(error) { button.disabled=false; sheet.showErr(error.message||t('pc30_preview_failed')); }
+    } catch(error) { restoreButton(); sheet.showErr(error.message||t('pc30_preview_failed')); }
   }
 
   async function execute(button,previewId) {
-    button.disabled=true;
+    const restoreButton=setBusy(button,'pc30_action_saving');
     try {
       const saved=resultObject(await data.executeWorkItem(ctx,previewId));
       const actionId=saved.itemId||saved.item?.id;
@@ -106,46 +118,62 @@ function openCandidateAction(ctx,candidate,onDone) {
       sheet.overlay.remove();
       ctx.toast(t(saved.replayed?'work_item_replayed':'work_item_saved'),'ok');
       onDone?.();
-    } catch(error) { button.disabled=false; sheet.showErr(error.message||t('pc30_action_failed')); }
+    } catch(error) { restoreButton(); sheet.showErr(error.message||t('pc30_action_failed')); }
   }
 }
 
 async function saveDecision(ctx,candidate,decision,onDone,button,snoozeDays) {
-  button.disabled=true;
+  const restoreButton=setBusy(button,'saving');
   try {
     await data.decideProactiveCoachCandidate(ctx,{candidateKey:candidate.candidateKey,personId:String(candidate.personId),
       sourceType:candidate.sourceType,sourceId:String(candidate.sourceId),decision,
       ...(decision==='deferred'?{snoozeDays}: {})});
     ctx.toast(t(decision==='deferred'?'pc30_deferred':'pc30_rejected'),'ok');
     onDone?.();
-  } catch(error) { button.disabled=false; ctx.toast(error.message||t('pc30_decision_failed'),'error'); }
+  } catch(error) { restoreButton(); ctx.toast(error.message||t('pc30_decision_failed'),'error'); }
 }
 
 export async function renderProactiveCoach(ctx,{onDone}={}) {
   const result=await data.proactiveCoachCandidates(ctx);
   const candidates=Array.isArray(result.candidates)?result.candidates:[];
-  const body=candidates.length?candidates.map(candidate=>h('div',{class:'list-row'},[
-    avatar(candidate.personName,true),
-    h('div',{style:'flex:1;min-width:0'},[
-      h('div',{class:'row-title'},`${candidate.personName} · ${sourceTag(candidate)}`),
-      h('div',{class:'row-sub'},reason(candidate)),
-      h('div',{class:'row-sub'},`${t('pc30_evidence_window')} ${dateLabel(candidate.windowStart)} – ${dateLabel(candidate.windowEnd)} · ${t('pc30_confidence')} ${Math.round((candidate.confidence||0)*100)}%`),
-      h('a',{class:'src-tag',href:candidate.target,title:candidate.source},candidate.source),
-      candidate.previouslyDeferred?h('div',{class:'row-sub'},t('pc30_deferred_once')):null,
-      candidate.testData?.containsTestData===true?h('div',{class:'row-sub',style:'color:var(--gold)'},t('pc30_test_data')):null,
-      candidate.testData?.status!=='verified'?h('div',{class:'row-sub',style:'color:var(--red)'},t('pc30_test_data_unverified')):null,
+  const body=candidates.length?h('div',{class:'pc30-list'},candidates.map(candidate=>h('article',{class:'pc30-candidate'},[
+    h('div',{class:'pc30-candidate-content'},[
+      h('div',{class:'pc30-candidate-heading'},[
+        avatar(candidate.personName,true),
+        h('div',{class:'pc30-heading-copy'},[
+          h('strong',{class:'pc30-person-title'},candidate.personName),
+          bdg(sourceTag(candidate),'gold'),
+        ]),
+        bdg(t('pc30_review_candidate'),'gray'),
+      ]),
+      h('p',{class:'pc30-reason'},reason(candidate)),
+      h('div',{class:'pc30-evidence'},[
+        h('span',{},`${t('pc30_evidence_window')} ${dateLabel(candidate.windowStart)} – ${dateLabel(candidate.windowEnd)}`),
+        h('span',{},`${t('pc30_confidence')} ${Math.round((candidate.confidence||0)*100)}%`),
+      ]),
+      h('a',{class:'pc30-source-link',href:candidate.target,title:candidate.source},candidate.source),
+      h('div',{class:'pc30-candidate-flags'},[
+        candidate.previouslyDeferred?h('span',{class:'pc30-candidate-warning'},t('pc30_deferred_once')):null,
+        candidate.testData?.containsTestData===true?h('span',{class:'pc30-candidate-warning'},t('pc30_test_data')):null,
+        candidate.testData?.status!=='verified'?h('span',{class:'pc30-candidate-warning is-danger'},t('pc30_test_data_unverified')):null,
+        !candidate.canCreateAction?h('span',{class:'pc30-candidate-warning'},t('pc30_action_disabled_test_data')):null,
+      ]),
     ]),
-    bdg(t('pc30_review_candidate'),'gold'),
-    h('div',{class:'row-actions'},[
-      h('button',{class:'btn btn-ghost btn-sm',type:'button',onclick:event=>saveDecision(ctx,candidate,'deferred',onDone,event.currentTarget,7)},t('pc30_defer')),
-      h('button',{class:'btn btn-ghost btn-sm',type:'button',onclick:event=>{
-        if(window.confirm(t('pc30_confirm_reject'))) saveDecision(ctx,candidate,'rejected',onDone,event.currentTarget);
-      }},t('pc30_reject')),
-      h('button',{class:'btn btn-primary btn-sm',type:'button',disabled:!candidate.canCreateAction,
+    h('div',{class:'pc30-candidate-actions'},[
+      h('button',{class:'btn btn-primary',type:'button',disabled:!candidate.canCreateAction,
         title:!candidate.canCreateAction?t('pc30_action_disabled_test_data'):'',
         onclick:()=>openCandidateAction(ctx,candidate,onDone)},[ic('check'),t('pc30_create_action')]),
+      h('details',{class:'pc30-more'},[
+        h('summary',{class:'btn btn-ghost btn-sm'},t('pc30_more_actions')),
+        h('div',{class:'pc30-more-menu'},[
+          h('button',{class:'btn btn-ghost btn-sm',type:'button',onclick:event=>saveDecision(ctx,candidate,'deferred',onDone,event.currentTarget,7)},t('pc30_defer')),
+          h('button',{class:'btn btn-ghost btn-sm',type:'button',onclick:event=>{
+            if(window.confirm(t('pc30_confirm_reject'))) saveDecision(ctx,candidate,'rejected',onDone,event.currentTarget);
+          }},t('pc30_reject')),
+        ]),
+      ]),
     ]),
-  ])): [emptyNote(t('pc30_empty'),t('pc30_empty_note'))];
+  ]))):emptyNote(t('pc30_empty'),t('pc30_empty_note'));
   return card({title:t('pc30_title'),icon:'sparkle',tag:bdg(t('pc30_deterministic'),'gray'),body,
     foot:[h('span',{class:'foot-note'},result.hasMore?t('pc30_limited_more'):t('pc30_footer')),
       result.disclosure?.containsTestData===true?h('span',{class:'foot-note',style:'color:var(--gold)'},t('pc30_test_data')):null]});

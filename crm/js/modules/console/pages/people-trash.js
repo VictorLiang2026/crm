@@ -46,7 +46,7 @@ export function renderPeopleTrash(ctx) {
     });
     document.body.appendChild(sheet.overlay);
     confirmBtn.onclick = async () => {
-      confirmBtn.disabled = true; confirmBtn.textContent = t('restoring');
+      confirmBtn.disabled = true; confirmBtn.setAttribute('aria-busy','true'); confirmBtn.textContent = t('restoring');
       try {
         const res = await data.restorePerson(ctx, row.id);
         if (!res || res.ok === false) throw new Error(t('restore_failed'));
@@ -54,7 +54,7 @@ export function renderPeopleTrash(ctx) {
         ctx.toast(t('person_restored'), 'ok');
         runQuery();
       } catch (err) {
-        confirmBtn.disabled = false; confirmBtn.textContent = t('btn_restore');
+        confirmBtn.disabled = false; confirmBtn.removeAttribute('aria-busy'); confirmBtn.textContent = t('btn_restore');
         sheet.showErr(err.message);
       }
     };
@@ -95,7 +95,7 @@ export function renderPeopleTrash(ctx) {
           }, [ic('refresh'), t('btn_restore')])),
         ]);
       }));
-      return h('div', { class: 'table-scroll' }, h('table', { class: 'people-table' }, [thead, tbody]));
+      return h('div', { class: 'table-scroll' }, h('table', { class: 'people-table recycle-table' }, [thead, tbody]));
     });
   }
 
@@ -109,7 +109,7 @@ export function renderPeopleTrash(ctx) {
       actions: [h('a', { class: 'btn btn-ghost', href: '#/recycle' }, [ic('refresh'), t('trash_hub_back')]),
         h('a', { class: 'btn btn-ghost', href: '#/people' }, [ic('users'), t('title_people')])],
     }),
-    h('section', { class: 'card' }, [
+    h('section', { class: 'card recycle-trash-section' }, [
       listEl,
       h('div', { class: 'card-foot' }, [
         metaEl,

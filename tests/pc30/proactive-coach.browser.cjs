@@ -30,6 +30,23 @@ test('PC30 Today candidate stays review-only until a server preview and explicit
     })()`);
     await browser.wait("document.querySelector('#pc30-host').textContent.includes('虚构 Person')");
     assert.equal(await browser.evaluate("window.pc30.calls.some(x=>x.args.action==='previewWorkItem'||x.args.action==='executeWorkItem')"),false);
+    for (const size of [{width:820,height:1180},{width:1180,height:820}]) {
+      await browser.send('Emulation.setDeviceMetricsOverride',{...size,deviceScaleFactor:2,mobile:false});
+      assert.equal(await browser.evaluate('document.documentElement.scrollWidth<=innerWidth+1'),true,`candidate should fit ${size.width}px iPad viewport`);
+      const metrics=await browser.evaluate(`(()=>{const card=document.querySelector('.pc30-candidate'),button=card.querySelector('.pc30-candidate-actions>.btn-primary');return {
+        cardDisplay:getComputedStyle(card).display,cardBorder:getComputedStyle(card).borderStyle,
+        buttonHeight:Math.round(button.getBoundingClientRect().height),buttonLabel:button.innerText,
+        menuVisible:getComputedStyle(card.querySelector('.pc30-more-menu')).display
+      }})()`);
+      assert.equal(metrics.cardDisplay,'grid');
+      assert.equal(metrics.cardBorder,'solid');
+      assert.ok(metrics.buttonHeight>=44,`primary action should have a comfortable hit target (${metrics.buttonHeight}px)`);
+      assert.equal(metrics.menuVisible,'grid');
+      await browser.evaluate("document.querySelector('.pc30-more').open=true");
+      assert.equal(await browser.evaluate("document.querySelector('.pc30-more').open"),true,'secondary actions should open on request');
+      await browser.evaluate("document.querySelector('.pc30-more').open=false");
+    }
+    await browser.send('Emulation.clearDeviceMetricsOverride');
     await browser.click('#pc30-host button','预览并建行动');
     await browser.click('.sheet-overlay button','获取服务端预览');
     await browser.wait("window.pc30.calls.some(x=>x.args.action==='previewWorkItem')");

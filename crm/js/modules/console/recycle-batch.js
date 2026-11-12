@@ -42,6 +42,7 @@ export function createRecycleBatch(ctx, kind, onChanged) {
   function update() {
     count.textContent = t('l07_selected').replace('{count}',String(selected.size));
     preview.disabled = busy || !selected.size;
+    if(busy) preview.setAttribute('aria-busy','true'); else preview.removeAttribute('aria-busy');
     all.disabled = busy || !pageItems.length;
     all.checked = !!pageItems.length && selected.size === pageItems.length;
     all.indeterminate = !!selected.size && selected.size < pageItems.length;
@@ -94,14 +95,14 @@ export function createRecycleBatch(ctx, kind, onChanged) {
   }
   async function recover(id, button) {
     if(busy) return;
-    busy=true; if(button) button.disabled=true; update();
+    busy=true; if(button){button.disabled=true;button.setAttribute('aria-busy','true');} update();
     try {
       const value=check(await data.getRecycleBatch(ctx,id));
       if(!toolbar.isConnected)return;
       if(value.status==='executed') {showResult(value);onChanged();}
       else showPreview(value);
     } catch { showUncertain(id); }
-    finally {busy=false;if(button)button.disabled=false;update();}
+    finally {busy=false;if(button){button.disabled=false;button.removeAttribute('aria-busy');}update();}
   }
   function showPreview(value) {
     const expired=Date.parse(value.expiresAt)<=Date.now();
@@ -121,7 +122,7 @@ export function createRecycleBatch(ctx, kind, onChanged) {
     fresh.onclick=()=>{sheet.overlay.remove();review(value.items.map(identity));};
     confirm.onclick=async()=>{
       if(busy||confirm.disabled)return;
-      busy=true;confirm.disabled=true;update();remember(value.previewId);
+      busy=true;confirm.disabled=true;confirm.setAttribute('aria-busy','true');update();remember(value.previewId);
       showUncertain(value.previewId);
       try {
         const result=check(await data.executeRecycleBatch(ctx,value.previewId));
@@ -135,15 +136,15 @@ export function createRecycleBatch(ctx, kind, onChanged) {
   }
   async function review(items,button) {
     if(busy||!items.length)return;
-    busy=true;if(button)button.disabled=true;update();
+    busy=true;if(button){button.disabled=true;button.setAttribute('aria-busy','true');}update();
     try {
       const value=check(await data.previewRecycleBatch(ctx,{requestKey:crypto.randomUUID(),items:items.map(identity)}));
       if(!toolbar.isConnected)return;
       if(value.status==='executed')showResult(value);else showPreview(value);
     } catch { ctx.toast(t('l07_preview_failed'),'error'); }
-    finally {busy=false;if(button)button.disabled=false;update();}
+    finally {busy=false;if(button){button.disabled=false;button.removeAttribute('aria-busy');}update();}
   }
-  preview.onclick=()=>review([...selected.values()]);
+  preview.onclick=()=>review([...selected.values()],preview);
   update();
   // A browser bookmark is never authorization to write. Resume reads server status only.
   let pending;try{pending=sessionStorage.getItem(storageKey);}catch{/* optional */}

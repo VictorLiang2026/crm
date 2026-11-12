@@ -122,6 +122,7 @@ function renderTrash(ctx, kind) {
     document.body.appendChild(sheet.overlay);
     confirm.onclick = async () => {
       confirm.disabled = true;
+      confirm.setAttribute('aria-busy','true');
       confirm.textContent = t('restoring');
       try {
         const result = recruit
@@ -135,6 +136,7 @@ function renderTrash(ctx, kind) {
         runQuery();
       } catch (error) {
         confirm.disabled = false;
+        confirm.removeAttribute('aria-busy');
         confirm.textContent = t('btn_restore');
         sheet.showErr(error.message);
       }
@@ -180,11 +182,11 @@ function renderTrash(ctx, kind) {
         );
         return h('tr', {}, cells);
       }));
-      return h('div', { class: 'table-scroll' }, h('table', { class: 'people-table' }, [head, body]));
+      return h('div', { class: 'table-scroll' }, h('table', { class: 'people-table recycle-table' }, [head, body]));
     });
   }
 
-  const form = h('form', { class: 'search-form', onsubmit: event => {
+  const form = h('form', { class: 'search-form recycle-search', onsubmit: event => {
     event.preventDefault(); state.keyword = input.value.trim(); state.page = 1; runQuery();
   } }, [input, h('button', { class: 'btn btn-soft', type: 'submit' }, t('btn_search'))]);
   const sort = h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => {
@@ -199,8 +201,8 @@ function renderTrash(ctx, kind) {
       sub: t(recruit ? 'trash_recruit_sub' : 'trash_customer_sub'),
       actions: [h('a', { class: 'btn btn-ghost', href: '#/recycle' }, [ic('refresh'), t('trash_hub_back')]),
         h('a', { class: 'btn btn-ghost', href: '#/more' }, [ic('grid'), t('title_more')])] }),
-    h('section', { class: 'card' }, [
-      h('div', { class: 'card-body' }, [form, sort]), batch.toolbar, list,
+    h('section', { class: 'card recycle-trash-section' }, [
+      h('div', { class: 'card-body recycle-toolbar' }, [form, sort]), batch.toolbar, list,
       h('div', { class: 'card-foot' }, [totalInfo,
         h('div', { class: 'pager', style: 'margin-left:auto' }, [prev, pageInfo, next])]),
     ]),
