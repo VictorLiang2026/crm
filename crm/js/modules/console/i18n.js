@@ -121,7 +121,7 @@ const DICT = {
   device_login_failed: {"zh-CN":"登录失败，请检查用户名和密码。","en":"Sign-in failed. Check your username and password."},
   device_wait: {"zh-CN":"正在检查设备…","en":"Checking device…"},
   device_fingerprint: {"zh-CN":"设备核对码：","en":"Device verification code:"},
-  device_pending: {"zh-CN":"等待后台批准。请在 CloudBase 核对设备码后批准，再查看状态。","en":"Pending. Match the code in CloudBase before approving, then check again."},
+  device_pending: {"zh-CN":"当前浏览器的设备码仍待批准。审批只匹配本页显示的完整设备码，不按设备名称或备注匹配。若此电脑曾获批准，请核对后台记录是否为当前码；清除浏览器站点数据、更换浏览器配置文件或访问网址，都会生成新的设备码。","en":"This browser's code is still pending. Approval applies only to the full code shown here, not its device name or label. If this computer was approved before, compare the CloudBase record with this code. Clearing site data, changing browser profiles, or using a different site address creates a new code."},
   device_approved: {"zh-CN":"后台已批准此设备。","en":"CloudBase has approved this device."},
   device_revoked: {"zh-CN":"此设备的授权已撤销。","en":"Access for this device has been revoked."},
   device_limit: {"zh-CN":"待批准的申请已达上限，请在 CloudBase 整理申请。","en":"Pending request limit reached. Review requests in CloudBase."},

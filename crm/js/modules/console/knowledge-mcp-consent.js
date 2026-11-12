@@ -1,4 +1,5 @@
 import { t, getLang, setLang } from './i18n.js';
+import { deviceCall, verifyDevice, guardResume } from '../device-access/transport.js';
 
 const SESSION_TIMEOUT = 5 * 60 * 1000;
 const CONFIG = { envId: 'crm-d1gkae8ddc930d151' };
@@ -71,7 +72,7 @@ export async function initKnowledgeMcpConsent() {
   }
   async function callFn(name, data) {
     if (name !== 'assistant') throw new Error('Function is outside the consent flow allowlist');
-    const result = await state.app.callFunction({ name, data });
+    const result = await deviceCall(state.app, CONFIG.envId, name, data);
     return result?.result;
   }
   async function authorize() {
@@ -87,29 +88,36 @@ export async function initKnowledgeMcpConsent() {
     if (!window.cloudbase || !validRequest()) throw new Error('Invalid request');
     state.app = window.cloudbase.init({ env: CONFIG.envId, timeout: 120000 });
     state.auth = state.app.auth({ persistence: 'local' });
+    guardResume(() => state.ready, () => verifyDevice(state.app, CONFIG.envId));
     const lastActivity = Number(localStorage.getItem('crm_last_activity') || '0');
     const sessionResult = await state.auth.getSession();
     const hasSession = sessionIsTrusted(sessionResult);
     if (hasSession && lastActivity > 0 && Date.now() - lastActivity <= SESSION_TIMEOUT) {
+      await verifyDevice(state.app, CONFIG.envId);
       state.lastActivity = lastActivity; state.locked = false; showConsent();
     }
     else {
       if (hasSession) state.auth.signOut().catch(() => {});
       byId('login').classList.remove('hidden');
     }
-  } catch (_) { showError(byId('consentError')); byId('consent').classList.remove('hidden'); }
+  } catch (_) {
+    if (!document.body.hidden) { showError(byId('consentError')); byId('consent').classList.remove('hidden'); }
+  }
   byId('login').addEventListener('submit', async event => {
     event.preventDefault(); const button = byId('signin'); button.disabled = true; button.textContent = t('kmcp_processing'); byId('error').textContent = '';
     try {
       const result = await state.auth.signInWithPassword({ username: byId('username').value.trim(), password: byId('password').value });
       if (result?.error || !sessionIsTrusted(result)) throw result?.error||new Error('Authenticated session required');
+      await verifyDevice(state.app, CONFIG.envId);
       state.lastActivity = Date.now(); state.locked = false; localStorage.setItem('crm_last_activity', String(state.lastActivity)); showConsent();
     } catch (_) { byId('error').textContent = t('kmcp_signin_error'); button.disabled = false; button.textContent = t('kmcp_signin'); }
   });
   byId('allow').onclick = async () => {
     if (!state.ready) return;
     const button = byId('allow'); button.disabled = true; button.textContent = t('kmcp_processing');
-    try { await authorize(); } catch (_) { showError(byId('consentError')); button.disabled = false; button.textContent = t('kmcp_allow'); }
+    try { await authorize(); } catch (_) {
+      if (!document.body.hidden) { showError(byId('consentError')); button.disabled = false; button.textContent = t('kmcp_allow'); }
+    }
   };
   byId('deny').onclick = () => {
     try { callback({ error: 'access_denied', state: params.get('state') || '', iss: params.get('oauth_issuer') || '' }); }
