@@ -243,17 +243,7 @@ export const data = {
   removeActivityTask: (ctx, id, activityId, expectedUpdatedAt) => call(ctx, 'activity_tasks', {
     action: 'removeConsole', id: Number(id), activity_id: Number(activityId), expectedUpdatedAt,
   }),
-  personEvents: (ctx, personId, page) => p360(ctx,'listPersonEvents',{data:{personId,page}}),
-  participantResponses: (ctx, activityId) => p360(ctx,'listParticipantResponses',{data:{activityId}}),
-  saveParticipantResponse: (ctx, data) => p360(ctx,'saveParticipantResponse',{data}),
-  updateActivityParticipant: (ctx, id, activityId, expectedUpdatedAt, expectedStatus, status) => call(ctx, 'activities', {
-    action: 'updateParticipantConsole', id: Number(id), activity_id: Number(activityId),
-    expectedUpdatedAt, expectedStatus, status,
-  }),
   resolveActivityPerson: (ctx, name) => p360(ctx, 'resolveIdentity', { name }),
-  addCanonicalParticipant: (ctx, payload) => p360(ctx, 'addCanonicalParticipant', { data: payload }),
-  linkCanonicalParticipant: (ctx, payload) => p360(ctx, 'linkCanonicalParticipant', { data: payload }),
-  addTemporaryParticipant: (ctx, payload) => call(ctx, 'activities', { action: 'addParticipant', data: payload }),
   activitySpeakers: (ctx, params = {}) => call(ctx, 'activity_speakers', { action: 'list', ...params }),
   updateActivitySpeaker: (ctx, id, payload) => call(ctx, 'activity_speakers', { action: 'update', id: Number(id), data: payload }),
   createPersonSpeaker: (ctx, payload) => p360(ctx, 'createSpeakerProfile', { data: payload }),

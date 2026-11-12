@@ -6,10 +6,7 @@ import { renderSpeakerRecommendations } from './activity-speaker-recommend.js';
 import { renderTopicRecommendations } from './activity-topic-recommend.js';
 import { bdg, emptyNote, sectionTitle, pageHead } from './ui.js';
 
-const PARTICIPANT_TYPES = ['customer', 'recruit', 'speaker'];
-const PARTICIPANT_STATUSES = ['invited', 'attended', 'absent'];
 const SPEAKER_STAGES = ['new', 'contacted', 'cooperated', 'stable', 'deep', 'inactive'];
-const statusTone = { invited: 'ink', attended: 'jade', absent: 'red' };
 const dateOnly = value => String(value || '').slice(0, 10);
 
 function field(label, control, note) {
@@ -36,196 +33,6 @@ function actions(cancel, submit, label, danger = false) {
 }
 function errorText(error) { return error?.message || t('save_failed'); }
 function setBusy(button, busy, label) { button.disabled = busy; if (label) button.textContent = label; }
-function typeLabel(type) { return type === 'person' ? t('participant') : t(`act_participant_type_${type}`) || translateEnum('participant_type', type) || type; }
-
-function openParticipantAdd(ctx, activity, onDone, initial = {}) {
-  const name = input('search', initial.name || '', { maxlength: '160', placeholder: t('act_person_search_placeholder') });
-  const type = select(PARTICIPANT_TYPES.map(value => [value, typeLabel(value)]), initial.type || 'customer');
-  const status = select(PARTICIPANT_STATUSES.map(value => [value, t(`part_${value}`)]), 'invited');
-  const note = textarea('', { maxlength: '4000', rows: '3' });
-  const results = h('div', { class: 'act-person-results' });
-  const selected = h('p', { class: 'sheet-note act-person-selected' }, t('act_person_not_selected'));
-  const resolve = h('button', { class: 'btn btn-ghost', type: 'button' }, t('act_person_resolve'));
-  const submit = h('button', { class: 'btn btn-primary', type: 'button', disabled: true }, t('act_participant_confirm_add'));
-  let chosen = null;
-  const sheet = openSheet({ title: t('act_participant_add_title'), sub: t('act_person_identity_note'), body: h('div', { class: 'sheet-stack' }, [
-    field(t('act_participant_type'), type), field(t('act_person_name'), name),
-    h('div', { class: 'sheet-actions' }, [resolve]), results, selected,
-    field(t('act_participant_status'), status),
-    field(t('act_participant_note'), note, t('act_attendance_not_interaction')),
-    h('div', { class: 'sheet-note' }, t('act_attendance_not_interaction')),
-    h('div', { class: 'sheet-actions' }, [h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => sheet.overlay.remove() }, t('cancel')), submit]),
-  ]) });
-  document.body.appendChild(sheet.overlay);
-  name.oninput = () => {
-    chosen = null; submit.disabled = true;
-    selected.textContent = t('act_person_not_selected'); results.replaceChildren();
-  };
-  resolve.onclick = async () => {
-    const query = name.value.trim();
-    chosen = null; submit.disabled = true; results.replaceChildren();
-    if (!query) { sheet.showErr(t('act_person_name_required')); return; }
-    setBusy(resolve, true, t('loading'));
-    try {
-      const resolution = await data.resolveActivityPerson(ctx, query);
-      const candidates = resolution.candidates || [];
-      if (!candidates.length) { results.replaceChildren(h('p', { class: 'sheet-note' }, t('act_person_no_match'))); return; }
-      results.replaceChildren(...candidates.map(candidate => h('button', {
-        class: 'btn btn-ghost act-person-candidate', type: 'button',
-        onclick: event => {
-          chosen = candidate;
-          selected.textContent = `${t('act_person_selected')}: ${candidate.displayName} · #${candidate.id}`;
-          submit.disabled = false;
-          results.querySelectorAll('.act-person-candidate').forEach(button => button.classList.remove('sel'));
-          event.currentTarget.classList.add('sel');
-        },
-      }, `${candidate.displayName} · ${candidate.occupation || t('occupation_empty')} · ${candidate.organization || ''} · #${candidate.id}`)));
-      if (resolution.hasMore) results.append(h('p', { class: 'sheet-note' }, t('relationship_candidates_limited')));
-    } catch (error) { sheet.showErr(errorText(error)); }
-    finally { setBusy(resolve, false, t('act_person_resolve')); }
-  };
-  submit.onclick = async () => {
-    if (!chosen || submit.disabled) return;
-    setBusy(submit, true, t('saving'));
-    try {
-      const saved = await data.addCanonicalParticipant(ctx, {
-        activityId: String(activity.id), personType: type.value, canonicalPersonId: String(chosen.id),
-        selectedDisplayName: chosen.displayName, status: status.value, relationshipNote: note.value.trim() || null,
-        confirmed: true,
-      });
-      if (!saved.id || !saved.canonicalPersonId) throw new Error(t('save_failed'));
-      sheet.overlay.remove(); ctx.toast(t('act_participant_added'), 'ok'); onDone?.();
-    } catch (error) { setBusy(submit, false, t('act_participant_confirm_add')); sheet.showErr(errorText(error)); }
-  };
-}
-
-function openTemporaryParticipant(ctx, activity, onDone) {
-  const name = input('text', '', { maxlength: '160', required: true });
-  const type = select(PARTICIPANT_TYPES.map(value => [value, typeLabel(value)]), 'customer');
-  const note = textarea('', { maxlength: '4000', rows: '3' });
-  const sheet = openSheet({ title: t('act_temp_participant_title'), sub: t('act_temp_participant_warning'), body: h('div', { class: 'sheet-stack' }, [
-    h('div', { class: 'sheet-note act-warning' }, t('act_temp_participant_warning')),
-    field(t('act_person_name'), name), field(t('act_participant_type'), type), field(t('act_participant_note'), note),
-    actions(() => sheet.overlay.remove(), save, t('act_temp_participant_confirm')),
-  ]) });
-  document.body.appendChild(sheet.overlay);
-  const button = sheet.overlay.querySelector('.sheet-actions .btn-primary');
-  async function save() {
-    if (!name.value.trim()) { sheet.showErr(t('act_person_name_required')); return; }
-    setBusy(button, true, t('saving'));
-    try {
-      const result = await data.addTemporaryParticipant(ctx, { activity_id: Number(activity.id),
-        person_type: type.value, person_name: name.value.trim(), status: 'invited',
-        relationship_note: note.value.trim() || null });
-      if (!result.id || result.linked !== false) throw new Error(t('save_failed'));
-      sheet.overlay.remove(); ctx.toast(t('act_temp_participant_added'), 'ok'); onDone?.();
-    } catch (error) { setBusy(button, false, t('act_temp_participant_confirm')); sheet.showErr(errorText(error)); }
-  }
-}
-
-function openLinkParticipant(ctx, activity, participant, onDone) {
-  const name = input('search', participant.person_name || '', { maxlength: '160' });
-  const results = h('div', { class: 'act-person-results' });
-  const selected = h('p', { class: 'sheet-note' }, t('act_person_not_selected'));
-  const resolve = h('button', { class: 'btn btn-ghost', type: 'button' }, t('act_person_resolve'));
-  let chosen = null;
-  const sheet = openSheet({ title: t('act_link_person_title'), sub: t('act_link_person_note'), body: h('div', { class: 'sheet-stack' }, [
-    field(t('act_person_name'), name), h('div', { class: 'sheet-actions' }, [resolve]), results, selected,
-    h('div', { class: 'sheet-actions' }, [h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => sheet.overlay.remove() }, t('cancel')),
-      h('button', { class: 'btn btn-primary act-link-confirm', type: 'button', disabled: true }, t('act_link_person_confirm'))]),
-  ]) });
-  document.body.appendChild(sheet.overlay);
-  const confirm = sheet.overlay.querySelector('.act-link-confirm');
-  name.oninput = () => { chosen = null; confirm.disabled = true; selected.textContent = t('act_person_not_selected'); results.replaceChildren(); };
-  resolve.onclick = async () => {
-    const query = name.value.trim(); chosen = null; confirm.disabled = true; results.replaceChildren();
-    if (!query) { sheet.showErr(t('act_person_name_required')); return; }
-    setBusy(resolve, true, t('loading'));
-    try {
-      const resolution = await data.resolveActivityPerson(ctx, query);
-      const candidates = resolution.candidates || [];
-      if (!candidates.length) { results.replaceChildren(h('p', { class: 'sheet-note' }, t('act_person_no_match'))); return; }
-      results.replaceChildren(...candidates.map(candidate => h('button', { class: 'btn btn-ghost act-person-candidate', type: 'button', onclick: event => {
-        chosen = candidate; confirm.disabled = false;
-        selected.textContent = `${t('act_person_selected')}: ${candidate.displayName} · #${candidate.id}`;
-        results.querySelectorAll('.act-person-candidate').forEach(button => button.classList.remove('sel'));
-        event.currentTarget.classList.add('sel');
-      } }, `${candidate.displayName} · #${candidate.id}`)));
-    } catch (error) { sheet.showErr(errorText(error)); }
-    finally { setBusy(resolve, false, t('act_person_resolve')); }
-  };
-  confirm.onclick = async () => {
-    if (!chosen || confirm.disabled) return;
-    setBusy(confirm, true, t('saving'));
-    try {
-      const result = await data.linkCanonicalParticipant(ctx, { participantId: String(participant.id),
-        activityId: String(activity.id), canonicalPersonId: String(chosen.id), selectedDisplayName: chosen.displayName,
-        expectedUpdatedAt: participant.updated_at, confirmed: true });
-      if (result.ok !== true) throw new Error(t('save_failed'));
-      sheet.overlay.remove(); ctx.toast(t('act_person_linked'), 'ok'); onDone?.();
-    } catch (error) { setBusy(confirm, false, t('act_link_person_confirm')); sheet.showErr(errorText(error)); }
-  };
-}
-
-function openParticipantStatus(ctx, activity, participant, onDone) {
-  const status = select(PARTICIPANT_STATUSES.map(value => [value, t(`part_${value}`)]), participant.status || 'invited');
-  const response = select(['unrecorded','registered','cancelled'].map(key => [key,t('event_response_'+key)]), participant.response || 'unrecorded');
-  const sheet = openSheet({ title: t('act_participant_status_title'), sub: participant.person_name || `#${participant.id}`, body: h('div', { class: 'sheet-stack' }, [
-    field(t('act_participant_status'), status), field(t('event_response'), response), h('div', { class: 'sheet-note' }, t('act_attendance_not_interaction')),
-    actions(() => sheet.overlay.remove(), save, t('btn_save')),
-  ]) });
-  document.body.appendChild(sheet.overlay);
-  const button = sheet.overlay.querySelector('.sheet-actions .btn-primary');
-  async function save() {
-    setBusy(button, true, t('saving'));
-    try {
-      const result = participant.updated_at && response.value === (participant.response || 'unrecorded')
-        ? await data.updateActivityParticipant(ctx, participant.id, activity.id, participant.updated_at, participant.status || 'invited', status.value)
-        : await data.saveParticipantResponse(ctx, {activityId:activity.id,participantId:participant.id,
-          version:participant.responseVersion || null,updatedAt:participant.updated_at || null,
-          expectedStatus:participant.status || 'invited',status:status.value,response:response.value});
-      if (result.ok !== true) throw new Error(result.error || t('act_participant_conflict'));
-      sheet.overlay.remove(); ctx.toast(t('act_participant_status_saved'), 'ok'); onDone?.();
-    } catch (error) { setBusy(button, false, t('btn_save')); sheet.showErr(error.message === 'PARTICIPATION_CHANGED' ? t('act_participant_conflict') : errorText(error)); }
-  }
-}
-
-export function renderActivityParticipants(ctx, activity, participants, onDone) {
-  const refresh = onDone || (() => {});
-  const groups = ['attended', 'invited', 'absent'];
-  const blocks = [
-    h('div', { class: 'act-note-row' }, [h('p', { class: 'sheet-note' }, t('act_attendance_not_interaction')),
-      h('div', { class: 'sheet-actions' }, [
-        h('button', { class: 'btn btn-primary btn-sm', type: 'button', onclick: () => openParticipantAdd(ctx, activity, refresh) }, t('act_participant_add')),
-        h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => openTemporaryParticipant(ctx, activity, refresh) }, t('act_temp_participant_add')),
-      ])]),
-  ];
-  for (const status of groups) {
-    const rows = participants.filter(participant => (participant.status || 'invited') === status);
-    if (!rows.length) continue;
-    blocks.push(sectionTitle(`${t(`part_${status}`)}（${rows.length}）`, bdg(String(rows.length), statusTone[status])));
-    blocks.push(h('div', {}, rows.map(participant => {
-      const name = participant.person_name || (participant.person_id ? `#${participant.person_id}` : t('act_temp_name'));
-      const label = participant.canonical_person_id ? typeLabel('person') : typeLabel(participant.person_type);
-      const person = participant.canonical_person_id
-        ? h('a', { href: `#/person/${participant.canonical_person_id}`, class: 'act-person-link' }, name)
-        : h('span', {}, name);
-      return h('article', { class: 'list-row act-resource-row' }, [
-        h('div', { class: 'act-resource-main' }, [h('div', { class: 'row-title' }, [bdg(label, participant.person_type === 'recruit' ? 'gold' : 'ink'), person]),
-          participant.response && participant.response !== 'unrecorded' ? h('div', { class: 'row-sub' }, t('event_response')+' · '+t('event_response_'+participant.response)) : null,
-          participant.relationship_note ? h('div', { class: 'row-sub' }, participant.relationship_note) : null,
-          participant.canonical_person_id ? h('div', { class: 'row-sub' }, `Person #${participant.canonical_person_id}`) : null]),
-        h('div', { class: 'act-resource-actions' }, [
-          h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => openParticipantStatus(ctx, activity, participant, refresh) }, t('act_participant_change_status')),
-          participant.canonical_person_id ? null : h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => openLinkParticipant(ctx, activity, participant, refresh) }, t('act_link_person')),
-        ]),
-      ]);
-    })));
-  }
-  if (participants.length === 0) blocks.push(emptyNote(t('act_no_participants'), t('act_participant_empty_note')));
-  return h('div', { class: 'tab-stack act-people' }, blocks);
-}
-
 function openSpeakerEditor(ctx, speaker, onDone) {
   const editing = !!speaker;
   const linked = !!speaker?.person_id;
@@ -677,8 +484,7 @@ export async function renderActivityResources(ctx, activityId, onDone, directory
     const speakers = speakerResult.rows || [], topics = topicResult.rows || [];
     if (showSpeakers) {
     if (!directory) {
-      const recommendations = renderSpeakerRecommendations(ctx, detail.activity,
-        name => openParticipantAdd(ctx, detail.activity, refresh, { name, type: 'speaker' }));
+      const recommendations = renderSpeakerRecommendations(ctx,detail.activity);
       if (recommendations) root.append(recommendations);
     }
     root.append(sectionTitle(t('act_speakers_title'), h('button', { class: 'btn btn-primary btn-sm', type: 'button', onclick: () => openSpeakerEditor(ctx, null, refresh) }, t('act_speaker_add'))));

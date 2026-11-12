@@ -1,7 +1,7 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict');
 const {PersonService,parsePersonName}=require('../../cloudfunctions/_shared/person-service');
-const {ParticipantService}=require('../../cloudfunctions/person_360/participant-service');
+const {ParticipantService}=require('../fixtures/legacy-participant-service.cjs');
 const {SpeakerProfileService}=require('../../cloudfunctions/person_360/speaker-profile-service');
 const {evaluate}=require('./audit.cjs');
 const name='【系统测试·勿联系】虚构同名甲';

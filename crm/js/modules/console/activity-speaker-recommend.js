@@ -11,7 +11,7 @@ function messageFor(error) {
   return t('act_ai_speaker_invalid');
 }
 
-export function renderSpeakerRecommendations(ctx, activity, onChoose) {
+export function renderSpeakerRecommendations(ctx, activity) {
   if (!['idea', 'preparing', 'confirmed', 'in_progress'].includes(activity.status)) return null;
   const result = h('div', { class: 'act-ai-speaker-results' });
   const generate = h('button', { class: 'btn btn-ghost btn-sm', type: 'button' }, t('act_ai_speaker_generate'));
@@ -37,8 +37,6 @@ export function renderSpeakerRecommendations(ctx, activity, onChoose) {
             h('div', { class: 'row-sub' }, `${t('act_ai_speaker_topic')}: ${row.suggested_topic}`),
             h('div', { class: 'row-sub' }, `${t('act_ai_speaker_contact')}: ${row.contact_suggestion}`),
           ]),
-          h('button', { class: 'btn btn-ghost btn-sm', type: 'button', title: t('act_ai_speaker_review_add_full'),
-            onclick: () => onChoose(row.speaker_name) }, t('act_ai_speaker_review_add')),
         ]))) : h('p', { class: 'sheet-note' }, t('act_ai_speaker_empty')),
         h('p', { class: 'sheet-note' }, t('act_ai_speaker_identity_note')),
       ].filter(Boolean));

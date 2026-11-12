@@ -1,6 +1,6 @@
 'use strict';
 
-const { PersonService } = require('./person-service');
+const { PersonService } = require('../../cloudfunctions/person_360/person-service');
 
 const TYPES = new Set(['customer', 'recruit', 'speaker']);
 const STATUSES = new Set(['invited', 'attended', 'absent']);

@@ -159,9 +159,7 @@ exports.main = async (event, context) => {
     var activity = a.data;
 
     // 拉取参与者
-    var parts = assertOk(await rdb.from('activity_participants').select()
-      .eq('activity_id', activityId).is('deleted_at', null)
-      .order('created_at', { ascending: true })).data || [];
+    var parts = await require('./roster-facts').rosterFacts({activityIds:[activityId]});
 
     if (!parts.length) return { analysis: { top3: [], no_followup: [] }, raw: '', message: '暂无参与者' };
 
@@ -330,9 +328,7 @@ async function loadActivityContext(activityId) {
   if (!a.data) return { error: 'activity not found' };
   var activity = a.data;
 
-  var parts = assertOk(await rdb.from('activity_participants').select()
-    .eq('activity_id', activityId).is('deleted_at', null)
-    .order('created_at', { ascending: true })).data || [];
+  var parts = await require('./roster-facts').rosterFacts({activityIds:[activityId]});
 
   var tasks = assertOk(await rdb.from('activity_tasks').select()
     .eq('activity_id', activityId)
@@ -424,8 +420,7 @@ async function recommendSpeakers(event) {
     .eq('status', 'active').is('deleted_at', null)
     .order('updated_at', { ascending: false }).limit(50)).data || [];
   pool = await enrichSpeakerPeople(pool);
-  var parts = assertOk(await rdb.from('activity_participants').select('person_type, person_id')
-    .eq('activity_id', activityId).is('deleted_at', null)).data || [];
+  var parts = await require('./roster-facts').rosterFacts({activityIds:[activityId]});
   var existingIds = {};
   parts.forEach(function(p){ if (p.person_type === 'speaker' && p.person_id) existingIds[p.person_id] = true; });
   var candidates = pool.filter(function(s){ return !existingIds[s.id]; });
@@ -701,9 +696,7 @@ async function postReview(event) {
     var activity = a.data;
 
     // 2. 参与者
-    var pRes = assertOk(await rdb.from('activity_participants').select()
-      .eq('activity_id', activityId).is('deleted_at', null)
-      .order('created_at', { ascending: true })).data || [];
+    var pRes = await require('./roster-facts').rosterFacts({activityIds:[activityId]});
 
     var customerIds = [], recruitIds = [], speakerIds = [];
     pRes.forEach(function (p) {
@@ -1066,9 +1059,7 @@ async function participantReview(event) {
     var activity = aRes.data;
 
     // 2. 参与者（仅已关联客户/增员的人能进入跟进分类；speaker 走嘉宾资源池，不在此列）
-    var parts = assertOk(await rdb.from('activity_participants').select()
-      .eq('activity_id', activityId).is('deleted_at', null)
-      .order('created_at', { ascending: true })).data || [];
+    var parts = await require('./roster-facts').rosterFacts({activityIds:[activityId]});
     var targets = parts.filter(function (p) {
       return (p.person_type === 'customer' || p.person_type === 'recruit') && p.person_id;
     });
@@ -1393,9 +1384,7 @@ async function learning(event) {
     var actIds = winActs.map(function (a) { return a.id; });
 
     // 2. 参与者 / 3. 任务（窗口内活动）
-    var parts = assertOk(await rdb.from('activity_participants')
-      .select('activity_id, person_type, person_id, canonical_person_id, person_name, status, participant_role, followup_status')
-      .in('activity_id', actIds).is('deleted_at', null)).data || [];
+    var parts = await require('./roster-facts').rosterFacts({activityIds:actIds});
     var tasks = assertOk(await rdb.from('activity_tasks')
       .select('activity_id, task_type, status, priority, due_date')
       .in('activity_id', actIds)).data || [];

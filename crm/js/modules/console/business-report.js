@@ -90,8 +90,8 @@ function groups(r) {
     pipelineGroup('protection',r.pipeline.protection,r),pipelineGroup('recruitment',r.pipeline.recruitment,r),
     group('people',[note(label('people_basis')),metric('persons',r.roles.total),...roles.map(k=>metric('role_'+k,rate(r.roles.coverage[k]||0,r.roles.total))),
       metric('multi',rate(r.roles.multi,r.roles.total))]),
-    group('events',[note(label('events_basis')),metric('held_dates',e.heldDates),metric('participants',e.entries),
-      metric('registered',e.registered),metric('registration_cancelled',e.cancelled),metric('attendance',rate(e.attended,e.entries)),
+    group('events',[note(t('roster_unknown')),metric('held_dates',e.heldDates),metric('participants',e.heldDates>0&&e.heldDates===e.missingLists?t('roster_empty'):e.entries),h('div',{class:'list-row'},[t('roster_missingCount')+' · '+(e.missingLists??'—')]),
+
       metric('followups',e.interactions),metric('event_completed',e.completed),metric('accepted_candidates',e.acceptedCandidates),metric('accepted_actions',e.acceptedActions)]),
     group('actions',[note(label('actions_basis')),metric('completion',rate(a.completed,a.due)),metric('overdue_open',rate(c.overdue,a.dated)),
       metric('waiting',c.waiting),metric('unlinked',rate(a.unlinked,a.open)),

@@ -88,9 +88,7 @@ exports.main = async (event, context) => {
       rdb.from('gifts').select('gift_name, given_date').eq('customer_id', customerId)
         .order('given_date', { ascending: false, nullsFirst: false }).limit(5),
       // 活动参与情况（v1.3 activities）
-      rdb.from('activity_participants').select('activity_id, status, created_at')
-        .eq('person_type', 'customer').eq('person_id', customerId).is('deleted_at', null)
-        .order('created_at', { ascending: false }).limit(10),
+      require('./roster-facts').rosterFacts({personType:'customer',legacyId:String(customerId)}).then(rows=>({data:rows.slice(-10).reverse()})),
       // 现有转介绍线索（避免重复建议）
       rdb.from('opportunities').select('status, referred_name, updated_at')
         .eq('customer_id', customerId).eq('opportunity_type', '转介绍').is('deleted_at', null)

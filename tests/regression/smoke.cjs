@@ -511,19 +511,8 @@ module.exports = async function smoke(root, test, options = {}) {
       assert.equal(payload.importance, 3);
       assert.equal(payload.confirmed, true);
     });
-    await check('activity.person-first-add', '活动新增参与者先人工选择 Person 再提交', async () => {
-      await b.click('#view button', '+ 添加参与者');
-      assert.equal(await b.evaluate("window.__crmTest.calls.some(c=>c.action==='addCanonicalParticipant')"), false);
-      await b.evaluate("(() => { const input=document.querySelector('.modal-overlay input[type=text]'); input.value='[CRM_TEST_ONLY]客户甲'; input.dispatchEvent(new Event('input',{bubbles:true})); })()");
-      await b.wait(called('person_360', 'resolveQuickCaptureName'), 15000);
-      await b.wait("Boolean(document.querySelector('.modal-overlay .person-candidate'))");
-      await b.click('.modal-overlay .person-candidate', '[CRM_TEST_ONLY]客户甲');
-      await b.click('.modal-overlay button', '确认添加 Person');
-      await b.wait(called('person_360', 'addCanonicalParticipant'));
-      const payload = await b.evaluate("window.__crmTest.calls.find(c=>c.action==='addCanonicalParticipant').payload");
-      assert.equal(payload.canonicalPersonId, '980001');
-      assert.equal(payload.selectedDisplayName, '[CRM_TEST_ONLY]客户甲');
-      assert.equal(payload.confirmed, true);
+    await check('activity.roster-entry', '活动详情进入本场参与名单', async () => {
+      const entry=await b.evaluate("document.querySelector('#view a[href*=activity-roster]')?.getAttribute('href')");assert.ok(entry&&entry.includes('activity-roster/'));
     });
     await check('recruit.list', '增员列表与漏斗加载', async () => {
       await open('#/recruit', '[CRM_TEST_ONLY]候选人甲');

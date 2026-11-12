@@ -7,7 +7,7 @@ const crypto = require('node:crypto');
 const root = path.resolve(__dirname, '../..');
 const origin = 'https://crm-d1gkae8ddc930d151-1434199662.tcloudbaseapp.com';
 const sha = x => crypto.createHash('sha256').update(x).digest('hex');
-const PAGES = ['admin.html', 'console.html', 'crm/activity-registration.html'];
+const PAGES = ['admin.html', 'console.html'];
 function comparable(file, contents) {
   // Static hosting can normalize CRLF to LF for HTML as well as JS/CSS.
   if (!/\.(?:html|js|css)$/.test(file)) return contents;

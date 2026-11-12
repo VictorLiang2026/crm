@@ -3,7 +3,7 @@ const test=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const path=require('node:path');
-const {ParticipantService}=require('../../cloudfunctions/person_360/participant-service');
+const {ParticipantService}=require('../fixtures/legacy-participant-service.cjs');
 
 function fixture({participant={}, duplicate=false, personDeleted=false}={}){
   const tables={
@@ -72,11 +72,10 @@ test('PC17 server write actions remain scoped and do not write interactions on a
   const speakers=fs.readFileSync(path.join(__dirname,'../../cloudfunctions/activity_speakers/index.js'),'utf8');
   const topics=fs.readFileSync(path.join(__dirname,'../../cloudfunctions/activity_topics/index.js'),'utf8');
   const person=fs.readFileSync(path.join(__dirname,'../../cloudfunctions/person_360/index.js'),'utf8');
-  assert.match(activities,/case 'updateParticipantConsole'/);
-  assert.match(activities,/\.eq\('id', id\)\.eq\('activity_id', activityId\)\.eq\('status', expectedStatus\)[\s\S]*?\.eq\('updated_at', expectedUpdatedAt\)/);
+  assert.doesNotMatch(activities,/case 'updateParticipantConsole'/);
   assert.match(activities,/case 'applyTopicsConsole'/);
   assert.match(speakers,/case 'previewRemoveConsole'/);assert.match(speakers,/speaker has participant records/);
   assert.match(topics,/case 'previewRemoveConsole'/);assert.match(topics,/topic is used by activities/);
-  assert.match(person,/case 'linkCanonicalParticipant'/);
-  assert.match(activities,/Attendance remains a participation fact; this action never creates an Interaction/);
+  assert.match(person,/case 'activityRoster'/);
+  assert.doesNotMatch(activities,/case 'addParticipant'/);
 });

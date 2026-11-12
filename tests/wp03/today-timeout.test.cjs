@@ -58,6 +58,7 @@ function loadToday(ai,empty=false) {
       if(name==='./db')return db;
       if(name==='./device-internal-delegation')return {unwrap:async(_app,event,context)=>({event,context})};
       if(name==='./test-data')return {...TD,disclose:async()=>disclosure};
+      if(name==='./roster-facts')return {rosterFacts:async()=>data.activity_participants||[]};
       if(name==='./action-facts')return {...require(path.join(directory,name)),readOpenActions:async()=>({rows:[],persons:[]})};
       if(name==='./ai-wait')return {waitForTodayAi:(work,start)=>waitForTodayAi(work,start,clock)};
       return require(name.startsWith('./')?path.join(directory,name):name);

@@ -7,7 +7,7 @@ const scope=new AsyncLocalStorage();
 const deny=()=>Object.assign(Error('DEVICE_ACCESS_DENIED'),{code:'DEVICE_ACCESS_DENIED'});
 const fail=()=>({ok:false,error:'DEVICE_ACCESS_DENIED'});
 const internalRoutes={
- activities:{person_360:['listActivityData']},activity_reports:{recruit_goals:['getProgress']},
+ activities:{person_360:['listActivityData','getRosterFacts']},activity_reports:{recruit_goals:['getProgress']},
  ai_followup:{person_360:['listInteractions']},ai_recommend:{person_360:['listInteractions']},ai_referral:{person_360:['listInteractions']},
  assistant:{person_360:['getMeetingPrepContext','listRecruitContext','getRecruitCoachContext','extractKnowledgePdfText'],ai_parse:['ocr_knowledge_source'],today_coach:['daily_review']},
  person_360:{ai_parse:['parse_import_draft']}

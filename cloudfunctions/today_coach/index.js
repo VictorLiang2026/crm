@@ -105,9 +105,7 @@ async function loadAll() {
       'id, activity_id, task_title, task_type, status, priority, due_date, related_type, related_id, created_at, updated_at'
     ),
     // 活动参与者（v1.7.6：活动后未跟进判定）
-    rdb.from('activity_participants').select(
-      'id, activity_id, person_type, person_id, person_name, status, participant_role, followup_status, updated_at'
-    ).is('deleted_at', null),
+    require('./roster-facts').rosterFacts({since:'0001-01-01'}).then(rows=>({data:rows})),
     // 嘉宾资源池（v1.7.6：到联系时间判定）
     rdb.from('activity_speakers').select(
       'id, name, position, expertise, relationship_stage, status, next_contact_date, last_contact_date, cooperation_count, updated_at, person_id'

@@ -38,6 +38,7 @@ function load(name,data,ledger=[]) {
  const testData={...TD,disclose:(refs,options={})=>TD.disclose(refs,{...options,rdb})};
  const context={exports,module:{exports},console,setTimeout,clearTimeout,process:{env:{}},Date,Map,Set,Buffer,
  require(dep){
+  if(dep==='./roster-facts')return {rosterFacts:async()=>data.activity_participants||[]};
   if(dep==='./db')return db;
   if(dep==='./device-internal-delegation')return {unwrap:async(_app,event,context)=>({event,context})};
   if(dep==='./test-data')return testData;

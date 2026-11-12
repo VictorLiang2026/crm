@@ -66,12 +66,15 @@ test('the retired GPT queue has an exact service-role deny exception', () => {
   assert.match(evaluate(source).failures.join('\n'),/Routine permission exception mismatch/);
 });
 
-test('signing secrets and retry receipts deny direct access even to the environment service role', () => {
-  for (const name of ['activity_registration_signers','activity_registration_receipts','activity_registration_nonces']) {
-    const sample=structuredClone(require('./expected-public-baseline.json'));
-    const row=sample.objects.find(item=>item.kind==='relation' && item.name===name);
-    row.detail.privileges.service_role=['SELECT'];
-    assert.match(evaluate(sample).failures.join('\n'),/Signing state must deny all three/);
+test('roster profiles, import commands and the person projection deny direct client access', () => {
+  for (const name of ['activity_roster_people','activity_roster_commands','v_activity_roster_people']) {
+    for (const role of ['anon','authenticated']) {
+      const sample=copy();
+      const grants=object(sample,name).detail.privileges;
+      assert.deepEqual(grants[role],[]);
+      grants[role]=['SELECT','INSERT'];
+      assert.match(evaluate(sample).failures.join('\n'),/Permission or policy drift/);
+    }
   }
 });
 

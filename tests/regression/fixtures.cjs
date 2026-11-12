@@ -440,7 +440,7 @@ function installFixtures() {
     'activities:list': () => rows([activity]),
     'activities:directory': data => ({ rows: mode === 'empty' ? [] : [activity],
       page: data.page || 1, pageSize: data.pageSize || 30, hasMore: false, total: null }),
-    'activities:get': () => ({ activity, participants: [{ id: 970001, person_type: 'customer', person_id: customer.Id, person_name: customer.customer_name, status: 'invited' }] }),
+    'activities:get': () => ({ activity, participants: [{ id: 970001, canonical_person_id:980001, person_type: 'customer', person_id: customer.Id, person_name: customer.customer_name, status: 'invited' }] }),
     'activity_speakers:list': () => rows([{ id: 990010, name: customer.customer_name,
       customer_id: customer.Id, person_id: null, expertise: marker + '讲师',
       relationship_stage: 'new', status: 'active' }]),

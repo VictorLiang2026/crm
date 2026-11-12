@@ -6,7 +6,8 @@ import {
   changeActivityTaskStatus, confirmActivityRemoval, confirmActivityTaskRemoval,
   openActivityEditor, openActivityTaskEditor,
 } from '../activities-write.js';
-import { renderActivityParticipants, renderActivityResources } from '../activity-people.js';
+import { renderActivityResources } from '../activity-people.js';
+import { renderRoster } from '../activity-roster.js';
 import { renderActivityReview } from '../activity-review.js';
 import { renderActivityPreparation } from '../activity-preparation.js';
 import { actionContextPanel } from '../action-center.js';
@@ -16,7 +17,7 @@ import {
   fmtDate, weekdayCN,
 } from '../ui.js';
 
-const ACT_TABS = ['act_tab_flow', 'act_tab_attend', 'act_tab_acts', 'act_tab_candidates', 'act_tab_photos', 'act_tab_review', 'act_tab_resources'];
+const ACT_TABS = ['act_tab_flow', 'roster_title', 'act_tab_acts', 'act_tab_candidates', 'act_tab_photos', 'act_tab_review', 'act_tab_resources'];
 
 // 枚举翻译统一走 i18n.js 集中注册表
 const actStatusLabel = (s) => translateEnum('activity_status', s);
@@ -109,7 +110,7 @@ export function renderActivities(ctx) {
       kicker: 'ACTIVITIES', title: t('title_activities'), tag: wpTag(t('act_manage_tag')),
       sub: t('sub_activities'),
       actions: [
-        h('a', { class:'btn btn-ghost', href:'#/activity-registrations' }, [ic('calendar'), t('ar_admin_open')]),
+        h('a', { class:'btn btn-ghost', href:'#/activity-roster' }, [ic('calendar'), t('roster_title')]),
         h('a', { class: 'btn btn-ghost', href: '#/activity-speakers' }, t('resource_directory_speakers_tab')),
         h('a', { class: 'btn btn-ghost', href: '#/activity-topics' }, t('resource_directory_topics_tab')),
         h('button', { class: 'btn btn-ghost', type: 'button', title: t('act_daily_report'), onclick: () => {
@@ -177,17 +178,6 @@ function flowNode(ctx, id) {
         ]),
       ]))) : emptyNote(t('act_no_prep_tasks'), ''),
     ]);
-  });
-}
-
-function attendanceNode(ctx, id, onDone) {
-  return Promise.all([data.activityDetail(ctx, id), data.participantResponses(ctx, id)]).then(([detail, registration]) => {
-    const parts = (detail.participants || []).map(row => ({...row,
-      response: registration.responses?.[row.id]?.response || 'unrecorded',
-      responseVersion: registration.responses?.[row.id]?.version || null,
-    }));
-    if (!detail.activity) throw new Error(t('act_activity_not_found'));
-    return renderActivityParticipants(ctx, detail.activity, parts, onDone);
   });
 }
 
@@ -275,9 +265,7 @@ export function renderActivity(ctx, id) {
     if (loaded.has(i)) return;
     loaded.add(i);
     if (i === 0) loadInto(bodies[i], async () => h('div', { class: 'card-body' }, [await flowNode(ctx, id)]));
-    else if (i === 1) loadInto(bodies[i], async () => h('div', { class: 'card-body' }, [await attendanceNode(ctx, id, () => {
-      loaded.delete(1); select(1);
-    })]));
+    else if (i === 1) renderRoster({...ctx,main:bodies[i]},String(id));
     else if (i === 5) loadInto(bodies[i], async () => h('div', { class: 'card-body' }, [await reviewNode(ctx, id)]));
     else if (i === 2) loadInto(bodies[i], async () => h('div', { class: 'card-body' }, [await interactionNode(ctx, id)]));
     else if (i === 3) loadInto(bodies[i], async () => h('div', { class: 'card-body' }, [await candidateNode(ctx, id)]));

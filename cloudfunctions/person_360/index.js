@@ -11,7 +11,6 @@ const { WorkItemService } = require('./work-item-service');
 const { OpportunityWorkflowService } = require('./opportunity-workflow-service');
 const { disclose, refsForRows } = require('./test-data');
 const { InsuranceContextService } = require('./insurance-context-service');
-const { ParticipantService } = require('./participant-service');
 const { SpeakerProfileService } = require('./speaker-profile-service');
 const { RelationshipDecayService } = require('./relationship-decay-service');
 const { getCustomerProfile } = require('./customer-profile-service');
@@ -152,12 +151,12 @@ async function pgRequest(table, method, filters = {}, body, { timeoutMs = 8000 }
 }
 
 async function pgRpc(name, body) {
-  if (!new Set(['quick_capture_v2_commit', 'person_directory_page_v1', 'person_directory_filtered_page_v1',
+  if (!new Set(['crm_activity_roster_v1','quick_capture_v2_commit', 'person_directory_page_v1', 'person_directory_filtered_page_v1',
     'person_trash_page_v1', 'person_customer_worklist_v1',
     'person_identity_preview_v1', 'person_identity_execute_v1',
     'crm_person_only_recruit_delete_v1', 'crm_work_item_preview_v1',
     'crm_work_item_execute_v1', 'crm_opportunity_directory_v1', 'crm_opportunity_preview_v1',
-    'crm_opportunity_execute_v1','crm_pipeline_stage_v1','crm_event_participation_v1','crm_policy_service_v1','crm_advice_feedback_v1','crm_business_report_v1','crm_action_center_v1','crm_action_context_v1','crm_activity_review_preview_v1',
+    'crm_opportunity_execute_v1','crm_pipeline_stage_v1','crm_policy_service_v1','crm_advice_feedback_v1','crm_business_report_v1','crm_action_center_v1','crm_action_context_v1','crm_activity_review_preview_v1',
     'crm_activity_review_execute_v1','crm_person_delete_preview_v1',
     'crm_person_delete_execute_v1','crm_person_restore_v1',
     'crm_context_item_preview_v1','crm_context_item_execute_v1',
@@ -192,9 +191,9 @@ async function pgRpc(name, body) {
       const message = typeof problem?.message === 'string' ? problem.message : '';
       const code = typeof problem?.code === 'string' && /^(?:PGRST\d{3}|[0-9A-Z]{5})$/.test(problem.code)
         ? problem.code : '';
+      if (name === 'crm_activity_roster_v1' && /^ROSTER_[A-Z_]+$/.test(message)) throw Error(message);
       if (name === 'crm_person_interaction_v1' && /^INTERACTION_[A-Z_]+$/.test(message)) throw new Error(message);
       if (name === 'crm_policy_service_v1' && (message === 'Policy review changed' || code === 'P0002')) throw new Error('POLICY_REFRESH');
-      if (name === 'crm_event_participation_v1' && (message === 'Participation changed' || code === 'P0002')) throw new Error('PARTICIPATION_CHANGED');
       if (name === 'crm_pipeline_stage_v1') {
         if (message === 'Pipeline preview expired' || message.startsWith('Pipeline record changed')) throw new Error('PIPELINE_REVIEW_AGAIN');
         if (code === 'P0002') throw new Error('PIPELINE_TARGET_UNAVAILABLE');
@@ -1053,6 +1052,10 @@ exports.main = async event => {
     }
     const service = createService();
     switch (event?.action) {
+      case 'getRosterFacts': return pgRpc('crm_activity_roster_v1',{p_actor:uid,p_op:'facts',p_input:event.query||{}});
+      case 'activityRoster':
+        try{return await require('./activity-roster').activityRoster(uid,event.operation,event.data||{},pgRpc);}
+        catch(error){return {error:(String(error.message).match(/ROSTER_[A-Z_]+/)||[])[0]||'ROSTER_FAILED'};}
       case 'get': return await service.get(event.personId);
       case 'extractKnowledgePdfText':
         if(event.actorUid!==uid)return {error:'UNAUTHORIZED'};
@@ -1150,12 +1153,6 @@ exports.main = async event => {
       });
       case 'businessReport': return await pgRpc('crm_business_report_v1',{p_actor_uid:uid,p_input:event.query});
       case 'policyService': return await pgRpc('crm_policy_service_v1',{p_actor_uid:uid,p_op:event.operation,p_input:event.data});
-      case 'listPersonEvents':
-      case 'listParticipantResponses':
-      case 'saveParticipantResponse': {
-        const op = {listPersonEvents:'person',listParticipantResponses:'responses',saveParticipantResponse:'save'}[event.action];
-        return await pgRpc('crm_event_participation_v1',{p_actor_uid:uid,p_op:op,p_input:event.data});
-      }
       case 'listActionCenter': return await pgRpc('crm_action_center_v1',{p_actor_uid:uid,p_query:event.query});
       case 'previewActionContext':
       case 'confirmActionContext': return await pgRpc('crm_action_context_v1',{
@@ -1311,10 +1308,6 @@ exports.main = async event => {
       case 'listActivityReviewHistory': return await new ActivityReviewWorkflowService({request:pgRequest,rpc:pgRpc})
         .history(event.activityId);
       case 'resolveQuickCaptureName': return await service.resolveQuickCaptureName(event.name);
-      case 'addCanonicalParticipant': return await new ParticipantService({ request: pgRequest })
-        .add(event.data, uid);
-      case 'linkCanonicalParticipant': return await new ParticipantService({ request: pgRequest })
-        .link(event.data, uid);
       case 'createSpeakerProfile': return await new SpeakerProfileService({ request: pgRequest })
         .create(event.data, uid);
       case 'linkSpeakerPerson': return await new SpeakerProfileService({ request: pgRequest })

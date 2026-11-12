@@ -78,6 +78,13 @@ function assistantPayloadAllowed(payload,audience,actor){
    payload.action==='daily_review'&&payload.view==='morning'&&(payload.guidance===undefined||payload.guidance==='rules');
  return false;
 }
+function rosterReadAllowed(payload,source){
+ if(!exactKeys(payload,['action','query'])||payload.action!=='getRosterFacts')return false;
+ const q=payload.query;
+ if(!q||!Number.isSafeInteger(q.after)||q.after<0)return false;
+ if(source==='activities'&&exactKeys(q,['activityIds','after']))return Array.isArray(q.activityIds)&&q.activityIds.length===1&&positiveId(q.activityIds[0]);
+ return exactKeys(q,['legacyId','personType','after'])&&positiveId(q.legacyId)&&(source==='activities'?['customer','recruit','speaker'].includes(q.personType):q.personType==='customer');
+}
 function audienceForInternalPayload(source,payload){
  if(['ai_followup','ai_recommend','ai_referral'].includes(source)&&payload?.action==='listInteractions')return 'person_360';
  if(source==='assistant'){
@@ -97,7 +104,8 @@ async function issueInternalDelegation(app,event){
  const attestation=verifiedDeviceAttestation(event.attestation),payload=event.payload;
  if(!payload||typeof payload!=='object'||Array.isArray(payload)||Object.keys(payload).some(k=>['__crmDelegation','__deviceRequest','__proto__','constructor','prototype'].includes(k)))throw deny();
  let audience;
- if(attestation.source==='activities'&&Object.keys(payload).sort().join(',')==='action,activityId'&&/^\d{1,20}$/.test(String(payload.activityId))&&
+ if(['activities','ai_referral'].includes(attestation.source)&&rosterReadAllowed(payload,attestation.source))audience='person_360';
+ else if(attestation.source==='activities'&&Object.keys(payload).sort().join(',')==='action,activityId'&&/^\d{1,20}$/.test(String(payload.activityId))&&
    permitted({name:'activities',origin:'browser'},'person_360',payload.action)) audience='person_360';
  else if(attestation.source==='activity_reports'&&validRecruitGoalPayload(payload)&&
    permitted({name:'activity_reports',origin:'browser'},'recruit_goals',payload.action)) audience='recruit_goals';
@@ -124,7 +132,7 @@ async function consumeInternalDelegation(app,event){
  const source=event.audience==='recruit_goals'?'activity_reports':event.audience==='person_360'&&event.payload?.action==='listActivityData'?'activities':
    event.audience==='person_360'&&event.payload?.action==='listInteractions'?'ai_followup':
    ['person_360','ai_parse','today_coach'].includes(event.audience)?'assistant':null;
- const valid=event.audience==='recruit_goals'?validRecruitGoalPayload(event.payload):
+ const valid=event.audience==='person_360'&&rosterReadAllowed(event.payload,'activities')?true:event.audience==='recruit_goals'?validRecruitGoalPayload(event.payload):
    (source==='activities'&&exactKeys(event.payload,['action','activityId'])&&/^\d{1,20}$/.test(String(event.payload.activityId||'')))||
    importDraft || Boolean(source&&internalPayloadAllowed(source,event.audience,event.payload,
      event.payload?.action==='extractKnowledgePdfText'?event.payload.actorUid:undefined));

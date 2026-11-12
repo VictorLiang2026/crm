@@ -1,6 +1,6 @@
 'use strict';
 const assert = require('node:assert/strict');
-const { ParticipantService } = require('../../cloudfunctions/person_360/participant-service');
+const { ParticipantService } = require('../fixtures/legacy-participant-service.cjs');
 
 function fixture() {
   const tables = {

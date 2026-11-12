@@ -1,6 +1,6 @@
 'use strict';
 const {deviceProtocol}=require('./device-proof');
-const ALLOWED=new Set('activities activity_reports activity_speakers activity_tasks activity_topics ai_activity ai_followup ai_parse ai_recommend ai_recommendations ai_referral assistant customers followups funnel_insight gifts opportunities ocr_records person_360 photos pmc18_observer policy_review_reports products recruit_candidates recruit_followups recruit_goals recruit_recommend recruit_score today_coach activity_registration'.split(' '));
+const ALLOWED=new Set('activities activity_reports activity_speakers activity_tasks activity_topics ai_activity ai_followup ai_parse ai_recommend ai_recommendations ai_referral assistant customers followups funnel_insight gifts opportunities ocr_records person_360 photos pmc18_observer policy_review_reports products recruit_candidates recruit_followups recruit_goals recruit_recommend recruit_score today_coach'.split(' '));
 // Only the app-side authenticated UID from the CloudBase runtime is accepted.
 // Never expose rpc(), inspect, consume, UID overrides or an approval API.
 async function serviceRpc(env,body){

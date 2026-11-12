@@ -32,20 +32,6 @@
       "memorySize": 256
     },
     {
-      "name": "activity_registration",
-      "timeout": 20,
-      "runtime": "Nodejs20.19",
-      "handler": "index.main",
-      "memorySize": 256
-    },
-    {
-      "name": "activity_registration_public",
-      "timeout": 20,
-      "runtime": "Nodejs20.19",
-      "handler": "index.publicMain",
-      "memorySize": 256
-    },
-    {
       "name": "activity_reports",
       "timeout": 15,
       "runtime": "Nodejs18.15",

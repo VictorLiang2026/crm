@@ -9,7 +9,7 @@ import {
   renderTestScenario, renderTestAction,
   renderFollowupAdvice, renderFollowupAdviceTasks,
   renderKnowledgeEditor, renderKnowledgeTrash,
-  renderActivityRegistrations,
+  renderRoster,
 } from './views.js';
 
 import { renderFollowupList } from './business-report.js';
@@ -27,7 +27,8 @@ const EXACT = new Map([
   ['#/recycle/recruit', renderRecruitTrash],
   ['#/opportunities', renderOpportunities],
   ['#/activities', renderActivities],
-  ['#/activity-registrations', renderActivityRegistrations],
+  ['#/activity-registrations', renderRoster],
+  ['#/activity-roster',renderRoster],
   ['#/activity-resources', renderResourceDirectory],
   ['#/activity-speakers', renderSpeakerDirectory],
   ['#/activity-topics', renderTopicDirectory],
@@ -50,6 +51,7 @@ const EXACT = new Map([
 ]);
 
 const PATTERNS = [
+  { re: /^#\/activity-roster\/(\d+)$/, nav: '#/activities', render: renderRoster },
   { re: /^#\/today\/list\/(protection|recruitment|event)$/, nav: '#/today', render: renderFollowupList },
   { re: /^#\/people\/customer\/(review|renewal|verify)$/, nav: '#/people', render: renderPeople },
   { re: /^#\/actions\/([1-9]\d*|today|week|overdue|waiting|completed)$/, nav: '#/more', render: renderActionCenter },
@@ -86,6 +88,7 @@ const NAV_OF = {
   '#/opportunities': '#/opportunities',
   '#/activities': '#/activities',
   '#/activity-registrations': '#/activities',
+  '#/activity-roster':'#/activities',
   '#/activity-resources': '#/activities',
   '#/activity-speakers': '#/activities',
   '#/activity-topics': '#/activities',
