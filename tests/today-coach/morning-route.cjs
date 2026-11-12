@@ -30,8 +30,17 @@ test('morning view rejects anonymous before reading and returns seven empty sect
   try {
     process.env.TCB_ENV = 'crm-test123';
     process.env.CRM_TODAY_DB_API_KEY = 'fixture-only';
-    global.fetch = async (_url, options) => {
+    let rosterReads = 0;
+    global.fetch = async (url, options) => {
       reads++;
+      if (new URL(url).pathname.endsWith('/rpc/crm_activity_roster_v1')) {
+        assert.equal(options.method, 'POST');
+        assert.deepEqual(JSON.parse(options.body), {
+          p_actor: 'today_coach', p_op: 'facts', p_input: { since: '0001-01-01', after: 0 }
+        });
+        rosterReads++;
+        return { ok: true, json: async () => ({ rows: [] }) };
+      }
       assert.equal(options.method, 'GET');
       assert.equal(options.headers['Accept-Profile'], 'public');
       return { ok: true, json: async () => [] };
@@ -43,7 +52,12 @@ test('morning view rejects anonymous before reading and returns seven empty sect
     assert.equal(result.view, 'morning');
     assert.deepEqual(Object.keys(result.sections).slice(0, 7), ['morningBrief', 'topActions',
       'commitments', 'upcoming', 'risk', 'opportunities', 'needConfirmation']);
-    assert.equal(reads, 5); // open actions + four Morning Brief tables; no Person IDs
+    assert.equal(reads, 6); // roster, open actions and four Morning Brief tables
+    assert.equal(rosterReads, 1);
+    const cockpit = await coach.main({ __deviceRequest:{__deviceProof:'fixture', action:'cockpit'} });
+    assert.ok(Array.isArray(cockpit.trends));
+    assert.ok(Array.isArray(cockpit.reminders));
+    assert.equal(rosterReads, 2);
     assert.equal(modelCalls, 0);
   } finally {
     caller = null;
