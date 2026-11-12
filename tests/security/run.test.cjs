@@ -66,17 +66,14 @@ test('the retired GPT queue has an exact service-role deny exception', () => {
   assert.match(evaluate(source).failures.join('\n'),/Routine permission exception mismatch/);
 });
 
-test('retired PC28 executor has no service execution and its audit table is read-only', () => {
+test('retired PC28 executor is absent while its historical audit table is read-only', () => {
   const id='routine:assistant_recruit_delete_command_v1(p_stage text, p_actor_uid text, p_command_id uuid, p_idempotency_key uuid, p_person_id bigint, p_candidate_id bigint, p_request_text text, p_person_mention text, p_preview_hash text)';
-  const exception=require('./routine-execution-exceptions.json').routines.find(item=>item.id===id);
-  assert.ok(exception);
   const sample=copy();
   const routine=object(sample,id.slice('routine:'.length));
-  assert.ok(routine);
-  routine.detail={...exception.expectedDetail};
+  assert.equal(routine,undefined);
   assert.deepEqual(evaluate(sample).failures,[]);
-  routine.detail.service_execute=true;
-  assert.match(evaluate(sample).failures.join('\n'),/Routine permission exception mismatch/);
+  sample.objects.push({kind:'routine',name:id.slice('routine:'.length),detail:{anon_execute:false,service_execute:false,security_definer:false,authenticated_execute:false}});
+  assert.match(evaluate(sample).failures.join('\n'),/Unapproved public object/);
   assert.deepEqual(object(copy(),'assistant_recruit_delete_commands').detail.privileges.service_role,['SELECT']);
 });
 

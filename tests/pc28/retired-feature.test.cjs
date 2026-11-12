@@ -23,12 +23,17 @@ test('standard recruit profile edit and recycle-bin delete remain available',()=
   assert.match(read('crm/js/modules/console/pages/recruit.js'),/openRecruitCandidateCreate/);
 });
 
-test('retirement migration disables only PC28 writes and is reversible without dropping audit data',()=>{
+test('retirement migrations remove the RPC and preserve the audit table and rows',()=>{
   const migration=read('cloudbase/migrations/20261112224500_retire_assistant_recruit_delete.sql');
   const rollback=read('cloudbase/rollbacks/20261112224500_retire_assistant_recruit_delete.sql');
+  const drop=read('cloudbase/migrations/20261112233000_drop_assistant_recruit_delete_rpc.sql');
+  const restore=read('cloudbase/rollbacks/20261112233000_drop_assistant_recruit_delete_rpc.sql');
   assert.match(migration,/REVOKE INSERT, UPDATE ON public\.assistant_recruit_delete_commands FROM service_role/);
   assert.match(migration,/REVOKE ALL ON FUNCTION public\.assistant_recruit_delete_command_v1/);
-  assert.doesNotMatch(migration,/DROP TABLE|DELETE FROM/);
+  assert.match(drop,/DROP FUNCTION public\.assistant_recruit_delete_command_v1/);
+  assert.match(restore,/CREATE FUNCTION public\.assistant_recruit_delete_command_v1/);
+  assert.match(restore,/REVOKE ALL ON FUNCTION public\.assistant_recruit_delete_command_v1[\s\S]*FROM PUBLIC,anon,authenticated,service_role/);
+  assert.doesNotMatch(migration+rollback+drop+restore,/DROP TABLE|DELETE FROM public\.assistant_recruit_delete_commands/);
   assert.match(rollback,/GRANT INSERT, UPDATE ON public\.assistant_recruit_delete_commands TO service_role/);
   assert.match(rollback,/GRANT EXECUTE ON FUNCTION public\.assistant_recruit_delete_command_v1/);
 });
