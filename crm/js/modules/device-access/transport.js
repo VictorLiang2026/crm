@@ -14,7 +14,13 @@ export async function deviceCall(app,env,name,data){
   });sessions.set(app,client);}
   let signed;
   try{signed=await client.sign(name,data||{});}catch(e){if(denied(e.message))requireSetup(e.message);throw e;}
-  const r=await app.callFunction({name,data:{__deviceRequest:signed}});
+  let r=await app.callFunction({name,data:{__deviceRequest:signed}});
+  // Activity detail is read-only. A fresh challenge can recover a one-off proof
+  // rejection without relaxing authorization or replaying any business write.
+  if(name==='activities'&&data?.action==='get'&&r?.result?.error==='DEVICE_ACCESS_DENIED'){
+    try{signed=await client.sign(name,data||{});}catch(e){if(denied(e.message))requireSetup(e.message);throw e;}
+    r=await app.callFunction({name,data:{__deviceRequest:signed}});
+  }
   if(denied(r?.result?.error))requireSetup(r.result.error);
   return r;
 }
