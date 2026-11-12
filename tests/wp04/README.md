@@ -10,6 +10,8 @@
 
 SQL 区分参与者 `person_type=person` 的直接 Person ID 与 customer/recruit/speaker 的旧业务 ID，检查双方映射一致、有效性和活动父记录；保留已有 canonical Person 且旧 ID 为空的兼容路径。旧记录的原始姓名、联系方式不进入快照；受保护的测试 ID 清单也不导出。
 
+活动花名册导入的 `person_type=attendee` 是独立于旧业务 ID 的正式参与者类型。审计要求其 `roster_id` 指向花名册记录，旧 `person_id` 为空，且 `canonical_person_id` 与花名册绑定的 Person 一致；未绑定 Person 的独立花名册成员有效，已绑定时 Person 必须存在且未软删除。其余未知类型、失配或无效 Person 仍阻断门禁。
+
 夹具所有业务文本使用 `【系统测试·勿联系】`，全部在内存内，POST/PATCH 只是隔离请求替身，不联网、不落库、不生成审计或外发。线上审计不写数据库。已有 WP03 初始样本 10 条，不运行新的种子或空库事务夹具。
 
 自动测试不等于本轮真实登录、CRUD 或手机真机验收；本轮没有业务产物变更，旧页面通过隔离回归，云端业务文件逐一核对。历史真实验证见 WP03 报告。

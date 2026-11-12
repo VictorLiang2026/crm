@@ -22,6 +22,11 @@ WITH links AS (
  UNION ALL
  SELECT 'participants',a.id::text,
   CASE WHEN event.id IS NULL OR event.deleted_at IS NOT NULL THEN 'INVALID_ACTIVITY'
+   -- Standalone roster participants are valid without a Person; linked attendees must agree with an active Person.
+   WHEN a.person_type='attendee' THEN CASE
+    WHEN roster.id IS NULL OR roster.person_id IS DISTINCT FROM a.canonical_person_id THEN 'IDENTITY_CONFLICT'
+    WHEN a.person_id IS NOT NULL THEN 'IDENTITY_CONFLICT'
+    WHEN a.canonical_person_id IS NOT NULL AND (p.id IS NULL OR p.deleted_at IS NOT NULL) THEN 'INVALID_PERSON' END
    WHEN a.person_type NOT IN ('person','customer','recruit','speaker') THEN 'UNKNOWN_TYPE'
    WHEN a.canonical_person_id IS NULL AND a.person_id IS NULL THEN 'NAME_ONLY_UNCONFIRMED'
    WHEN p.id IS NULL OR p.deleted_at IS NOT NULL THEN 'INVALID_PERSON'
@@ -33,6 +38,7 @@ WITH links AS (
      WHEN 'speaker' THEN s.deleted_at IS NOT NULL OR s.id IS NULL
      ELSE direct.deleted_at IS NOT NULL OR direct.id IS NULL END) THEN 'IDENTITY_CONFLICT' END
  FROM public.activity_participants a LEFT JOIN public.activities event ON event.id=a.activity_id
+ LEFT JOIN public.activity_roster_people roster ON roster.id=a.roster_id
  LEFT JOIN public.persons p ON p.id=a.canonical_person_id
  LEFT JOIN public.persons direct ON a.person_type='person' AND direct.id=a.person_id
  LEFT JOIN public.customers c ON a.person_type='customer' AND c."Id"=a.person_id

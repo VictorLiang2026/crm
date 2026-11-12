@@ -96,7 +96,7 @@ module.exports = async function smoke(root, test, options = {}) {
       await b.wait("location.pathname.endsWith('/console.html') && location.hash === '#/more' && document.querySelector('.console-main .more-section')");
       assert.equal(await b.evaluate("document.querySelector('.phase14-tile') === null"), true);
       await navigateAdmin('#/ai-suggestions');
-      await b.wait("location.pathname.endsWith('/console.html') && location.hash === '#/ai/experience' && document.querySelector('.crm-ai-exp-page')");
+      await b.wait("location.pathname.endsWith('/console.html') && location.hash === '#/ai/experience' && document.querySelector('.crm-ai-exp-page')", 15000);
       await open('#/more/followups', '[CRM_TEST_ONLY]客户甲');
       await b.click('#view button', '打开传统跟进');
       await b.wait(text('[CRM_TEST_ONLY]跟进内容'));

@@ -103,12 +103,17 @@ test('verified activity assertion is required to issue a scoped service delegati
   assert.equal(calls.length,2);
   assert.equal(calls[1].body.p_op,'issue');assert.equal(calls[1].body.p_args.actor,actor);
   assert.equal(calls[1].body.p_args.origin,'browser');assert.equal(calls[1].body.p_args.fingerprint,fingerprint);
+  const withTransportMetadata=await issue({action:'issueInternalDelegation',attestation:verified.attestation,payload,
+    transportContext:{requestId:'fixture-only'}});
+  assert.match(withTransportMetadata.token,/^[a-f0-9-]{36}$/);assert.equal(calls.length,3);
+  const forbiddenEnvelope=await issue({action:'issueInternalDelegation',attestation:verified.attestation,payload,__deviceRequest:{}});
+  assert.equal(forbiddenEnvelope.error,'DEVICE_ACCESS_DENIED');assert.equal(calls.length,3);
   const denied=await issue({action:'issueInternalDelegation',attestation:verified.attestation,payload:{action:'deleteCustomer',id:1}});
-  assert.equal(denied.error,'DEVICE_ACCESS_DENIED');assert.equal(calls.length,2);
+  assert.equal(denied.error,'DEVICE_ACCESS_DENIED');assert.equal(calls.length,3);
   const dot=verified.attestation.indexOf('.'),signature=verified.attestation[dot+1];
   const corrupted=verified.attestation.slice(0,dot+1)+(signature==='A'?'B':'A')+verified.attestation.slice(dot+2);
   const forged=await issue({action:'issueInternalDelegation',attestation:corrupted,payload});
-  assert.equal(forged.error,'DEVICE_ACCESS_DENIED');assert.equal(calls.length,2);
+  assert.equal(forged.error,'DEVICE_ACCESS_DENIED');assert.equal(calls.length,3);
   assert.equal(calls[1].options.headers.Authorization,'Bearer '+process.env.CRM_PERSON360_DB_API_KEY);
   assert.equal(calls[1].options.headers['Content-Profile'],'public');
   const activityRuntime=require('../../cloudfunctions/activities/device-runtime');
@@ -126,13 +131,13 @@ test('verified activity assertion is required to issue a scoped service delegati
   }),()=>activityApp);
   const response=await activityHandler({__deviceRequest:{action:'getActivityData',activityId:'42',__deviceProof:{fingerprint,challenge:crypto.randomUUID()}}});
   assert.deepEqual(response,{result:{ok:true,actor,action:'listActivityData'}});
-  assert.equal(calls.length,4);assert.deepEqual(calls.map(c=>c.body.p_op),['issue','issue','issue','consume']);
+  assert.equal(calls.length,5);assert.deepEqual(calls.map(c=>c.body.p_op),['issue','issue','issue','issue','consume']);
   const rosterHandler=activityRuntime.protect('activities',async()=>activityRuntime.scopedApp(activityApp).callFunction({
    name:'person_360',data:{action:'getRosterFacts',query:{activityIds:[42],after:0}}
   }),()=>activityApp);
   const rosterResponse=await rosterHandler({__deviceRequest:{action:'get',id:42,__deviceProof:{fingerprint,challenge:crypto.randomUUID()}}});
   assert.deepEqual(rosterResponse,{result:{ok:true,actor,action:'getRosterFacts'}});
-  assert.equal(calls.length,6);assert.deepEqual(calls.slice(-2).map(c=>c.body.p_op),['issue','consume']);
+  assert.equal(calls.length,7);assert.deepEqual(calls.slice(-2).map(c=>c.body.p_op),['issue','consume']);
  }finally{
   global.fetch=previous.fetch;
   if(previous.env===undefined)delete process.env.TCB_ENV;else process.env.TCB_ENV=previous.env;

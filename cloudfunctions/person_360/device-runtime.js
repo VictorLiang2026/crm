@@ -100,23 +100,27 @@ function internalPayloadAllowed(source,audience,payload,actor){
  return source==='assistant'&&assistantPayloadAllowed(payload,audience,actor);
 }
 async function issueInternalDelegation(app,event){
- if(!event||Object.keys(event).sort().join(',')!=='action,attestation,payload')throw deny();
- const attestation=verifiedDeviceAttestation(event.attestation),payload=event.payload;
- if(!payload||typeof payload!=='object'||Array.isArray(payload)||Object.keys(payload).some(k=>['__crmDelegation','__deviceRequest','__proto__','constructor','prototype'].includes(k)))throw deny();
- let audience;
- if(['activities','ai_referral'].includes(attestation.source)&&rosterReadAllowed(payload,attestation.source))audience='person_360';
- else if(attestation.source==='activities'&&Object.keys(payload).sort().join(',')==='action,activityId'&&/^\d{1,20}$/.test(String(payload.activityId))&&
-   permitted({name:'activities',origin:'browser'},'person_360',payload.action)) audience='person_360';
- else if(attestation.source==='activity_reports'&&validRecruitGoalPayload(payload)&&
-   permitted({name:'activity_reports',origin:'browser'},'recruit_goals',payload.action)) audience='recruit_goals';
- else if(['assistant','ai_followup','ai_recommend','ai_referral'].includes(attestation.source)){
-   audience=audienceForInternalPayload(attestation.source,payload);
-   if(!audience||!internalPayloadAllowed(attestation.source,audience,payload,attestation.actor)||
-      !permitted({name:attestation.source,origin:'browser'},audience,payload.action))throw deny();
- }else throw deny();
- const normalized=JSON.parse(JSON.stringify(payload));
- const result=await delegate(app,'issue',{audience,payload_hash:digest(canonical(normalized)),actor:attestation.actor,origin:'browser',fingerprint:attestation.fingerprint});
- if(typeof result?.token!=='string')throw deny();return {token:result.token};
+ const attestation=verifiedDeviceAttestation(event?.attestation);
+  // CloudBase may add transport metadata to the outer event. Only the signed
+  // command fields below are consumed; reserved security fields still fail closed.
+  if(!event||event.action!=='issueInternalDelegation'||!Object.hasOwn(event,'attestation')||!Object.hasOwn(event,'payload')||
+    ['__crmDelegation','__deviceRequest','__proto__','constructor','prototype'].some(k=>Object.hasOwn(event,k)))throw deny();
+  const payload=event.payload;
+  if(!payload||typeof payload!=='object'||Array.isArray(payload)||Object.keys(payload).some(k=>['__crmDelegation','__deviceRequest','__proto__','constructor','prototype'].includes(k)))throw deny();
+  let audience;
+  if(['activities','ai_referral'].includes(attestation.source)&&rosterReadAllowed(payload,attestation.source))audience='person_360';
+  else if(attestation.source==='activities'&&Object.keys(payload).sort().join(',')==='action,activityId'&&/^\d{1,20}$/.test(String(payload.activityId))&&
+    permitted({name:'activities',origin:'browser'},'person_360',payload.action)) audience='person_360';
+  else if(attestation.source==='activity_reports'&&validRecruitGoalPayload(payload)&&
+    permitted({name:'activity_reports',origin:'browser'},'recruit_goals',payload.action)) audience='recruit_goals';
+  else if(['assistant','ai_followup','ai_recommend','ai_referral'].includes(attestation.source)){
+    audience=audienceForInternalPayload(attestation.source,payload);
+    if(!audience||!internalPayloadAllowed(attestation.source,audience,payload,attestation.actor)||
+       !permitted({name:attestation.source,origin:'browser'},audience,payload.action))throw deny();
+  }else throw deny();
+  const normalized=JSON.parse(JSON.stringify(payload));
+  const result=await delegate(app,'issue',{audience,payload_hash:digest(canonical(normalized)),actor:attestation.actor,origin:'browser',fingerprint:attestation.fingerprint});
+  if(typeof result?.token!=='string')throw deny();return {token:result.token};
 }
 async function consumeInternalDelegation(app,event){
  if(!event||Object.keys(event).sort().join(',')!=='action,audience,payload,token'||!/^[a-f0-9-]{36}$/.test(event.token||''))throw deny();
