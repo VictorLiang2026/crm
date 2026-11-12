@@ -127,6 +127,12 @@ test('verified activity assertion is required to issue a scoped service delegati
   const response=await activityHandler({__deviceRequest:{action:'getActivityData',activityId:'42',__deviceProof:{fingerprint,challenge:crypto.randomUUID()}}});
   assert.deepEqual(response,{result:{ok:true,actor,action:'listActivityData'}});
   assert.equal(calls.length,4);assert.deepEqual(calls.map(c=>c.body.p_op),['issue','issue','issue','consume']);
+  const rosterHandler=activityRuntime.protect('activities',async()=>activityRuntime.scopedApp(activityApp).callFunction({
+   name:'person_360',data:{action:'getRosterFacts',query:{activityIds:[42],after:0}}
+  }),()=>activityApp);
+  const rosterResponse=await rosterHandler({__deviceRequest:{action:'get',id:42,__deviceProof:{fingerprint,challenge:crypto.randomUUID()}}});
+  assert.deepEqual(rosterResponse,{result:{ok:true,actor,action:'getRosterFacts'}});
+  assert.equal(calls.length,6);assert.deepEqual(calls.slice(-2).map(c=>c.body.p_op),['issue','consume']);
  }finally{
   global.fetch=previous.fetch;
   if(previous.env===undefined)delete process.env.TCB_ENV;else process.env.TCB_ENV=previous.env;
