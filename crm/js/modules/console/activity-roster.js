@@ -24,7 +24,7 @@ export function renderRoster(ctx,preset=''){
  function showNav(){nav.replaceChildren(btn(tr('byEvent'),()=>{mode='event';list();},mode==='event'),btn(tr('directory'),()=>{mode='directory';list();},mode==='directory'));}
  async function preview(operation,rows,file='',back=()=>list()){
   const aid=['import','remove'].includes(operation)?activity:null;const p=await call(ctx,'prepare',{operation,rows,file,activityId:aid});
-  const summary=p.rows.map(r=>h('div',{class:'list-row'},[h('strong',{},r.values.display_name),h('span',{class:'row-sub'},[r.personId?'Person #'+r.personId:r.id?tr('reuse')+' #'+r.id:tr('independent'),...Object.entries(r.changes||{}).map(([k,v])=>tr(k)+' · '+v)].join(' · '))]));
+  const summary=p.rows.map(r=>h('div',{class:'list-row'},[h('strong',{},r.values.display_name),h('span',{class:'row-sub'},[r.personId?'Person #'+r.personId:r.id?tr('reuse')+' #'+r.id:r.choice==='different'?tr('differentPerson'):tr('independent'),...Object.entries(r.changes||{}).map(([k,v])=>tr(k)+' · '+v),...(r.renameExisting||[]).map(x=>tr('renameExisting')+' · '+x.displayName)].join(' · '))]));
   body.replaceChildren(card(h('h3',{},tr('review')+' · '+tr(({import:'importAction',edit:'editAction',remove:'remove',createPerson:'createPerson',link:'link',unlink:'unlink'})[operation])),aid?h('p',{},activityName()+' #'+aid):null,h('p',{},[file,p.rows.length].filter(Boolean).join(' · ')),operation==='import'?h('p',{},tr('added')+' '+p.newCount+' · '+tr('existing')+' '+p.existing):null,...summary,bar(btn(tr('cancel'),back),btn(tr('confirm'),safe(async()=>{const result=await call(ctx,'confirm',{previewId:p.previewId});await list();err.textContent=tr('done')+(operation==='import'?' · '+tr('added')+' '+result.added+' · '+tr('existing')+' '+(result.processed-result.added):'');},err),true))));
  }
   async function detail(id){
@@ -47,13 +47,27 @@ export function renderRoster(ctx,preset=''){
   async function analyze(rows){
    const analysis=await call(ctx,'analyze',{activityId:activity,rows});const decisions=[];
    const nodes=analysis.rows.map((r,rowIndex)=>{
-    const choices=sel([['',tr('decide')],...r.profiles.map(p=>['r'+p.id,tr('reuse')+' #'+p.id+' '+[p.display_name,p.school,p.organization,p.wechat,p.phone].filter(Boolean).join(' · ')]),...r.candidates.map(p=>['p'+p.id,'Person #'+p.id+' '+[p.display_name,p.organization,p.phone,p.wechat].filter(Boolean).join(' · ')]),['new',tr('independent')],['skip',tr('skip')]],r.profiles.length+r.candidates.length?'':'new');
-    const exact=r.hasMore?h('input',{type:'text',inputmode:'numeric',placeholder:'Person ID'}):null;
-    const changed=stack();let picks=[];const compare=()=>{picks=[];changed.replaceChildren();let p=choices.value[0]==='r'?r.profiles.find(x=>String(x.id)===choices.value.slice(1)):r.profiles.find(x=>x.person_id&&'p'+x.person_id===choices.value);if(!p)return;
+    const normalizeName=value=>String(value||'').replace(/[（]/g,'(').replace(/[）]/g,')').replace(/\s+/g,' ').trim().toLowerCase();
+    const preferred=r.candidates.find(p=>normalizeName(p.display_name)===normalizeName(r.values.display_name))||r.candidates[0];
+    const initial=preferred?'p'+preferred.id:r.profiles.length?'r'+r.profiles[0].id:'new';
+    const choices=sel([...r.profiles.map(p=>['r'+p.id,tr('reuse')+' #'+p.id+' '+[p.display_name,p.school,p.organization,p.wechat,p.phone].filter(Boolean).join(' · ')]),...r.candidates.map(p=>['p'+p.id,'Person #'+p.id+' '+[p.display_name,p.organization,p.phone,p.wechat].filter(Boolean).join(' · ')]),...(r.candidates.length?[['different',tr('differentPerson')]]:[]),['new',tr('independent')],['skip',tr('skip')]],initial);
+    const exact=r.hasMore?h('input',{type:'text',inputmode:'numeric',placeholder:tr('personId')}):null;
+    const changed=stack(),decisionHelp=stack();let picks=[];const sameConfirmed=h('input',{type:'checkbox'}),differentConfirmed=h('input',{type:'checkbox'});
+    const qualifier=h('input',{value:r.values.display_name,'aria-label':tr('qualify')});
+    const plainCandidates=r.candidates.filter(p=>!/(?:（[^（）]+）|\([^()]+\))\s*$/.test(p.display_name));
+    const renameEditors=plainCandidates.map(p=>({person:p,name:h('input',{value:'','aria-label':tr('renameExisting')+' '+p.display_name}),confirmed:h('input',{type:'checkbox'})}));
+    const compare=()=>{picks=[];changed.replaceChildren();decisionHelp.replaceChildren();let p=choices.value[0]==='r'?r.profiles.find(x=>String(x.id)===choices.value.slice(1)):r.profiles.find(x=>x.person_id&&'p'+x.person_id===choices.value);if(!p)return;
      for(const f of fields.filter(k=>k!=='display_name'&&r.values[k]&&String(p[k]??'')!==r.values[k])){const cb=h('input',{type:'checkbox',disabled:p.person_id&&shared.includes(f)});changed.append(box(tr(f)+' · '+(p[f]||'—')+' → '+r.values[f],bar(cb,h('span',{},p.person_id&&shared.includes(f)?tr('personEdit'):tr('accept')))));picks.push([f,cb]);}};
-    choices.onchange=compare;compare();decisions.push(()=>{const v=exact?.value.trim()?'p'+exact.value.trim():choices.value;if(!v)throw Error('ROSTER_IDENTITY');return {number:r.number,values:r.values,choice:v==='new'?'independent':v==='skip'?'skip':v[0]==='r'?'profile':'person',...(v[0]==='r'?{id:v.slice(1)}:v[0]==='p'?{personId:v.slice(1)}:{}),updateFields:picks.filter(([,c])=>c.checked).map(([k])=>k)};});
+    const renderDecision=()=>{decisionHelp.replaceChildren();if(['p','r'].includes(choices.value[0]))decisionHelp.append(h('p',{class:'row-sub'},tr('samePersonPrompt')),box(tr('confirmSame'),sameConfirmed));
+     if(choices.value==='different'){decisionHelp.append(h('p',{class:'row-sub'},tr('differentPersonPrompt')),box(tr('qualify'),qualifier),...renameEditors.map(item=>card(h('strong',{},item.person.display_name),box(tr('renameExisting'),item.name),box(tr('confirmRename'),item.confirmed))),box(tr('confirmDifferent'),differentConfirmed));}
+     if(choices.value==='new')decisionHelp.append(h('p',{class:'row-sub'},tr('newPersonNoMatch')));};
+    choices.onchange=()=>{compare();renderDecision();};compare();renderDecision();
+    decisions.push(()=>{const v=exact?.value.trim()?'p'+exact.value.trim():choices.value;if(!v)throw Error('ROSTER_IDENTITY');const base={number:r.number,values:r.values,updateFields:picks.filter(([,c])=>c.checked).map(([k])=>k)};
+     if(['p','r'].includes(v[0])){if(!sameConfirmed.checked)throw Error('ROSTER_IDENTITY');return {...base,choice:v[0]==='r'?'profile':'person',...(v[0]==='r'?{id:v.slice(1)}:{personId:v.slice(1)})};}
+     if(v==='different'){if(!differentConfirmed.checked||renameEditors.some(x=>!x.confirmed.checked))throw Error('ROSTER_IDENTITY');return {...base,choice:'different',values:{...r.values,display_name:qualifier.value},renameExisting:renameEditors.map(x=>({personId:String(x.person.id),displayName:x.name.value}))};}
+     return {...base,choice:v==='new'?'independent':'skip'};});
     const rename=h('input',{value:r.values.display_name,'aria-label':tr('qualify')});
-    return card(h('strong',{},tr('row')+' '+r.number+' · '+r.values.display_name),r.hasMore?h('p',{},tr('more')):null,bar(rename,btn(tr('lookup'),safe(()=>analyze(rows.map((item,index)=>index===rowIndex?{...item,values:{...item.values,display_name:rename.value}}:item)),err))),h('p',{class:'row-sub'},fields.slice(1).map(f=>r.values[f]).filter(Boolean).join(' · ')),choices,exact,changed);
+    return card(h('strong',{},tr('row')+' '+r.number+' · '+r.values.display_name),r.hasMore?h('p',{},tr('more')):null,bar(rename,btn(tr('lookup'),safe(()=>analyze(rows.map((item,index)=>index===rowIndex?{...item,values:{...item.values,display_name:rename.value}}:item)),err))),h('p',{class:'row-sub'},fields.slice(1).map(f=>r.values[f]).filter(Boolean).join(' · ')),choices,exact,decisionHelp,changed);
    });
    matches.replaceChildren(...nodes,btn(tr('preview'),safe(()=>preview('import',decisions.map(fn=>fn()),file.name,()=>body.replaceChildren(mapUI,matches)),err),true));
   }
