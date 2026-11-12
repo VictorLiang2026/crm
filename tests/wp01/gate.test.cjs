@@ -8,7 +8,8 @@ const baseline = require('../security/expected-public-baseline.json');
 const now = Date.now();
 const date = new Date(now).toISOString();
 const report = () => ({ version:1, environment:'crm-d1gkae8ddc930d151', fingerprint:'same',
-  finishedAt:date, catalogObservedAt:date, checks:['catalog','regression','guard-tests','anonymous','wp02-fixtures','wp03-fixtures','wp04-identity','wp05-profile','wp06-insights','pc34-business-security'].map(id => ({id,status:'PASS'})) });
+  finishedAt:date, catalogObservedAt:date, checks:['catalog','regression','guard-tests','anonymous','wp02-fixtures','wp03-fixtures','wp04-identity','wp05-profile','wp06-insights','pc34-business-security',
+    'home-roster-facts','home-morning-and-cockpit'].map(id => ({id,status:'PASS'})) });
 test('gate accepts explicit gaps but never failure, missing critical check or stale evidence', () => {
   const r = report();
   r.checks.push({id:'login',status:'MANUAL_LOGIN'},{id:'service-runtime',status:'UNVERIFIED'});
@@ -29,6 +30,18 @@ test('gate accepts explicit gaps but never failure, missing critical check or st
     r => { r.checks.push(r.checks[0]); }
   ]) { const bad=report(); mutate(bad); assert.ok(blockers(bad,'same',now).length); }
   assert.equal(fresh(new Date(now+120000).toISOString(),now),false);
+});
+test('release requires passing roster facts and both home routes', () => {
+  for (const id of ['home-roster-facts', 'home-morning-and-cockpit']) {
+    const missing = report();
+    missing.checks = missing.checks.filter(check => check.id !== id);
+    assert.ok(blockers(missing, 'same', now).includes(id + ' not verified'));
+    for (const status of ['FAIL', 'UNVERIFIED']) {
+      const incomplete = report();
+      incomplete.checks.find(check => check.id === id).status = status;
+      assert.ok(blockers(incomplete, 'same', now).includes(id + ' not verified'));
+    }
+  }
 });
 test('fresh catalog detects expanded grants, view bypass and policy drift without rebaselining', () => {
   const actual = {...structuredClone(baseline), roles:require('./expected-roles.json'), environment:'crm-d1gkae8ddc930d151', version:'wp01-v1', observedAt:date};

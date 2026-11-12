@@ -12,7 +12,8 @@ const maxAgeMs = 60 * 60 * 1000;
 const reportFile = path.join(dir, 'wp01-report.json');
 const catalogFile = path.join(dir, 'wp01-catalog.json');
 const labels = { PASS: '自动通过', FAIL: '失败', MANUAL_LOGIN: '需人工登录', UNVERIFIED: '未验证' };
-const critical = ['catalog', 'regression', 'guard-tests', 'anonymous', 'wp02-fixtures', 'wp03-fixtures', 'wp04-identity', 'wp05-profile', 'wp06-insights', 'pc34-business-security'];
+const critical = ['catalog', 'regression', 'guard-tests', 'anonymous', 'wp02-fixtures', 'wp03-fixtures', 'wp04-identity', 'wp05-profile', 'wp06-insights', 'pc34-business-security',
+  'home-roster-facts', 'home-morning-and-cockpit'];
 const sha = input => crypto.createHash('sha256').update(input).digest('hex');
 function fresh(date, now = Date.now()) {
   const age = now - Date.parse(date);
@@ -129,6 +130,8 @@ async function main(args = process.argv.slice(2)) {
   if (!checks.some(c => c.status === 'FAIL')) {
     for (const [id, args] of [
       ['guard-tests', ['--test','tests/security/run.test.cjs','tests/security/device-delegation.test.cjs','tests/wp01/gate.test.cjs','tests/tooling/cloudbase-sdk-pins.cjs','tests/recruit-goals/transactional-save.cjs']],
+      ['home-roster-facts', ['--test', 'tests/activity-roster/facts.test.cjs']],
+      ['home-morning-and-cockpit', ['--test', 'tests/today-coach/morning-route.cjs']],
       ['wp02-fixtures', ['--test','tests/wp02/run.test.cjs','tests/wp02/browser.test.cjs']],
       ['wp03-fixtures', ['--test','tests/wp03/run.test.cjs','tests/wp03/browser.test.cjs']],
       ['wp04-identity', ['tests/wp04/run.cjs']],
