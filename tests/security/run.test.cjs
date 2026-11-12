@@ -66,6 +66,20 @@ test('the retired GPT queue has an exact service-role deny exception', () => {
   assert.match(evaluate(source).failures.join('\n'),/Routine permission exception mismatch/);
 });
 
+test('retired PC28 executor has no service execution and its audit table is read-only', () => {
+  const id='routine:assistant_recruit_delete_command_v1(p_stage text, p_actor_uid text, p_command_id uuid, p_idempotency_key uuid, p_person_id bigint, p_candidate_id bigint, p_request_text text, p_person_mention text, p_preview_hash text)';
+  const exception=require('./routine-execution-exceptions.json').routines.find(item=>item.id===id);
+  assert.ok(exception);
+  const sample=copy();
+  const routine=object(sample,id.slice('routine:'.length));
+  assert.ok(routine);
+  routine.detail={...exception.expectedDetail};
+  assert.deepEqual(evaluate(sample).failures,[]);
+  routine.detail.service_execute=true;
+  assert.match(evaluate(sample).failures.join('\n'),/Routine permission exception mismatch/);
+  assert.deepEqual(object(copy(),'assistant_recruit_delete_commands').detail.privileges.service_role,['SELECT']);
+});
+
 test('roster profiles, import commands and the person projection deny direct client access', () => {
   for (const name of ['activity_roster_people','activity_roster_commands','v_activity_roster_people']) {
     for (const role of ['anon','authenticated']) {

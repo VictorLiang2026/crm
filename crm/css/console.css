@@ -611,30 +611,51 @@ body:has(.login), body.is-login { padding-top: env(safe-area-inset-top); }
 
 .goal-row { display: grid; grid-template-columns: 72px 1fr 52px; align-items: center; gap: 10px; padding: 6px 0; font-size: 12.5px; color: var(--ink-2); }
 
-/* Recruit goals and analysis: period milestones and current stock stay visually distinct. */
-.recruit-analysis-filter { border-top: 4px solid var(--red); }
-.recruit-analysis-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
-.recruit-analysis-metric { min-width: 0; padding: 20px 22px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); box-shadow: var(--shadow); display: grid; gap: 4px; }
+/* Recruit goals and analysis: an iPad-first operations report with quieter detail layers. */
+.recruit-analysis-page { gap: 18px; }
+.recruit-analysis-filter { border-top: 4px solid var(--red); display: grid; grid-template-columns: minmax(130px, .36fr) minmax(0, 1fr); gap: 18px; align-items: end; }
+.recruit-analysis-filter > b { padding-bottom: 11px; color: var(--ink); font-size: 15px; }
+.recruit-analysis-filter-controls { display: grid; grid-template-columns: repeat(2, minmax(180px, 1fr)) auto; gap: 14px; align-items: end; }
+.recruit-analysis-filter-controls .btn { min-height: 44px; }
+.recruit-analysis-report { gap: 18px; }
+.recruit-analysis-overall { padding: 11px 15px; border-left: 3px solid var(--jade); border-radius: 0 var(--radius) var(--radius) 0; background: var(--card); color: var(--ink-2); font-size: 13px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.recruit-analysis-metrics { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(190px, .72fr); gap: 12px; }
+.recruit-analysis-metric { min-width: 0; min-height: 110px; padding: 17px 20px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); box-shadow: var(--shadow); display: grid; align-content: center; gap: 5px; }
 .recruit-analysis-metric-label { color: var(--ink-2); font-size: 13px; font-weight: 700; }
-.recruit-analysis-metric strong { color: var(--ink); font-size: 30px; line-height: 1.2; font-weight: 800; font-variant-numeric: tabular-nums; }
+.recruit-analysis-metric strong { color: var(--ink); font-size: 30px; line-height: 1.15; font-weight: 800; font-variant-numeric: tabular-nums; }
 .recruit-analysis-metric-detail { color: var(--muted); font-size: 12px; }
-.recruit-analysis-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr); gap: 14px; align-items: start; }
-.recruit-analysis-panel { min-width: 0; display: grid; gap: 12px; }
-.recruit-analysis-stage-list, .recruit-analysis-current-list { display: grid; gap: 11px; }
-.recruit-analysis-stage { display: grid; grid-template-columns: minmax(80px, 105px) minmax(0, 1fr) 70px; align-items: center; gap: 10px; font-size: 13px; }
+.recruit-analysis-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(330px, .85fr); gap: 14px; align-items: stretch; }
+.recruit-analysis-panel { min-width: 0; display: grid; align-content: start; gap: 12px; padding: 20px; }
+.recruit-analysis-panel .section-title { margin: 0; }
+.recruit-analysis-stage-list, .recruit-analysis-current-list { display: grid; gap: 12px; }
+.recruit-analysis-stage { display: grid; grid-template-columns: minmax(100px, 128px) minmax(0, 1fr) 72px; align-items: center; gap: 12px; font-size: 13px; }
 .recruit-analysis-stage-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.recruit-analysis-bars { display: grid; gap: 3px; }
-.recruit-analysis-bar { display: block; height: 7px; min-width: 0; border-radius: 99px; }
+.recruit-analysis-bars { display: grid; gap: 4px; }
+.recruit-analysis-bar { display: block; height: 8px; min-width: 0; border-radius: 99px; }
 .recruit-analysis-bar.target { background: var(--gold); }
 .recruit-analysis-bar.actual { background: var(--jade); }
 .recruit-analysis-stage-count { text-align: right; color: var(--ink-2); font-variant-numeric: tabular-nums; }
-.recruit-analysis-current-row { display: grid; grid-template-columns: minmax(80px, 105px) minmax(0, 1fr) 30px; align-items: center; gap: 10px; font-size: 13px; }
+.recruit-analysis-current-row { display: grid; grid-template-columns: minmax(100px, 128px) minmax(0, 1fr) 34px; align-items: center; gap: 12px; font-size: 13px; }
 .recruit-analysis-current-row > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.recruit-analysis-current-track { height: 8px; border-radius: 99px; background: var(--bg); overflow: hidden; }
+.recruit-analysis-current-track { height: 9px; border-radius: 99px; background: var(--bg); overflow: hidden; }
 .recruit-analysis-current-track > span { display: block; height: 100%; border-radius: inherit; background: var(--ink-2); }
 .recruit-analysis-current-track > span.lost { background: var(--muted); }
 .recruit-analysis-current-row strong { text-align: right; font-variant-numeric: tabular-nums; }
-.recruit-analysis-targets { border-top: 4px solid var(--gold); display: grid; gap: 12px; }
+.recruit-analysis-details { border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); }
+.recruit-analysis-details > summary { padding: 15px 18px; color: var(--ink-2); font-size: 14px; font-weight: 700; cursor: pointer; }
+.recruit-analysis-details[open] > summary { border-bottom: 1px solid var(--line); color: var(--ink); }
+.recruit-analysis-detail-content { display: grid; gap: 20px; padding: 18px; }
+.recruit-analysis-table-group { display: grid; gap: 10px; min-width: 0; }
+.recruit-analysis-table-group .section-title { margin: 0; }
+.recruit-analysis-table-scroll { overflow-x: auto; }
+.recruit-analysis-targets { border-top: 4px solid var(--gold); display: grid; gap: 16px; }
+.recruit-analysis-targets > .card { border: 0; box-shadow: none; background: transparent; }
+.recruit-analysis-target-heading { display: grid; grid-template-columns: minmax(0, 1fr) minmax(190px, 250px); gap: 18px; align-items: end; }
+.recruit-analysis-target-heading .section-title { margin: 0 0 5px; }
+.recruit-analysis-target-heading .row-sub { margin: 0; }
+.recruit-analysis-target-month { min-width: 0; }
+.recruit-analysis-goal-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.recruit-analysis-goal-grid .sheet-input { min-width: 0; }
 @media (max-width: 980px) {
   .recruit-analysis-grid { grid-template-columns: 1fr; }
   .recruit-analysis-metric { padding: 16px; }

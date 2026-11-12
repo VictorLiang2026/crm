@@ -4,21 +4,12 @@
 const { routeIntent, IntentError } = require('./intent-router');
 const { handleCommand, OPERATIONS } = require('./command-safety');
 const AI_AUDIT_CODES = new Set(['AI_IN_PROGRESS', 'AI_RETRY_LATER', 'AI_AUDIT_UNKNOWN']);
-// Project only the PC28 contract from a runtime event envelope. Other metadata is never forwarded.
-const RECRUIT_DELETE_BUSINESS_KEYS = new Set(['action','query','language','personMention',
+// Reject known business fields for the wrong action stage instead of silently ignoring forged input.
+const COMMAND_BUSINESS_KEYS = new Set(['action','query','language','personMention',
   'selectedPersonId','stage','command','idempotencyKey','commandId','previewHash',
   'confirmed','actorUid','personId','candidateId','customerId','resource','operation',
-  'preview','result','followupIds','batchId','requestText']);
-function recruitDeleteInput(event, allowed) {
-  if (!event || typeof event !== 'object' || Array.isArray(event) ||
-      Object.keys(event).some(key=>RECRUIT_DELETE_BUSINESS_KEYS.has(key)&&!allowed.includes(key))) return null;
-  return Object.fromEntries(allowed.filter(key=>Object.hasOwn(event,key)).map(key=>[key,event[key]]));
-}
-// CloudBase adds transport fields to event; never forward them into a command.
-// Reject known business fields for the wrong stage instead of silently ignoring forged input.
-const COMMAND_BUSINESS_KEYS = new Set([...RECRUIT_DELETE_BUSINESS_KEYS,
-  'targetActionId','actionId','opportunityId','targetOpportunityId','changes','outcomeResult',
-  'selectedOpportunityId','selectedActionId']);
+  'preview','result','targetActionId','actionId',
+  'opportunityId','targetOpportunityId','changes','outcomeResult','selectedOpportunityId','selectedActionId']);
 function commandInput(event, allowed) {
   if (!event || typeof event !== 'object' || Array.isArray(event) ||
       Object.keys(event).some(key=>COMMAND_BUSINESS_KEYS.has(key)&&!allowed.includes(key))) return null;
@@ -78,9 +69,6 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
   opportunityIntentRunner = event => require('./opportunity-command-intent-service').interpretOpportunityCommand(event),
   opportunityTargetsRunner = (event, uid) => require('./opportunity-command-intent-service').listOpportunityTargets(event,uid),
   opportunityCommandRunner = (event, uid) => require('./opportunity-command-service').runOpportunityCommand(event,uid),
-  recruitDeleteIntentRunner = event => require('./recruit-delete-intent-service').interpretRecruitDelete(event),
-  recruitDeleteTargetsRunner = (event,uid) => require('./recruit-delete-intent-service').listRecruitDeleteTargets(event,uid),
-  recruitDeleteCommandRunner = (event,uid) => require('./recruit-delete-command-service').runRecruitDeleteCommand(event,uid),
   summaryRunner = (event, options) => require('./summarize-service').runSummarize(event, options),
   knowledgeLibraryRunner = (event, uid, options) => require('./knowledge-library-service').handleKnowledgeLibrary(event, uid, options),
   aiTaskStatusRunner = (event, uid) => {
@@ -280,49 +268,6 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
         const code=['INVALID_COMMAND','PREVIEW_STALE','CONFIRMATION_REQUIRED','OPPORTUNITY_COMMAND_FAILED'].includes(error?.code)?
           error.code:'OPPORTUNITY_COMMAND_FAILED';
         return {ok:false,error:{code,message:'Opportunity command could not be completed'}};
-      }
-    }
-    if (event?.action === 'recruitDeleteInterpret') {
-      try {
-        const input=recruitDeleteInput(event,['action','query','language']);
-        if (!input) {
-          return {ok:false,error:{code:'INVALID_INPUT',message:'Recruit delete request is invalid'}};
-        }
-        return await recruitDeleteIntentRunner({query:input.query,language:input.language});
-      } catch (error) {
-        const code=['INVALID_INPUT','INVALID_RESULT','INVALID_CONFIG','TIMEOUT','UPSTREAM_UNAVAILABLE',
-          'PERSISTENCE_ERROR','AI_REQUEST_FAILED'].includes(error?.code)||AI_AUDIT_CODES.has(error?.code)?
-          error.code:'RECRUIT_DELETE_FAILED';
-        return {ok:false,error:{code,message:'Recruit delete request could not be interpreted'}};
-      }
-    }
-    if (event?.action === 'recruitDeleteTargets') {
-      try {
-        const input=recruitDeleteInput(event,['action','personMention','selectedPersonId']);
-        if (!input) {
-          return {ok:false,error:{code:'INVALID_INPUT',message:'Recruit delete target is invalid'}};
-        }
-        return await recruitDeleteTargetsRunner({personMention:input.personMention,
-          selectedPersonId:input.selectedPersonId},identity.uid);
-      } catch (error) {
-        const code=['INVALID_INPUT','INVALID_CONFIG','UPSTREAM_UNAVAILABLE'].includes(error?.code)?
-          error.code:'RECRUIT_DELETE_FAILED';
-        return {ok:false,error:{code,message:'Recruit delete target could not be verified'}};
-      }
-    }
-    if (event?.action === 'recruitDeleteCommand') {
-      try {
-        const fields=event.stage==='plan'?['action','stage','command','idempotencyKey']:
-          event.stage==='confirm'?['action','stage','commandId','previewHash']:
-          ['action','stage','commandId'];
-        const input=recruitDeleteInput(event,fields);
-        if (!input) return {ok:false,error:{code:'INVALID_COMMAND',message:'Recruit delete command could not be completed'}};
-        return await recruitDeleteCommandRunner(input,identity.uid);
-      }
-      catch (error) {
-        const code=['INVALID_COMMAND','PREVIEW_STALE','COMMAND_DENIED','RECRUIT_DELETE_FAILED'].includes(error?.code)?
-          error.code:'RECRUIT_DELETE_FAILED';
-        return {ok:false,error:{code,message:'Recruit delete command could not be completed'}};
       }
     }
     const isActionPlan = event?.action === 'command' && event.stage === 'plan' &&

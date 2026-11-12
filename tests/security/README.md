@@ -8,7 +8,7 @@
 
 2026-10-17 PC27 更新：核对 `public.assistant_opportunity_commands` 的 FORCE RLS、service_role-only 策略/表权限，以及 `public.assistant_opportunity_command_v1` 仅授予 `service_role` 执行；仅加入这两个新对象，未接受其他目录漂移。
 
-2026-10-18 PC28 更新：核对 `public.assistant_recruit_delete_commands` 的 FORCE RLS、service_role-only 策略与表权限，以及 `public.assistant_recruit_delete_command_v1` 仅授予 `service_role` 执行；仅加入这两个对象。发布前对完整线上目录快照比较，未接受其他对象漂移。
+2026-10-18 PC28 originally added the FORCE RLS audit table and its service-only executor. On 2026-11-12, the feature was retired: the audit table and its one executed record remain; service_role now has SELECT only, with no table write or function EXECUTE permission.
 
 ## 运行
 

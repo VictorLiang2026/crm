@@ -9,7 +9,7 @@ const secret='test-only-hmac-secret-with-at-least-32-characters';
 process.env.CRM_KNOWLEDGE_MCP_HMAC_KEY=secret;
 
 function makeMain(runner){
-  return createMain(()=>({uid:'unused',isAnonymous:false}),...Array(13).fill(undefined),runner);
+  return createMain(()=>({uid:'unused',isAnonymous:false}),...Array(10).fill(undefined),runner);
 }
 
 async function invoke(input,runner){

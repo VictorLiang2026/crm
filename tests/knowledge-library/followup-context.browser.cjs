@@ -43,7 +43,7 @@ test('desktop, iPad and iPhone generate, reload and distinguish background-read 
     }})
   });
   const operator='fixture-operator';
-  const handler=createMain(()=>({uid:operator,isAnonymous:false}),...Array(13).fill(undefined),
+  const handler=createMain(()=>({uid:operator,isAnonymous:false}),...Array(10).fill(undefined),
     (event,actor,options)=>service.run(event,actor,options),event=>service.adviceStatus(event,operator));
   try{
     await b.start();

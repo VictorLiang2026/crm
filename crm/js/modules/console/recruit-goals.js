@@ -46,7 +46,7 @@ function targetEditor(ctx, month, rows, afterSaved) {
   } }, t('pc21_save_goals'));
   return card({ title: t('pc21_monthly_goals'), icon: 'recruit', body: [
     h('p', { class: 'row-sub' }, t('pc21_goal_help').replace('{month}', month)),
-    h('div', { class: 'form-grid l06-goal-fields', style: 'grid-template-columns:repeat(auto-fit,minmax(180px,1fr))' }, fields),
+    h('div', { class: 'form-grid l06-goal-fields recruit-analysis-goal-grid' }, fields),
     h('div', { class: 'sheet-actions' }, [save, undo]), status,
     goalTools(ctx, month, () => inputs[6].value, applyDraft),
   ] });
@@ -266,7 +266,7 @@ function progressPanel(progress, funnel) {
     h('th', { scope: 'row' }, month.month),
     ...STAGES.map(stage => h('td', {}, `${month.stages?.[stage]?.actual ?? 0} / ${month.stages?.[stage]?.target ?? 0}`)),
   ]));
-  const table = (labels, body) => h('div', { style: 'overflow-x:auto' }, h('table', { class: 'data-table' }, [
+  const table = (labels, body) => h('div', { class: 'recruit-analysis-table-scroll' }, h('table', { class: 'data-table' }, [
     h('thead', {}, h('tr', {}, labels.map(label => h('th', {}, label)))),
     h('tbody', {}, body.length ? body : [h('tr', {}, h('td', { colspan: String(labels.length) }, t('pc21_no_history')))]),
   ]));
@@ -282,15 +282,24 @@ function progressPanel(progress, funnel) {
       ]),
     ]),
     h('div', { class: 'recruit-analysis-grid' }, [stageComparison(progress.rows), currentFunnelPanel(funnel)]),
-    h('p', { class: 'row-sub' }, `${t('l06_overall')}: ${progress.overall?.new_count ?? 0} → ${progress.overall?.sign_count ?? 0} · ${Number(progress.overall?.new_count) > 0 ? `${progress.overall?.rate ?? 0}%` : '—'}`),
+    h('div', { class: 'recruit-analysis-overall' }, `${t('l06_overall')}: ${progress.overall?.new_count ?? 0} → ${progress.overall?.sign_count ?? 0} · ${Number(progress.overall?.new_count) > 0 ? `${progress.overall?.rate ?? 0}%` : '—'}`),
     progress.testData?.status === 'unverified' ? h('p', { class: 'status-error' }, t('pc21_test_unverified'))
       : progress.testData?.containsTestData ? h('p', { class: 'status-error' }, t('pc21_test_notice').replace('{count}', String(progress.testData.recordCount))) : null,
-    h('h3', { class: 'section-title' }, t('pc21_period_summary')),
-    h('p', { class: 'foot-note' }, t('goal_gap_note')),
-    h('p', { class: 'foot-note' }, t('l06_metric_note')),
-    table(heads, rows),
-    h('h3', { class: 'section-title' }, t('pc21_monthly_history')),
-    table([t('pc21_month'), ...STAGES.map(stage => translateEnum('recruit_stage', stage))], trends),
+    h('details', { class: 'recruit-analysis-details' }, [
+      h('summary', {}, t('recruit_analysis_details')),
+      h('div', { class: 'recruit-analysis-detail-content' }, [
+        h('section', { class: 'recruit-analysis-table-group' }, [
+          h('h3', { class: 'section-title' }, t('pc21_period_summary')),
+          h('p', { class: 'foot-note' }, t('goal_gap_note')),
+          h('p', { class: 'foot-note' }, t('l06_metric_note')),
+          table(heads, rows),
+        ]),
+        h('section', { class: 'recruit-analysis-table-group' }, [
+          h('h3', { class: 'section-title' }, t('pc21_monthly_history')),
+          table([t('pc21_month'), ...STAGES.map(stage => translateEnum('recruit_stage', stage))], trends),
+        ]),
+      ]),
+    ]),
   ]);
 }
 
@@ -301,7 +310,7 @@ export function renderRecruitGoals(ctx) {
   const end = monthInput(current);
   const targetMonth = monthInput(current);
   const targetHost = h('div', { class: 'tab-stack' }, h('p', { class: 'row-sub' }, t('loading')));
-  const historyHost = h('div', { class: 'tab-stack' }, h('p', { class: 'row-sub' }, t('loading')));
+  const historyHost = h('div', { class: 'tab-stack recruit-analysis-report' }, h('p', { class: 'row-sub' }, t('loading')));
   let targetRequest = 0;
   let historyRequest = 0;
   async function loadTarget() {
@@ -331,20 +340,20 @@ export function renderRecruitGoals(ctx) {
     pageHead({ kicker: t('pc21_kicker'), title: t('recruit_analysis_entry'), tag: wpTag(t('fact')),
       sub: t('recruit_analysis_sub'),
       actions: [h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => { location.hash = '#/recruit'; } }, t('pc21_back_recruit'))] }),
-    h('div', { class: 'tab-stack' }, [
-      h('section', { class: 'card card-body tab-stack recruit-analysis-filter' }, [
+    h('div', { class: 'tab-stack recruit-analysis-page' }, [
+      h('section', { class: 'card card-body recruit-analysis-filter' }, [
         h('b', {}, t('recruit_analysis_period')),
-        h('div', { class: 'form-row', style: 'display:flex;gap:12px;align-items:end;flex-wrap:wrap' }, [
+        h('div', { class: 'recruit-analysis-filter-controls' }, [
           h('label', { class: 'sheet-field' }, [h('span', {}, t('pc21_start_month')), start]),
           h('label', { class: 'sheet-field' }, [h('span', {}, t('pc21_end_month')), end]), query,
         ]),
       ]),
       historyHost,
       h('section', { class: 'card card-body recruit-analysis-targets' }, [
-        h('h2', { class: 'section-title' }, t('recruit_analysis_target_section')),
-        h('p', { class: 'row-sub' }, t('recruit_analysis_target_note')),
-        h('div', { class: 'form-row', style: 'display:flex;gap:12px;align-items:end;flex-wrap:wrap' }, [
-          h('label', { class: 'sheet-field' }, [h('span', {}, t('pc21_goal_month')), targetMonth]),
+        h('div', { class: 'recruit-analysis-target-heading' }, [
+          h('div', {}, [h('h2', { class: 'section-title' }, t('recruit_analysis_target_section')),
+            h('p', { class: 'row-sub' }, t('recruit_analysis_target_note'))]),
+          h('label', { class: 'sheet-field recruit-analysis-target-month' }, [h('span', {}, t('pc21_goal_month')), targetMonth]),
         ]), targetHost,
       ]),
     ]),

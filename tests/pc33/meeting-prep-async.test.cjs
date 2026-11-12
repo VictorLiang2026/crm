@@ -82,7 +82,7 @@ test('meeting prep responds with a pending task before background generation fin
     return { ok: true, taskId: 81, brief30Seconds: 'Ready' };
   };
   const main = createMain(() => ({ uid: 'test-operator', isAnonymous: false }),
-    ...Array(12).fill(undefined), undefined, undefined, undefined, runner);
+    ...Array(9).fill(undefined), undefined, undefined, undefined, runner);
   const callbacks = [], context = {};
   assert.equal(main({ action: 'meetingPrep', personId: '783', asyncWait: true }, context,
     (error, result) => callbacks.push({ error, result,

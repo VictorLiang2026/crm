@@ -8,7 +8,7 @@ test('OCR timer requires the exact private trigger secret and routes only the in
   const original=process.env.KNOWLEDGE_OCR_TRIGGER_SECRET;
   process.env.KNOWLEDGE_OCR_TRIGGER_SECRET='fixture-only-secret-with-at-least-32-chars';
   let identityCalls=0,queueCalls=0,queueArgs=null;
-  const deps=Array(13).fill(undefined);
+  const deps=Array(10).fill(undefined);
   deps.push(async(...args)=>{queueCalls++;queueArgs=args;return {ok:true,processed:false};});
   const main=createMain(async()=>{identityCalls++;throw Error('unauthorized fixture');},...deps);
   const valid={Type:'Timer',TriggerName:'knowledgeOcrWorker',Message:process.env.KNOWLEDGE_OCR_TRIGGER_SECRET};
