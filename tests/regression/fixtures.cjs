@@ -333,6 +333,13 @@ function installFixtures() {
     'person_360:getContextGroups': () => ({ groups:{fact:[],signal:[],inference:[]},
       testData:{status:'verified',containsTestData:false,recordCount:0,sources:[]} }),
     'assistant:conversationPlaybookHistory': () => ({ ok:true, hasResult:false, rows:[] }),
+    'assistant:aiExperience': data => {
+      if (data.operation === 'list') return { ok:true, source:data.filters?.source || 'runtime',
+        tasks:[], results:[], decisions:[], outcomes:[], learnings:[], metrics:{numerator:0,denominator:0,pending:0},
+        pagination:{page:1,hasMore:false} };
+      if (data.operation === 'targets') return { ok:true, actions:[], opportunities:[], activities:[], recruitFollowups:[] };
+      return fail('UNEXPECTED_OR_WRITE_ACTION: assistant:aiExperience:' + data.operation);
+    },
     'person_360:getRelationshipDecay': () => mode === 'empty' ? ({
       status: 'insufficient_evidence', why: '缺少明确的关系强度、最近一次重要互动，暂不能判断关系是否衰减。',
       confidence: 0, recommended_action: '先核实并补录真实的关系和互动信息，不要仅因经过的天数打扰对方。',

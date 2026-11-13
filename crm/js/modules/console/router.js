@@ -14,6 +14,9 @@ import {
 
 import { renderFollowupList } from './business-report.js';
 import { renderActionCenter } from './action-center.js';
+import { renderAssistantActionCreate } from '../assistant-action-create.js';
+import { renderAssistantActionChange } from '../assistant-action-change.js';
+import { renderAssistantOpportunityChange } from '../assistant-opportunity-change.js';
 
 const EXACT = new Map([
   ['#/actions', renderActionCenter],
@@ -35,6 +38,10 @@ const EXACT = new Map([
   ['#/recruit', renderRecruit],
   ['#/recruit/goals', renderRecruitGoals],
   ['#/ai', renderAI],
+  ['#/ai/search', renderAI],
+  ['#/assistant/actions/new', ctx => renderAssistantActionCreate({root:ctx.main,callFn:ctx.callFn})],
+  ['#/assistant/actions/change', ctx => renderAssistantActionChange({root:ctx.main,callFn:ctx.callFn})],
+  ['#/assistant/opportunities/change', ctx => renderAssistantOpportunityChange({root:ctx.main,callFn:ctx.callFn})],
   ['#/ai/followup-tasks', renderFollowupAdviceTasks],
   ['#/ai/experience', ctx => renderAiExperience({ root:ctx.main, callFn:ctx.callFn })],
   ['#/more', renderMore],
@@ -95,6 +102,10 @@ const NAV_OF = {
   '#/recruit': '#/recruit',
   '#/recruit/goals': '#/recruit',
   '#/ai': '#/ai',
+  '#/ai/search': '#/ai',
+  '#/assistant/actions/new': '#/ai',
+  '#/assistant/actions/change': '#/ai',
+  '#/assistant/opportunities/change': '#/ai',
   '#/ai/experience': '#/ai',
   '#/more': '#/more',
   '#/analytics': '#/more',

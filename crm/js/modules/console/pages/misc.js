@@ -224,18 +224,26 @@ function renderAssistantTask(ctx, response, run) {
 }
 
 export function renderAI(ctx) {
-  const items = [
-    ['sparkle', t('ai_item_nl_command'), t('ai_item_nl_command_desc'), 'WP3', 'hot'],
-    ['users', t('ai_item_person_summary'), t('ai_item_person_summary_desc'), 'WP3', ''],
-    ['shield', t('ai_item_prep'), t('ai_item_prep_desc'), 'WP3', ''],
-    ['target', t('ai_item_opportunity'), t('ai_item_opportunity_desc'), t('ai_status_planning'), ''],
-    ['calendar', t('ai_item_review'), t('ai_item_review_desc'), 'WP3', ''],
+  const links = [
+    ['check', 'ai_home_action_create', 'ai_home_action_create_desc', '#/assistant/actions/new'],
+    ['edit', 'action_change_title', 'action_change_help', '#/assistant/actions/change'],
+    ['target', 'opp_change_title', 'opp_change_help', '#/assistant/opportunities/change'],
+    ['users', 'ai_home_people', 'ai_home_people_desc', '#/people'],
+    ['calendar', 'ai_home_activity', 'ai_home_activity_desc', '#/activities'],
+    ['bell', 'ai_home_today', 'ai_home_today_desc', '#/today'],
   ];
   ctx.main.replaceChildren(
     pageHead({
       kicker: t('kicker_ai'), title: t('title_ai'), tag: wpTag(t('wp3_tag')),
       sub: t('sub_ai'),
     }),
+    h('div', { class: 'ai-grid ai-assistant-links' }, links.map(([icon, titleKey, descKey, href]) =>
+      h('a', { class: 'card ai-card ai-card-link', href }, [
+        h('div', { class: 'ai-ic' }, ic(icon)),
+        h('b', {}, t(titleKey)),
+        h('p', {}, t(descKey)),
+        h('span', { class: 'ai-card-action' }, t('ai_home_open')),
+      ]))),
     card({
       title:t('assistant_task_title'),icon:'sparkle',tag:wpTag(t('ai_status_live')),
       body:[assistantTaskPanel(ctx)],
@@ -254,15 +262,6 @@ export function renderAI(ctx) {
       body:[h('p',{class:'foot-note'},t('ai_experience_hub')),
         h('a',{class:'btn btn-soft',href:'#/ai/experience'},t('ai_experience_title'))],
     }),
-    h('div', { style: 'height:16px' }),
-    h('div', { class: 'ai-grid' }, items.map(([icon, name, desc, status, hot]) =>
-      h('div', { class: 'card ai-card' }, [
-        h('div', { class: 'ai-ic' }, ic(icon)),
-        h('b', {}, name),
-        h('p', {}, desc),
-        h('div', { class: 'ai-foot' }, [h('span', { class: 'status-chip ' + (hot || 'plan') }, status)]),
-      ]))),
-    h('div', { style: 'height:16px' }),
     card({
       body: [h('p', { class: 'foot-note' }, t('ai_safety_note'))],
     }),

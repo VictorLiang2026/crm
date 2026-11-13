@@ -7,8 +7,7 @@ const longBrowserCases = new Set([
   'account.entry-refresh', 'console.settings.password-signout', 'assistant.action.create',
   'person360.opportunity-candidate-preview', 'person360.opportunity-create',
   'person360.opportunity-edit', 'person360.opportunity-preview-error',
-  'activity.relationship-review-preview', 'activity.review-human-decision',
-  'activity.review-opportunity-outcome', 'activity.important-interaction',
+  'activity.relationship-review-preview', 'activity.important-interaction',
   'activity.person-first-add',
   'recruit.list', 'recruit.customer-lookup', 'quickcapture.v2.confirm',
 ]);
@@ -91,13 +90,16 @@ module.exports = async function smoke(root, test, options = {}) {
       assert.equal(await b.evaluate("window.__crmTest.calls.some(c=>c.name==='opportunities' && c.action==='create')"), false);
     });
     await check('phase14.ai-more', '旧更多与 AI 历史地址转到 Console，其他旧功能路由仍可访问', async () => {
-      await open('#/ai', 'AI CRM 搜索');
+      await navigateAdmin('#/ai');
+      await b.wait("location.pathname.endsWith('/console.html') && location.hash === '#/ai' && document.querySelector('#console-main .ai-assistant-links')");
       await navigateAdmin('#/more');
       await b.wait("location.pathname.endsWith('/console.html') && location.hash === '#/more' && document.querySelector('.console-main .more-section')");
       assert.equal(await b.evaluate("document.querySelector('.phase14-tile') === null"), true);
       await navigateAdmin('#/ai-suggestions');
       await b.wait("location.pathname.endsWith('/console.html') && location.hash === '#/ai/experience' && document.querySelector('.crm-ai-exp-page')", 15000);
-      await open('#/more/followups', '[CRM_TEST_ONLY]客户甲');
+      await b.send('Page.navigate', {url:b.origin + '/admin.html?authCase=1&run=' + Date.now() + '#/more/followups'});
+      await b.wait("location.pathname.endsWith('/admin.html') && document.querySelector('#view')");
+      await b.wait(text('[CRM_TEST_ONLY]客户甲'));
       await b.click('#view button', '打开传统跟进');
       await b.wait(text('[CRM_TEST_ONLY]跟进内容'));
       assert.equal(await b.evaluate('location.hash'), '#/customer/910001');
@@ -160,30 +162,34 @@ module.exports = async function smoke(root, test, options = {}) {
       assert.equal(await b.evaluate("localStorage.getItem('crm_lang')"), 'en');
       assert.equal(await b.evaluate("localStorage.getItem('console-fixture-preserve')"), '1');
     });
-    await check('ai.search.entry', 'AI CRM 搜索独立页面展示固定示例，进入页面不执行搜索', async () => {
-      await open('#/ai/search', 'AI CRM 搜索');
-      await b.wait(text('最近三个月参加过活动'));
+    await check('ai.search.entry', 'AI 搜索旧入口转到 Console 首页且不会误执行搜索', async () => {
+      await b.evaluate("sessionStorage.removeItem('crm_fixture_signed_out')");
+      await navigateAdmin('#/ai/search');
+      await b.wait("location.pathname.endsWith('/console.html') && location.hash === '#/ai' && document.querySelector('#console-main .ai-assistant-links')");
       assert.equal(await b.evaluate("window.__crmTest.calls.some(c=>c.name==='assistant' && c.action!=='testSamples')"), false);
     });
     await check('assistant.action.create', 'Action 必须人工选人、预览、确认后才执行', async () => {
-      await open('#/assistant/actions/new', '新建行动');
+      await b.evaluate("sessionStorage.removeItem('crm_fixture_signed_out')");
+      await b.evaluate("localStorage.setItem('crm_lang','zh-CN')");
+      await b.openConsole('#/assistant/actions/new', 'authCase=1');
+      await b.wait("document.querySelector('.crm-action-create')?.innerText.includes('新建行动')");
       assert.equal(await b.evaluate("window.__crmTest.calls.some(c=>c.name==='assistant' && c.action==='command')"), false);
       await b.evaluate("document.querySelector('.crm-action-search input').value='[CRM_TEST_ONLY]家人乙'");
       await b.click('.crm-action-search button', '查找人物');
-      await b.wait(text('[CRM_TEST_ONLY]家人乙 · #980002'));
+      await b.wait("document.querySelector('.crm-action-choices')?.innerText.includes('[CRM_TEST_ONLY]家人乙 · #980002')");
       await b.click('.crm-action-choices button', '[CRM_TEST_ONLY]家人乙');
       await b.evaluate("document.querySelector('.crm-action-field input').value='[CRM_TEST_ONLY]联系'");
       await b.click('.crm-action-form button', '1. 规划');
       await b.wait(called('assistant', 'command'));
       assert.equal(await b.evaluate("window.__crmTest.calls.some(c=>c.name==='assistant' && c.stage==='execute')"), false);
       await b.click('.crm-action-progress button', '2. 查看预览');
-      await b.wait(text('标题：[CRM_TEST_ONLY]联系'));
+      await b.wait("document.querySelector('.crm-action-preview')?.innerText.includes('标题：[CRM_TEST_ONLY]联系')");
       assert.equal(await b.evaluate("window.__crmTest.calls.some(c=>c.name==='assistant' && c.stage==='execute')"), false);
       await b.click('.crm-action-progress button', '3. 确认预览');
-      await b.wait(text('已确认预览'));
+      await b.wait("document.querySelector('.crm-action-notice')?.innerText.includes('已确认预览')");
       assert.equal(await b.evaluate("window.__crmTest.calls.some(c=>c.name==='assistant' && c.stage==='execute')"), false);
       await b.click('.crm-action-progress button', '4. 执行创建');
-      await b.wait(text('行动已创建：#990777'));
+      await b.wait("document.querySelector('.crm-action-notice')?.innerText.includes('行动已创建：#990777')");
       assert.equal(await b.evaluate("window.__crmTest.calls.filter(c=>c.name==='assistant' && c.stage==='execute').length"), 1);
     });
     await check('customers.legacy-route', '旧客户列表只提示进入新版人物目录', async () => {
@@ -446,51 +452,14 @@ module.exports = async function smoke(root, test, options = {}) {
       await b.wait("!document.querySelector('#view .loading')");
       assert.equal(await b.evaluate("window.__crmTest.calls.find(c=>c.name==='activities' && c.action==='get').id"), 940001);
     });
-    await check('activity.relationship-review-preview', '关系复盘只生成有来源的行动候选，不触发业务写入', async () => {
+    await check('activity.relationship-review-preview', '旧活动详情移除重复关系复盘入口，Console 复盘流程继续可达', async () => {
       await open('#/activity/940001', '[CRM_TEST_ONLY]客户甲', 'mode=activity-ended');
-      await b.click('#view button', '关系复盘预览');
-      await b.wait(called('ai_activity', 'postReviewV2'));
-      await b.wait(text('[CRM_TEST_ONLY]核实需求'));
-      assert.equal(await b.evaluate("document.querySelectorAll('.activity-review-v2-candidate').length"), 2);
-      assert.equal(await b.evaluate("window.__crmTest.calls.some(c=>['createOpportunity','createInteraction','createManual','recordActivityInteraction'].includes(c.action))"), false);
-    });
-    await check('activity.review-human-decision', '活动复盘候选先预览再逐项确认，拒绝与结果记录不绕过人工', async () => {
-      await open('#/activity/940001', '[CRM_TEST_ONLY]客户甲', 'mode=activity-ended');
-      await b.click('#view button', '关系复盘预览');
-      await b.wait(text('Action Candidate'));
-      assert.equal(await b.evaluate("window.__crmTest.calls.some(c=>c.action==='previewActivityReview')"), false);
-      await b.click('#view .activity-review-v2-candidate button', '逐项审核');
-      await b.click('#view .activity-review-v2-candidate .activity-review-v2-editor button', '生成服务端预览');
-      await b.wait(called('person_360','previewActivityReview'));
-      assert.equal(await b.evaluate("window.__crmTest.calls.some(c=>c.action==='executeActivityReview')"), false);
-      await b.click('#view .activity-review-v2-candidate .activity-review-v2-editor button', '确认以上内容并执行');
-      await b.wait(text('行动 #990101 已保存'));
-      await b.evaluate("document.querySelectorAll('#view .activity-review-v2-candidate')[1].querySelector('button').click()");
-      await b.evaluate("[...document.querySelectorAll('#view .activity-review-v2-candidate')[1].querySelectorAll('.activity-review-v2-editor button')].find(x=>x.textContent.includes('拒绝候选预览')).click()");
-      await b.wait(text('服务端预览 · 请核对'));
-      await b.evaluate("document.querySelectorAll('#view .activity-review-v2-candidate')[1].querySelector('.activity-review-v2-preview button').click()");
-      await b.wait(text('候选已拒绝'));
-      const decisions = await b.evaluate("window.__crmTest.calls.filter(c=>c.action==='previewActivityReview').map(c=>c.data?.operation || c.payload?.operation)");
-      assert.ok(decisions.includes('action'));
-      assert.ok(decisions.includes('reject_opportunity'));
-      assert.equal(await b.evaluate("window.__crmTest.calls.filter(c=>c.action==='executeActivityReview').length"), 2);
-    });
-    await check('activity.review-opportunity-outcome', '活动机会候选与实际结果各自经过预览和人工执行', async () => {
-      await open('#/activity/940001', '[CRM_TEST_ONLY]客户甲', 'mode=activity-ended');
-      await b.click('#view button', '关系复盘预览');
-      await b.wait(text('Opportunity Candidate'));
-      await b.evaluate("document.querySelectorAll('#view .activity-review-v2-candidate')[1].querySelector('button').click()");
-      await b.evaluate("[...document.querySelectorAll('#view .activity-review-v2-candidate')[1].querySelectorAll('.activity-review-v2-editor button')].find(x=>x.textContent.includes('生成服务端预览')).click()");
-      await b.wait(text('服务端预览 · 请核对'));
-      await b.evaluate("document.querySelectorAll('#view .activity-review-v2-candidate')[1].querySelector('.activity-review-v2-preview button').click()");
-      await b.wait(text('机会候选 #990102 已保存'));
-      await b.evaluate("[...document.querySelectorAll('#view .activity-review-v2-section')].find(x=>x.querySelector('h4')?.textContent==='记录实际 Outcome').querySelector('button').click()");
-      await b.wait(text('来源：人工记录的活动事实'));
-      assert.equal(await b.evaluate("window.__crmTest.calls.filter(c=>c.action==='executeActivityReview').length"), 1);
-      await b.evaluate("[...document.querySelectorAll('#view .activity-review-v2-section')].find(x=>x.querySelector('h4')?.textContent==='记录实际 Outcome').querySelector('.activity-review-v2-preview button').click()");
-      await b.wait(text('活动结果 #990103 已保存'));
-      const decisions = await b.evaluate("window.__crmTest.calls.filter(c=>c.action==='previewActivityReview').map(c=>c.payload.operation)");
-      assert.deepEqual(decisions,['opportunity','outcome']);
+      assert.equal(await b.evaluate("[...document.querySelectorAll('#view button')].some(x=>x.textContent.includes('关系复盘预览'))"), false);
+      await b.evaluate("sessionStorage.removeItem('crm_fixture_signed_out')");
+      await b.openConsole('#/activity/940001', 'authCase=1');
+      await b.wait("[...document.querySelectorAll('#console-main .tabs button')].some(x=>x.textContent.includes('Review') || x.textContent.includes('复盘'))");
+      assert.equal(await b.evaluate("[...document.querySelectorAll('#console-main button')].some(x=>x.textContent.includes('复盘'))"), true);
+      assert.equal(await b.evaluate("window.__crmTest.calls.some(c=>c.name==='ai_activity' && c.action==='postReviewV2')"), false);
     });
     await check('activity.important-interaction', '重要互动必须填写结果与摘要并人工确认', async () => {
       await open('#/activity/940001', '[CRM_TEST_ONLY]客户甲');

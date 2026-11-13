@@ -1,12 +1,15 @@
 import { createApi } from '../core/api.js';
+import { t } from './console/i18n.js';
 
 const PAGE = '#/assistant/actions/new';
 const errors = {
-  INVALID_COMMAND: '填写的信息无效，请检查后重新规划。',
-  DUPLICATE_ACTION: '已有相同标题和截止时间的待办行动，请核对后再建。',
-  PREVIEW_STALE: '人物资料已变化，请重新规划并预览。',
-  CONFIRMATION_REQUIRED: '确认已失效，请重新预览。',
+  INVALID_COMMAND: 'assistant_create_invalid',
+  DUPLICATE_ACTION: 'assistant_create_duplicate',
+  PREVIEW_STALE: 'assistant_create_stale',
+  CONFIRMATION_REQUIRED: 'assistant_create_confirmation_expired',
 };
+const format = (key, values) => Object.entries(values).reduce((value, [name, text]) =>
+  value.replaceAll(`{${name}}`, String(text ?? '')), t(key));
 
 function el(tag, className, value) {
   const node = document.createElement(tag);
@@ -33,41 +36,41 @@ export function renderAssistantActionCreate({ root, callFn, scenario = false }) 
   addCss();
   const api = createApi(callFn);
   const page = el('section', 'crm-action-create');
-  const back = el('a', '', '← 返回首页'); back.href = '#/';
-  page.append(back, el('h2', '', '新建行动'),
-    el('p', 'crm-action-help', '选择已存在的人物，规划并核对预览。只有点击最后的“执行创建”才会写入行动。'));
+  const back = el('a', '', t('assistant_create_back')); back.href = '#/ai';
+  page.append(back, el('h2', '', t('assistant_create_title')),
+    el('p', 'crm-action-help', t('assistant_create_intro')));
   const notice = el('p', 'crm-action-notice'); notice.setAttribute('aria-live', 'polite');
   const searchForm = el('form', 'crm-action-search');
   const name = el('input'); name.required = true; name.maxLength = 100;
-  name.placeholder = '输入准确姓名或带括号的限定名';
-  name.setAttribute('aria-label', '查找人物');
-  const searchButton = el('button', 'btn', '查找人物'); searchButton.type = 'submit';
+  name.placeholder = t('assistant_create_name_placeholder');
+  name.setAttribute('aria-label', t('assistant_create_person_search'));
+  const searchButton = el('button', 'btn', t('assistant_create_find_person')); searchButton.type = 'submit';
   searchForm.append(name, searchButton);
   const choices = el('div', 'crm-action-choices');
-  const selected = el('p', 'crm-action-selected', '尚未选择人物');
+  const selected = el('p', 'crm-action-selected', t('assistant_create_no_person'));
   const form = el('form', 'crm-action-form');
   const type = el('select');
-  for (const [value, label] of [['followup','跟进'], ['call','电话'], ['meeting','会面'], ['other','其他']]) {
-    const option = el('option', '', label); option.value = value; type.append(option);
+  for (const [value, labelKey] of [['followup','test_action_type_followup'], ['call','test_action_type_call'], ['meeting','test_action_type_meeting'], ['other','test_action_type_other']]) {
+    const option = el('option', '', t(labelKey)); option.value = value; type.append(option);
   }
-  field(form, '行动类型', type);
+  field(form, t('assistant_create_action_type'), type);
   const title = el('input'); title.required = true; title.maxLength = 200;
-  field(form, '标题', title);
+  field(form, t('assistant_create_title_field'), title);
   const description = el('textarea'); description.maxLength = 4000;
-  field(form, '说明', description);
+  field(form, t('assistant_create_description'), description);
   const due = el('input'); due.type = 'datetime-local';
-  field(form, '截止时间（可选）', due);
+  field(form, t('assistant_create_due'), due);
   const priority = el('select');
-  for (const [value, label] of [['medium','普通'], ['low','低'], ['high','高'], ['urgent','紧急']]) {
-    const option = el('option', '', label); option.value = value; priority.append(option);
+  for (const [value, labelKey] of [['medium','priority_medium'], ['low','priority_low'], ['high','priority_high'], ['urgent','priority_urgent']]) {
+    const option = el('option', '', t(labelKey)); option.value = value; priority.append(option);
   }
-  field(form, '优先级', priority);
-  const planButton = el('button', 'btn btn-primary', '1. 规划'); planButton.type = 'submit';
+  field(form, t('assistant_create_priority'), priority);
+  const planButton = el('button', 'btn btn-primary', t('assistant_create_plan')); planButton.type = 'submit';
   form.append(planButton);
   const progress = el('div', 'crm-action-progress');
-  const previewButton = el('button', 'btn', '2. 查看预览'); previewButton.disabled = true;
-  const confirmButton = el('button', 'btn', '3. 确认预览'); confirmButton.disabled = true;
-  const executeButton = el('button', 'btn btn-primary', '4. 执行创建'); executeButton.disabled = true;
+  const previewButton = el('button', 'btn', t('assistant_create_preview')); previewButton.disabled = true;
+  const confirmButton = el('button', 'btn', t('assistant_create_confirm')); confirmButton.disabled = true;
+  const executeButton = el('button', 'btn btn-primary', t('assistant_create_execute')); executeButton.disabled = true;
   progress.append(previewButton, confirmButton, executeButton);
   const preview = el('section', 'crm-action-preview');
   page.append(notice, searchForm, choices, selected, form, progress, preview);
@@ -88,7 +91,7 @@ export function renderAssistantActionCreate({ root, callFn, scenario = false }) 
     preview.replaceChildren();
     previewButton.disabled = confirmButton.disabled = executeButton.disabled = true;
   }
-  function fail(error) { status(errors[error?.message] || '操作未完成，请核对后重试。', true); }
+  function fail(error) { status(t(errors[error?.message] || 'assistant_create_failed'), true); }
   async function request(stage, extra) {
     const response = await api.call('assistant', { action: 'command', stage, ...extra });
     if (!response?.ok) throw new Error(response?.error?.code || 'ACTION_COMMAND_FAILED');
@@ -109,33 +112,33 @@ export function renderAssistantActionCreate({ root, callFn, scenario = false }) 
   searchForm.addEventListener('submit', event => {
     event.preventDefault();
     run(searchButton, async () => {
-      person = null; resetPlan(); selected.textContent = '尚未选择人物';
-      choices.replaceChildren(); status('正在查找…');
+      person = null; resetPlan(); selected.textContent = t('assistant_create_no_person');
+      choices.replaceChildren(); status(t('assistant_create_searching'));
       const response = await api.call('person_360', { action: 'search', name: name.value.trim() });
       if (!active()) return;
       if (!Array.isArray(response?.candidates)) throw new Error('SEARCH_FAILED');
-      if (!response.candidates.length) { status('没有匹配的人物。请先在 Person 360 核实身份。'); return; }
+      if (!response.candidates.length) { status(t('assistant_create_no_matches')); return; }
       for (const candidate of response.candidates) {
         if (!/^[1-9][0-9]*$/.test(String(candidate.id))) continue;
         const choice = el('button', 'btn', `${candidate.display_name} · #${candidate.id}`);
         choice.type = 'button';
         choice.addEventListener('click', () => {
           person = candidate; resetPlan();
-          selected.textContent = `已选择：${candidate.display_name}（Person #${candidate.id}）`;
-          status('请填写行动，再点击规划。');
+          selected.textContent = format('test_action_selected', { name: candidate.display_name, id: candidate.id });
+          status(t('assistant_create_choose_action'));
         });
         choices.append(choice);
       }
-      if (response.hasMore) status('匹配较多，请增加括号限定后重新查找。', true);
-      else status('请选择正确的人物；系统不会按姓名自动决定。');
+      if (response.hasMore) status(t('assistant_create_refine_name'), true);
+      else status(t('assistant_create_choose_person'));
     });
   });
   for (const input of [type, title, description, due, priority]) {
-    input.addEventListener('input', () => { if (commandId) { resetPlan(); status('内容已变化，请重新规划。'); } });
+    input.addEventListener('input', () => { if (commandId) { resetPlan(); status(t('assistant_create_changed')); } });
   }
   form.addEventListener('submit', event => {
     event.preventDefault();
-    if (!person || busy) { status('请先人工选择人物。', true); return; }
+    if (!person || busy) { status(t('assistant_create_select_first'), true); return; }
     run(planButton, async () => {
       resetPlan();
       const changes = { action_type: type.value, title: title.value.trim(),
@@ -146,7 +149,7 @@ export function renderAssistantActionCreate({ root, callFn, scenario = false }) 
       if (!active()) return;
       commandId = result.commandId;
       previewButton.disabled = false;
-      status('已规划。请查看数据库核对后的预览。');
+      status(t('assistant_create_planned'));
     });
   });
   previewButton.addEventListener('click', () => run(previewButton, async () => {
@@ -155,20 +158,23 @@ export function renderAssistantActionCreate({ root, callFn, scenario = false }) 
     if (!active()) return;
     previewHash = result.previewHash;
     confirmButton.disabled = false; executeButton.disabled = true;
-    preview.replaceChildren(el('h3', '', '创建前预览'),
-      el('p', '', `人物：${result.preview.person.displayName}（#${result.preview.person.id}）`),
-      el('p', '', `标题：${result.preview.after.title}`),
-      el('p', '', `类型：${result.preview.after.action_type} · 优先级：${result.preview.after.priority}`),
-      el('p', '', `截止：${result.preview.after.due_at ? new Date(result.preview.after.due_at).toLocaleString() : '未设置'}`),
-      el('p', '', `说明：${result.preview.after.description || '未填写'}`));
-    status('请核对预览。确认仅记录同意，尚不创建行动。');
+    preview.replaceChildren(el('h3', '', t('assistant_create_before')),
+      el('p', '', format('test_action_preview_person', { name: result.preview.person.displayName, id: result.preview.person.id })),
+      el('p', '', format('test_action_preview_title_field', { title: result.preview.after.title })),
+      el('p', '', format('test_action_preview_type_field', {
+        type: t(`test_action_type_${result.preview.after.action_type}`),
+        priority: t(`priority_${result.preview.after.priority}`),
+      })),
+      el('p', '', format('test_action_preview_due', { due: result.preview.after.due_at ? new Date(result.preview.after.due_at).toLocaleString() : t('assistant_create_not_set') })),
+      el('p', '', format('test_action_preview_description', { description: result.preview.after.description || t('assistant_create_not_filled') })));
+    status(t('assistant_create_preview_review'));
   }));
   confirmButton.addEventListener('click', () => run(confirmButton, async () => {
     if (!commandId || !previewHash) return;
     await request('confirm', { resource: 'actions', commandId, previewHash });
     if (!active()) return;
     confirmButton.disabled = true; executeButton.disabled = false;
-    status('已确认预览。点击“执行创建”后才会写入行动。');
+    status(t('assistant_create_confirmed'));
   }));
   executeButton.addEventListener('click', () => run(executeButton, async () => {
     if (!commandId || !previewHash) return;
@@ -176,18 +182,18 @@ export function renderAssistantActionCreate({ root, callFn, scenario = false }) 
     if (!active()) return;
     executed = true;
     previewButton.disabled = confirmButton.disabled = executeButton.disabled = planButton.disabled = true;
-    status(`行动已创建：#${result.actionId}。可在今日经营查看。`);
+    status(format('test_action_created', { id: result.actionId }));
   }));
   if(scenario) {
     planButton.disabled=searchButton.disabled=true;
     void api.call('assistant',{action:'testSamples',stage:'status'}).then(result=>{
       if(!active())return;
       if(!result?.ok||!result.ready)throw Error('SEED_FORBIDDEN');
-      name.value='【系统测试·勿联系】虚构体验甲';
-      title.value='【系统测试·勿联系】下一步体验行动';
-      description.value='【系统测试·勿联系】仅在系统内验证正常确认流程，不联系、不外发。';
+      name.value=t('test_action_sample_name');
+      title.value=t('test_action_sample_title');
+      description.value=t('test_action_sample_description');
       type.value='other';planButton.disabled=searchButton.disabled=false;
-      status('已预填测试内容。请点击查找并确认人物，然后按原流程规划、预览、确认与执行。');
-    }).catch(()=>{if(active())status('请先用授权测试账号生成场景。',true);});
+      status(t('assistant_create_test_prefilled'));
+    }).catch(()=>{if(active())status(t('assistant_create_test_unavailable'),true);});
   }
 }

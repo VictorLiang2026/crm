@@ -249,7 +249,10 @@ export function renderAiExperience({ root, callFn }) {
       const task = taskFor(result) || {};
       const row = el('article', `crm-ai-exp-result${String(result.id) === selectedResultId ? ' is-selected' : ''}`);
       const pick = el('button', 'crm-ai-exp-result-pick', `${t('ai_experience_select')} #${result.id}`);
-      pick.type = 'button'; pick.addEventListener('click', () => { selectedResultId = String(result.id); resultRows(); detailView(); });
+      pick.type = 'button'; pick.addEventListener('click', () => {
+        selectedResultId = String(result.id);
+        resultRows(); detailView(); renderOutcome(); renderLearning();
+      });
       const checkLabel = el('label', 'crm-ai-exp-check');
       const check = document.createElement('input'); check.type = 'checkbox'; check.checked = learningSelection.has(String(result.id));
       check.addEventListener('change', () => {

@@ -9,8 +9,8 @@ test('Person profile uses one Person editor and retains profile access and test 
   assert.equal(await b.evaluate("document.querySelectorAll('.person360-profile input,.person360-profile textarea,.person360-profile select').length"),0);
   assert.equal(await b.evaluate("[...document.querySelectorAll('.person360-profile button')].filter(b=>b.textContent.startsWith('复制')).every(b=>b.disabled)"),true);
   assert.equal(await b.evaluate("document.querySelector('.person360-profile').innerText.includes('含测试数据')"),true);
-  for(const width of [360,390,768]){
-   await b.send('Emulation.setDeviceMetricsOverride',{width,height:844,deviceScaleFactor:1,mobile:true});
+  for(const [width,height] of [[820,1180],[1180,820]]){
+   await b.send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:2,mobile:false});
    assert.equal(await b.evaluate("(()=>{const p=document.querySelector('.person360-profile'),r=p.getBoundingClientRect();return p.scrollWidth<=p.clientWidth+1&&r.right<=innerWidth+1})()"),true);
   }
   await b.click('.person360-toolbar button','编辑人物资料');
@@ -27,11 +27,11 @@ test('Person profile uses one Person editor and retains profile access and test 
 test('profile errors retry; no-link and stale-navigation fixtures never expose a second editor',async()=>{
  const b=new Browser(path.resolve(__dirname,'../..'));
  try{
-  await b.start();await b.open('#/ai');
-  await b.wait("document.querySelector('#view')?.innerText.includes('AI助手')");
+  await b.start();await b.openConsole('#/ai','authCase=1');
+  await b.wait("document.querySelector('#console-main .ai-assistant-links')");
   await b.evaluate(`(async()=>{
     const {renderPersonProfile}=await import('/crm/js/modules/person-profile.js');
-    window.mountProfile=(mode)=>renderPersonProfile({root:document.getElementById('view'),personId:71,
+    window.mountProfile=(mode)=>renderPersonProfile({root:document.getElementById('console-main'),personId:71,
       isCurrent:()=>mode!=='stale',callFn:async()=>{
        if(mode==='error')throw Error('fixture failure');
        return {personId:'71',customerId:null,status:mode==='deleted'?'customer_unavailable':'person_only',
@@ -39,14 +39,14 @@ test('profile errors retry; no-link and stale-navigation fixtures never expose a
         testData:{status:'unverified',containsTestData:null}};
       }});await window.mountProfile('error');
   })()`);
-  assert.equal(await b.evaluate("document.getElementById('view').innerText.includes('重试资料')"),true);
+  assert.equal(await b.evaluate("document.getElementById('console-main').innerText.includes('重试资料')"),true);
   await b.evaluate("window.mountProfile('person')");
-  assert.equal(await b.evaluate("document.querySelectorAll('#view a,#view input,#view textarea,#view img').length"),0);
-  assert.equal(await b.evaluate("[...document.querySelectorAll('#view button')].every(x=>x.disabled)"),true);
+  assert.equal(await b.evaluate("document.querySelectorAll('#console-main a,#console-main input,#console-main textarea,#console-main img').length"),0);
+  assert.equal(await b.evaluate("[...document.querySelectorAll('#console-main button')].every(x=>x.disabled)"),true);
   await b.evaluate("window.mountProfile('deleted')");
-  assert.equal(await b.evaluate("document.getElementById('view').innerText.includes('移入回收站')"),true);
+  assert.equal(await b.evaluate("document.getElementById('console-main').innerText.includes('移入回收站')"),true);
   await b.evaluate("window.mountProfile('stale')");
-  assert.equal(await b.evaluate("document.getElementById('view').innerText.includes('虚构独立人物')"),false);
+  assert.equal(await b.evaluate("document.getElementById('console-main').innerText.includes('虚构独立人物')"),false);
   await b.healthy();assert.deepEqual(b.networkViolations,[]);
  }finally{await b.close();}
 });

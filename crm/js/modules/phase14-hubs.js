@@ -319,23 +319,6 @@ export function renderOpportunities({ root, callFn }) {
   void load(1);
 }
 
-export function renderAssistantHub({ root }) {
-  const wrap = page(root, 'AI助手', '从明确的任务进入；重要结果继续由人预览和确认。');
-  const grid = node('div', 'phase14-grid');
-  for (const [title, description, hash] of [
-    ['AI CRM 搜索', '描述要查找的人，由数据库筛选结果。', '#/ai/search'],
-    ['创建行动', '选择人物、预览、确认后创建。', '#/assistant/actions/new'],
-    [t('action_change_title'), t('action_change_help'), '#/assistant/actions/change'],
-    [t('opp_change_title'), t('opp_change_help'), '#/assistant/opportunities/change'],
-    ['晨间简报', '在今日经营页按需生成。', '#/today'],
-  ]) {
-    const card = link(title, hash, 'phase14-tile');
-    card.append(node('span', 'phase14-muted', description));
-    grid.append(card);
-  }
-  wrap.append(grid);
-}
-
 export function renderLegacyPicker({ root, callFn, feature, openLegacyTab }) {
   const target = LEGACY_TABS[feature];
   if (!target) throw new Error('未知的旧功能入口');

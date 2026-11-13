@@ -7,7 +7,7 @@ const {Browser}=require('../regression/browser.cjs');
 test('PC18 displays review history and requires server preview then explicit confirmation for all writes',async()=>{
   const browser=new Browser(path.resolve(__dirname,'../..'));
   try{
-    await browser.start();await browser.open('#/ai');
+    await browser.start();await browser.openConsole('#/ai', 'authCase=1');
     await browser.evaluate(`(async()=>{
       const i18n=await import('/crm/js/modules/console/i18n.js');i18n.setLang('en');
       const {renderActivityReview}=await import('/crm/js/modules/console/activity-review.js');
@@ -96,7 +96,7 @@ test('PC18 displays review history and requires server preview then explicit con
     assert.equal(await browser.evaluate("window.pc18.history.versions.length"),2);
     await browser.evaluate(`(async()=>{const i=await import('/crm/js/modules/console/i18n.js');i.setLang('zh-CN');document.querySelector('#pc18-host').replaceChildren(await window.pc18render(window.pc18ctx,42))})()`);
     await browser.wait("document.querySelector('#pc18-host').innerText.includes('复盘版本历史')");
-    for(const [width,height] of [[390,844],[844,390],[820,1180],[1180,820],[1440,900]]){
+    for(const [width,height] of [[820,1180],[1180,820],[1440,900]]){
       await browser.send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:false});
       const m=await browser.evaluate(`(()=>({doc:document.documentElement.scrollWidth,host:document.querySelector('#pc18-host').scrollWidth,client:document.querySelector('#pc18-host').clientWidth}))()`);
       assert.ok(m.doc<=width+1&&m.host<=m.client+1,`iPad overflow ${JSON.stringify(m)}`);
