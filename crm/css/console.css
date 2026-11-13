@@ -1237,6 +1237,9 @@ body:has(.login), body.is-login { padding-top: env(safe-area-inset-top); }
 .kg-content-summary-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
 .kg-content-original-wide { grid-column: 1 / -1; }
 .kc-panel .kg-form-actions { flex-wrap: wrap; gap: 8px; }
+@media (min-width: 768px) {
+  .kg-document-summary-editor { display: block; width: 100%; min-width: 0; box-sizing: border-box; min-height: 180px; resize: vertical; }
+}
 @media (min-width: 821px) {
   .kc-sheet-overlay { align-items: center; }
   .kc-sheet-overlay .sheet { width: min(1128px,calc(100vw - 48px)); max-width: calc(100vw - 48px); max-height: 90vh; padding: 18px 24px 24px; border-radius: 16px; }

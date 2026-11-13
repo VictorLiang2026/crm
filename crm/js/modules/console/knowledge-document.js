@@ -85,7 +85,7 @@ export function overviewRow(ctx,id){
     panel.append(h('h3',{},tr('gpt')),h('p',{},overview.needsReview?tr('stale'):(overview.gpt||tr('empty'))));
     const edit=async generate=>{
       const initial=generate?(await api(ctx,'documentDraft',{id,basis:overview.basis})).summary:overview.gpt;
-      const field=h('textarea',{rows:'6',maxlength:12000,'aria-label':tr('gpt')});field.value=initial||'';
+      const field=h('textarea',{class:'kg-document-summary-editor',rows:'6',maxlength:12000,'aria-label':tr('gpt')});field.value=initial||'';
       const editor=h('div',{},[field,button('saveGpt',async()=>draw(await api(ctx,'documentGpt',{id,basis:overview.basis,version:overview.gptVersion,summary:field.value})))]);
       panel.querySelector('textarea')?.parentElement.remove();panel.append(editor);field.focus();
     };
