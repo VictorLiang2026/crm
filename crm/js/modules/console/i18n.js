@@ -3720,6 +3720,7 @@ const DICT = {
   'kg_retry': { 'zh-CN': '重试提取', 'en': 'Retry Extraction' },
   'kg_retry_success': { 'zh-CN': '资料已重新提取并生效。', 'en': 'The source was re-extracted and activated.' },
   'kg_retry_failed': { 'zh-CN': '重新提取失败，请检查资料后重试。', 'en': 'Extraction failed. Check the source and try again.' },
+  'kg_ocr_auth_failed': { 'zh-CN': '原件已上传，后台 OCR 授权失败。请在服务修复后重新提取。', 'en': 'File uploaded. Background OCR authorization failed. Retry extraction after the service is fixed.' },
   'kg_stale_source_refresh': { 'zh-CN': '资料刚刚更新，列表已刷新。请确认当前状态后再删除。', 'en': 'This source changed. The list has been refreshed; review its current state before deleting.' },
   'kg_pdf_no_text': { 'zh-CN': 'PDF中没有可提取的文字，扫描件OCR也未能识别文字。请检查PDF清晰度后重试。', 'en': 'No text was extracted from this PDF, and OCR found no readable text. Check the scan quality and retry.' },
   'kg_pdf_file_limit': { 'zh-CN': 'PDF文件超过 30 MB 处理上限，请压缩或拆分后重新上传。', 'en': 'The PDF exceeds the 30 MB processing limit. Compress or split it, then upload again.' },

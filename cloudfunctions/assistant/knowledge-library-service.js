@@ -270,6 +270,9 @@ async function extractImageText(fileName,mime,bytes,{app:client,sourceId,uploadI
   if(!result||result.error||typeof result.ocrText!=='string')fail(result?.error||'OCR_FAILED');
   return boundedText(result.ocrText);
 }
+function ocrImages(pages) {
+  return pages.map(({fileName,contentType,base64})=>({fileName,contentType,base64}));
+}
 async function extractPdfImageText(bytes,{app:client,pdfPageRenderer,ocrPdfBatch}={}){
   const render=pdfPageRenderer||require('./knowledge-pdf-render').renderPdfPages;
   const callOcr=ocrPdfBatch|| (async images=>{
@@ -282,7 +285,7 @@ async function extractPdfImageText(bytes,{app:client,pdfPageRenderer,ocrPdfBatch
   });
   const pages=[];
   await render(bytes,{onBatch:async images=>{
-    const text=await callOcr(images);
+    const text=await callOcr(ocrImages(images));
     if(!text.trim())fail('OCR_FAILED');
     pages.push(text);
   }});
@@ -324,6 +327,8 @@ function metadataForSource(row) {
     versionNo:row.version_no,createdAt:row.created_at,updatedAt:row.updated_at,deletedAt:row.deleted_at||null,
     updated_at:row.updated_at,deleted_at:row.deleted_at||null,
     categories:Array.isArray(row.metadata?.categories)?row.metadata.categories:[],
+    ocrAuthorizationFailed:row.extraction_status==='failed'&&row.metadata?.ocr_job?.stage==='ocr'&&
+      ['DEVICE_ACCESS_DENIED','OCR_AUTH_DENIED'].includes(row.metadata.ocr_job.last_error),
     ocrProgress:row.metadata?.ocr_job?{stage:row.metadata.ocr_job.stage,completedPages:Math.max(0,Number(row.metadata.ocr_job.next_page||1)-1),totalPages:Number(row.metadata.ocr_job.page_count)||null}:null};
 }
 
@@ -628,8 +633,16 @@ function createKnowledgeLibrary(options={}) {
       });
       if(!Number.isSafeInteger(rendered.pageCount)||rendered.pageCount<1||rendered.pageCount>MAX_PDF_PAGES)fail('PDF_PAGE_LIMIT');
       if(job.page_count&&job.page_count!==rendered.pageCount)fail('INVALID_CONTENT');
-      const response=options.ocrPdfBatch?{result:{ocrText:await options.ocrPdfBatch(images)}}:
-        await callFunction({name:'ai_parse',data:{action:'ocr_knowledge_source',images}});
+      const pictures=ocrImages(images);
+      let response;
+      try {
+        response=options.ocrPdfBatch?{result:{ocrText:await options.ocrPdfBatch(pictures)}}:
+          await callFunction({name:'ai_parse',data:{action:'ocr_knowledge_source',images:pictures}});
+      } catch(error) {
+        if(error?.code==='DEVICE_ACCESS_DENIED')fail('OCR_AUTH_DENIED');
+        throw error;
+      }
+      if(response?.result?.error==='DEVICE_ACCESS_DENIED')fail('OCR_AUTH_DENIED');
       const result=response?.result;
       if(!result||result.error||typeof result.ocrText!=='string'||!result.ocrText.trim())fail(result?.error||'OCR_FAILED');
       job.text=boundedPdfText(String(job.text||'')+(job.text?'\n\n':'')+boundedPdfText(result.ocrText));
@@ -651,7 +664,7 @@ function createKnowledgeLibrary(options={}) {
         completedPages:Math.min(job.page_count,job.next_page-1),totalPages:job.page_count};
     } catch(error) {
       const errorCode=String(error?.code||'OCR_FAILED').slice(0,64),retryable=OCR_TRANSIENT_ERRORS.has(errorCode);
-      const attempts=Number(job.attempts||0)+1,maxAttempts=retryable?OCR_TRANSIENT_MAX_ATTEMPTS:5,keep=attempts<maxAttempts;
+      const attempts=Number(job.attempts||0)+1,maxAttempts=errorCode==='OCR_AUTH_DENIED'?1:(retryable?OCR_TRANSIENT_MAX_ATTEMPTS:5),keep=attempts<maxAttempts;
       const delayMs=retryable?Math.min(OCR_MAX_BACKOFF_MS,60_000*2**Math.min(attempts-1,4)):0;
       const batchPages=Math.max(1,Math.min(OCR_MAX_BATCH_PAGES,Number(job.batch_pages)||OCR_MAX_BATCH_PAGES));
       const failedJob={...job,attempts,lease_until:null,

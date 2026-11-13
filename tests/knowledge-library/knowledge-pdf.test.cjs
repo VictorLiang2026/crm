@@ -164,6 +164,64 @@ test('PDF renderer can resume after the former 40-page boundary',async()=>{
   assert.deepEqual(result,{pageCount:41,nextPage:42});assert.equal(received,1);
 },{timeout:20000});
 
+test('authenticated OCR timer renders a scanned PDF and creates one unverified draft through the protected route',async t=>{
+  const assistant=require('../../cloudfunctions/assistant/device-runtime');
+  const person=require('../../cloudfunctions/person_360/device-runtime');
+  const {unwrap}=require('../../cloudfunctions/ai_parse/device-internal-delegation');
+  const secret='local-fixture-only-secret-at-least-32-characters';
+  const env={TCB_ENV:'crm-test123',KNOWLEDGE_OCR_TRIGGER_SECRET:secret,CRM_ASSISTANT_DB_API_KEY:secret,CRM_PERSON360_DB_API_KEY:secret};
+  for(const [key,value] of Object.entries(env)){
+    const old=process.env[key];process.env[key]=value;
+    t.after(()=>{if(old===undefined)delete process.env[key];else process.env[key]=old;});
+  }
+  const delegation=new Map();
+  t.mock.method(global,'fetch',async(_url,{body})=>{
+    const {p_op,p_args}=JSON.parse(body);
+    if(p_op==='issue'){
+      const token=require('node:crypto').randomUUID();delegation.set(token,p_args);
+      return Response.json({token});
+    }
+    const ticket=delegation.get(p_args.token);delegation.delete(p_args.token);
+    if(!ticket||ticket.payload_hash!==p_args.payload_hash||ticket.audience!==p_args.audience)return Response.json({},{status:403});
+    return Response.json({origin:ticket.origin,actor:ticket.actor});
+  });
+  const source={id:77,domain:'legal_tax',title:'fixture',created_by:'fixture-user',updated_at:new Date().toISOString(),
+    file_name:'fixture.pdf',content_type:'application/pdf',original_base64:scannedPdf().toString('base64'),extraction_status:'extracting',
+    metadata:{categories:['legal_tax'],ocr_job:{stage:'ocr',attempts:0,next_page:1}}};
+  const meta={requestId:'transport-only',userInfo:{uid:'untrusted'}},drafts=[];let rejectReceipt=true;
+  const verify=person.protect('person_360',async()=>{throw Error('unexpected operation')},()=>({}));
+  const app={callFunction:async({name,data})=>{
+    assert.equal(name,'ai_parse');
+    const aiApp={callFunction:async req=>({result:await verify({...req.data,...meta})})};
+    if(rejectReceipt)data.knowledgeOcrDelegation.token=require('node:crypto').randomUUID();
+    try{
+      const {event,context}=await unwrap(aiApp,{...data,...meta},{},'ai_parse');
+      assert.equal(context.__crmInternalDelegation.origin,'worker');
+      assert.deepEqual(Object.keys(event.images[0]).sort(),['base64','contentType','fileName']);
+      return {result:{ocrText:'OCR fixture'}};
+    }catch(error){if(error.message!=='DEVICE_ACCESS_DENIED')throw error;return {result:{error:error.message}};}
+  }};
+  const service=createKnowledgeLibrary({client:assistant.scopedApp(app),env:'crm-test123',key:secret,
+    gatewayFactory:()=>({runAITask:async()=>({result:{summary:'Fixture',keyPoints:[],applicationNotes:[],boundaries:[]},taskId:1,resultId:2})}),
+    fetchImpl:async(url,{method,body})=>{
+      if(String(url).includes('/rpc/'))return restResponse(200,{ok:true,job:null});
+      if(method==='GET')return restResponse(200,source.extraction_status==='extracting'?[source]:[]);
+      const values=JSON.parse(body);
+      if(method==='POST'){drafts.push(values[0]);return restResponse(200,[{id:91}]);}
+      Object.assign(source,values);return restResponse(200,[source]);
+    }});
+  const worker=assistant.protect('assistant',()=>service.processOcrQueue(),()=>app);
+  const trigger={Type:'Timer',TriggerName:'knowledgeOcrWorker',Message:secret};
+  const failed=await worker(trigger);
+  assert.equal(failed.errorCode,'OCR_AUTH_DENIED');assert.equal(failed.retrying,false);
+  assert.equal(source.metadata.ocr_job.next_page,1);assert.equal(source.metadata.ocr_job.attempts,1);
+  rejectReceipt=false;source.extraction_status='extracting';
+  assert.equal((await worker(trigger)).stage,'summarize');
+  assert.equal((await worker(trigger)).stage,'complete');
+  assert.equal((await worker(trigger)).processed,false);assert.equal(drafts.length,1);
+  assert.equal(drafts[0].verified,false);assert.equal(drafts[0].lifecycle_status,'draft');
+});
+
 test('scanned PDF retries route rendered pages through the OCR batch contract',async()=>{
   const batches=[];
   const text=await extractText('scan.pdf','application/pdf',scannedPdf(),{ocrPdfBatch:async images=>{

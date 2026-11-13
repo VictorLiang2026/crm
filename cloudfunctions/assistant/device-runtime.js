@@ -47,7 +47,10 @@ async function internalCall(app,request){
    token=(await delegate(app,'issue',args))?.token;
  }
  if(typeof token!=='string'||!/^[a-f0-9-]{36}$/.test(token))throw deny();
- return app.callFunction({...request,data:{__crmDelegation:{token,payload}}});
+ const ticket={token,payload};
+ if(s.origin==='worker'&&request.name==='ai_parse'&&payload.action==='ocr_knowledge_source')
+   return app.callFunction({...request,data:{knowledgeOcrDelegation:ticket}});
+ return app.callFunction({...request,data:{__crmDelegation:ticket}});
 }
 function scopedApp(app){return new Proxy(app,{get(target,k){if(k==='callFunction')return req=>internalCall(target,req);const v=Reflect.get(target,k,target);return typeof v==='function'?v.bind(target):v;}});}
 function callerIdentity(app){const s=scope.getStore();return s?{uid:s.actor,isAnonymous:false}:app.auth().getUserInfo();}

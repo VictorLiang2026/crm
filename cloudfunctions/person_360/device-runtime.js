@@ -172,6 +172,15 @@ async function dispatch(name,main,event,ctx,callback,app){
    return issueInternalDelegation(app,event);
  }
  if(name==='person_360'&&event?.action==='consumeInternalDelegation'){
+   if(Object.hasOwn(event,'knowledgeOcrReceipt')){
+     const receipt=event.knowledgeOcrReceipt;
+     if(!exactKeys(receipt,['audience','token','payload'])||receipt.audience!=='ai_parse'||
+       receipt.payload?.action!=='ocr_knowledge_source'||
+       ['__deviceRequest','__crmDelegation','__crmInternalDelegation','audience','token','payload'].some(k=>Object.hasOwn(event,k)))throw deny();
+     const verified=await consumeInternalDelegation(app,{action:event.action,...receipt});
+     if(verified.origin!=='worker')throw deny();
+     return verified;
+   }
    return consumeInternalDelegation(app,event);
  }
  if(name==='person_360'&&event?.__crmDelegation&&!event?.__deviceRequest){

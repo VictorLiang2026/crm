@@ -18,7 +18,7 @@ const categoriesOf = row => Array.isArray(row.metadata?.categories) && row.metad
 const active = row => (row.lifecycle_status || (row.verified ? 'verified' : 'draft')) === 'verified';
 const titleOf = row => row.table === 'playbooks' ? `${row.scenario || ''}${row.objection ? ` · ${row.objection}` : ''}`
   : row.table === 'knowledge_sources' ? row.title || row.fileName || '' : row.source || '';
-const summaryOf = row => row.contentManaged ? row.metadata?.summary || '' : row.table === 'playbooks' ? row.metadata?.summary || row.response_logic || ''
+const summaryOf = row => row.ocrAuthorizationFailed ? text('ocr_auth_failed') : row.contentManaged ? row.metadata?.summary || '' : row.table === 'playbooks' ? row.metadata?.summary || row.response_logic || ''
   : row.table === 'knowledge_sources' ? (row.extractionStatus==='failed' ? text('retry_failed') : row.ocrProgress ? (row.ocrProgress.stage==='summarize' ? text('ocr_summarizing') : text('ocr_progress').replace('{done}',String(row.ocrProgress.completedPages)).replace('{total}',row.ocrProgress.totalPages?String(row.ocrProgress.totalPages):'…')) : text('source_pending_summary')) : row.metadata?.summary || String(row.content || '').slice(0,220);
 const errorCodeOf = error => String(error?.message||'').match(/^([A-Z][A-Z0-9_]+)(?::|$)/)?.[1]||'';
 const retryErrorText = error => errorCodeOf(error)==='PDF_NO_TEXT'?text('pdf_no_text')
