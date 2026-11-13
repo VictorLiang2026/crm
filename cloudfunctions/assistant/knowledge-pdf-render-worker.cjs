@@ -7,8 +7,8 @@ const respond=value=>{if(process.connected)process.send(value,()=>{});};
 process.once('message',message=>(async()=>{
   const bytes=Buffer.from(message?.bytes||[]);
   if(!bytes.subarray(0,5).equals(Buffer.from('%PDF-')))throw Error('INVALID_CONTENT');
-  globalThis.DOMMatrix=require('@thednp/dommatrix');
-  const {createCanvas}=require('@napi-rs/canvas');
+  const {createCanvas,DOMMatrix,Path2D,ImageData}=require('@napi-rs/canvas');
+  Object.assign(globalThis,{DOMMatrix,Path2D,ImageData});
   const {getDocument}=await import('pdfjs-dist/legacy/build/pdf.mjs');
   const path=require('node:path'),assets=path.dirname(require.resolve('pdfjs-dist/package.json'));
   const loading=getDocument({data:new Uint8Array(bytes),verbosity:0,isEvalSupported:false,useSystemFonts:false,useWasm:false,

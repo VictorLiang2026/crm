@@ -95,18 +95,20 @@ function simplePdf(pageCount=1){
   return Buffer.from(body,'ascii');
 }
 
-function scannedPdf(){
+function scannedPdf(gradient=false){
   const {createCanvas}=require('../../cloudfunctions/assistant/node_modules/@napi-rs/canvas');
   const canvas=createCanvas(600,800),context=canvas.getContext('2d');context.fillStyle='#fff';context.fillRect(0,0,600,800);
   context.fillStyle='#000';context.font='38px sans-serif';context.fillText('OCR SCAN FIXTURE',45,110);
-  const image=canvas.toBuffer('image/jpeg',80),stream='q 612 0 0 792 0 0 cm /Im1 Do Q';
+  const image=canvas.toBuffer('image/jpeg',80);
+  const stream='q 612 0 0 792 0 0 cm /Im1 Do Q'+(gradient?' /Pattern cs /P1 scn 10 10 200 100 re f':'');
   const objects=[
     '<< /Type /Catalog /Pages 2 0 R >>',
     '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
-    `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /XObject << /Im1 4 0 R >> >> /Contents 5 0 R >>`,
+    `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /XObject << /Im1 4 0 R >> ${gradient?'/Pattern << /P1 6 0 R >>':''} >> /Contents 5 0 R >>`,
     `<< /Type /XObject /Subtype /Image /Width 600 /Height 800 /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${image.length} >>\nstream\n${image.toString('binary')}\nendstream`,
     `<< /Length ${Buffer.byteLength(stream)} >>\nstream\n${stream}\nendstream`,
   ];
+  if(gradient)objects.push('<< /Type /Pattern /PatternType 2 /Matrix [1 0 0 1 2 2] /Shading << /ShadingType 2 /ColorSpace /DeviceRGB /Coords [0 0 100 100] /Extend [true true] /Function << /FunctionType 2 /Domain [0 1] /C0 [0 0 0] /C1 [1 1 1] /N 1 >> >> >>');
   let body='%PDF-1.4\n';const offsets=[0];
   objects.forEach((value,index)=>{offsets.push(Buffer.byteLength(body,'binary'));body+=`${index+1} 0 obj\n${value}\nendobj\n`;});
   const xrefOffset=Buffer.byteLength(body,'binary');body+=`xref\n0 ${objects.length+1}\n0000000000 65535 f \n`;
@@ -114,6 +116,15 @@ function scannedPdf(){
   body+=`trailer\n<< /Size ${objects.length+1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF\n`;
   return Buffer.from(body,'binary');
 }
+
+test('scan pages with an axial gradient render before OCR',async()=>{
+  const {renderPdfPages}=require('../../cloudfunctions/assistant/knowledge-pdf-render');
+  const images=[];
+  const result=await renderPdfPages(scannedPdf(true),{onBatch:async batch=>images.push(...batch)});
+  assert.equal(result.pageCount,1);
+  assert.equal(images.length,1);
+  assert.equal(images[0].contentType,'image/jpeg');
+});
 
 test('bounded local PDF worker extracts a 30 MB, 150-page text PDF',async()=>{
   const small=simplePdf(150),size=MAX_BYTES;
