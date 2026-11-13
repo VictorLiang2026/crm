@@ -173,6 +173,8 @@ test('People directory uses 30-row pages on phone and iPad with an unlocked cont
     assert.equal(await b.evaluate("document.documentElement.classList.contains('crm-iphone-layout')"), false,
       'the generic phone fixture must not activate iPhone-only table sizing');
     assert.equal(await b.evaluate("document.querySelector('.people-directory-table').dataset.iphoneView"), undefined);
+    assert.equal(await b.evaluate("document.querySelectorAll('.people-directory-views > .people-directory-view').length"), 6,
+      'generic phone keeps all directory views in the original view row');
     assert.equal(await b.evaluate("getComputedStyle(document.querySelector('.people-directory-table tbody td.people-col-name a')).fontWeight"), '400',
       'iPhone name weight matches the standard directory typography');
     const mobile = await b.evaluate(`(async()=>{
@@ -206,6 +208,8 @@ test('People directory uses 30-row pages on phone and iPad with an unlocked cont
     assert.equal(await b.evaluate("document.documentElement.classList.contains('crm-iphone-layout')"), false,
       'iPad must not activate iPhone-only table sizing');
     assert.equal(await b.evaluate("document.querySelector('.people-directory-table').dataset.iphoneView"), undefined);
+    assert.equal(await b.evaluate("document.querySelectorAll('.people-directory-views > .people-directory-view').length"), 6,
+      'iPad keeps all directory views in the original view row');
     assert.equal(await b.evaluate("getComputedStyle(document.querySelector('.people-directory-table tbody td.people-col-name a')).fontWeight"), '400',
       'iPad name weight matches the standard directory typography');
     assert.equal(await b.evaluate("getComputedStyle(document.querySelector('.people-date-full')).display"), 'inline');
@@ -220,6 +224,8 @@ test('People directory uses 30-row pages on phone and iPad with an unlocked cont
     assert.equal(await b.evaluate("document.documentElement.classList.contains('crm-iphone-layout')"), false,
       'desktop must not activate iPhone-only table sizing');
     assert.equal(await b.evaluate("document.querySelector('.people-directory-table').dataset.iphoneView"), undefined);
+    assert.equal(await b.evaluate("document.querySelectorAll('.people-directory-views > .people-directory-view').length"), 6,
+      'desktop keeps all directory views in the original view row');
     assert.equal(await b.evaluate("getComputedStyle(document.querySelector('.people-directory-table tbody td.people-col-name a')).fontWeight"), '400',
       'desktop name weight matches the standard directory typography');
   } finally { await b.close(); }
@@ -234,6 +240,7 @@ test('iPhone People toolbar keeps import, trash and new-person actions on one ro
     });
     await b.send('Emulation.setDeviceMetricsOverride', { width: 320, height: 844, deviceScaleFactor: 3, mobile: true });
     await b.openConsole('#/ai');
+    await b.wait("document.documentElement.classList.contains('crm-iphone-layout')");
     await b.evaluate(`(async()=>{
       const {renderPeople}=await import('/crm/js/modules/console/pages/people.js');
       const main=document.createElement('main');document.body.append(main);
@@ -241,20 +248,25 @@ test('iPhone People toolbar keeps import, trash and new-person actions on one ro
     })()`);
     await b.wait("document.querySelector('.people-directory-toolbar')");
     await b.evaluate("document.head.insertAdjacentHTML('beforeend','<link rel=stylesheet href=/crm/css/console.css>')");
-    await b.wait("!!document.querySelector('link[href=\"/crm/css/console.css\"]')?.sheet && getComputedStyle(document.querySelector('.people-directory-toolbar')).gridTemplateColumns.split(' ').length===3");
+    await b.wait("!!document.querySelector('link[href=\"/crm/css/console.css\"]')?.sheet && getComputedStyle(document.querySelector('.people-directory-toolbar')).gridTemplateColumns.split(' ').length===4");
     const layout = await b.evaluate(`(()=>{
       const toolbar=document.querySelector('.people-directory-toolbar').getBoundingClientRect();
-      const buttons=[...document.querySelectorAll('.people-directory-toolbar > .people-import-link, .people-directory-toolbar > .people-trash-link, .people-directory-toolbar > .people-new-button')];
+      const buttons=[...document.querySelectorAll('.people-directory-toolbar > .people-directory-view, .people-directory-toolbar > .people-import-link, .people-directory-toolbar > .people-trash-link, .people-directory-toolbar > .people-new-button')];
+      const views=[...document.querySelectorAll('.people-directory-views > .people-directory-view')];
       return {iphone:document.documentElement.classList.contains('crm-iphone-layout'),toolbarRight:toolbar.right,
         buttons:buttons.map(button=>{const rect=button.getBoundingClientRect();return {text:button.innerText.trim(),top:rect.top,left:rect.left,right:rect.right,
-          width:rect.width,scrollWidth:button.scrollWidth,clientWidth:button.clientWidth};})};
+          width:rect.width,scrollWidth:button.scrollWidth,clientWidth:button.clientWidth};}),
+        views:views.map(button=>{const rect=button.getBoundingClientRect();return {text:button.innerText.trim(),top:rect.top,left:rect.left,right:rect.right};})};
     })()`);
     assert.equal(layout.iphone, true, 'the iPhone UA activates the iPhone layout');
-    assert.deepEqual(layout.buttons.map(button=>button.text), ['从资料导入人物','回收站','新建人物']);
-    assert.ok(layout.buttons.every(button=>Math.abs(button.top-layout.buttons[0].top)<1), 'all three actions share one row');
-    assert.ok(layout.buttons[0].left<layout.buttons[1].left && layout.buttons[1].left<layout.buttons[2].left, 'actions stay in requested order');
+    assert.deepEqual(layout.buttons.map(button=>button.text.replace(/\s+/g,'')), ['全部','导入人物','回收站','新建人物']);
+    assert.ok(layout.buttons.every(button=>Math.abs(button.top-layout.buttons[0].top)<1), 'all four actions share one row');
+    assert.ok(layout.buttons.every((button,index)=>index===0 || layout.buttons[index-1].left<button.left), 'actions stay in requested order');
     assert.ok(layout.buttons.every(button=>button.right<=layout.toolbarRight+1), 'no action extends beyond the toolbar');
-    assert.ok(layout.buttons.every(button=>button.scrollWidth<=button.clientWidth+1), 'all three labels fit without clipping');
+    assert.ok(layout.buttons.every(button=>button.scrollWidth<=button.clientWidth+1), 'all four labels fit without clipping');
+    assert.deepEqual(layout.views.map(button=>button.text.replace(/\s+/g,'')), ['客户','增员','推荐人','嘉宾','互动参与者']);
+    assert.ok(layout.views.every(button=>Math.abs(button.top-layout.views[0].top)<1), 'the five view buttons share one row');
+    assert.ok(layout.views.every((button,index)=>index===0 || layout.views[index-1].left<button.left), 'view buttons retain directory order');
     await b.healthy();
   } finally { await b.close(); }
 });
@@ -268,7 +280,7 @@ test('iPhone 15 people table keeps the toolbar width across pages and truncates 
       userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1',
     });
     await b.openConsole('#/ai');
-    await b.evaluate("document.documentElement.classList.add('crm-iphone-layout')");
+    await b.wait("document.documentElement.classList.contains('crm-iphone-layout')");
     await b.evaluate(`(async()=>{
       const {renderPeople}=await import('/crm/js/modules/console/pages/people.js');
       const all=Array.from({length:31},(_,i)=>({id:100+i,
@@ -290,15 +302,22 @@ test('iPhone 15 people table keeps the toolbar width across pages and truncates 
       const toolbar=document.querySelector('.people-directory-toolbar').getBoundingClientRect();
       const card=document.querySelector('section.card').getBoundingClientRect();
       const scroll=document.querySelector('.people-directory-scroll');
+      const scrollRect=scroll.getBoundingClientRect();
       const table=document.querySelector('.people-directory-table');
+      const tableRect=table.getBoundingClientRect();
       const name=table.querySelector('tbody td.people-col-name a');
       return {iphone:document.documentElement.classList.contains('crm-iphone-layout'),userAgent:navigator.userAgent,view:table.dataset.iphoneView,
-        tableLayout:getComputedStyle(table).tableLayout,toolbarWidth:toolbar.width,cardWidth:card.width,tableWidth:table.getBoundingClientRect().width,
+        tableLayout:getComputedStyle(table).tableLayout,toolbarLeft:toolbar.left,toolbarRight:toolbar.right,toolbarWidth:toolbar.width,
+        cardLeft:card.left,cardRight:card.right,cardWidth:card.width,scrollLeft:scrollRect.left,scrollRight:scrollRect.right,
+        tableLeft:tableRect.left,tableRight:tableRect.right,tableWidth:tableRect.width,
         scrollWidth:scroll.scrollWidth,scrollClientWidth:scroll.clientWidth,pageWidth:document.documentElement.scrollWidth,
         viewportWidth:document.documentElement.clientWidth,nameWidth:name.clientWidth,nameScrollWidth:name.scrollWidth,
         nameOverflow:getComputedStyle(name).textOverflow,nameWhiteSpace:getComputedStyle(name).whiteSpace};
     })()`);
     assert.ok(Math.abs(first.cardWidth-first.toolbarWidth)<=1, `list card must align with toolbar: ${JSON.stringify(first)}`);
+    assert.ok(Math.abs(first.tableWidth-first.toolbarWidth)<=1, `table width must equal toolbar width: ${JSON.stringify(first)}`);
+    assert.ok(Math.abs(first.tableLeft-first.toolbarLeft)<=1 && Math.abs(first.tableRight-first.toolbarRight)<=1,
+      `table edges must align with toolbar edges: ${JSON.stringify(first)}`);
     assert.ok(Math.abs(first.tableWidth-first.scrollClientWidth)<=1, `table must fill its fixed container: ${JSON.stringify(first)}`);
     assert.ok(first.scrollWidth<=first.scrollClientWidth+1, `iPhone list must not scroll beyond its container: ${JSON.stringify(first)}`);
     assert.ok(first.pageWidth<=first.viewportWidth+1, `long name must not widen the page: ${JSON.stringify(first)}`);
@@ -316,14 +335,17 @@ test('iPhone 15 people table keeps the toolbar width across pages and truncates 
     }))()`);
     assert.ok(Math.abs(second.tableWidth-first.tableWidth)<=1, `table width must remain stable on page two: ${JSON.stringify({first,second})}`);
     assert.ok(Math.abs(second.toolbarWidth-second.cardWidth)<=1);
+    assert.ok(Math.abs(second.tableWidth-second.toolbarWidth)<=1);
     assert.ok(Math.abs(second.tableWidth-second.scrollClientWidth)<=1);
     for (const view of ['customer','participant']) {
       await b.evaluate(`document.querySelector('[data-directory-view="${view}"]').click()`);
       await b.wait(`document.querySelector('.people-directory-table')?.dataset.iphoneView==='${view}'`);
       const metrics=await b.evaluate(`(()=>{const scroll=document.querySelector('.people-directory-scroll'),table=document.querySelector('.people-directory-table');return {
-        view:table.dataset.iphoneView,tableWidth:table.getBoundingClientRect().width,clientWidth:scroll.clientWidth,
+        view:table.dataset.iphoneView,tableWidth:table.getBoundingClientRect().width,
+        toolbarWidth:document.querySelector('.people-directory-toolbar').getBoundingClientRect().width,clientWidth:scroll.clientWidth,
         scrollWidth:scroll.scrollWidth,pageWidth:document.documentElement.scrollWidth,viewportWidth:document.documentElement.clientWidth
       }})()`);
+      assert.ok(Math.abs(metrics.tableWidth-metrics.toolbarWidth)<=1, `${view} view must keep toolbar width: ${JSON.stringify(metrics)}`);
       assert.ok(Math.abs(metrics.tableWidth-metrics.clientWidth)<=1, `${view} view must fill the same fixed width: ${JSON.stringify(metrics)}`);
       assert.ok(metrics.scrollWidth<=metrics.clientWidth+1, `${view} view must not overflow its list container: ${JSON.stringify(metrics)}`);
       assert.ok(metrics.pageWidth<=metrics.viewportWidth+1, `${view} view must not widen the iPhone page: ${JSON.stringify(metrics)}`);

@@ -64,6 +64,7 @@ function fmtDateShort(v) {
 }
 
 export function renderPeople(ctx,initialPolicyFilter) {
+  const iphoneLayout = document.documentElement.classList.contains('crm-iphone-layout');
   const emptyFilters = () => ({ roles: [], customerPriorities: [], recruitPriorities: [], referralPriorities: [] });
   const state = { page: 1, keyword: '', sortField: 'id', sortDir: 'desc', worklistStatus: 'all', policyFilter: 'all', filters: emptyFilters(), pendingFilters: emptyFilters() };
   const listEl = h('div', {});
@@ -208,7 +209,7 @@ export function renderPeople(ctx,initialPolicyFilter) {
         cells.forEach((td, i) => { if (i > 0) td.setAttribute('data-label', cols[i].label); });
         return h('tr', { onclick: () => { location.hash = `#/person/${p.id}`; } }, cells);
       }));
-      const iphoneView = document.documentElement.classList.contains('crm-iphone-layout')
+      const iphoneView = iphoneLayout
         ? participantView ? 'participant' : customerView ? 'customer' : 'default'
         : undefined;
       return h('div', { class: 'table-scroll people-directory-scroll' }, h('table', {
@@ -275,7 +276,9 @@ export function renderPeople(ctx,initialPolicyFilter) {
     ['', 'people_all_view'], ['customer', 'people_customer_view'], ['recruit', 'recruit'],
     ['referrer', 'role_referrer'], ['speaker', 'speaker'], ['participant', 'directory_participant'],
   ].map(([role, key]) => {
-    const shortKey = role === '' ? 'people_all_view_iphone' : role === 'customer' ? 'people_customer_view_iphone' : null;
+    const shortKey = role === '' ? 'people_all_view_iphone'
+      : role === 'customer' ? 'people_customer_view_iphone'
+        : role === 'participant' ? 'directory_participant_iphone' : null;
     const label = t(key);
     return [role, h('button', { type: 'button', class: 'people-directory-view', 'data-directory-view': role,
       title: label, onclick: () => selectView(role) }, shortKey ? [
@@ -304,6 +307,16 @@ export function renderPeople(ctx,initialPolicyFilter) {
     updateViewButtons();
     runQuery();
   }
+  const importLinkLabel = iphoneLayout ? [
+    h('span', { class: 'people-import-label-wide' }, t('l04_import_title')),
+    h('span', { class: 'people-import-label-iphone' }, t('l04_import_title_iphone')),
+  ] : t('l04_import_title');
+  const importLinkAttrs = { class: 'btn btn-soft people-toolbar-link people-import-link', href: '#/people/import' };
+  if (iphoneLayout) importLinkAttrs.title = t('l04_import_title');
+  const importLink = h('a', importLinkAttrs, importLinkLabel);
+  const directoryViews = [...viewButtons]
+    .filter(([role]) => !iphoneLayout || role !== '')
+    .map(([, button]) => button);
   function renderFilterPanel() {
     const roleFilters = checkboxGroup(state.pendingFilters.roles, roles.map(role => [role, roleLabels[role]]), (value, checked) => {
       const set = new Set(state.pendingFilters.roles);
@@ -350,7 +363,8 @@ export function renderPeople(ctx,initialPolicyFilter) {
         h('button', { class: 'btn btn-primary btn-sm', type: 'button', onclick: doSearch }, t('btn_search')),
       ]),
       h('div', { class: 'people-filter-anchor' }, [filterButton, filterPanel]),
-      h('a',{class:'btn btn-soft people-toolbar-link people-import-link',href:'#/people/import'},t('l04_import_title')),
+      ...(iphoneLayout ? [viewButtons.get('')] : []),
+      importLink,
       h('a', {
         class: 'btn btn-soft people-toolbar-link people-trash-link', href: '#/people-trash',
       }, [ic('trash'), t('btn_trash')]),
@@ -359,7 +373,7 @@ export function renderPeople(ctx,initialPolicyFilter) {
         onclick: () => openPersonNew(ctx, { onDone: (newId) => { if (newId) location.hash = `#/person/${newId}`; else runQuery(); } }),
       }, [ic('plus'), t('btn_new_person')]),
     ]),
-    h('div', { class: 'toolbar people-directory-views', role: 'group', 'aria-label': t('title_people') }, [...viewButtons.values()]),
+    h('div', { class: 'toolbar people-directory-views', role: 'group', 'aria-label': t('title_people') }, directoryViews),
     worklistTools,
     h('section', { class: 'card' }, [
       listEl,
