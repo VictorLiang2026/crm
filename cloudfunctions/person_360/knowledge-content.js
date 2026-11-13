@@ -34,10 +34,14 @@ function projectContent(row, table, source, today) {
   if (!content) return null;
   // Do not carry unselected text or metadata summaries into AI prompts/ranking.
   const { gpt_summary, content_state, ...safe } = row;
+  const doc=row.metadata?.document;
+  const ref=doc?.number?{documentNumber:doc.number}:{};
+  if(doc?.part)Object.assign(ref,{partNumber:doc.part,partCount:doc.total,pageStart:doc.start,pageEnd:doc.end,
+    documentTitle:doc.title,locator:doc.number+'-'+String(doc.part).padStart(2,'0')+' pp. '+doc.start+'–'+doc.end});
   return { ...safe, [table === 'playbooks' ? 'response_logic' : 'content']: content.text,
     metadata: { categories: row.metadata?.categories, domain: row.metadata?.domain,
       published_at: row.metadata?.published_at, locator: row.metadata?.locator, summary: content.summary },
-    contentReference: { contentSource: content.source, contentVersion: content.version } };
+    contentReference: { ...ref, contentSource: content.source, contentVersion: content.version } };
 }
 function managementRow(row, table, source) {
   const versions = contentVersions(row, table, source);

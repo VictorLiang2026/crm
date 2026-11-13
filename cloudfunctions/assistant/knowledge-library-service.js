@@ -34,7 +34,7 @@ const LEGACY_CATEGORY = Object.freeze({product:'on_sale_product',service:'existi
   top_performer_sharing:'top_performer_sharing',legal_tax:'legal_tax',case:'customer_case',playbook:'conversation_strategy',
   company:'company_information'});
 const REST_TABLES = new Set(['knowledge_sources','knowledge_items','playbooks','knowledge_content_commands',
-  'person_followup_advice','persons','ai_tasks','ai_results']);
+  'knowledge_documents','knowledge_document_chunks','person_followup_advice','persons','ai_tasks','ai_results']);
 const FOLLOWUP_ADVICE_COLUMNS = 'id,person_id,client_request_id,title,system_title,gpt_title,system_status,system_strategy,system_product_advice,'+
   'system_strategy_sources,system_product_sources,system_version,system_task_id,gpt_strategy,gpt_product_advice,'+
   'gpt_strategy_sources,gpt_product_sources,gpt_based_on_system_version,gpt_kept_for_system_version,gpt_status,'+
@@ -323,6 +323,7 @@ function metadataForSource(row) {
     sourceUri:row.source_uri||null,publishedAt:row.published_at||null,
     reviewAt:row.review_at||null,
     fileName:row.file_name||null,fileSizeBytes:row.file_size_bytes||null,sha256:row.sha256||null,
+    document:row.metadata?.document||null,
     extractionStatus:row.extraction_status,lifecycleStatus:row.lifecycle_status,lifecycle_status:row.lifecycle_status,
     versionNo:row.version_no,createdAt:row.created_at,updatedAt:row.updated_at,deletedAt:row.deleted_at||null,
     updated_at:row.updated_at,deleted_at:row.deleted_at||null,
@@ -340,6 +341,7 @@ function createKnowledgeLibrary(options={}) {
   const testDataReader=options.testDataReader||testData.disclose;
   const logger=options.logger||console;
   const callFunction=options.callFunction||client.callFunction.bind(client);
+  const documents=require('./knowledge-documents').documentService(request,(name,args)=>searchDataFactory({env,key,fetchImpl}).auditRdb.rpc(name,args),generateSummary);
   const contentService=createKnowledgeContentService({
     rpc:(name,args)=>searchDataFactory({env,key,fetchImpl}).auditRdb.rpc(name,args),
     request,sourceBytes,extractText,generateSummary,callFunction,
@@ -716,13 +718,27 @@ function createKnowledgeLibrary(options={}) {
     const fileName=/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(meta.fileName)
       ? meta.fileName : `document${extensionOf(meta.fileName)}`;
     const storageKey=`${actor}/${uploadId}/${fileName}`;
+    let volume;
+    if(input.volume){
+      const doc=await documents.parent(actor,input.volume.documentId);
+      volume=require('./knowledge-documents').checkedVolume(input.volume,doc);
+      const [prior]=await request('knowledge_sources','GET',{select:'id,metadata,storage_key,content_type,file_size_bytes,extraction_status',
+        'metadata->document->>number':'eq.'+doc.id,'metadata->document->>part':'eq.'+volume.index,deleted_at:'is.null',limit:1});
+      if(prior){
+        if(prior.metadata?.upload?.phase==='complete')return {ok:true,existing:true,sourceId:String(prior.id),queued:prior.extraction_status==='extracting'};
+        if(prior.file_size_bytes!==fileSizeBytes)fail('DOCUMENT_CONFLICT');
+        const head=await storageRequest(prior.storage_key,'HEAD').catch(err=>{if(err.code==='SOURCE_UNAVAILABLE')return null;throw err;});
+        return {ok:true,sourceId:String(prior.id),uploadId:prior.metadata.upload.upload_id,storageKey:prior.storage_key,
+          contentType:prior.content_type,stored:head?.size===fileSizeBytes};
+      }
+    }
     const upload={upload_id:uploadId,phase:'receiving',file_size_bytes:fileSizeBytes,storage_bucket:KNOWLEDGE_BUCKET};
     const rows=await request('knowledge_sources','POST',{select:'id,updated_at'},[{
       domain:meta.domain,title:meta.title,publisher:meta.publisher,source_uri:meta.sourceUri,
       published_at:meta.publishedAt,valid_from:null,valid_to:null,review_at:meta.reviewAt,
       storage_key:storageKey,file_name:meta.fileName,content_type:meta.contentType,file_size_bytes:fileSizeBytes,
       sha256:placeholderDigest,extraction_status:'queued',lifecycle_status:'draft',version_no:1,
-      created_by:actor,updated_by:actor,metadata:{categories:meta.categories,upload},original_base64:null,
+      created_by:actor,updated_by:actor,metadata:{categories:meta.categories,upload,...(volume?{volume}:{})},original_base64:null,
     }]);
     if(!rows?.[0]?.id)fail('PERSISTENCE_ERROR');
     return {ok:true,sourceId:String(rows[0].id),uploadId,storageBucket:KNOWLEDGE_BUCKET,storageKey,contentType:meta.contentType};
@@ -975,11 +991,20 @@ function createKnowledgeLibrary(options={}) {
   function tokenize(value) { return [...new Set(String(value||'').toLowerCase().match(/[a-z0-9]{3,}|[\u4e00-\u9fff]{2,}/g)||[])].slice(0,80); }
   function rankEvidence(entries,query,maxCount=8) {
     const tokens=tokenize(query);
-    return entries.map(({row,source})=>{
+    const ranked=entries.map(({row,source})=>{
       const hay=`${row.source||''} ${row.content||''} ${row.metadata?.summary||''}`.toLowerCase();
       const score=tokens.reduce((n,token)=>n+(hay.includes(token)?1:0),0);
       return {row,source,score};
-    }).sort((a,b)=>b.score-a.score||Number(b.row.id)-Number(a.row.id)).slice(0,maxCount);
+    }).sort((a,b)=>b.score-a.score||Number(b.row.id)-Number(a.row.id));
+    const selected=ranked.slice(0,maxCount);
+    const best=selected.find(entry=>entry.score>0&&entry.row.contentReference?.partNumber);
+    if(best&&maxCount>1){
+      const ref=best.row.contentReference;
+      const adjacent=ranked.find(entry=>entry.row.contentReference?.documentNumber===ref.documentNumber&&
+        Math.abs(entry.row.contentReference.partNumber-ref.partNumber)===1);
+      if(adjacent&&!selected.includes(adjacent)&&best!==selected.at(-1))selected[selected.length-1]=adjacent;
+    }
+    return selected;
   }
   function sourceContext(entries) {
     const refs=[]; const allowed=new Map();
@@ -1591,8 +1616,17 @@ function createKnowledgeLibrary(options={}) {
         userSelected:row.user_selected,userEdited:row.user_edited}))})).filter(row=>row.candidates.length===2)};
   }
   async function run(event,actor,options={}) {
-    if(event?.operation==='content')return contentService.run(event.contentOperation,actor,event.data);
+    if(event?.operation==='content'){
+      const item=event.data;
+      if(event.contentOperation==='queueGpt'&&item?.table==='knowledge_items'&&positiveId(item.id)){
+        const [row]=await request('knowledge_items','GET',{select:'metadata',id:'eq.'+item.id,deleted_at:'is.null',limit:1});
+        if(row?.metadata?.document?.part)return {ok:true,skipped:true,reason:'DOCUMENT_LEVEL_SUMMARY',documentNumber:row.metadata.document.number};
+      }
+      return contentService.run(event.contentOperation,actor,item);
+    }
     switch(event?.operation){
+      case 'documentBegin':case 'documentChunk':case 'documentComplete':case 'documentOriginal':case 'documentOverview':case 'documentDraft':case 'documentGpt':
+        return documents.run(event.operation,event.data||{},actorUid(actor));
       case 'list':return list(actor,event.data||{});
       case 'trashList':return trashList();
       case 'save':return saveKnowledge(event.data,actor);

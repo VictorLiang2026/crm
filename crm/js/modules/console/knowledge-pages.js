@@ -1,6 +1,7 @@
 import { h } from './dom.js';
 import { pageHead, emptyNote } from './ui.js';
 import { getLang, t } from './i18n.js';
+import { archivePdf } from './knowledge-document.js';
 import { data } from './data.js';
 import { uploadKnowledgePdfParts, knowledgePdfPartTitle, KNOWLEDGE_PDF_PART_BYTES } from './knowledge-pdf-upload.js';
 
@@ -68,17 +69,20 @@ export function renderKnowledgeEditor(ctx,{mode='new',table='knowledge_items',id
         if(file.size>MAX_SOURCE_FILE_BYTES)throw new Error(text('source_file_too_large'));
         if(!ctx.knowledgeFiles)throw new Error(text('source_upload_failed'));
         const isPdf=/\.pdf$/i.test(file.name)||file.type==='application/pdf';
-        let uploadedParts=0;
+        let uploadedParts=0,documentId=null;
         const uploadPart=async(part,details)=>{
           if(details.split&&part.size>KNOWLEDGE_PDF_PART_BYTES)throw new Error(text('pdf_part_too_large'));
           const title=details.split?knowledgePdfPartTitle(values.title,details.index,details.total,
             details.startPage,details.endPage,getLang()):values.title;
-          const initialized=await data.knowledgeLibrary(ctx,'uploadPrepare',{data:{...values,title,fileName:part.name,fileSizeBytes:part.size}});
+          if(details.split&&!documentId)documentId=await archivePdf(ctx,file,values.title,details.pageCount);
+          const volume=details.split?{documentId,index:details.index,start:details.startPage,end:details.endPage}:null;
+          const initialized=await data.knowledgeLibrary(ctx,'uploadPrepare',{data:{...values,title,fileName:part.name,fileSizeBytes:part.size,...(volume?{volume}:{})}});
+          if(initialized?.existing){queuedUpload=queuedUpload||initialized.queued;uploadedParts++;return true;}
           if(!initialized?.ok)throw new Error(initialized?.error?.code||text('source_upload_failed'));
           const session={sourceId:initialized.sourceId,uploadId:initialized.uploadId};let finalizing=false;
           try{
             if(!details.split)formStatus.textContent=text('source_upload_progress');
-            const stored=await ctx.knowledgeFiles.upload(initialized.storageKey,part,{
+            const stored=initialized.stored?{}:await ctx.knowledgeFiles.upload(initialized.storageKey,part,{
               contentType:part.type||initialized.contentType||'application/octet-stream',upsert:false,
             });
             if(stored?.error)throw new Error(stored.error.message||text('source_upload_failed'));

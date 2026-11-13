@@ -53,6 +53,8 @@ test('knowledge upload splits long PDFs into sequential, named, independently re
       const calls=[],uploads=[],toasts=[];
       const ctx={main:document.querySelector('.console-main'),toast:(...args)=>toasts.push(args),
         api:{call:async(name,payload)=>{calls.push({name,payload});
+          if(payload.operation==='documentBegin')return {ok:true,documentId:100042};
+          if(['documentChunk','documentComplete'].includes(payload.operation))return {ok:true};
           if(payload.operation==='uploadPrepare')return {ok:true,sourceId:calls.length,uploadId:'u'+calls.length,storageKey:'k'+calls.length,contentType:'application/pdf'};
           if(payload.operation==='uploadFinalize')return {ok:true,queued:true};
           if(payload.operation==='uploadCancel')return {ok:true};
@@ -73,9 +75,10 @@ test('knowledge upload splits long PDFs into sequential, named, independently re
         enMarker:(await import('/crm/js/modules/console/knowledge-pdf-upload.js')).knowledgePdfPartTitle('Policy',1,2,1,40,'en')};
     })()`);
     const operations=ui.calls.map(entry=>entry.payload.operation);
-    assert.deepEqual(operations,['uploadPrepare','uploadFinalize','uploadPrepare','uploadFinalize']);
+    assert.deepEqual(operations,['documentBegin','documentChunk','documentComplete','uploadPrepare','uploadFinalize','uploadPrepare','uploadFinalize']);
     assert.deepEqual(ui.uploads.map(item=>item.name),['Original-part01-of02-pages001-030.pdf','Original-part02-of02-pages031-041.pdf']);
     assert.deepEqual(ui.names,ui.uploads.map(item=>item.name));
+    assert.deepEqual(ui.calls.filter(x=>x.payload.operation==='uploadPrepare').map(x=>x.payload.data.volume),[{documentId:100042,index:1,start:1,end:30},{documentId:100042,index:2,start:31,end:41}]);
     assert.match(ui.titles[0],/分卷 01\/02，第 001–030 页/);
     assert.match(ui.titles[1],/分卷 02\/02，第 031–041 页/);
     assert.match(ui.enHelp,/up to 30 pages/);
@@ -88,6 +91,7 @@ test('knowledge upload splits long PDFs into sequential, named, independently re
         const calls=[],uploads=[];
         const ctx={main:document.querySelector('.console-main'),toast:()=>{},
           api:{call:async(name,payload)=>{calls.push({name,payload});
+            if(payload.operation==='documentBegin')return {ok:true,documentId:100042,ready:true};
             if(payload.operation==='uploadPrepare')return {ok:true,sourceId:calls.length,uploadId:'f'+calls.length,storageKey:'f'+calls.length,contentType:'application/pdf'};
             if(payload.operation==='uploadFinalize')return calls.filter(x=>x.payload.operation==='uploadFinalize').length===1
               ? {ok:true,queued:true}:{ok:false,errorCode};
@@ -112,7 +116,7 @@ test('knowledge upload splits long PDFs into sequential, named, independently re
     assert.match(failures.timeout.message,/提取超时/);
     assert.match(failures.timeout.message,/无需重新上传原 PDF/);
     assert.deepEqual(failures.timeout.calls.map(entry=>entry.payload.operation),[
-      'uploadPrepare','uploadFinalize','uploadPrepare','uploadFinalize',
+      'documentBegin','uploadPrepare','uploadFinalize','uploadPrepare','uploadFinalize',
     ]);
     assert.equal(failures.timeout.uploads.length,2,'only the two split parts are uploaded once');
     assert.match(failures.busy.message,/AI 服务暂时繁忙/);

@@ -21,6 +21,8 @@ self.onmessage=async({data:message})=>{
       const partIndex=nextPart++,startIndex=partIndex*maxPages;
       const endIndex=Math.min(startIndex+maxPages,pageCount),indices=Array.from({length:endIndex-startIndex},(_,index)=>startIndex+index);
       const output=await PDFLib.PDFDocument.create();
+      // Fixed split metadata makes retries of the same original produce identical part bytes.
+      output.setCreationDate(new Date(0));output.setModificationDate(new Date(0));
       const copied=await output.copyPages(sourceDocument,indices);
       for(const page of copied)output.addPage(page);
       const bytes=await output.save();

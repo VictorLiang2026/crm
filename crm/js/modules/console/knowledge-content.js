@@ -74,7 +74,7 @@ export async function openKnowledgeContent(ctx,row,onSaved=()=>{}) {
         button('save',()=>save('original',{text:originalText.value,summary:systemSummary.value}),'btn btn-primary'),
       ]),
     ]);
-    body.replaceChildren(h('div',{class:'kc-edit-grid'},[systemSummaryCard,gptSummaryCard,originalCard]),errorBox);
+    body.replaceChildren(h('div',{class:'kc-edit-grid'},[systemSummaryCard,row.metadata?.document?.part&&!record.gpt?.summary?null:gptSummaryCard,originalCard]),errorBox);
   };
 
   try{await load();}catch(error){body.replaceChildren(errorBox);errorBox.textContent=errorText(error);}

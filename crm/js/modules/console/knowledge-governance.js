@@ -4,6 +4,8 @@ import { t } from './i18n.js';
 import { data } from './data.js';
 import { openKnowledgeContent } from './knowledge-content.js';
 
+import {documentOf, documentNumber, aliases, groupRows, groupHeader, overviewRow} from './knowledge-document.js';
+
 const text = key => t(`kg_${key}`);
 const CATEGORIES = ['on_sale_product','existing_service','recruitment_policy','industry_development',
   'marketing_activity','legal_tax','health_wealth_sharing','top_performer_sharing','customer_case','recruitment_case',
@@ -35,10 +37,22 @@ export function renderKnowledgeGovernance(ctx) {
   // Scoped to this page instance; never retain knowledge text across sessions.
   const contentCache=new Map();
   const contentKey=row=>JSON.stringify([row.table,row.id,row.updated_at,row.contentVersion,row.lifecycle_status]);
+  const expanded=new Set();
   const main=ctx.main;
   const load=async()=>{
-    const result=await data.knowledgeLibrary(ctx,'list');
-    records={knowledge:result.knowledge||[],playbooks:result.playbooks||[],sources:result.sources||[]};
+    let result=await data.knowledgeLibrary(ctx,'list');
+    const combined={knowledge:[],playbooks:[],sources:[]};
+    let previous='';
+    for(;;){
+      for(const key of Object.keys(combined))combined[key].push(...(result[key]||[]));
+      const coverage=result.coverage;
+      if(!Object.values(coverage?.hasMore||{}).some(Boolean))break;
+      const offsets=coverage.nextOffsets,signature=JSON.stringify(offsets);
+      if(!offsets||signature===previous)throw Error(text('load_failed'));
+      previous=signature;
+      result=await data.knowledgeLibrary(ctx,'list',{data:{sourceOffset:offsets.sources,knowledgeOffset:offsets.knowledge,playbookOffset:offsets.playbooks}});
+    }
+    records=combined;
     const currentKeys=new Set(rows().map(contentKey));
     for(const key of contentCache.keys())if(!currentKeys.has(key))contentCache.delete(key);
     draw();
@@ -136,19 +150,21 @@ export function renderKnowledgeGovernance(ctx) {
       }
     };
     entry.refresh();
+    if(documentOf(row).part&&!row.gpt_summary_preview)cells[1].replaceChildren(h('small',{},text('doc_gpt')));
     return cells;
   };
   const draw=()=>{
     const all=rows(),query=keyword.trim().toLocaleLowerCase();
-    const filtered=all.filter(row=>{
+    const matches=row=>{
       if(categoryFilter.length&&!categoriesOf(row).some(category=>categoryFilter.includes(category)))return false;
       if(statusFilter==='active'&&!active(row))return false;
       if(statusFilter==='invalid'&&active(row))return false;
-      if(query){const title=titleOf(row),search=fullText?`${title} ${summaryOf(row)}`:title;
+      if(query){const title=[titleOf(row), documentOf(row).title, documentNumber(row), ...aliases(row)].join(' '),search=fullText?`${title} ${summaryOf(row)} ${row.content||row.response_logic||''}`:title;
         if(!search.toLocaleLowerCase().includes(query))return false;}
       return true;
-    });
-    const sortValue=row=>sortField==='id'?row.id:sortField==='title'?titleOf(row):sortField==='category'?categoriesOf(row).join(' '):
+    };
+    const filtered=groupRows(all).filter(row=>row.children?row.children.some(matches):matches(row));
+    const sortValue=row=>sortField==='id'?(documentOf(row).number||row.id):sortField==='title'?titleOf(row):sortField==='category'?categoriesOf(row).join(' '):
       sortField==='summary'?summaryOf(row):sortField==='status'?(active(row)?'1':'0'):row.updated_at||'';
     filtered.sort((a,b)=>{const cmp=String(sortValue(a)).localeCompare(String(sortValue(b)),undefined,{numeric:true,sensitivity:'base'});
       return sortDir==='asc'?cmp:-cmp;});
@@ -157,10 +173,7 @@ export function renderKnowledgeGovernance(ctx) {
     const header=(field,label)=>h('th',{class:'kg-sortable',onclick:()=>{
       sortDir=sortField===field&&sortDir==='asc'?'desc':'asc';sortField=field;draw();
     }},`${label}${sortField===field?(sortDir==='asc'?' ↑':' ↓'):''}`);
-    const table=h('div',{class:'kg-table-wrap'},h('table',{class:'kg-table'},[
-      h('thead',{},h('tr',{},[header('id',text('number')),header('title',text('title_column')),header('category',text('category')),
-        header('summary',t('kc_original')),h('th',{},text('gpt_content')),header('status',text('status')),header('updated_at',text('updated_at')),h('th',{},text('actions'))])),
-      h('tbody',{},pageRows.length?pageRows.map(row=>{
+    const itemRow=row=>{
         const live=active(row),isSource=row.table==='knowledge_sources',isPlaybook=row.table==='playbooks',pending=!live&&row.lifecycle_status==='draft';
         const sourceProcessing=isSource&&row.extractionStatus==='extracting'&&!!row.ocrProgress;
         const sourceFailed=isSource&&row.extractionStatus==='failed';
@@ -175,8 +188,9 @@ export function renderKnowledgeGovernance(ctx) {
           h('button',{class:'btn btn-ghost btn-sm kg-action-delete',type:'button',onclick:()=>remove(row).catch(error=>ctx.toast(error.message,'error'))},text('delete')),
         ].filter(Boolean);
         return h('tr',{'data-kg-id':String(row.id)},[
-          h('td',{class:'kg-number-cell'},`${row.table==='knowledge_items'?'K':isPlaybook?'P':'S'}-${row.id}`),
+          h('td',{class:'kg-number-cell'},documentOf(row).number?documentNumber(row):aliases(row)[0]),
           h('td',{},[h('b',{},titleOf(row)||'—'),
+            documentOf(row).number?h('small',{class:'kg-table-meta'},[aliases(row).join(' · '),documentOf(row).part?`${documentOf(row).start}–${documentOf(row).end} / ${documentOf(row).pages}`:''].filter(Boolean).join(' · ')):null,
             isPlaybook?h('small',{class:'kg-table-meta'},text('playbook')):null,
             !isSource?h('small',{class:'kg-table-meta'},`${t('kc_selected')}: ${t(row.selected_content_source==='gpt'?'kc_gpt':'kc_original')}${row.contentPaused?' · '+t('kc_paused'):''}`):null]),
           h('td',{class:'kg-category-tags'},categoriesOf(row).map(category=>h('span',{class:'kg-category-chip'},text(`category_${category}`)))),
@@ -185,7 +199,17 @@ export function renderKnowledgeGovernance(ctx) {
           h('td',{},row.updated_at?String(row.updated_at).slice(0,10):'—'),
           h('td',{class:'kg-table-actions'},actions),
         ]);
-      }):h('tr',{},h('td',{colspan:'8',class:'kg-empty-cell'},text('no_results')))),
+      };
+    const bodyRows=pageRows.flatMap(row=>{
+      if(!row.children)return [itemRow(row)];
+      const open=expanded.has(row.id);
+      const head=groupHeader(ctx,row,open,()=>{if(open)expanded.delete(row.id);else expanded.add(row.id);draw();});
+      return open?[head,overviewRow(ctx,row.id),...row.children.map(itemRow)]:[head];
+    });
+    const table=h('div',{class:'kg-table-wrap'},h('table',{class:'kg-table'},[
+      h('thead',{},h('tr',{},[header('id',text('number')),header('title',text('title_column')),header('category',text('category')),
+        header('summary',t('kc_original')),h('th',{},text('gpt_content')),header('status',text('status')),header('updated_at',text('updated_at')),h('th',{},text('actions'))])),
+      h('tbody',{},bodyRows.length?bodyRows:h('tr',{},h('td',{colspan:'8',class:'kg-empty-cell'},text('no_results')))),
     ]));
     const pager=h('div',{class:'kg-pager'},[
       h('span',{},text('result_count').replace('{count}',String(filtered.length))),
