@@ -27,6 +27,8 @@ function phoneTabs() {
 }
 
 export function mountShell({ appRoot, operator, onQuickCapture }) {
+  const userAgent = typeof navigator === 'undefined' ? '' : (navigator.userAgent || '');
+  document.documentElement.classList.toggle('crm-iphone-layout', /iPhone/i.test(userAgent));
   const initial = String((operator && operator.name) || 'V').trim().charAt(0).toUpperCase() || 'V';
   const brand = h('a', { class: 'brand', href: '#/today' }, [
     h('span', { class: 'brand-logo', html: LOGO_SVG }),

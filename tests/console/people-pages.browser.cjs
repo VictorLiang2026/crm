@@ -8,7 +8,7 @@ test('Console People directory sorts person-owned priority and follow-up columns
   const b = new Browser(path.resolve(__dirname, '../..'));
   try {
     await b.start();
-    await b.open('#/ai');
+    await b.openConsole('#/ai');
     await b.evaluate(`(async()=>{
       const {renderPeople}=await import('/crm/js/modules/console/pages/people.js');
       window.peopleRequests=[];
@@ -57,7 +57,7 @@ test('People directory reveals role priorities and applies multi-select only on 
   const b = new Browser(path.resolve(__dirname, '../..'));
   try {
     await b.start();
-    await b.open('#/ai');
+    await b.openConsole('#/ai');
     await b.evaluate(`(async()=>{
       const {renderPeople}=await import('/crm/js/modules/console/pages/people.js');
       window.peopleRequests=[];
@@ -103,7 +103,7 @@ test('People directory name cells show only names while role filters and global 
   const b = new Browser(path.resolve(__dirname, '../..'));
   try {
     await b.start();
-    await b.open('#/ai');
+    await b.openConsole('#/ai');
     await b.evaluate(`(async()=>{
       const {renderPeople}=await import('/crm/js/modules/console/pages/people.js');
       const ctx={main:(()=>{const e=document.createElement('main');document.body.append(e);return e})(),toast(){},api:{call:async()=>({rows:[
@@ -128,7 +128,7 @@ test('Recycle bin remains simple and has no directory filters', async () => {
   const b = new Browser(path.resolve(__dirname, '../..'));
   try {
     await b.start();
-    await b.open('#/ai');
+    await b.openConsole('#/ai');
     await b.evaluate(`(async()=>{
       const {renderPeopleTrash}=await import('/crm/js/modules/console/pages/people-trash.js');
       window.trashRequests=[];
@@ -149,7 +149,7 @@ test('People directory uses 30-row pages on phone and iPad with an unlocked cont
   const b = new Browser(path.resolve(__dirname, '../..'));
   try {
     await b.start();
-    await b.open('#/ai');
+    await b.openConsole('#/ai');
     await b.send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
     await b.send('Emulation.setTouchEmulationEnabled', { enabled: true });
     await b.evaluate(`(async()=>{

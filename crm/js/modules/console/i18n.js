@@ -3087,6 +3087,8 @@ const DICT = {
   'customer_income_invalid': { 'zh-CN': '年收入须为零或正整数。', 'en': 'Annual income must be a non-negative integer.' },
   'people_customer_view': { 'zh-CN': '客户经营视图', 'en': 'Customer View' },
   'people_all_view': { 'zh-CN': '全部人物', 'en': 'All People' },
+  'people_customer_view_iphone': { 'zh-CN': '客户', 'en': 'Clients' },
+  'people_all_view_iphone': { 'zh-CN': '全部', 'en': 'All' },
   'customer_view_stage': { 'zh-CN': '客户阶段', 'en': 'Stage' },
   'profile_family': { 'zh-CN': '家庭画像', 'en': 'Family' },
   'profile_children': { 'zh-CN': '子女画像', 'en': 'Children' },

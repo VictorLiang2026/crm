@@ -107,23 +107,25 @@ function actionRow(ctx, item, onDone) {
   const labelMap = { M: [t('must_do'), 'red'], R: [t('should_do'), 'ink'], O: [t('can_do'), 'gray'] };
   const [text, tone] = labelMap[item.level] ||
     [translateEnum('work_status', item.status) || t('fact'), 'gray'];
-  return h('div', { class: 'list-row' }, [
+  return h('div', { class: 'list-row today-priority-row' }, [
     avatar(name),
-    h('div', { style: 'flex:1;min-width:0' }, [
+    h('div', { class: 'today-action-main', style: 'flex:1;min-width:0' }, [
       h('a', { class: 'row-title', href:'#/actions/'+item.id }, item.title || t('unnamed_action')),
       h('div', { class: 'row-sub' }, `${name} · ${dueLabel(item._due)}`),
     ]),
-    bdg(text, tone),
     item.status === 'completed' || item.status === 'cancelled'
       ? h('button', { class: 'btn btn-ghost btn-sm', type: 'button',
         onclick: () => openWorkItemTransition(ctx, { row: item, operation: 'reopen', onDone }) }, t('work_reopen'))
-      : h('div', { class: 'row-actions' }, [
-        h('button', { class: 'btn btn-ghost btn-sm', type: 'button',
-          onclick: () => openWorkItemEditor(ctx, { kind: 'action', row: item, personId: item.person_id, personName: name, onDone }) }, t('btn_edit')),
-        h('button', { class: 'btn btn-ghost btn-sm', type: 'button',
-          onclick: () => openWorkItemTransition(ctx, { row: item, operation: 'complete', onDone }) }, [ic('check'), t('done')]),
-        h('button', { class: 'btn btn-ghost btn-sm', type: 'button',
-          onclick: () => openWorkItemTransition(ctx, { row: item, operation: 'cancel', onDone }) }, t('work_cancel')),
+      : h('div', { class: 'today-action-controls' }, [
+        bdg(text, tone),
+        h('div', { class: 'row-actions' }, [
+          h('button', { class: 'btn btn-ghost btn-sm', type: 'button',
+            onclick: () => openWorkItemEditor(ctx, { kind: 'action', row: item, personId: item.person_id, personName: name, onDone }) }, t('btn_edit')),
+          h('button', { class: 'btn btn-ghost btn-sm', type: 'button',
+            onclick: () => openWorkItemTransition(ctx, { row: item, operation: 'complete', onDone }) }, [ic('check'), t('done')]),
+          h('button', { class: 'btn btn-ghost btn-sm', type: 'button',
+            onclick: () => openWorkItemTransition(ctx, { row: item, operation: 'cancel', onDone }) }, t('work_cancel')),
+        ]),
       ]),
   ]);
 }

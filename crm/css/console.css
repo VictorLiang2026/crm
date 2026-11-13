@@ -1449,3 +1449,34 @@ body:has(.login), body.is-login { padding-top: env(safe-area-inset-top); }
   .pc30-more-menu { position: absolute; z-index: 8; bottom: calc(100% + 6px); right: 0; display: grid; gap: 4px; min-width: 190px; padding: 7px; border: 1px solid var(--line); border-radius: 10px; background: #fff; box-shadow: 0 12px 28px rgba(30,38,52,.15); }
   .pc30-more-menu .btn { justify-content: flex-start; width: 100%; }
 }
+
+/* iPhone-only refinements; activated by the iPhone user-agent marker in shell.js. */
+.today-action-controls { display: contents; }
+.crm-iphone-layout .today-priority-row {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(136px, 42%); align-items: center; gap: 8px;
+}
+.crm-iphone-layout .today-priority-row > .pavatar { display: none; }
+.crm-iphone-layout .today-action-main { min-width: 0; }
+.crm-iphone-layout .today-action-controls {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; align-items: center;
+}
+.crm-iphone-layout .today-action-controls > .bdg { justify-self: start; }
+.crm-iphone-layout .today-action-controls .row-actions { display: contents; }
+.crm-iphone-layout .today-action-controls .btn { width: 100%; min-width: 0; height: 32px; padding: 2px 4px; font-size: 11px; }
+.crm-iphone-layout .pc30-candidate-heading > .pavatar { display: none; }
+.crm-iphone-layout .pc30-person-title { max-width: 100%; white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
+.crm-iphone-layout .people-directory-toolbar {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: stretch; gap: 8px; margin-bottom: 10px;
+}
+.crm-iphone-layout .people-directory-search { grid-column: 1; min-width: 0; width: 100%; padding-left: 9px; padding-right: 7px; gap: 5px; }
+.crm-iphone-layout .people-directory-search .btn { padding-left: 8px; padding-right: 8px; }
+.crm-iphone-layout .people-directory-toolbar > .people-filter-anchor { grid-column: 2; }
+.crm-iphone-layout .people-directory-toolbar > .people-import-link,
+.crm-iphone-layout .people-directory-toolbar > .people-trash-link,
+.crm-iphone-layout .people-directory-toolbar > .people-new-button { grid-column: 1 / -1; width: 100%; }
+.crm-iphone-layout .people-directory-views { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px; }
+.crm-iphone-layout .people-directory-view { width: 100%; min-width: 0; padding-left: 3px; padding-right: 3px; font-size: clamp(9px, 2.8vw, 11px); overflow: hidden; }
+.crm-iphone-layout .people-directory-view > span { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.people-directory-view .people-view-label-iphone { display: none; }
+.crm-iphone-layout .people-directory-view .people-view-label-wide { display: none; }
+.crm-iphone-layout .people-directory-view .people-view-label-iphone { display: block; }

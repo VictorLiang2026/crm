@@ -269,13 +269,20 @@ export function renderPeople(ctx,initialPolicyFilter) {
   const viewButtons = new Map([
     ['', 'people_all_view'], ['customer', 'people_customer_view'], ['recruit', 'recruit'],
     ['referrer', 'role_referrer'], ['speaker', 'speaker'], ['participant', 'directory_participant'],
-  ].map(([role, key]) => [role, h('button', { type: 'button', 'data-directory-view': role,
-    onclick: () => selectView(role) }, t(key))]));
+  ].map(([role, key]) => {
+    const shortKey = role === '' ? 'people_all_view_iphone' : role === 'customer' ? 'people_customer_view_iphone' : null;
+    const label = t(key);
+    return [role, h('button', { type: 'button', class: 'people-directory-view', 'data-directory-view': role,
+      title: label, onclick: () => selectView(role) }, shortKey ? [
+        h('span', { class: 'people-view-label-wide' }, label),
+        h('span', { class: 'people-view-label-iphone' }, t(shortKey)),
+      ] : h('span', { class: 'people-view-label' }, label))];
+  }));
   function updateViewButtons() {
     for (const [role, button] of viewButtons) {
       const selected = role ? state.filters.roles.length === 1 && state.filters.roles[0] === role
         : state.filters.roles.length === 0;
-      button.className = selected ? 'btn btn-dark' : 'btn btn-soft';
+      button.className = `btn ${selected ? 'btn-dark' : 'btn-soft'} people-directory-view`;
       button.setAttribute('aria-pressed', String(selected));
     }
   }
@@ -332,18 +339,18 @@ export function renderPeople(ctx,initialPolicyFilter) {
       kicker: t('kicker_people'), title: t('title_people'), tag: wpTag(t('wp1_readonly')),
       sub: t('sub_people'),
     }),
-    h('div', { class: 'toolbar' }, [
-      h('div', { class: 'searchbox' }, [
+    h('div', { class: 'toolbar people-directory-toolbar' }, [
+      h('div', { class: 'searchbox people-directory-search' }, [
         ic('search'), input,
         h('button', { class: 'btn btn-primary btn-sm', type: 'button', onclick: doSearch }, t('btn_search')),
       ]),
       h('div', { class: 'people-filter-anchor' }, [filterButton, filterPanel]),
-      h('a',{class:'btn btn-soft people-toolbar-link',href:'#/people/import'},t('l04_import_title')),
+      h('a',{class:'btn btn-soft people-toolbar-link people-import-link',href:'#/people/import'},t('l04_import_title')),
       h('a', {
-        class: 'btn btn-soft people-toolbar-link', href: '#/people-trash',
+        class: 'btn btn-soft people-toolbar-link people-trash-link', href: '#/people-trash',
       }, [ic('trash'), t('btn_trash')]),
       h('button', {
-        class: 'btn btn-primary', type: 'button',
+        class: 'btn btn-primary people-new-button', type: 'button',
         onclick: () => openPersonNew(ctx, { onDone: (newId) => { if (newId) location.hash = `#/person/${newId}`; else runQuery(); } }),
       }, [ic('plus'), t('btn_new_person')]),
     ]),
