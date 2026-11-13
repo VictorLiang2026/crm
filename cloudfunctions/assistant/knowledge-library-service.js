@@ -559,7 +559,7 @@ function createKnowledgeLibrary(options={}) {
   }
   async function generateSummary({domain,title,content},actor) {
     const database=searchDataFactory({env,key,fetchImpl});
-    const gateway=gatewayFactory({app:client,rdb:database.auditRdb,timeoutMs:60000,maxAttempts:1,
+    const gateway=gatewayFactory({app:client,rdb:database.auditRdb,timeoutMs:120000,maxAttempts:1,
       actorResolver:async()=>({uid:actor,isAnonymous:false})});
     const task=await gateway.runAITask({taskType:'knowledge_summary',skill:'knowledge_extract',capability:'summarization',
       input:{domain,title},context:{document:{title,domain,text:content}},

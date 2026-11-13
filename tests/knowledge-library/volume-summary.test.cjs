@@ -36,16 +36,21 @@ function fixture({ready=true,summaryReady=true,gptSummary=null,gptVersion=0,miss
     matched=matched.slice(offset,offset+limit);
     return new Response(JSON.stringify(matched),{status:200,headers:{'Content-Type':'application/json'}});
   };
-  const aiInputs=[];
+  const aiInputs=[],gatewayConfigs=[];
   const service=createKnowledgeLibrary({env:'crm-test',key:'test-key',fetchImpl,
     client:{callFunction:async()=>({result:{}})},
     searchDataFactory:()=>({auditRdb:{rpc:async(name,args)=>{
       assert.equal(name,'crm_knowledge_document_read_v1');assert.equal(args.p_document,700);
       return {data:overview};
     }}}),
-    gatewayFactory:()=>({runAITask:async input=>{aiInputs.push(input.context.document.text);return {
-      result:{summary:'Verified GPT total summary'},taskId:'task-7',resultId:'result-8'};}})});
-  return {service,tables,aiInputs,overview};
+    gatewayFactory:config=>{
+      gatewayConfigs.push(config);
+      return {runAITask:async input=>{
+        aiInputs.push(input.context.document.text);
+        return {result:{summary:'Verified GPT total summary'},taskId:'task-7',resultId:'result-8'};
+      }};
+    }});
+  return {service,tables,aiInputs,gatewayConfigs,overview};
 }
 
 test('multi-volume listing exposes stable document and child IDs with readiness and total-summary coverage',async()=>{
@@ -73,6 +78,7 @@ test('GPT total summary uses the complete stored original and saves to the exact
   assert.equal(f.tables.knowledge_documents[0].gpt_summary,'Verified GPT total summary');
   assert.equal(f.tables.knowledge_documents[0].gpt_basis,'basis-v1');
   assert.equal(f.tables.knowledge_documents[0].gpt_version,1);
+  assert.equal(f.gatewayConfigs[0].timeoutMs,120000);
   const readback=await f.service.run({operation:'volumeDocumentGet',data:{documentId:'700'}},'crm-volume-user');
   assert.equal(readback.document.gptTotalSummaryPresent,true);
   assert.equal(readback.document.gptTotalSummary,'Verified GPT total summary');
