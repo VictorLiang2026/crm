@@ -100,6 +100,23 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
           if(page.limit===undefined)page.limit=100;
           return await knowledgeLibraryRunner({action:'knowledgeLibrary',operation:'list',data:page},actorUid);
         }
+        if (input.tool === 'knowledge_documents_list' && Object.keys(input).every(k=>['tool','offset','volumeOffset','limit'].includes(k)) &&
+            (input.offset===undefined||Number.isSafeInteger(input.offset)&&input.offset>=0) &&
+            (input.volumeOffset===undefined||Number.isSafeInteger(input.volumeOffset)&&input.volumeOffset>=0) &&
+            (input.limit===undefined||Number.isSafeInteger(input.limit)&&input.limit>=1&&input.limit<=20))
+          return await knowledgeLibraryRunner({action:'knowledgeLibrary',operation:'volumeDocumentsList',data:{
+            ...(input.offset===undefined?{}:{offset:input.offset}),
+            ...(input.volumeOffset===undefined?{}:{volumeOffset:input.volumeOffset}),...(input.limit===undefined?{}:{limit:input.limit}),
+          }},actorUid);
+        if (input.tool === 'knowledge_document_get' && Object.keys(input).every(k=>['tool','documentId'].includes(k)) &&
+            /^[1-9][0-9]*$/.test(String(input.documentId)))
+          return await knowledgeLibraryRunner({action:'knowledgeLibrary',operation:'volumeDocumentGet',data:{documentId:String(input.documentId)}},actorUid);
+        if (input.tool === 'knowledge_generate_gpt_total_summary' &&
+            Object.keys(input).every(k=>['tool','documentId','expectedGptVersion'].includes(k)) &&
+            /^[1-9][0-9]*$/.test(String(input.documentId)) && Number.isSafeInteger(input.expectedGptVersion)&&input.expectedGptVersion>=0)
+          return await knowledgeLibraryRunner({action:'knowledgeLibrary',operation:'volumeDocumentSummaryGenerate',data:{
+            documentId:String(input.documentId),expectedGptVersion:input.expectedGptVersion,
+          }},actorUid);
         if (input.tool === 'knowledge_record_get' && Object.keys(input).every(k=>['tool','table','id'].includes(k)) &&
             ['knowledge_items','playbooks'].includes(input.table) && /^[1-9][0-9]*$/.test(String(input.id)))
           return await knowledgeLibraryRunner({action:'knowledgeLibrary',operation:'content',contentOperation:'get',data:{table:input.table,id:String(input.id)}},actorUid);
@@ -137,7 +154,8 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
         return {ok:false,error:{code:/^[A-Z][A-Z0-9_]{1,79}$/.test(error?.code||'')?error.code:'MCP_OPERATION_FAILED',message:'Knowledge operation could not be completed'}};
       }
       return {ok:false,error:{code:'INVALID_INPUT',message:'Unsupported knowledge operation',diagnostic:{
-        recognizedTool:['knowledge_records_list','knowledge_record_get','knowledge_generate_gpt_pending','knowledge_generation_status',
+          recognizedTool:['knowledge_records_list','knowledge_documents_list','knowledge_document_get',
+            'knowledge_generate_gpt_total_summary','knowledge_record_get','knowledge_generate_gpt_pending','knowledge_generation_status',
           'followup_gpt_task_package','followup_gpt_import_preview','followup_gpt_import_confirm','followup_gpt_advice_save'].includes(input.tool),
         toolName:typeof input.tool==='string'&&/^[A-Za-z0-9_.:-]{1,80}$/.test(input.tool)?input.tool:'unclassified',
         fieldCount:Object.keys(input).length,

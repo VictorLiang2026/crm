@@ -2,7 +2,7 @@
 const test=require('node:test'),assert=require('node:assert/strict');
 const {createKnowledgeContentService}=require('../../cloudfunctions/assistant/knowledge-content-service');
 
-function fixture({table='knowledge_items',recordOverrides={}}={}){
+function fixture({table='knowledge_items',recordOverrides={},request=async()=>{throw Error('Source records must not be read');}}={}){
  const expectedUpdatedAt='2026-10-31T12:00:00.000Z',calls=[],generated=[];
  const record={table,id:'12',title:'Synthetic fixture',updatedAt:expectedUpdatedAt,sourceFingerprint:null,version:3,
   original:{text:'System stored original',summary:'System summary'},gpt:{summary:null,reviewed:false},...recordOverrides};
@@ -11,7 +11,7 @@ function fixture({table='knowledge_items',recordOverrides={}}={}){
   if(op==='get')return {data:{ok:true,record:{...record,original:{...record.original},gpt:{...record.gpt}}}};
   if(op==='save')return {data:{ok:true,record:{...record,updatedAt:'2026-10-31T12:01:00.000Z'}}};
   throw Error(`Unexpected operation ${op}`);
- },sourceBytes:async()=>{throw Error('Attachment bytes must not be read');},request:async()=>{throw Error('Source records must not be read');},
+ },sourceBytes:async()=>{throw Error('Attachment bytes must not be read');},request,
  generateSummary:async input=>{generated.push(input);return {summary:'Only a summary',taskId:'task-1',resultId:'result-1'};}});
  return {service,calls,generated,record,expectedUpdatedAt,table};
 }
@@ -46,4 +46,39 @@ test('GPT generation rejects unsupported types and malformed record IDs before r
  await assert.rejects(f.service.run('queueGpt','actor',{table:'knowledge_sources',id:'12',expectedUpdatedAt:f.expectedUpdatedAt}),{code:'INVALID_INPUT'});
  await assert.rejects(f.service.run('queueGpt','actor',{table:f.table,id:'0',expectedUpdatedAt:f.expectedUpdatedAt}),{code:'INVALID_INPUT'});
  assert.equal(f.calls.length,0);
+});
+
+test('ordinary GPT summary generation rejects a child record in an explicitly linked multi-volume document',async()=>{
+ const f=fixture({recordOverrides:{source:{id:'35'}},request:async(table)=>{
+  if(table==='knowledge_sources')return [{id:'35',metadata:{document:{number:'100001',part:1,total:3}}}];
+  if(table==='knowledge_documents')return [{id:'100001',part_count:3}];
+  throw Error(`Unexpected table ${table}`);
+ }});
+ await assert.rejects(f.service.run('queueGpt','crm-user-1',{table:'knowledge_items',id:'12',expectedUpdatedAt:f.expectedUpdatedAt}),
+  {code:'VOLUME_CHILD_USE_TOTAL_SUMMARY'});
+ assert.equal(f.generated.length,0);
+ assert.equal(f.calls.some(call=>call.p_operation==='save'),false);
+});
+
+test('ordinary GPT summary generation stops when volume metadata has no valid aggregate document',async()=>{
+ const f=fixture({recordOverrides:{source:{id:'36'}},request:async(table)=>{
+  if(table==='knowledge_sources')return [{id:'36',metadata:{document:{number:'999999',part:1,total:3}}}];
+  if(table==='knowledge_documents')return [];
+  throw Error(`Unexpected table ${table}`);
+ }});
+ await assert.rejects(f.service.run('queueGpt','crm-user-1',{table:'knowledge_items',id:'12',expectedUpdatedAt:f.expectedUpdatedAt}),
+  {code:'VOLUME_GROUP_UNRESOLVED'});
+ assert.equal(f.generated.length,0);
+ assert.equal(f.calls.some(call=>call.p_operation==='save'),false);
+});
+
+test('ordinary GPT summary generation treats any explicit part marker as volume metadata',async()=>{
+ const f=fixture({recordOverrides:{source:{id:'37'}},request:async(table)=>{
+  if(table==='knowledge_sources')return [{id:'37',metadata:{document:{number:'999999',part:1}}}];
+  if(table==='knowledge_documents')return [];
+  throw Error(`Unexpected table ${table}`);
+ }});
+ await assert.rejects(f.service.run('queueGpt','crm-user-1',{table:'knowledge_items',id:'12',expectedUpdatedAt:f.expectedUpdatedAt}),
+  {code:'VOLUME_GROUP_UNRESOLVED'});
+ assert.equal(f.generated.length,0);
 });

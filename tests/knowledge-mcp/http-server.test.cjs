@@ -114,6 +114,17 @@ test('MCP metadata and tool contract expose text-only read and summary-only subm
   assert.deepEqual(submit.inputSchema.properties.table.enum,['knowledge_items','playbooks']);
   assert.match(submit.description,/stored system original text/);
   assert.doesNotMatch(submit.description,/attachment|file bytes/i);
+  const documents=listed.find(tool=>tool.name==='knowledge_documents_list');
+  assert.deepEqual(documents.securitySchemes[0].scopes,['knowledge:read']);
+  assert.equal(documents.inputSchema.properties.limit.maximum,20);
+  assert.match(documents.description,/document IDs and part metadata/);
+  const document=listed.find(tool=>tool.name==='knowledge_document_get');
+  assert.deepEqual(document.securitySchemes[0].scopes,['knowledge:read']);
+  assert.equal(document.inputSchema.required.includes('documentId'),true);
+  const totalSubmit=listed.find(tool=>tool.name==='knowledge_generate_gpt_total_summary');
+  assert.deepEqual(totalSubmit.securitySchemes[0].scopes,['knowledge:read','knowledge:gpt:submit']);
+  assert.equal(totalSubmit.inputSchema.required.includes('expectedGptVersion'),true);
+  assert.match(totalSubmit.description,/complete stored system original/);
   const task=listed.find(tool=>tool.name==='followup_gpt_task_package');
   assert.deepEqual(task.securitySchemes[0].scopes,['followup:read']);
   assert.equal(task.inputSchema.properties.limit.maximum,10);
