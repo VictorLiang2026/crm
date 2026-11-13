@@ -1468,6 +1468,44 @@ body:has(.login), body.is-login { padding-top: env(safe-area-inset-top); }
 .crm-iphone-layout .today-action-controls .btn { width: 100%; min-width: 0; height: 32px; padding: 2px 4px; font-size: 11px; }
 .crm-iphone-layout .pc30-candidate-heading > .pavatar { display: none; }
 .crm-iphone-layout .pc30-person-title { max-width: 100%; white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
+.crm-iphone-layout .people-directory-scroll { width: 100%; min-width: 0; }
+.crm-iphone-layout .people-directory-table { width: 100%; min-width: 100%; max-width: 100%; table-layout: fixed; }
+.crm-iphone-layout .people-directory-table th,
+.crm-iphone-layout .people-directory-table td { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.crm-iphone-layout .people-directory-table .people-col-name { width: 30%; }
+.crm-iphone-layout .people-directory-table .people-col-customer_priority,
+.crm-iphone-layout .people-directory-table .people-col-recruit_priority,
+.crm-iphone-layout .people-directory-table .people-col-referral_priority,
+.crm-iphone-layout .people-directory-table .people-col-latest_followup,
+.crm-iphone-layout .people-directory-table .people-col-next_followup,
+.crm-iphone-layout .people-directory-table .people-col-updated_at,
+.crm-iphone-layout .people-directory-table .people-col-id { width: 10%; }
+.crm-iphone-layout .people-directory-table[data-iphone-view="customer"] .people-col-name { width: 28%; }
+.crm-iphone-layout .people-directory-table[data-iphone-view="customer"] .people-col-wb_status { width: 9%; }
+.crm-iphone-layout .people-directory-table[data-iphone-view="customer"] .people-col-customer_priority,
+.crm-iphone-layout .people-directory-table[data-iphone-view="customer"] .people-col-recruit_priority,
+.crm-iphone-layout .people-directory-table[data-iphone-view="customer"] .people-col-referral_priority { width: 8%; }
+.crm-iphone-layout .people-directory-table[data-iphone-view="customer"] .people-col-latest_followup,
+.crm-iphone-layout .people-directory-table[data-iphone-view="customer"] .people-col-next_followup,
+.crm-iphone-layout .people-directory-table[data-iphone-view="customer"] .people-col-updated_at { width: 10%; }
+.crm-iphone-layout .people-directory-table[data-iphone-view="customer"] .people-col-customer_id { width: 9%; }
+.crm-iphone-layout .people-directory-table[data-iphone-view="participant"] .people-col-name { width: 22.5%; }
+.crm-iphone-layout .people-directory-table[data-iphone-view="participant"] .people-col-activity_count { width: 5%; }
+.crm-iphone-layout .people-directory-table[data-iphone-view="participant"] .people-col-latest_activity { width: 15%; }
+.crm-iphone-layout .people-directory-table[data-iphone-view="participant"] .people-col-activity_status { width: 8%; }
+.crm-iphone-layout .people-directory-table[data-iphone-view="participant"] .people-col-customer_priority,
+.crm-iphone-layout .people-directory-table[data-iphone-view="participant"] .people-col-recruit_priority,
+.crm-iphone-layout .people-directory-table[data-iphone-view="participant"] .people-col-referral_priority { width: 6.5%; }
+.crm-iphone-layout .people-directory-table[data-iphone-view="participant"] .people-col-latest_followup,
+.crm-iphone-layout .people-directory-table[data-iphone-view="participant"] .people-col-next_followup,
+.crm-iphone-layout .people-directory-table[data-iphone-view="participant"] .people-col-updated_at { width: 7%; }
+.crm-iphone-layout .people-directory-table[data-iphone-view="participant"] .people-col-id { width: 9%; }
+.crm-iphone-layout .people-directory-table td.people-col-name a,
+.crm-iphone-layout .people-directory-table td.people-col-latest_activity a {
+  display: block; width: 100%; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.crm-iphone-layout .people-directory-table td.people-col-name a:focus-visible,
+.crm-iphone-layout .people-directory-table td.people-col-latest_activity a:focus-visible { outline-offset: -2px; }
 .crm-iphone-layout .people-directory-toolbar {
   display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: stretch; gap: 8px; margin-bottom: 10px;
 }

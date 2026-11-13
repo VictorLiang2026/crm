@@ -208,7 +208,12 @@ export function renderPeople(ctx,initialPolicyFilter) {
         cells.forEach((td, i) => { if (i > 0) td.setAttribute('data-label', cols[i].label); });
         return h('tr', { onclick: () => { location.hash = `#/person/${p.id}`; } }, cells);
       }));
-      return h('div', { class: 'table-scroll people-directory-scroll' }, h('table', { class: 'people-table people-directory-table' }, [thead, tbody]));
+      const iphoneView = document.documentElement.classList.contains('crm-iphone-layout')
+        ? participantView ? 'participant' : customerView ? 'customer' : 'default'
+        : undefined;
+      return h('div', { class: 'table-scroll people-directory-scroll' }, h('table', {
+        class: 'people-table people-directory-table', 'data-iphone-view': iphoneView,
+      }, [thead, tbody]));
     });
   }
 

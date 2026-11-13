@@ -170,6 +170,9 @@ test('People directory uses 30-row pages on phone and iPad with an unlocked cont
     await b.evaluate("document.head.insertAdjacentHTML('beforeend','<link rel=stylesheet href=/crm/css/console.css>')");
     await b.wait("!!document.querySelector('link[href=\"/crm/css/console.css\"]')?.sheet && getComputedStyle(document.querySelector('.people-directory-table')).minWidth==='0px'");
     assert.equal(await b.evaluate('window.peopleRequests[0].args.pageSize'), 30);
+    assert.equal(await b.evaluate("document.documentElement.classList.contains('crm-iphone-layout')"), false,
+      'the generic phone fixture must not activate iPhone-only table sizing');
+    assert.equal(await b.evaluate("document.querySelector('.people-directory-table').dataset.iphoneView"), undefined);
     assert.equal(await b.evaluate("getComputedStyle(document.querySelector('.people-directory-table tbody td.people-col-name a')).fontWeight"), '400',
       'iPhone name weight matches the standard directory typography');
     const mobile = await b.evaluate(`(async()=>{
@@ -200,6 +203,9 @@ test('People directory uses 30-row pages on phone and iPad with an unlocked cont
     await b.send('Emulation.setDeviceMetricsOverride', { width: 1024, height: 768, deviceScaleFactor: 1, mobile: true });
     await b.evaluate('document.body.replaceChildren();window.renderPeopleForViewport()');
     await b.wait("window.peopleRequests.at(-1)?.args.pageSize===30");
+    assert.equal(await b.evaluate("document.documentElement.classList.contains('crm-iphone-layout')"), false,
+      'iPad must not activate iPhone-only table sizing');
+    assert.equal(await b.evaluate("document.querySelector('.people-directory-table').dataset.iphoneView"), undefined);
     assert.equal(await b.evaluate("getComputedStyle(document.querySelector('.people-directory-table tbody td.people-col-name a')).fontWeight"), '400',
       'iPad name weight matches the standard directory typography');
     assert.equal(await b.evaluate("getComputedStyle(document.querySelector('.people-date-full')).display"), 'inline');
@@ -211,6 +217,9 @@ test('People directory uses 30-row pages on phone and iPad with an unlocked cont
     await b.send('Emulation.setTouchEmulationEnabled', { enabled: false });
     await b.evaluate('document.body.replaceChildren();window.renderPeopleForViewport()');
     await b.wait("window.peopleRequests.at(-1)?.args.pageSize===20");
+    assert.equal(await b.evaluate("document.documentElement.classList.contains('crm-iphone-layout')"), false,
+      'desktop must not activate iPhone-only table sizing');
+    assert.equal(await b.evaluate("document.querySelector('.people-directory-table').dataset.iphoneView"), undefined);
     assert.equal(await b.evaluate("getComputedStyle(document.querySelector('.people-directory-table tbody td.people-col-name a')).fontWeight"), '400',
       'desktop name weight matches the standard directory typography');
   } finally { await b.close(); }
@@ -246,6 +255,79 @@ test('iPhone People toolbar keeps import, trash and new-person actions on one ro
     assert.ok(layout.buttons[0].left<layout.buttons[1].left && layout.buttons[1].left<layout.buttons[2].left, 'actions stay in requested order');
     assert.ok(layout.buttons.every(button=>button.right<=layout.toolbarRight+1), 'no action extends beyond the toolbar');
     assert.ok(layout.buttons.every(button=>button.scrollWidth<=button.clientWidth+1), 'all three labels fit without clipping');
+    await b.healthy();
+  } finally { await b.close(); }
+});
+
+test('iPhone 15 people table keeps the toolbar width across pages and truncates long names', async () => {
+  const b = new Browser(path.resolve(__dirname, '../..'));
+  try {
+    await b.start();
+    await b.send('Emulation.setDeviceMetricsOverride', { width: 393, height: 852, deviceScaleFactor: 3, mobile: true });
+    await b.send('Network.setUserAgentOverride', {
+      userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1',
+    });
+    await b.openConsole('#/ai');
+    await b.evaluate("document.documentElement.classList.add('crm-iphone-layout')");
+    await b.evaluate(`(async()=>{
+      const {renderPeople}=await import('/crm/js/modules/console/pages/people.js');
+      const all=Array.from({length:31},(_,i)=>({id:100+i,
+        display_name:i===0?'【系统测试·勿联系】跟进建议验收甲':'人物'+String(i+1).padStart(2,'0'),
+        roles:[],sales_priority:'A',recruitment_priority:'B',referral_priority:'C',
+        latest_followup_date:'2026-10-04',next_followup_date:'2026-10-18',updated_at:'2026-10-12T09:30:00Z'}));
+      const main=document.createElement('main');main.className='console-main';document.body.append(main);
+      window.peopleTestCtx={main,toast(){},api:{call:async(_,args)=>{
+        const start=(args.page-1)*args.pageSize,rows=all.slice(start,start+args.pageSize);
+        return {rows,page:args.page,pageSize:args.pageSize,total:all.length,totalPages:2,hasMore:args.page<2};
+      }}};
+      window.renderPeopleForViewport=()=>renderPeople(window.peopleTestCtx);
+      window.renderPeopleForViewport();
+    })()`);
+    await b.wait("document.querySelectorAll('.people-directory-table tbody tr').length===30");
+    await b.evaluate("document.head.insertAdjacentHTML('beforeend','<link rel=stylesheet href=/crm/css/console.css>')");
+    await b.wait("!!document.querySelector('link[href=\"/crm/css/console.css\"]')?.sheet");
+    const first = await b.evaluate(`(()=>{
+      const toolbar=document.querySelector('.people-directory-toolbar').getBoundingClientRect();
+      const card=document.querySelector('section.card').getBoundingClientRect();
+      const scroll=document.querySelector('.people-directory-scroll');
+      const table=document.querySelector('.people-directory-table');
+      const name=table.querySelector('tbody td.people-col-name a');
+      return {iphone:document.documentElement.classList.contains('crm-iphone-layout'),userAgent:navigator.userAgent,view:table.dataset.iphoneView,
+        tableLayout:getComputedStyle(table).tableLayout,toolbarWidth:toolbar.width,cardWidth:card.width,tableWidth:table.getBoundingClientRect().width,
+        scrollWidth:scroll.scrollWidth,scrollClientWidth:scroll.clientWidth,pageWidth:document.documentElement.scrollWidth,
+        viewportWidth:document.documentElement.clientWidth,nameWidth:name.clientWidth,nameScrollWidth:name.scrollWidth,
+        nameOverflow:getComputedStyle(name).textOverflow,nameWhiteSpace:getComputedStyle(name).whiteSpace};
+    })()`);
+    assert.ok(Math.abs(first.cardWidth-first.toolbarWidth)<=1, `list card must align with toolbar: ${JSON.stringify(first)}`);
+    assert.ok(Math.abs(first.tableWidth-first.scrollClientWidth)<=1, `table must fill its fixed container: ${JSON.stringify(first)}`);
+    assert.ok(first.scrollWidth<=first.scrollClientWidth+1, `iPhone list must not scroll beyond its container: ${JSON.stringify(first)}`);
+    assert.ok(first.pageWidth<=first.viewportWidth+1, `long name must not widen the page: ${JSON.stringify(first)}`);
+    assert.ok(first.nameScrollWidth>first.nameWidth, `long name should be visually truncated: ${JSON.stringify(first)}`);
+    assert.equal(first.nameOverflow,'ellipsis');
+    assert.equal(first.nameWhiteSpace,'nowrap');
+    await b.evaluate("document.querySelector('.pager button:last-child').click()");
+    await b.wait("document.querySelectorAll('.people-directory-table tbody tr').length===1");
+    const second = await b.evaluate(`(()=>({
+      toolbarWidth:document.querySelector('.people-directory-toolbar').getBoundingClientRect().width,
+      cardWidth:document.querySelector('section.card').getBoundingClientRect().width,
+      tableWidth:document.querySelector('.people-directory-table').getBoundingClientRect().width,
+      scrollWidth:document.querySelector('.people-directory-scroll').scrollWidth,
+      scrollClientWidth:document.querySelector('.people-directory-scroll').clientWidth
+    }))()`);
+    assert.ok(Math.abs(second.tableWidth-first.tableWidth)<=1, `table width must remain stable on page two: ${JSON.stringify({first,second})}`);
+    assert.ok(Math.abs(second.toolbarWidth-second.cardWidth)<=1);
+    assert.ok(Math.abs(second.tableWidth-second.scrollClientWidth)<=1);
+    for (const view of ['customer','participant']) {
+      await b.evaluate(`document.querySelector('[data-directory-view="${view}"]').click()`);
+      await b.wait(`document.querySelector('.people-directory-table')?.dataset.iphoneView==='${view}'`);
+      const metrics=await b.evaluate(`(()=>{const scroll=document.querySelector('.people-directory-scroll'),table=document.querySelector('.people-directory-table');return {
+        view:table.dataset.iphoneView,tableWidth:table.getBoundingClientRect().width,clientWidth:scroll.clientWidth,
+        scrollWidth:scroll.scrollWidth,pageWidth:document.documentElement.scrollWidth,viewportWidth:document.documentElement.clientWidth
+      }})()`);
+      assert.ok(Math.abs(metrics.tableWidth-metrics.clientWidth)<=1, `${view} view must fill the same fixed width: ${JSON.stringify(metrics)}`);
+      assert.ok(metrics.scrollWidth<=metrics.clientWidth+1, `${view} view must not overflow its list container: ${JSON.stringify(metrics)}`);
+      assert.ok(metrics.pageWidth<=metrics.viewportWidth+1, `${view} view must not widen the iPhone page: ${JSON.stringify(metrics)}`);
+    }
     await b.healthy();
   } finally { await b.close(); }
 });
