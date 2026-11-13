@@ -132,8 +132,8 @@ export function renderActivities(ctx) {
 }
 
 // ---------- 详情 ----------
-function flowNode(ctx, id) {
-  return Promise.all([data.activityDetail(ctx, id), data.activityTasks(ctx, id)]).then(([detail, tasksRes]) => {
+function flowNode(ctx, id, detailPromise) {
+  return Promise.all([detailPromise, data.activityTasks(ctx, id)]).then(([detail, tasksRes]) => {
     if (!detail.activity) throw new Error(t('act_activity_not_found'));
     const a = detail.activity;
     const tasks = tasksRes.rows || [];
@@ -145,7 +145,7 @@ function flowNode(ctx, id) {
       ]),
       sectionTitle(`${t('act_prep_tasks')}（${tasks.length}）`, h('button', {
         class: 'btn btn-primary btn-sm', type: 'button',
-        onclick: () => openActivityTaskEditor(ctx, { activityId: id, onDone: () => renderActivity(ctx, id) }),
+        onclick: () => openActivityTaskEditor(ctx, { activityId: id, activityName: a.name, onDone: () => renderActivity(ctx, id) }),
       }, [ic('plus'), t('act_task_add')])),
       renderActivityPreparation(ctx, id, a.status),
       tasks.length ? h('div', {}, tasks.map((task) => h('div', { class: 'list-row act-task-row' }, [
@@ -160,7 +160,7 @@ function flowNode(ctx, id) {
         bdg(t((TASK_STATUS[task.status] || [task.status, 'gray'])[0]), (TASK_STATUS[task.status] || ['', 'gray'])[1]),
         h('div', { class: 'act-task-actions' }, [
           h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => openActivityTaskEditor(ctx, {
-            activityId: id, task, onDone: () => renderActivity(ctx, id),
+            activityId: id, activityName: a.name, task, onDone: () => renderActivity(ctx, id),
           }) }, t('act_task_edit')),
           ['completed', 'skipped'].includes(task.status) ? null : h('button', {
             class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => changeActivityTaskStatus(ctx, {
@@ -248,6 +248,18 @@ function reviewNode(ctx, id) {
 }
 
 export function renderActivity(ctx, id) {
+  const title = h('span', {}, t('loading'));
+  const activityPromise = data.activityDetail(ctx, id).then((detail) => {
+    if (!detail.activity) {
+      title.textContent = `${t('act_activity_not_found')}${t('act_id_suffix')}${id}`;
+      throw new Error(t('act_activity_not_found'));
+    }
+    title.textContent = `${detail.activity.name || t('title_activity')}${t('act_id_suffix')}${id}`;
+    return detail;
+  }, (error) => {
+    title.textContent = `${t('act_load_failed')}${t('act_id_suffix')}${id}`;
+    throw error;
+  });
   const bodies = ACT_TABS.map(() => h('div', {}));
   const loaded = new Set();
   const btns = ACT_TABS.map((key, i) => h('button', {
@@ -264,7 +276,7 @@ export function renderActivity(ctx, id) {
     bodies.forEach((b, j) => { b.style.display = i === j ? '' : 'none'; });
     if (loaded.has(i)) return;
     loaded.add(i);
-    if (i === 0) loadInto(bodies[i], async () => h('div', { class: 'card-body' }, [await flowNode(ctx, id)]));
+    if (i === 0) loadInto(bodies[i], async () => h('div', { class: 'card-body' }, [await flowNode(ctx, id, activityPromise)]));
     else if (i === 1) renderRoster({...ctx,main:bodies[i]},String(id));
     else if (i === 5) loadInto(bodies[i], async () => h('div', { class: 'card-body' }, [await reviewNode(ctx, id)]));
     else if (i === 2) loadInto(bodies[i], async () => h('div', { class: 'card-body' }, [await interactionNode(ctx, id)]));
@@ -275,7 +287,7 @@ export function renderActivity(ctx, id) {
 
   ctx.main.replaceChildren(
     pageHead({
-      kicker: 'ACTIVITY', title: `${t('title_activity')} #${id}`, tag: wpTag(t('act_manage_tag')),
+      kicker: 'ACTIVITY', title, tag: wpTag(t('act_manage_tag')),
       sub: t('sub_activity'),
       actions: [
         h('button', { class: 'btn btn-ghost', type: 'button', onclick: async () => {

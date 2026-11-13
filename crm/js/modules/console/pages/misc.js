@@ -33,7 +33,9 @@ function searchReasonText(reason, criteria) {
       Number.isInteger(months) && months >= 1 && months <= 24) {
     details.push(`${t('search_v2_recent_prefix')}${months}${t('search_v2_months_suffix')}`);
   }
-  const references = (reason.records || []).map(ref => `public.${ref.table} #${ref.id}`);
+  const references = (reason.records || []).map(ref => ref.table === 'activities'
+    ? `${ref.name || t('act_activity_name_unavailable')}${t('act_id_suffix')}${ref.id}`
+    : `public.${ref.table} #${ref.id}`);
   if (references.length) details.push(references.join(', '));
   if (reason.verifiedAbsence) details.push(t('search_v2_no_recent_followup'));
   return details.length ? `${label}: ${details.join(' · ')}` : label;

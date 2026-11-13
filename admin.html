@@ -4495,7 +4495,7 @@ async function showActivityDetail(id){
       card.appendChild(el('div',{class:'list-row'},[
         el('a',{href:'/crm/console.html#/person/'+(p.canonical_person_id||p.canonicalPersonId)},p.person_name||p.name||'人物资料'),
         el('a',{class:'btn-sm',onclick:function(){openActivityInteraction(act,p);}},'记录重要互动'),
-        p.person_type==='customer'&&p.person_id?el('button',{class:'btn-sm',onclick:function(){openActivityFollowup(id,p);}},'记录跟进'):null
+        p.person_type==='customer'&&p.person_id?el('button',{class:'btn-sm',onclick:function(){openActivityFollowup(id,act.name,p);}},'记录跟进'):null
       ]));
     });
 
@@ -4987,7 +4987,9 @@ function openPersonPickerModal(opts){
 }
 
 // 新增时先使用服务端 Person 身份解析；旧入口保留给尚未建立 Person 的人员。
-function openActivityFollowup(activityId, p){
+async function openActivityFollowup(activityId, activityName, p){
+  var i18n = await import('/crm/js/modules/console/i18n.js');
+  var activityLabel = (activityName || i18n.t('act_activity_name_unavailable')) + i18n.t('act_id_suffix') + activityId;
   var FIELDS = [
     {name:'followup_notes',label:'沟通内容',type:'textarea',req:true},
     {name:'followup_date',label:'沟通日期',type:'date'},
@@ -4995,13 +4997,13 @@ function openActivityFollowup(activityId, p){
     {name:'next_followup_goal',label:'下次跟进目标',type:'select',options:GOALS},
   ];
   var today = dayStr(new Date());
-  modal('记录沟通 · 活动 #' + activityId, FIELDS, {followup_date:today, followup_notes:p.ai_followup_suggestion || ''}, async function(data){
+  modal(i18n.t('act_followup_dialog') + ' · ' + activityLabel, FIELDS, {followup_date:today, followup_notes:p.ai_followup_suggestion || ''}, async function(data){
     if(!data.followup_notes) throw new Error('请填写沟通内容');
     data.customer_id = p.person_id;
     data.activity_id = activityId;
     var r = await callFn('followups', {action:'create', data:data});
     if(r.error) throw new Error(r.error);
-    toast('沟通已记录（关联活动 #' + activityId + '）');
+    toast(i18n.t('act_followup_saved') + ' · ' + activityLabel);
     showActivityDetail(activityId);
   }, {wide:true});
 }
@@ -5685,7 +5687,9 @@ async function adoptPostReviewNextActivity(activityId, sug, row){
     }});
     if(r && r.error) throw new Error(r.error);
     sug.__adopted = true;
-    toast('已创建活动 #' + (r.id || '') + '（状态：想法）');
+    var i18n = await import('/crm/js/modules/console/i18n.js');
+    toast(i18n.t('act_next_created') + ' · ' + (sug.topic || i18n.t('act_ai_suggested_default')) +
+      i18n.t('act_id_suffix') + (r.id || '') + '（' + i18n.t('act_status_idea') + '）');
     if(row && row.remove) row.remove();
   } catch(e){
     btns.forEach(function(b){ b.disabled = false; });

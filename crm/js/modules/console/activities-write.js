@@ -136,7 +136,7 @@ export function confirmActivityRemoval(ctx, { activity, onDone } = {}) {
   })();
 }
 
-export function openActivityTaskEditor(ctx, { activityId, task = null, onDone } = {}) {
+export function openActivityTaskEditor(ctx, { activityId, activityName, task = null, onDone } = {}) {
   const editing = !!task;
   const title = input('text', task?.task_title, { maxlength: '160', required: true });
   const type = select(TASK_TYPES.map(value => [value, t(`act_task_type_${value}`)]), task?.task_type || 'preparation');
@@ -146,7 +146,7 @@ export function openActivityTaskEditor(ctx, { activityId, task = null, onDone } 
   const note = textarea(task?.note, { maxlength: '2000', rows: '3' });
   const sheet = openSheet({
     title: t(editing ? 'act_task_edit_title' : 'act_task_create_title'),
-    sub: `${t('act_task_activity')} #${activityId}`,
+    sub: `${t('act_task_activity_prefix')}${activityName || t('act_activity_name_unavailable')}${t('act_id_suffix')}${activityId}`,
     body: h('div', {}, [
       field(t('act_task_title'), title), field(t('act_task_type'), type),
       field(t('act_task_status'), status), field(t('act_task_priority'), priority),

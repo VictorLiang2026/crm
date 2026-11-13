@@ -6,9 +6,10 @@ const {runSearchV2,validateFilters,normalizePage}=require('../../cloudfunctions/
 function filters(overrides={}) { return {roles:null,relationshipTypes:null,fact:null,attendanceMonths:null,
   followupState:null,followupMonths:null,opportunityStatuses:null,opportunityTypes:null,recruitStages:null,...overrides}; }
 function deps(result,{resolution={status:'confirm_existing',candidates:[{id:'42',displayName:'林华',organization:'North',occupation:'Manager'}]},rows=[]}={}) {
-  const calls={resolved:[],searched:[],audited:[]};
+  const calls={resolved:[],searched:[],audited:[],activityNames:[]};
   return {calls,data:{auditRdb:{},resolveName:async name=>{calls.resolved.push(name);return resolution;},
     searchV2:async(...args)=>{calls.searched.push(args);return {total:rows.length,rows,filterLabels:['roles']};},
+    activityNames:async ids=>{calls.activityNames.push(ids);return {'940001':'【系统测试·勿联系】活动甲'};},
     linkTestAudit:async(...args)=>calls.audited.push(args),testDataReader:async refs=>({status:'verified',containsTestData:false,recordCount:0,sources:[]})},
     gateway:{runAITask:async()=>({taskId:7,resultId:8,result})}};
 }
@@ -62,6 +63,15 @@ test('passes real row provenance through test-data disclosure',async()=>{
   const out=await runSearchV2({query:'客户有近期到场记录'},d);
   assert.equal(out.execution.businessDataWritten,false);assert.equal(out.resultSource,'public.crm_search_people_v2');
   assert.deepEqual(d.calls.searched[0].slice(1),[50,0]);
+});
+
+test('attaches the activity title to search provenance while retaining its ID',async()=>{
+  const d=deps(supported,{rows:[{person_id:42,display_name:'林华',sources:{activity_participants:['19'],activities:['940001']}}]});
+  d.data.searchV2=async(...args)=>{d.calls.searched.push(args);return {total:1,rows:[{person_id:42,display_name:'林华',sources:{activity_participants:['19'],activities:['940001']}}],filterLabels:['attendanceMonths']};};
+  const out=await runSearchV2({query:'客户有近期到场记录'},d);
+  const event=out.rows[0].matchReasons[0].records.find(ref=>ref.table==='activities');
+  assert.deepEqual(d.calls.activityNames,[['940001']]);
+  assert.deepEqual(event,{table:'activities',id:'940001',name:'【系统测试·勿联系】活动甲'});
 });
 
 test('marks the fixed search window as truncated instead of claiming it is complete',async()=>{

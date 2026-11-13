@@ -135,6 +135,19 @@ function createSearchData({ env, key, fetchImpl = fetch } = {}) {
     return value;
   }
 
+  async function activityNames(values) {
+    if (!Array.isArray(values) || values.length > 500) throw new Error('Invalid activity IDs');
+    const ids = [...new Set(values.map(String))];
+    if (ids.some(id => !/^[1-9][0-9]*$/.test(id))) throw new Error('Invalid activity IDs');
+    if (!ids.length) return {};
+    const rows = await request('activities', 'GET', {
+      select: 'id,name', id: `in.(${ids.join(',')})`, deleted_at: 'is.null',
+    });
+    if (!Array.isArray(rows)) throw new Error('Invalid activity name response');
+    return Object.fromEntries(rows.filter(row => /^[1-9][0-9]*$/.test(String(row.id)) && typeof row.name === 'string')
+      .map(row => [String(row.id), row.name]));
+  }
+
   async function resolveName(name) {
     const { PersonService } = require('./person-service');
     return new PersonService({ request: (table, method, filters, body) =>
@@ -147,7 +160,7 @@ function createSearchData({ env, key, fetchImpl = fetch } = {}) {
     if(result?.ok!==true) throw Error('Audit provenance was not saved');
     return result;
   }
-  return { auditRdb, search, searchV2, resolveName, linkTestAudit };
+  return { auditRdb, search, searchV2, activityNames, resolveName, linkTestAudit };
 }
 
 module.exports = { createSearchData };

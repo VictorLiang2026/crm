@@ -46,10 +46,11 @@ test('search result card shows bilingual sources and time window without evidenc
         window.searchCalls.push(p);
         if(!p.selectedPersonId)return {ok:true,status:'needs_person_selection',candidates:[{id:'784',displayName:'【系统测试·勿联系】虚构独立增员甲'}]};
         return {ok:true,status:'complete',page:p.page||1,total:51,hasMore:(p.page||1)===1,
-          criteria:{roles:['recruit'],followupState:'recent',followupMonths:3},
+          criteria:{roles:['recruit'],followupState:'recent',followupMonths:3,attendanceMonths:3},
           interpretation:'Fictional Person',testData:{status:'verified',containsTestData:true},
           rows:[{person_id:'784',customer_id:'791',display_name:'【系统测试·勿联系】虚构独立增员甲',matchReasons:[
             {condition:'roles',records:[{table:'recruit_candidates',id:'19'}],evidence:[{id:19,stage:'互动暖客'}]},
+            {condition:'attendanceMonths',windowMonths:3,records:[{table:'activities',id:'940001',name:'【系统测试·勿联系】活动甲'}],evidence:[{activityDate:'2026-10-19'}]},
             {condition:'followupState',windowMonths:3,records:[{table:'followups',id:'261'},{table:'recruit_followups',id:'5'}],evidence:[{id:261,date:'2026-10-19'}]},
             {condition:'followupMonths',records:[],evidence:[]},
           ]}]};
@@ -67,6 +68,7 @@ test('search result card shows bilingual sources and time window without evidenc
     const zh=await browser.evaluate("({text:document.querySelectorAll('.search-panel')[1].innerText,calls:window.searchCalls})");
     assert.match(zh.text,/有效角色/);assert.match(zh.text,/跟进记录: 近 3 个月/);
     assert.match(zh.text,/public\.followups #261/);assert.match(zh.text,/public\.recruit_followups #5/);
+    assert.match(zh.text,/【系统测试·勿联系】活动甲 · 活动 #940001/);
     assert.doesNotMatch(zh.text,/search_v2_condition_followupMonths|\[\{|\{\"id\"/);
     assert.equal(zh.calls[1].selectedPersonId,'784');
     await browser.evaluate("[...document.querySelectorAll('.search-panel')[1].querySelectorAll('button')].find(b=>b.textContent.trim()==='下一页').click()");
@@ -76,6 +78,7 @@ test('search result card shows bilingual sources and time window without evidenc
     const en=await browser.evaluate("document.querySelectorAll('.search-panel')[1].innerText");
     assert.match(en,/Active role/);assert.match(en,/Follow-up status: Last 3 months/);
     assert.match(en,/public\.recruit_candidates #19/);assert.doesNotMatch(en,/search_v2_condition_followupMonths|\[\{/);
+    assert.match(en,/【系统测试·勿联系】活动甲 · Activity #940001/);
     for(const [width,height] of [[1180,820],[820,1180]]){
       await browser.send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:false});
       assert.equal(await browser.evaluate('document.documentElement.scrollWidth<=innerWidth+1'),true,`${width}x${height}`);

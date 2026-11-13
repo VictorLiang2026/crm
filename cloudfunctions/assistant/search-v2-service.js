@@ -102,8 +102,16 @@ async function runSearchV2(event, { app, data, gateway } = {}) {
   } else if (event.selectedPersonId) fail('INVALID_INPUT','Unexpected selected Person');
   const pageSize=50;
   const found = await database.searchV2({...filters, ...(selectedPersonId ? {personId:selectedPersonId}: {})},pageSize,(page-1)*pageSize);
+  const activityIds = found.rows.flatMap(row => Array.isArray(row.sources?.activities)
+    ? row.sources.activities : row.sources?.activities == null ? [] : [row.sources.activities]);
+  const activityNames = activityIds.length ? await database.activityNames([...new Set(activityIds.map(String))]) : {};
   const rows = found.rows.map(row => ({...row, matchReasons:(found.filterLabels||[]).map(condition => ({condition,
-    records:(EVIDENCE_BY_FILTER[condition]||[]).flatMap(table=>(row.sources?.[table]||[]).map(id=>({table,id:String(id)}))),
+    records:(EVIDENCE_BY_FILTER[condition]||[]).flatMap(table=>{
+      const sourceIds = row.sources?.[table];
+      const ids = Array.isArray(sourceIds) ? sourceIds : sourceIds == null ? [] : [sourceIds];
+      return ids.map(id=>({table,id:String(id),
+        ...(table==='activities'&&activityNames[String(id)]?{name:activityNames[String(id)]}:{})}));
+    }),
     evidence:(DETAILS_BY_FILTER[condition]||[]).flatMap(key=>Array.isArray(row[key])?row[key]:[]),
     ...(condition==='followupState'&&filters.followupState==='none'?{verifiedAbsence:true,windowMonths:filters.followupMonths}:{}),
     ...(condition==='attendanceMonths'?{windowMonths:filters.attendanceMonths,timeZone:'Asia/Shanghai'}:{}),

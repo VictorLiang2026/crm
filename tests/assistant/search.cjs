@@ -58,15 +58,18 @@ test('server adapter allows only audit writes and the fixed public search RPC', 
       calls.push({ url: String(url), method: options.method, body: options.body });
       return { ok: true, text: async () => options.method === 'POST' && String(url).includes('/rpc/')
         ? JSON.stringify({ total: 0, rows: [], coverage: { source: 'attended_participants', rows: 0 } })
-        : JSON.stringify([{ id: 1 }]) };
+        : String(url).includes('/activities?') ? JSON.stringify([{ id: 4, name: '【系统测试·勿联系】活动甲' }])
+          : JSON.stringify([{ id: 1 }]) };
     } });
   assert.throws(() => adapter.auditRdb.from('persons'), /Invalid AI audit table/);
   await assert.rejects(adapter.search('SELECT * FROM public.persons', 3, 30), /Invalid CRM search criteria/);
   const result = await adapter.search('activity_no_followup', 3, 30);
   assert.equal(result.total, 0);
+  assert.deepEqual(await adapter.activityNames(['4']), { '4': '【系统测试·勿联系】活动甲' });
   const audit = await adapter.auditRdb.from('ai_tasks').insert({ task_type: 'test' }).select('id');
   assert.deepEqual(audit.data, [{ id: 1 }]);
   assert.match(calls[0].url, /\/v1\/rdb\/rest\/rpc\/crm_search_people_v1$/);
+  assert.match(calls[1].url, /\/v1\/rdb\/rest\/activities\?select=id%2Cname&id=in\.%284%29&deleted_at=is\.null$/);
   assert.equal(calls.some(call => call.url.includes('/persons')), false);
   assert.equal(JSON.stringify(result).includes('test-secret'), false);
 });

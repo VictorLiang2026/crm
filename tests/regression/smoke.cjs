@@ -451,6 +451,23 @@ module.exports = async function smoke(root, test, options = {}) {
       await b.wait(called('activity_tasks', 'list'));
       await b.wait("!document.querySelector('#view .loading')");
       assert.equal(await b.evaluate("window.__crmTest.calls.find(c=>c.name==='activities' && c.action==='get').id"), 940001);
+      await b.click('#view button', '记录跟进');
+      await b.wait("document.querySelector('.modal-overlay')?.innerText.includes('[CRM_TEST_ONLY]活动甲 · 活动 #940001')");
+      await b.evaluate("document.querySelector('.modal-overlay textarea[name=followup_notes]').value='[CRM_TEST_ONLY]测试活动跟进'");
+      await b.click('.modal-overlay button', '确定');
+      await b.wait("document.querySelector('#toast-root .toast')?.textContent.includes('沟通已记录 · [CRM_TEST_ONLY]活动甲 · 活动 #940001')");
+      await b.openConsole('#/activity/940001');
+      await b.wait("document.querySelector('#console-main .page-title')?.textContent.includes('[CRM_TEST_ONLY]活动甲 · 活动 #940001')");
+      await b.click('#console-main button', '添加任务');
+      await b.wait("document.querySelector('.sheet-sub')?.textContent.includes('[CRM_TEST_ONLY]活动甲 · 活动 #940001')");
+      await b.evaluate("document.querySelector('.sheet-overlay')?.remove()");
+      await b.evaluate("localStorage.setItem('crm_lang','en')");
+      await b.openConsole('#/activity/940001');
+      await b.wait("document.querySelector('#console-main .page-title')?.textContent.includes('[CRM_TEST_ONLY]活动甲 · Activity #940001')");
+      await b.click('#console-main button', 'Add Task');
+      await b.wait("document.querySelector('.sheet-sub')?.textContent.includes('Activity: [CRM_TEST_ONLY]活动甲 · Activity #940001')");
+      await b.evaluate("document.querySelector('.sheet-overlay')?.remove();localStorage.setItem('crm_lang','zh-CN')");
+      await open('#/activity/940001', '[CRM_TEST_ONLY]客户甲');
     });
     await check('activity.relationship-review-preview', '旧活动详情移除重复关系复盘入口，Console 复盘流程继续可达', async () => {
       await open('#/activity/940001', '[CRM_TEST_ONLY]客户甲', 'mode=activity-ended');
