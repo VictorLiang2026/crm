@@ -20,10 +20,15 @@ test('master record, page coverage and old alias search on desktop, tablet and p
    })()`);
    await browser.wait("document.querySelector('[data-document-number] button')");
    assert.equal(await browser.evaluate("document.querySelectorAll('tbody tr').length"),1);
-   await browser.evaluate("document.querySelector('[type=search]').value='S-36';document.querySelector('.kg-search').requestSubmit();document.querySelector('[data-document-number] button').click()");
+   for(const term of ['0001-02','100001-02','100001','S-36','K-15']){
+    await browser.evaluate("document.querySelector('[type=search]').value="+JSON.stringify(term)+";document.querySelector('.kg-search').requestSubmit()");
+    assert.equal(await browser.evaluate("document.querySelector('[data-document-number] .kg-number-cell')?.textContent"),'100001');
+   }
+   await browser.evaluate("document.querySelector('[data-document-number] button').click()");
    await browser.wait("document.querySelector('.kg-document-overview')?.textContent.includes('Reviewed last')");
-   assert.deepEqual(await browser.evaluate("Array.from(document.querySelectorAll('[data-kg-id] .kg-number-cell'),e=>e.textContent)"),['100001-01','100001-02','100001-03']);
+   assert.deepEqual(await browser.evaluate("Array.from(document.querySelectorAll('[data-kg-id] .kg-number-cell'),e=>e.textContent)"),['0001-01','0001-02','0001-03']);
    assert.match(await browser.evaluate("document.querySelector('.kg-document-overview').innerText"),/1–30, 61–85/);
+   assert.match(await browser.evaluate("document.querySelector('.kg-document-overview').innerText"),/0001-03/);
   }
   await browser.healthy();
  }finally{await browser.close();}

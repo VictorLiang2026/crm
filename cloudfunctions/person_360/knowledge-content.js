@@ -29,6 +29,12 @@ function effectiveContent(row, table = 'knowledge_items', source = null, today =
   if ((v.managed || v.selected === 'gpt') && (!nonempty(pair.summary) || !pair.reviewed || row.content_state?.paused)) return null;
   return { text: pair.text, summary: pair.summary || '', source: v.selected, version: v.version };
 }
+function volumeNumber(number, part) {
+  const id = String(number);
+  // The registry starts at 100001. Keep later series distinct when four digits run out.
+  const prefix = /^10\d{4}$/.test(id) ? id.slice(2) : id.padStart(4, '0');
+  return prefix + '-' + String(part).padStart(2, '0');
+}
 function projectContent(row, table, source, today) {
   const content = effectiveContent(row, table, source, today);
   if (!content) return null;
@@ -37,7 +43,7 @@ function projectContent(row, table, source, today) {
   const doc=row.metadata?.document;
   const ref=doc?.number?{documentNumber:doc.number}:{};
   if(doc?.part)Object.assign(ref,{partNumber:doc.part,partCount:doc.total,pageStart:doc.start,pageEnd:doc.end,
-    documentTitle:doc.title,locator:doc.number+'-'+String(doc.part).padStart(2,'0')+' pp. '+doc.start+'–'+doc.end});
+    documentTitle:doc.title,locator:volumeNumber(doc.number,doc.part)+' pp. '+doc.start+'–'+doc.end});
   return { ...safe, [table === 'playbooks' ? 'response_logic' : 'content']: content.text,
     metadata: { categories: row.metadata?.categories, domain: row.metadata?.domain,
       published_at: row.metadata?.published_at, locator: row.metadata?.locator, summary: content.summary },
@@ -52,4 +58,4 @@ function managementRow(row, table, source) {
     contentPaused: !effectiveContent(row, table, source),
     gpt_summary_preview: (gpt_summary || '').slice(0,180) };
 }
-module.exports = { CONTENT_COLUMNS, contentVersions, effectiveContent, projectContent, managementRow };
+module.exports = { CONTENT_COLUMNS, contentVersions, effectiveContent, projectContent, managementRow, volumeNumber };

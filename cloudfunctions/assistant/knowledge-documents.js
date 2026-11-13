@@ -1,5 +1,6 @@
 'use strict';
 const {createHash}=require('node:crypto');
+const {volumeNumber}=require('./knowledge-content');
 const blockSize=393216;
 function invalid(code='INVALID_DOCUMENT'){throw Object.assign(new Error(code),{code});}
 function positive(n){return Number.isSafeInteger(n)&&n>0;}
@@ -73,7 +74,7 @@ function documentService(request,rpc,generateSummary){
     if(op==='documentDraft'){
       const overview=await read();
       if(!overview.parts.length||d.basis!==overview.basis)invalid('DOCUMENT_CONFLICT');
-      const sections=overview.parts.map(p=>'['+doc.id+'-'+String(p.part).padStart(2,'0')+' pp. '+p.start+'–'+p.end+'] '+p.summary);
+      const sections=overview.parts.map(p=>'['+volumeNumber(doc.id,p.part)+' pp. '+p.start+'–'+p.end+'] '+p.summary);
       const summarize=async list=>(await generateSummary({domain:'other',title:doc.title,content:list.join('\n\n')},actor)).summary;
       let batch=[],partial=[],length=0;
       for(const section of sections){

@@ -6,9 +6,15 @@ const blockSize=393216;
 const tr=id=>t('kg_doc_'+id);
 const api=(ctx,op,input)=>data.knowledgeLibrary(ctx,op,{data:input});
 export const documentOf=row=>row.metadata?.document||row.document||{};
+function volumeNumber(number, part) {
+  const id = String(number);
+  // The registry starts at 100001. Keep later series distinct when four digits run out.
+  const prefix = /^10\d{4}$/.test(id) ? id.slice(2) : id.padStart(4, '0');
+  return prefix + '-' + String(part).padStart(2, '0');
+}
 export function documentNumber(row){
   const doc=documentOf(row);
-  return doc.part?doc.number+'-'+String(doc.part).padStart(2,'0'):String(doc.number||row.id);
+  return doc.part?volumeNumber(doc.number,doc.part):String(doc.number||row.id);
 }
 export function aliases(row){
   const prefix={knowledge_items:'K',playbooks:'P',knowledge_sources:'S'}[row.table];
@@ -74,7 +80,7 @@ export function overviewRow(ctx,id){
   const draw=overview=>{
     const list=overview.parts||[];
     panel.replaceChildren(h('h3',{},tr('overview')),h('p',{},tr('coverage')+' '+(list.map(r=>r.start+'–'+r.end).join(', ')||'—')+' / '+overview.pages),
-      ...list.map(r=>h('p',{},[h('b',{},id+'-'+String(r.part).padStart(2,'0')+' · '+r.start+'–'+r.end+' '),r.summary])));
+      ...list.map(r=>h('p',{},[h('b',{},volumeNumber(id,r.part)+' · '+r.start+'–'+r.end+' '),r.summary])));
     if(overview.originalReady)panel.append(button('original',()=>download(ctx,id)));
     panel.append(h('h3',{},tr('gpt')),h('p',{},overview.needsReview?tr('stale'):(overview.gpt||tr('empty'))));
     const edit=async generate=>{

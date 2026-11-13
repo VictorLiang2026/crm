@@ -5,7 +5,7 @@ const fs=require('node:fs');
 const path=require('node:path');
 const {PGlite}=require('@electric-sql/pglite');
 const {checkedVolume,documentService}=require('../../cloudfunctions/assistant/knowledge-documents');
-const {projectContent}=require('../../cloudfunctions/assistant/knowledge-content');
+const {projectContent,volumeNumber}=require('../../cloudfunctions/assistant/knowledge-content');
 const migration=ext=>fs.readFileSync(path.join(__dirname,'../../cloudbase/migrations/20261113104500_knowledge_documents'+ext),'utf8');
 
 test('registry assigns global numbers, preserves legacy routes, excludes drafts and revokes stale GPT',async()=>{
@@ -56,6 +56,9 @@ test('service scopes writes, checks original hash, resumes chunks and rejects st
  assert.throws(()=>checkedVolume({index:2,start:30,end:35},doc));
  assert.equal(checkedVolume({index:2,start:31,end:35},doc).end,35);
  await assert.rejects(svc.run('documentGpt',{id:123,basis:'v',version:1,summary:'x'},'staff'),/CONFLICT/);
+ assert.equal(volumeNumber('100001',2),'0001-02');
+ assert.equal(volumeNumber(109999,99),'9999-99');
+ assert.equal(volumeNumber(110001,2),'110001-02');
  const row={id:15,content:'Reviewed text',metadata:{document:{number:123,part:1,total:2,start:1,end:30,title:'x'}}};
- assert.equal(projectContent(row,'knowledge_items',null).contentReference.locator,'123-01 pp. 1–30');
+ assert.equal(projectContent(row,'knowledge_items',null).contentReference.locator,'0123-01 pp. 1–30');
 });

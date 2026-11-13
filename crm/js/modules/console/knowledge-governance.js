@@ -159,7 +159,9 @@ export function renderKnowledgeGovernance(ctx) {
       if(categoryFilter.length&&!categoriesOf(row).some(category=>categoryFilter.includes(category)))return false;
       if(statusFilter==='active'&&!active(row))return false;
       if(statusFilter==='invalid'&&active(row))return false;
-      if(query){const title=[titleOf(row), documentOf(row).title, documentNumber(row), ...aliases(row)].join(' '),search=fullText?`${title} ${summaryOf(row)} ${row.content||row.response_logic||''}`:title;
+      if(query){const doc=documentOf(row);
+        const legacyVolume=doc.part?String(doc.number)+'-'+String(doc.part).padStart(2,'0'):'';
+        const title=[titleOf(row), doc.title, doc.number, documentNumber(row), legacyVolume, ...aliases(row)].join(' '),search=fullText?`${title} ${summaryOf(row)} ${row.content||row.response_logic||''}`:title;
         if(!search.toLocaleLowerCase().includes(query))return false;}
       return true;
     };
