@@ -17,7 +17,8 @@ test('master record, page coverage and old alias search on desktop, tablet and p
      metadata:{document:{number:100001,part,total:3,start:1+30*i,end:Math.min(30*part,85),pages:85,title:'Fixture'}}}));
     renderKnowledgeGovernance({main,toast:()=>{},api:{call:async(_,p)=>p.operation==='list'?{ok:true,knowledge:rows}:
       p.operation==='documentDraft'?{summary:'Synthetic total summary draft',basis:'fixture-basis'}:
-      {parts:[{part:1,start:1,end:30,summary:'Reviewed first'},{part:3,start:61,end:85,summary:'Reviewed last'}],total:3,pages:85}}});
+      {parts:[{part:1,start:1,end:30,summary:'Reviewed first'},{part:3,start:61,end:85,summary:'Reviewed last'}],total:3,pages:85,
+       originalReady:false,needsReview:false,gpt:'Existing total summary',gptVersion:1,basis:'fixture-basis'}}});
    })()`);
    await browser.wait("document.querySelector('[data-document-number] button')");
    assert.equal(await browser.evaluate("document.querySelectorAll('tbody tr').length"),1);
@@ -30,9 +31,10 @@ test('master record, page coverage and old alias search on desktop, tablet and p
    assert.deepEqual(await browser.evaluate("Array.from(document.querySelectorAll('[data-kg-id] .kg-number-cell'),e=>e.textContent)"),['0001-01','0001-02','0001-03']);
    assert.match(await browser.evaluate("document.querySelector('.kg-document-overview').innerText"),/1–30, 61–85/);
    assert.match(await browser.evaluate("document.querySelector('.kg-document-overview').innerText"),/0001-03/);
+   await browser.evaluate("document.querySelector('.kg-document-overview button').click()");
+   await browser.wait("document.querySelector('.kg-document-summary-editor')?.value.includes('Synthetic total summary draft')");
+   assert.equal(await browser.evaluate("document.querySelector('.kg-document-summary-editor').classList.contains('kg-document-summary-editor')"),true);
    if(width>=768){
-    await browser.evaluate("Array.from(document.querySelectorAll('.kg-document-overview button')).find(b=>/生成总摘要草稿|Generate summary draft/.test(b.textContent)).click()");
-    await browser.wait("document.querySelector('.kg-document-summary-editor')?.value.includes('Synthetic total summary draft')");
     const widths=await browser.evaluate(`(()=>{const panel=document.querySelector('.kg-document-overview');const heading=Array.from(panel.querySelectorAll('h3')).find(h=>h.textContent.includes('GPT'));return {editor:panel.querySelector('.kg-document-summary-editor').getBoundingClientRect().width,display:heading.nextElementSibling.getBoundingClientRect().width}})()`);
     assert.ok(Math.abs(widths.editor-widths.display)<1,`summary editor ${widths.editor}px should match display ${widths.display}px`);
    }

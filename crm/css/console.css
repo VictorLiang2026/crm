@@ -1469,14 +1469,20 @@ body:has(.login), body.is-login { padding-top: env(safe-area-inset-top); }
 .crm-iphone-layout .pc30-candidate-heading > .pavatar { display: none; }
 .crm-iphone-layout .pc30-person-title { max-width: 100%; white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
 .crm-iphone-layout .people-directory-toolbar {
-  display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: stretch; gap: 8px; margin-bottom: 10px;
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: stretch; gap: 8px; margin-bottom: 10px;
 }
-.crm-iphone-layout .people-directory-search { grid-column: 1; min-width: 0; width: 100%; padding-left: 9px; padding-right: 7px; gap: 5px; }
+.crm-iphone-layout .people-directory-search { grid-column: 1 / 3; min-width: 0; width: 100%; padding-left: 9px; padding-right: 7px; gap: 5px; }
 .crm-iphone-layout .people-directory-search .btn { padding-left: 8px; padding-right: 8px; }
-.crm-iphone-layout .people-directory-toolbar > .people-filter-anchor { grid-column: 2; }
+.crm-iphone-layout .people-directory-toolbar > .people-filter-anchor { grid-column: 3; }
+.crm-iphone-layout .people-directory-toolbar > .people-import-link { grid-column: 1; }
+.crm-iphone-layout .people-directory-toolbar > .people-trash-link { grid-column: 2; }
+.crm-iphone-layout .people-directory-toolbar > .people-new-button { grid-column: 3; }
 .crm-iphone-layout .people-directory-toolbar > .people-import-link,
 .crm-iphone-layout .people-directory-toolbar > .people-trash-link,
-.crm-iphone-layout .people-directory-toolbar > .people-new-button { grid-column: 1 / -1; width: 100%; }
+.crm-iphone-layout .people-directory-toolbar > .people-new-button {
+  width: 100%; min-width: 0; justify-content: center; gap: 3px; padding: 5px 2px;
+  font-size: clamp(10px, 2.8vw, 11px); white-space: nowrap;
+}
 .crm-iphone-layout .people-directory-views { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px; }
 .crm-iphone-layout .people-directory-view { width: 100%; min-width: 0; padding-left: 3px; padding-right: 3px; font-size: clamp(9px, 2.8vw, 11px); overflow: hidden; }
 .crm-iphone-layout .people-directory-view > span { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

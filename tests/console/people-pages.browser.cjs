@@ -215,3 +215,37 @@ test('People directory uses 30-row pages on phone and iPad with an unlocked cont
       'desktop name weight matches the standard directory typography');
   } finally { await b.close(); }
 });
+
+test('iPhone People toolbar keeps import, trash and new-person actions on one row', async () => {
+  const b = new Browser(path.resolve(__dirname, '../..'));
+  try {
+    await b.start();
+    await b.send('Network.setUserAgentOverride', {
+      userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1',
+    });
+    await b.send('Emulation.setDeviceMetricsOverride', { width: 320, height: 844, deviceScaleFactor: 3, mobile: true });
+    await b.openConsole('#/ai');
+    await b.evaluate(`(async()=>{
+      const {renderPeople}=await import('/crm/js/modules/console/pages/people.js');
+      const main=document.createElement('main');document.body.append(main);
+      renderPeople({main,toast(){},api:{call:async()=>({rows:[],page:1,pageSize:30,total:0,totalPages:1,hasMore:false})}});
+    })()`);
+    await b.wait("document.querySelector('.people-directory-toolbar')");
+    await b.evaluate("document.head.insertAdjacentHTML('beforeend','<link rel=stylesheet href=/crm/css/console.css>')");
+    await b.wait("!!document.querySelector('link[href=\"/crm/css/console.css\"]')?.sheet && getComputedStyle(document.querySelector('.people-directory-toolbar')).gridTemplateColumns.split(' ').length===3");
+    const layout = await b.evaluate(`(()=>{
+      const toolbar=document.querySelector('.people-directory-toolbar').getBoundingClientRect();
+      const buttons=[...document.querySelectorAll('.people-directory-toolbar > .people-import-link, .people-directory-toolbar > .people-trash-link, .people-directory-toolbar > .people-new-button')];
+      return {iphone:document.documentElement.classList.contains('crm-iphone-layout'),toolbarRight:toolbar.right,
+        buttons:buttons.map(button=>{const rect=button.getBoundingClientRect();return {text:button.innerText.trim(),top:rect.top,left:rect.left,right:rect.right,
+          width:rect.width,scrollWidth:button.scrollWidth,clientWidth:button.clientWidth};})};
+    })()`);
+    assert.equal(layout.iphone, true, 'the iPhone UA activates the iPhone layout');
+    assert.deepEqual(layout.buttons.map(button=>button.text), ['从资料导入人物','回收站','新建人物']);
+    assert.ok(layout.buttons.every(button=>Math.abs(button.top-layout.buttons[0].top)<1), 'all three actions share one row');
+    assert.ok(layout.buttons[0].left<layout.buttons[1].left && layout.buttons[1].left<layout.buttons[2].left, 'actions stay in requested order');
+    assert.ok(layout.buttons.every(button=>button.right<=layout.toolbarRight+1), 'no action extends beyond the toolbar');
+    assert.ok(layout.buttons.every(button=>button.scrollWidth<=button.clientWidth+1), 'all three labels fit without clipping');
+    await b.healthy();
+  } finally { await b.close(); }
+});
