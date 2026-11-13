@@ -20,6 +20,17 @@ function createKnowledgeContentService({ rpc, request, sourceBytes, extractText,
           typeof data.expectedUpdatedAt!=='string'||!Number.isFinite(Date.parse(data.expectedUpdatedAt)))fail('INVALID_INPUT');
       const current=await invoke('get',actor,{table:data.table,id:String(data.id)}),record=current.record;
       if(!record||record.updatedAt!==data.expectedUpdatedAt)fail('CONTENT_STALE');
+      if(data.table==='knowledge_items'&&record.source?.id){
+        const sources=await request('knowledge_sources','GET',{select:'id,metadata',id:`eq.${record.source.id}`,deleted_at:'is.null',limit:1});
+        const documentId=String(sources[0]?.metadata?.document?.number||'');
+        const part=Number(sources[0]?.metadata?.document?.part||0),total=Number(sources[0]?.metadata?.document?.total||0);
+        if(part>0||total>1){
+          if(!documentId)fail('VOLUME_GROUP_UNRESOLVED');
+          const documents=await request('knowledge_documents','GET',{select:'id,part_count',id:`eq.${documentId}`,limit:1});
+          if(Number(documents[0]?.part_count)>1)fail('VOLUME_CHILD_USE_TOTAL_SUMMARY');
+          fail('VOLUME_GROUP_UNRESOLVED');
+        }
+      }
       if(typeof record.gpt?.summary==='string'&&record.gpt.summary.trim())return {ok:true,skipped:true,reason:'GPT_SUMMARY_EXISTS',status:'existing'};
       const sourceText=record.original?.text;
       if(typeof sourceText!=='string'||!sourceText.trim())fail('CONTENT_ORIGINAL_REQUIRED');

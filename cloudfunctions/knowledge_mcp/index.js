@@ -129,7 +129,7 @@ function compactList(result){
   for(const [table,key] of [['knowledge_items','knowledge'],['playbooks','playbooks']])for(const row of result?.[key]||[]){
     rows.push({table,id:String(row.id),title:String(row.title||row.source||row.scenario||''),
       updatedAt:row.updatedAt||row.updated_at||null,systemOriginalPresent:Boolean((row.content||row.response_logic||'').trim()),
-      gptSummaryPresent:Boolean(row.gpt_summary_preview)});
+      gptSummaryPresent:Boolean(row.gpt_summary_preview),sourceId:row.source_id==null?null:String(row.source_id)});
   }
   const coverage=result?.coverage||{};
   const hasMore=coverage.hasMore||{};
@@ -151,6 +151,9 @@ function compactList(result){
 }
 const TOOLS=[
  {name:'knowledge_records_list',description:'List one bounded page of CRM knowledge records and GPT coverage. Repeat with returned nextOffsets until all hasMore values are false.',securitySchemes:[{type:'oauth2',scopes:['knowledge:read']}],inputSchema:{type:'object',properties:{sourceOffset:{type:'integer',minimum:0},knowledgeOffset:{type:'integer',minimum:0},playbookOffset:{type:'integer',minimum:0},limit:{type:'integer',minimum:1,maximum:100},},additionalProperties:false}},
+ {name:'knowledge_documents_list',description:'List bounded pages of explicitly linked multi-volume knowledge documents and all source records marked as volume parts. Includes child knowledge record IDs, part metadata, system-volume summary readiness, and GPT total-summary coverage. Uses document IDs and part metadata, not titles, to identify groups.',securitySchemes:[{type:'oauth2',scopes:['knowledge:read']}],inputSchema:{type:'object',properties:{offset:{type:'integer',minimum:0},volumeOffset:{type:'integer',minimum:0},limit:{type:'integer',minimum:1,maximum:20}},additionalProperties:false}},
+ {name:'knowledge_document_get',description:'Read coverage and readiness for one exact multi-volume document ID, including its GPT total summary and per-volume status. The server checks the complete system original from stored text chunks; it never reads linked files.',securitySchemes:[{type:'oauth2',scopes:['knowledge:read']}],inputSchema:{type:'object',properties:{documentId:{type:'string',pattern:'^[1-9][0-9]*$'}},required:['documentId'],additionalProperties:false}},
+ {name:'knowledge_generate_gpt_total_summary',description:'Generate one GPT total summary for an explicitly linked multi-volume document and save it to that document ID. The server uses the complete stored system original, requires all volume originals and system summaries to be ready, and verifies the source fingerprint and GPT version before saving. It does not write to child volume records or read files.',securitySchemes:[{type:'oauth2',scopes:['knowledge:read','knowledge:gpt:submit']}],inputSchema:{type:'object',properties:{documentId:{type:'string',pattern:'^[1-9][0-9]*$'},expectedGptVersion:{type:'integer',minimum:0}},required:['documentId','expectedGptVersion'],additionalProperties:false}},
  {name:'knowledge_record_get',description:'Read text fields for one CRM knowledge record selected by exact table and record ID. Returns the stored system original and GPT summary only; it never reads linked files.',securitySchemes:[{type:'oauth2',scopes:['knowledge:read']}],inputSchema:{type:'object',properties:{table:{type:'string',enum:['knowledge_items','playbooks']},id:{type:'string',pattern:'^[1-9][0-9]*$'}},required:['table','id'],additionalProperties:false}},
  {name:'knowledge_generate_gpt_pending',description:'Generate a GPT summary only from stored system original text and save it directly to the exact record ID. Does not read files or images, generate GPT original text, or alter system content.',securitySchemes:[{type:'oauth2',scopes:['knowledge:read','knowledge:gpt:submit']}],inputSchema:{type:'object',properties:{table:{type:'string',enum:['knowledge_items','playbooks']},id:{type:'string',pattern:'^[1-9][0-9]*$'},expectedUpdatedAt:{type:'string',format:'date-time'}},required:['table','id','expectedUpdatedAt'],additionalProperties:false}},
  {name:'followup_gpt_task_package',description:'Read CRM-verified, redacted Person context and ready CloudBase follow-up recommendations whose GPT strategy and product/service advice are both empty. Optionally filter by exact Person ID; pages contain at most 10 rows.',securitySchemes:[{type:'oauth2',scopes:['followup:read']}],inputSchema:{type:'object',properties:{personId:{type:'string',pattern:'^[1-9][0-9]*$'},afterId:{type:'string',pattern:'^[1-9][0-9]*$'},limit:{type:'integer',minimum:1,maximum:10}},additionalProperties:false}},
@@ -196,6 +199,9 @@ async function mcp(req){
     const requiredScopes=tool.securitySchemes?.[0]?.scopes||[];
     if(requiredScopes.some(scope=>!scopes.includes(scope)))return toolAuthError(id,'INSUFFICIENT_SCOPE',requiredScopes);
     if(name==='knowledge_records_list'&&Object.entries(args).some(([k,v])=>!['sourceOffset','knowledgeOffset','playbookOffset','limit'].includes(k)||!Number.isSafeInteger(v)||v<0||(k==='limit'&&(v<1||v>100))))fail('INVALID_ARGUMENTS',400);
+    if(name==='knowledge_documents_list'&&Object.entries(args).some(([k,v])=>!['offset','volumeOffset','limit'].includes(k)||!Number.isSafeInteger(v)||v<0||(k==='limit'&&(v<1||v>20))))fail('INVALID_ARGUMENTS',400);
+    if(name==='knowledge_document_get'&&!/^[1-9][0-9]*$/.test(String(args.documentId)))fail('INVALID_ARGUMENTS',400);
+    if(name==='knowledge_generate_gpt_total_summary'&&(!/^[1-9][0-9]*$/.test(String(args.documentId))||!Number.isSafeInteger(args.expectedGptVersion)||args.expectedGptVersion<0))fail('INVALID_ARGUMENTS',400);
     if(name==='knowledge_record_get'&&(!['knowledge_items','playbooks'].includes(args.table)||!/^[1-9][0-9]*$/.test(String(args.id))))fail('INVALID_ARGUMENTS',400);
     if(name==='knowledge_generate_gpt_pending'&&(!['knowledge_items','playbooks'].includes(args.table)||!/^[1-9][0-9]*$/.test(String(args.id))||typeof args.expectedUpdatedAt!=='string'))fail('INVALID_ARGUMENTS',400);
     if(name==='knowledge_generation_status'&&!/^[0-9a-f-]{36}$/i.test(String(args.commandId)))fail('INVALID_ARGUMENTS',400);
@@ -210,6 +216,22 @@ async function mcp(req){
     const result=await invokeAssistant(actorUid,input);
     let safeResult=result;
     if(name==='knowledge_records_list')safeResult=compactList(result);
+    if(name==='knowledge_documents_list'&&result?.ok===true)safeResult={ok:true,rows:(result.rows||[]).map(row=>({
+      documentId:String(row.documentId),title:String(row.title||''),partCount:Number(row.partCount)||0,
+      originalReady:row.originalReady===true,systemSummariesReady:row.systemSummariesReady===true,
+      volumeKnowledgeItemIds:Array.isArray(row.volumeKnowledgeItemIds)?row.volumeKnowledgeItemIds.map(String):[],
+      partStatuses:Array.isArray(row.partStatuses)?row.partStatuses.map(part=>({id:String(part.id),systemSummaryPresent:part.systemSummaryPresent===true})):[],
+      gptTotalSummaryPresent:row.gptTotalSummaryPresent===true,gptVersion:Number(row.gptVersion)||0})),coverage:result.coverage||{},
+      volumeSources:Array.isArray(result.volumeSources)?result.volumeSources.map(row=>({sourceId:String(row.sourceId),
+        documentId:String(row.documentId||''),part:Number(row.part)||0,total:Number(row.total)||0})):[],
+      volumeSourceCoverage:result.volumeSourceCoverage||{}};
+    if(name==='knowledge_document_get'&&result?.document)safeResult={ok:result.ok===true,document:{
+      documentId:String(result.document.documentId),title:String(result.document.title||''),partCount:Number(result.document.partCount)||0,
+      originalReady:result.document.originalReady===true,systemSummariesReady:result.document.systemSummariesReady===true,
+      volumeKnowledgeItemIds:Array.isArray(result.document.volumeKnowledgeItemIds)?result.document.volumeKnowledgeItemIds.map(String):[],
+      partStatuses:Array.isArray(result.document.partStatuses)?result.document.partStatuses.map(part=>({id:String(part.id),systemSummaryPresent:part.systemSummaryPresent===true})):[],
+      gptTotalSummaryPresent:result.document.gptTotalSummaryPresent===true,gptTotalSummary:result.document.gptTotalSummary||null,
+      gptVersion:Number(result.document.gptVersion)||0}};
     if(name==='knowledge_record_get'&&result?.record){
       const record=result.record;
       safeResult={ok:result.ok===true,record:{table:record.table,id:String(record.id),title:record.title||'',updatedAt:record.updatedAt,

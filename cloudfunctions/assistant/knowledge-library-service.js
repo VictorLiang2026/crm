@@ -426,6 +426,119 @@ function createKnowledgeLibrary(options={}) {
       }),
       playbooks:playbooks.map(row=>managementRow(row,'playbooks'))};
   }
+  async function readVolumeOverview(documentId) {
+    const result=await searchDataFactory({env,key,fetchImpl}).auditRdb.rpc('crm_knowledge_document_read_v1',
+      {p_document:Number(documentId)});
+    if(result?.error||!object(result?.data))fail('DOCUMENT_UNAVAILABLE');
+    return result.data;
+  }
+  function documentState(doc,sourceRows,overview,itemRows,{includeData=true}={}) {
+    const documentId=String(doc.id),partCount=Number(doc.part_count||0);
+    const sources=(sourceRows||[]).filter(row=>String(row.metadata?.document?.number||'')===documentId);
+    const sourceParts=sources.map(row=>({sourceId:String(row.id),part:Number(row.metadata?.document?.part||0),
+      total:Number(row.metadata?.document?.total||0)})).sort((a,b)=>a.part-b.part);
+    const parts=Array.isArray(overview?.parts)?overview.parts.map(part=>({id:String(part.itemId||''),
+      sourceId:String(part.sourceId||''),part:Number(part.part||0),summary:String(part.summary||'')}))
+      .sort((a,b)=>a.part-b.part):[];
+    const itemsById=new Map((itemRows||[]).map(row=>[String(row.id),row]));
+    const slotsReady=partCount>1&&sources.length===partCount&&sourceParts.length===partCount&&sourceParts.every((part,index)=>
+      part.part===index+1&&part.total===partCount);
+    const partsReady=slotsReady&&parts.length===partCount&&parts.every((part,index)=>part.part===index+1&&
+      Boolean(part.id)&&Boolean(part.sourceId)&&part.sourceId===sourceParts[index].sourceId);
+    const currentParts=parts.map(part=>({...part,item:itemsById.get(part.id)}));
+    const systemSummariesReady=partsReady&&currentParts.every(part=>part.summary.trim().length>0&&
+      part.item&&String(part.item.source_id)===part.sourceId);
+    const systemOriginalReady=doc.original_ready===true&&partsReady&&currentParts.every(part=>part.item&&
+      String(part.item.source_id)===part.sourceId&&typeof part.item.content==='string'&&part.item.content.trim().length>0);
+    const sourceFingerprint=systemSummariesReady&&systemOriginalReady&&typeof overview?.basis==='string'?overview.basis:null;
+    return {documentId,title:String(doc.title||''),partCount,originalReady:systemOriginalReady,
+      systemSummariesReady,volumeKnowledgeItemIds:[...new Set(parts.map(part=>part.id).filter(Boolean))],
+      partStatuses:currentParts.map(part=>({id:part.id,systemSummaryPresent:Boolean(part.summary.trim()),
+        systemOriginalPresent:Boolean(part.item&&String(part.item.source_id)===part.sourceId&&
+          typeof part.item.content==='string'&&part.item.content.trim())})),
+      gptTotalSummaryPresent:Boolean(String(doc.gpt_summary||'').trim()),gptTotalSummary:doc.gpt_summary||null,
+      gptVersion:Number(doc.gpt_version)||0,gptBasis:doc.gpt_basis||null,sourceFingerprint,
+      chunks:includeData&&systemOriginalReady?currentParts.map(part=>({part:part.part,data:part.item.content})):[]};
+  }
+  async function getVolumeDocument(documentIdValue,{includeData=true}={}) {
+    const documentId=String(documentIdValue||'');
+    if(!positiveId(documentId))fail('INVALID_INPUT');
+    const docs=await request('knowledge_documents','GET',{select:'id,title,part_count,original_ready,gpt_summary,gpt_basis,gpt_version',
+      id:`eq.${documentId}`,limit:1});
+    const doc=docs[0];if(!doc)fail('NOT_FOUND');
+    const partCount=Number(doc.part_count||0);
+    if(partCount<=1||!Number.isSafeInteger(partCount))fail('NOT_A_VOLUME_DOCUMENT');
+    const [sources,overview]=await Promise.all([
+      request('knowledge_sources','GET',{select:'id,metadata',deleted_at:'is.null',
+        'metadata->document->>number':`eq.${documentId}`,limit:Math.min(500,partCount+1)}),
+      readVolumeOverview(documentId),
+    ]);
+    const itemIds=[...new Set((overview.parts||[]).map(part=>String(part.itemId||'')).filter(positiveId))];
+    const items=itemIds.length?await request('knowledge_items','GET',{select:'id,source_id,content',
+      id:`in.(${itemIds.join(',')})`,deleted_at:'is.null',limit:itemIds.length+1}):[];
+    return documentState(doc,sources,overview,items,{includeData});
+  }
+  async function listVolumeDocuments(actorValue,page={}) {
+    actorUid(actorValue);
+    const offset=Number(page.offset||0),volumeOffset=Number(page.volumeOffset||0),limit=page.limit===undefined?20:Number(page.limit);
+    if(!Number.isSafeInteger(offset)||offset<0||!Number.isSafeInteger(volumeOffset)||volumeOffset<0||
+        !Number.isSafeInteger(limit)||limit<1||limit>20)fail('INVALID_INPUT');
+    const docs=await request('knowledge_documents','GET',{select:'id,title,part_count,original_ready,gpt_summary,gpt_basis,gpt_version',
+      part_count:'gt.1',order:'id.asc',limit:limit+1,offset});
+    const volumeSources=await request('knowledge_sources','GET',{select:'id,metadata',deleted_at:'is.null',
+      'metadata->document->>part':'gt.0',order:'id.asc',limit:limit+1,offset:volumeOffset});
+    const pageDocs=docs.slice(0,limit);
+    let rows=[];
+    if(pageDocs.length){
+      const documentIds=pageDocs.map(doc=>String(doc.id));
+      const sources=await request('knowledge_sources','GET',{select:'id,metadata',deleted_at:'is.null',
+        'metadata->document->>number':`in.(${documentIds.join(',')})`,limit:Math.min(10000,documentIds.length*500)});
+      const overviews=await Promise.all(pageDocs.map(doc=>readVolumeOverview(String(doc.id))));
+      const itemIds=[...new Set(overviews.flatMap(overview=>(overview.parts||[]).map(part=>String(part.itemId||'')))
+        .filter(positiveId))];
+      const items=itemIds.length?await request('knowledge_items','GET',{select:'id,source_id,content',id:`in.(${itemIds.join(',')})`,
+        deleted_at:'is.null',limit:itemIds.length+1}):[];
+      rows=pageDocs.map((doc,index)=>documentState(doc,sources,overviews[index],items,{includeData:false}));
+    }
+    return {ok:true,rows:rows.map(({chunks,partStatuses,gptBasis,sourceFingerprint,...row})=>({...row,partStatuses})),
+      coverage:{offset,limit,hasMore:docs.length>limit,nextOffset:offset+pageDocs.length},
+      volumeSources:volumeSources.slice(0,limit).map(source=>({sourceId:String(source.id),
+        documentId:String(source.metadata?.document?.number||''),part:Number(source.metadata?.document?.part)||0,
+        total:Number(source.metadata?.document?.total)||0})),
+      volumeSourceCoverage:{offset:volumeOffset,limit,hasMore:volumeSources.length>limit,
+        nextOffset:volumeOffset+Math.min(volumeSources.length,limit)}};
+  }
+  async function getVolumeDocumentSummary(documentIdValue) {
+    const state=await getVolumeDocument(documentIdValue,{includeData:false});
+    const {chunks,sourceFingerprint,gptBasis,...safe}=state;
+    return {ok:true,document:safe};
+  }
+  async function generateVolumeDocumentSummary(input,actorValue) {
+    const actor=actorUid(actorValue),documentId=String(input?.documentId||''),expectedVersion=Number(input?.expectedGptVersion);
+    if(!positiveId(documentId)||!Number.isSafeInteger(expectedVersion)||expectedVersion<0)fail('INVALID_INPUT');
+    const current=await getVolumeDocument(documentId);
+    if(!current.originalReady)fail('DOCUMENT_ORIGINAL_INCOMPLETE');
+    if(!current.systemSummariesReady)fail('DOCUMENT_VOLUME_SUMMARY_INCOMPLETE');
+    if(current.gptTotalSummaryPresent)return {ok:true,skipped:true,reason:'GPT_TOTAL_SUMMARY_EXISTS',status:'existing',documentId};
+    if(current.gptVersion!==expectedVersion)fail('DOCUMENT_STALE');
+    const content=current.chunks.map(row=>row.data.trim()).join('\n\n');
+    if(!content.trim())fail('CONTENT_ORIGINAL_REQUIRED');
+    if(content.length>MAX_TEXT_CHARS)fail('CONTENT_TOO_LONG');
+    const generated=await generateSummary({domain:'other',title:current.title||'Knowledge',content},actor);
+    const latest=await getVolumeDocument(documentId);
+    if(!latest.originalReady||!latest.systemSummariesReady||latest.gptVersion!==expectedVersion||
+        latest.sourceFingerprint!==current.sourceFingerprint||latest.gptBasis!==current.gptBasis||
+        latest.gptTotalSummary!==current.gptTotalSummary)fail('DOCUMENT_STALE');
+    if(latest.gptTotalSummaryPresent)return {ok:true,skipped:true,reason:'GPT_TOTAL_SUMMARY_EXISTS',status:'existing',documentId};
+    const gptBasisFilter=latest.gptBasis==null?{gpt_basis:'is.null'}:{gpt_basis:`eq.${latest.gptBasis}`};
+    const summaryFilter=latest.gptTotalSummary==null?{gpt_summary:'is.null'}:{gpt_summary:`eq.${latest.gptTotalSummary}`};
+    const saved=await request('knowledge_documents','PATCH',{id:`eq.${documentId}`,original_ready:'eq.true',
+      gpt_version:`eq.${expectedVersion}`,...gptBasisFilter,...summaryFilter},
+      {gpt_summary:generated.summary,gpt_basis:current.sourceFingerprint,gpt_version:expectedVersion+1});
+    if(saved.length!==1)fail('DOCUMENT_STALE');
+    return {ok:true,status:'saved',documentId,gptVersion:expectedVersion+1,
+      taskId:generated.taskId,resultId:generated.resultId};
+  }
   async function trashList() {
     const [sources,items,playbooks]=await Promise.all([
       request('knowledge_sources','GET',{select:'id,domain,title,file_name,updated_at,deleted_at,metadata',deleted_at:'not.is.null',order:'deleted_at.desc,id.desc',limit:200}),
@@ -1628,6 +1741,9 @@ function createKnowledgeLibrary(options={}) {
       case 'documentBegin':case 'documentChunk':case 'documentComplete':case 'documentOriginal':case 'documentOverview':case 'documentDraft':case 'documentGpt':
         return documents.run(event.operation,event.data||{},actorUid(actor));
       case 'list':return list(actor,event.data||{});
+      case 'volumeDocumentsList':return listVolumeDocuments(actor,event.data||{});
+      case 'volumeDocumentGet':return getVolumeDocumentSummary(event.data?.documentId);
+      case 'volumeDocumentSummaryGenerate':return generateVolumeDocumentSummary(event.data,actor);
       case 'trashList':return trashList();
       case 'save':return saveKnowledge(event.data,actor);
       case 'upload':return upload(event.data,actor);

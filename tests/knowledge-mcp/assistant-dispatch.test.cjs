@@ -25,6 +25,34 @@ test('knowledge list dispatcher allowlists page fields and ignores MCP transport
   assert.deepEqual(captured,{event:{action:'knowledgeLibrary',operation:'list',data:{sourceOffset:3,limit:40}},actor:'crm-test-user'});
 });
 
+test('volume-document tools dispatch only exact IDs and bounded pagination fields',async()=>{
+  let captured;
+  const listed=await invoke({tool:'knowledge_documents_list',offset:20,volumeOffset:40,limit:10},
+    async(event,actor)=>{captured={event,actor};return {ok:true,rows:[],coverage:{offset:20,limit:10,hasMore:false,nextOffset:20}};});
+  assert.equal(listed.ok,true);
+  assert.deepEqual(captured,{event:{action:'knowledgeLibrary',operation:'volumeDocumentsList',data:{offset:20,volumeOffset:40,limit:10}},actor:'crm-test-user'});
+  const read=await invoke({tool:'knowledge_document_get',documentId:'100001'},async(event)=>{
+    captured=event;return {ok:true,document:{documentId:'100001'}};
+  });
+  assert.equal(read.ok,true);
+  assert.deepEqual(captured,{action:'knowledgeLibrary',operation:'volumeDocumentGet',data:{documentId:'100001'}});
+  const generated=await invoke({tool:'knowledge_generate_gpt_total_summary',documentId:'100001',expectedGptVersion:0},async(event)=>{
+    captured=event;return {ok:true,status:'saved',documentId:'100001'};
+  });
+  assert.equal(generated.ok,true);
+  assert.deepEqual(captured,{action:'knowledgeLibrary',operation:'volumeDocumentSummaryGenerate',
+    data:{documentId:'100001',expectedGptVersion:0}});
+  for(const input of [
+    {tool:'knowledge_documents_list',offset:-1},
+    {tool:'knowledge_document_get',documentId:'01'},
+    {tool:'knowledge_generate_gpt_total_summary',documentId:'100001',expectedGptVersion:-1},
+    {tool:'knowledge_generate_gpt_total_summary',documentId:'100001',expectedGptVersion:0,summary:'forged'},
+  ]){
+    const rejected=await invoke(input,async()=>{throw Error('invalid volume request must not dispatch');});
+    assert.equal(rejected.error.code,'INVALID_INPUT');
+  }
+});
+
 test('unsupported MCP operations report shape only without echoing caller values',async()=>{
   const result=await invoke({tool:'unknown_tool',secret:'do-not-return'},async()=>{throw Error('should not run');});
   assert.deepEqual(result.error,{code:'INVALID_INPUT',message:'Unsupported knowledge operation',
