@@ -4046,6 +4046,16 @@
     },
     {
       "kind": "routine",
+      "name": "person_identity_execute_with_roster_v1(p_actor_uid text, p_preview_id uuid)",
+      "detail": {
+        "anon_execute": false,
+        "service_execute": true,
+        "security_definer": false,
+        "authenticated_execute": false
+      }
+    },
+    {
+      "kind": "routine",
       "name": "person_identity_preview_v1(p_actor_uid text, p_idempotency_key uuid, p_kind text, p_payload jsonb)",
       "detail": {
         "anon_execute": false,

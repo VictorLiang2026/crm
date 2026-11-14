@@ -153,7 +153,7 @@ async function pgRequest(table, method, filters = {}, body, { timeoutMs = 8000 }
 async function pgRpc(name, body) {
   if (!new Set(['crm_activity_roster_v1','quick_capture_v2_commit', 'person_directory_page_v1', 'person_directory_filtered_page_v1',
     'person_trash_page_v1', 'person_customer_worklist_v1',
-    'person_identity_preview_v1', 'person_identity_execute_v1',
+    'person_identity_preview_v1', 'person_identity_execute_v1', 'person_identity_execute_with_roster_v1',
     'crm_person_only_recruit_delete_v1', 'crm_work_item_preview_v1',
     'crm_work_item_execute_v1', 'crm_opportunity_directory_v1', 'crm_opportunity_preview_v1',
     'crm_opportunity_execute_v1','crm_pipeline_stage_v1','crm_policy_service_v1','crm_advice_feedback_v1','crm_business_report_v1','crm_action_center_v1','crm_action_context_v1','crm_activity_review_preview_v1',
@@ -449,13 +449,28 @@ function createService({ request = pgRequest, rpc = pgRpc, disclosure = disclose
     return { personId, role: 'referrer', enabled: data.enabled };
   }
 
-  async function resolveIdentity(name) {
+  async function resolveIdentity(name, uid) {
     const resolved = await new PersonService({ request }).resolveName(name);
     const deleted = await request('persons', 'GET', {
       select: 'id', display_name: `eq.${resolved.displayName}`,
       deleted_at: 'not.is.null', limit: 1,
     });
-    return { ...resolved, deletedIdentity: deleted.length > 0 };
+    const roster = uid ? await rpc('crm_activity_roster_v1', {
+      p_actor: uid, p_op: 'lookup', p_input: { keys: [resolved.nameKey] },
+    }) : { profiles: [] };
+    const activityRosterCandidates = [];
+    for (const profile of (roster?.profiles || []).filter(row => !row.person_id)) {
+      const history = uid ? await rpc('crm_activity_roster_v1', {
+        p_actor: uid, p_op: 'history', p_input: { id: profile.id, page: 1 },
+      }) : { rows: [] };
+      activityRosterCandidates.push({
+        id: String(profile.id), version: String(profile.version), displayName: profile.display_name,
+        school: profile.school || '', organization: profile.organization || '',
+        phone: profile.phone || '', wechat: profile.wechat || '',
+        events: (history?.rows || []).map(row => row.name),
+      });
+    }
+    return { ...resolved, deletedIdentity: deleted.length > 0, activityRosterCandidates };
   }
 
   async function getPersonRoleRecovery(personId, kind, uid) {
@@ -511,6 +526,18 @@ function createService({ request = pgRequest, rpc = pgRpc, disclosure = disclose
       education: String(data.education || '').trim().slice(0, 120),
       source: kind === 'capture' ? '快速记录' : '人工新增',
     };
+    let rosterLink = null;
+    if (data.activityRosterId != null) {
+      if (kind !== 'person' || selected) throw new Error('Activity roster linking is only supported for a new Person');
+      const roster = await rpc('crm_activity_roster_v1', {
+        p_actor: uid, p_op: 'lookup', p_input: { keys: [resolution.nameKey] },
+      });
+      const candidate = (roster?.profiles || []).find(row => String(row.id) === String(data.activityRosterId));
+      if (!candidate || candidate.person_id || String(candidate.version) !== String(data.activityRosterVersion) ||
+          candidate.name_key !== resolution.nameKey) throw new Error('Activity roster candidate changed; review again');
+      rosterLink = { id: String(candidate.id), version: String(candidate.version), displayName: candidate.display_name };
+      payload.activityRosterLink = rosterLink;
+    }
     if (kind === 'capture') {
       const note = String(data.note || '').trim();
       if (!note || note.length > 10000) throw new Error('Invalid quick capture note');
@@ -552,9 +579,10 @@ function createService({ request = pgRequest, rpc = pgRpc, disclosure = disclose
       payload.facts = data.facts.map(item => item.trim());
       payload.signals = data.signals.map(item => item.trim());
     }
-    return rpc('person_identity_preview_v1', {
+    const result = await rpc('person_identity_preview_v1', {
       p_actor_uid: uid, p_idempotency_key: key, p_kind: kind, p_payload: payload,
     });
+    return rosterLink ? { ...result, activityRoster: rosterLink } : result;
   }
 
   async function executeIdentity(data, uid) {
@@ -562,7 +590,7 @@ function createService({ request = pgRequest, rpc = pgRpc, disclosure = disclose
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(previewId)) {
       throw new Error('Invalid preview ID');
     }
-    return rpc('person_identity_execute_v1', { p_actor_uid: uid, p_preview_id: previewId });
+    return rpc('person_identity_execute_with_roster_v1', { p_actor_uid: uid, p_preview_id: previewId });
   }
 
   // PMC-07: 修改已确认人物的基础资料（persons 表）
@@ -1123,7 +1151,7 @@ exports.main = async event => {
       case 'createRecruitCandidate': return await service.createRecruitCandidate(event.data, uid);
       case 'getRecruitCandidate': return await service.getRecruitCandidate(event.candidateId, event.personId);
       case 'transitionRecruitStage': return await service.transitionRecruitStage(event.data, uid);
-      case 'resolveIdentity': return await service.resolveIdentity(event.name);
+      case 'resolveIdentity': return await service.resolveIdentity(event.name, uid);
       case 'previewPersonListTransfer': return await service.previewPersonListTransfer(event.data, uid);
       case 'savePersonListTransferDecisions': return await service.savePersonListTransferDecisions(event.data, uid);
       case 'executePersonListTransfer': return await service.executePersonListTransfer(event.data, uid);

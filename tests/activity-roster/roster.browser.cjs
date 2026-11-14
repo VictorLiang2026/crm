@@ -60,14 +60,9 @@ test('iPad import defaults to Person reuse and requires explicit same or differe
   await p.evaluate(()=>{const file=new File(['姓名,电话\nRae,0011'], 'identity.csv',{type:'text/csv'}),dt=new DataTransfer();dt.items.add(file);const input=document.querySelector('input[type=file]');input.files=dt.files;input.dispatchEvent(new Event('change'));});
   await click('核对名单');await p.waitForFunction(()=>[...document.querySelectorAll('main select option')].some(o=>o.value==='p11'));
   assert.equal(await p.evaluate(()=>[...document.querySelectorAll('main select')].find(s=>[...s.options].some(o=>o.value==='p11')).value),'p11');
-  await click('预览变更');assert.equal(await p.evaluate(()=>window.prepared),null);
-  await p.evaluate(()=>{const s=[...document.querySelectorAll('main select')].find(x=>[...x.options].some(o=>o.value==='different'));s.value='different';s.dispatchEvent(new Event('change',{bubbles:true}));
-   const qualifier=document.querySelector('label.field-stack input[aria-label="区分姓名或限定词"]');qualifier.value='Rae（讲师）';
-   const existing=document.querySelector('input[aria-label^="为已有姓名添加限定词"]');existing.value='Rae（原联系人）';
-   const labels=[...document.querySelectorAll('label.field-stack')];for(const label of labels)if(['确认不是同一人，并按上述限定词新建人物','确认修改这个已有人物姓名'].some(v=>label.innerText.includes(v)))label.querySelector('input[type=checkbox]').click();
-  });
+  const confirmSame=await p.$('label input[type=checkbox]');assert.equal(await confirmSame.evaluate(node=>node.checked),true);
   await click('预览变更');await p.waitForFunction(()=>window.prepared!==null);
-  const staged=await p.evaluate(()=>window.prepared.rows[0]);assert.equal(staged.choice,'different');assert.equal(staged.values.display_name,'Rae（讲师）');assert.deepEqual(staged.renameExisting,[{personId:'11',displayName:'Rae（原联系人）'}]);
+  const staged=await p.evaluate(()=>window.prepared.rows[0]);assert.equal(staged.choice,'person');assert.equal(staged.personId,'11');
   assert.equal(await p.evaluate(()=>document.documentElement.scrollWidth>innerWidth+2),false);
  }finally{if(browser)await browser.close();server.closeAllConnections();await new Promise(r=>server.close(r));}
 });

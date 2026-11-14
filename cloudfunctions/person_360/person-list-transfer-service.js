@@ -112,11 +112,18 @@ class PersonListTransferService {
     }, { status: 'expired', payload: { rows: [] }, preview: { rows: [] }, decisions: {}, result: null, updated_at: this.now() });
   }
 
-  async buildRow(row, index) {
+  async buildRow(row, index, actorUid) {
     const values = rowValues(row);
     const parsed = parsePersonName(values.display_name);
     const resolution = await this.personService.resolveName(values.display_name);
     const candidates = resolution.candidates || [];
+    const rosterResult = await this.rpc('crm_activity_roster_v1', {
+      p_actor: actorUid, p_op: 'lookup', p_input: { keys: [parsed.nameKey] },
+    });
+    const activityRosterCandidates = (rosterResult?.profiles || []).filter(profile => !profile.person_id)
+      .map(profile => ({ id: String(profile.id), version: String(profile.version), displayName: profile.display_name,
+        nameKey: profile.name_key, phone: profile.phone || '', wechat: profile.wechat || '',
+        organization: profile.organization || '', school: profile.school || '' }));
     let current = [];
     if (candidates.length) {
       current = await this.request('persons', 'GET', {
@@ -135,18 +142,18 @@ class PersonListTransferService {
       const identified = snapshots.find(person => String(person.id) === values.PersonID);
       if (!identified || parsePersonName(identified.display_name).nameKey !== parsed.nameKey) {
         return { rowNumber: row.rowNumber || index + 2, values, baseName: parsed.nameKey,
-          candidates: snapshots, status: 'blocked', reason: 'PERSON_ID_NAME_MISMATCH', current: null };
+          candidates: snapshots, activityRosterCandidates, status: 'blocked', reason: 'PERSON_ID_NAME_MISMATCH', current: null };
       }
     }
     if (resolution.hasMore) {
       return { rowNumber: row.rowNumber || index + 2, values, baseName: parsed.nameKey,
-        candidates: snapshots, status: 'blocked', reason: 'TOO_MANY_NAME_MATCHES', current: null };
+        candidates: snapshots, activityRosterCandidates, status: 'blocked', reason: 'TOO_MANY_NAME_MATCHES', current: null };
     }
     let duplicateOf = null;
     if (row.fingerprint) duplicateOf = String(row.fingerprint);
     return { rowNumber: Number.isInteger(row.rowNumber) ? row.rowNumber : index + 2,
-      values, baseName: parsed.nameKey, candidates: snapshots,
-      status: candidates.length === 0 ? 'new' : 'needs_identity', current: null, duplicateOf,
+      values, baseName: parsed.nameKey, candidates: snapshots, activityRosterCandidates,
+      status: candidates.length === 0 ? (activityRosterCandidates.length ? 'needs_activity_roster_review' : 'new') : 'needs_identity', current: null, duplicateOf,
       personId: values.PersonID || null };
   }
 
@@ -173,7 +180,7 @@ class PersonListTransferService {
       if (command) return { previewId: command.id, status: command.status, preview: command.preview };
     }
     const built = [];
-    for (let index = 0; index < payload.rows.length; index += 1) built.push(await this.buildRow(payload.rows[index], index));
+    for (let index = 0; index < payload.rows.length; index += 1) built.push(await this.buildRow(payload.rows[index], index, actorUid));
     const seen = new Map();
     for (const row of built) {
       const rowHash = hash(row.values);
@@ -182,6 +189,7 @@ class PersonListTransferService {
     }
     const preview = { rows: built, counts: {
       new: built.filter(row => row.status === 'new').length,
+      activityRosterReview: built.filter(row => row.status === 'needs_activity_roster_review').length,
       update: built.filter(row => row.status === 'needs_identity').length,
       blocked: built.filter(row => row.status === 'blocked').length,
       duplicate: built.filter(row => row.status === 'duplicate').length,
@@ -213,6 +221,12 @@ class PersonListTransferService {
         const personId = idOf(decision.personId);
         if (!row.candidates.some(candidate => String(candidate.id) === personId)) throw new Error('PERSON_NOT_IN_PREVIEW');
         decisions[String(row.rowNumber)] = { kind: 'same', personId };
+      } else if (row.status === 'needs_activity_roster_review' && decision.kind === 'new') {
+        decisions[String(row.rowNumber)] = { kind: 'new' };
+      } else if (row.status === 'needs_activity_roster_review' && decision.kind === 'activity_roster') {
+        const candidate = row.activityRosterCandidates.find(profile => String(profile.id) === idOf(decision.profileId));
+        if (!candidate || String(candidate.version) !== String(decision.version)) throw new Error('PREVIEW_STALE');
+        decisions[String(row.rowNumber)] = { kind: 'activity_roster', profileId: String(candidate.id), version: String(candidate.version) };
       } else if (decision.kind === 'different') {
         const parsed = parsePersonName(decision.displayName);
         if (parsed.nameKey !== row.baseName || !parsed.hasQualifier) throw new Error('QUALIFIER_REQUIRED');
@@ -230,7 +244,14 @@ class PersonListTransferService {
           used.add(name.qualifierKey);
           return { personId: String(candidate.id), displayName: name.displayName };
         });
-        decisions[String(row.rowNumber)] = { kind: 'different', displayName: parsed.displayName, renameExisting: approvedRenames };
+        let activityRosterLink;
+        if (decision.activityRosterProfileId != null) {
+          const profile = row.activityRosterCandidates.find(item => String(item.id) === idOf(decision.activityRosterProfileId));
+          if (!profile || String(profile.version) !== String(decision.activityRosterVersion)) throw new Error('PREVIEW_STALE');
+          activityRosterLink = { id:String(profile.id), version:String(profile.version), displayName:profile.displayName };
+        }
+        decisions[String(row.rowNumber)] = { kind: 'different', displayName: parsed.displayName,
+          renameExisting: approvedRenames, ...(activityRosterLink ? { activityRosterLink } : {}) };
       } else throw new Error('INVALID_IMPORT_DECISION');
     }
     if (command.preview.counts?.blocked > 0) throw new Error('IMPORT_HAS_BLOCKED_ROWS');
@@ -243,7 +264,7 @@ class PersonListTransferService {
     const allDecisions = { ...(command.decisions || {}), ...decisions,
       fieldPolicy: { mode: fieldPolicy.mode || 'keep', mergeText: fieldPolicy.mergeText === true,
         fieldOverrides: fieldPolicy.fieldOverrides || {} } };
-    if (command.preview.rows.some(row => row.status === 'needs_identity' && !allDecisions[String(row.rowNumber)])) {
+    if (command.preview.rows.some(row => ['needs_identity','needs_activity_roster_review'].includes(row.status) && !allDecisions[String(row.rowNumber)])) {
       throw new Error('IDENTITY_DECISION_REQUIRED');
     }
     const result = await this.request(TABLE, 'PATCH', { id: `eq.${command.id}`, actor_uid: `eq.${actorUid}`, status: 'eq.preview' },
@@ -304,7 +325,7 @@ class PersonListTransferService {
         }
       }
       const decision = decisions[String(row.rowNumber)];
-      if (row.candidates.length && !decision) {
+      if ((row.candidates.length || row.status === 'needs_activity_roster_review') && !decision) {
         results.push({ rowNumber: row.rowNumber, status: 'needs_review', code: 'IDENTITY_DECISION_REQUIRED' });
         continue;
       }
@@ -340,6 +361,26 @@ class PersonListTransferService {
           !identity.candidates.some(candidate => candidate.id === String(target.id))) throw new Error('PREVIEW_STALE');
       const previous = row.candidates.find(candidate => String(candidate.id) === String(target.id));
       if (!previous || previous.updated_at !== target.updated_at) throw new Error('PREVIEW_STALE');
+    } else if (decision?.kind === 'activity_roster') {
+      if (identity.hasMore || identity.candidates.length) throw new Error('PREVIEW_STALE');
+      const selected = row.activityRosterCandidates.find(profile => String(profile.id) === String(decision.profileId));
+      if (!selected || String(selected.version) !== String(decision.version)) throw new Error('PREVIEW_STALE');
+      const current = await this.rpc('crm_activity_roster_v1', {
+        p_actor: actorUid, p_op: 'lookup', p_input: { keys: [row.baseName] },
+      });
+      const profile = (current?.profiles || []).find(item => String(item.id) === String(selected.id));
+      if (!profile || profile.person_id || String(profile.version) !== String(selected.version) || profile.name_key !== row.baseName) {
+        throw new Error('PREVIEW_STALE');
+      }
+      const fields = { ...row.values, display_name: name, name_key: row.baseName,
+        activityRosterLink: { id: String(profile.id), version: String(profile.version), displayName: profile.display_name } };
+      delete fields.PersonID;
+      const created = await this.rpc('crm_person_list_transfer_create_v1', {
+        p_actor_uid: actorUid, p_existing: [], p_new_person: fields,
+      });
+      if (created?.conflict || created?.code === 'PREVIEW_STALE') throw new Error('PREVIEW_STALE');
+      if (!created?.ok || !created.personId) throw new Error('PERSON_CONFLICT');
+      return { status: 'created', personId: String(created.personId), displayName: name, activityRosterLinked: true };
     } else {
       if (decision?.kind === 'different') {
         const priorIds = new Set(row.candidates.map(candidate => String(candidate.id)));
@@ -362,6 +403,15 @@ class PersonListTransferService {
         const parsed = parsePersonName(name);
         const fields = { ...row.values, display_name: name, name_key: parsed.nameKey };
         delete fields.PersonID;
+        if (decision.activityRosterLink) {
+          const currentRoster = await this.rpc('crm_activity_roster_v1', {
+            p_actor: actorUid, p_op: 'lookup', p_input: { keys: [row.baseName] },
+          });
+          const profile = (currentRoster?.profiles || []).find(item => String(item.id) === String(decision.activityRosterLink.id));
+          if (!profile || profile.person_id || String(profile.version) !== String(decision.activityRosterLink.version) ||
+              profile.name_key !== row.baseName || profile.display_name !== decision.activityRosterLink.displayName) throw new Error('PREVIEW_STALE');
+          fields.activityRosterLink = decision.activityRosterLink;
+        }
         const created = await this.rpc('crm_person_list_transfer_create_v1', {
           p_actor_uid: actorUid, p_existing: renameExisting, p_new_person: fields,
         });

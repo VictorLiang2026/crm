@@ -256,11 +256,18 @@ export function renderPersonListTransfer(ctx) {
       for (const row of preview?.rows || []) {
         if (row.personId && row.candidates.some(candidate => String(candidate.id) === String(row.personId))) {
           decisions[String(row.rowNumber)] = { kind: 'same', personId: String(row.personId) };
+        } else if (row.status === 'needs_activity_roster_review') {
+          const exact = (row.activityRosterCandidates || []).filter(candidate =>
+            String(candidate.displayName).trim().replace(/[（]/g,'(').replace(/[）]/g,')').toLowerCase() ===
+            String(row.values.display_name).trim().replace(/[（]/g,'(').replace(/[）]/g,')').toLowerCase());
+          if (exact.length === 1 && row.activityRosterCandidates.length === 1) {
+            decisions[String(row.rowNumber)] = { kind:'activity_roster', profileId:String(exact[0].id), version:String(exact[0].version) };
+          }
         }
       }
       setStatus(t('plt_analysis_ready'));
       busy = false; render();
-      const target = preview.rows.some(row => ['needs_identity','blocked'].includes(row.status))
+      const target = preview.rows.some(row => ['needs_identity','needs_activity_roster_review','blocked'].includes(row.status))
         ? ctx.main.querySelector('.plt-review-list, .plt-blocked-help')
         : ctx.main.querySelector('.plt-confirm-bar');
       target?.scrollIntoView({ behavior: 'auto', block: 'center' });
@@ -269,9 +276,10 @@ export function renderPersonListTransfer(ctx) {
 
   function renderPreview() {
     const rows = preview?.rows || [];
-    const unresolved = rows.filter(row => ['needs_identity'].includes(row.status) && !decisions[String(row.rowNumber)]);
+    const unresolved = rows.filter(row => ['needs_identity','needs_activity_roster_review'].includes(row.status) && !decisions[String(row.rowNumber)]);
     const plan = rows.reduce((result,row) => {
       if (row.status === 'new') { result.new += 1; return result; }
+      if (row.status === 'needs_activity_roster_review') { if (decisions[String(row.rowNumber)]) result.new += 1; return result; }
       if (row.status !== 'needs_identity') return result;
       const decision = decisions[String(row.rowNumber)];
       if (decision?.kind === 'different') { result.new += 1; result.rename += (decision.renameExisting || []).length; return result; }
@@ -308,7 +316,7 @@ export function renderPersonListTransfer(ctx) {
         const candidate = row.candidates.find(item => item.suggested);
         if (candidate) decisions[String(row.rowNumber)] = { kind: 'same', personId: String(candidate.id) };
       } render(); } }, [ic('check'), t('plt_accept_high')]);
-    const reviewCards = rows.filter(row => row.status === 'needs_identity' || row.status === 'blocked')
+    const reviewCards = rows.filter(row => row.status === 'needs_identity' || row.status === 'needs_activity_roster_review' || row.status === 'blocked')
       .map(row => renderIdentityRow(row));
     const conflicts = conflictRows(preview, decisions, policy);
     const blockedRows = rows.filter(row => row.status === 'blocked');
@@ -341,6 +349,23 @@ export function renderPersonListTransfer(ctx) {
       h('span', { class: 'plt-chip danger' }, t('plt_blocked_count')),
     ]);
     const rowDecision = decisions[String(row.rowNumber)];
+    if (row.status === 'needs_activity_roster_review') {
+      const candidates = row.activityRosterCandidates || [];
+      const card = h('article', { class:'plt-identity' }, [
+        h('div', { class:'plt-identity-head' }, [h('div', {}, [h('h3', {}, row.values.display_name),
+          h('p', { class:'plt-inline-help' }, t('plt_activity_roster_review'))]),
+          h('span', { class:'plt-chip suggested' }, t('plt_activity_roster'))]),
+      ]);
+      for (const candidate of candidates) card.append(h('div', { class:'plt-candidate act-warning' }, [
+        h('div', {}, [h('strong', {}, candidate.displayName),
+          h('p', { class:'foot-note' }, [candidate.organization,candidate.school,candidate.phone,candidate.wechat].filter(Boolean).join(' · ') || '—')]),
+        h('button', { class:'btn ' + (rowDecision?.kind==='activity_roster'&&rowDecision.profileId===String(candidate.id)?'btn-primary':'btn-soft'),
+          type:'button', onclick:()=>{decisions[String(row.rowNumber)]={kind:'activity_roster',profileId:String(candidate.id),version:String(candidate.version)};render();} }, t('plt_activity_link')),
+      ]));
+      card.append(h('button', { class:'btn ' + (rowDecision?.kind==='new'?'btn-primary':'btn-ghost'), type:'button',
+        onclick:()=>{decisions[String(row.rowNumber)]={kind:'new'};render();} }, t('plt_activity_create_only')));
+      return card;
+    }
     const draft = draftDifferent[String(row.rowNumber)] || {};
     const card = h('article', { class: 'plt-identity' }, [
       h('div', { class: 'plt-identity-head' }, [h('div', {}, [h('h3', {}, row.values.display_name),
@@ -374,9 +399,18 @@ export function renderPersonListTransfer(ctx) {
       }
       fields.push(qualifierInput(t('plt_incoming_name'), draft.displayName, value => { draft.displayName = value; }));
       card.append(h('div', { class: 'plt-qualifiers' }, fields), h('p', { class: 'plt-inline-help' }, t('plt_qualifier_help')),
+        (row.activityRosterCandidates || []).length ? h('div', { class:'act-warning' }, [
+          h('p', { class:'plt-inline-help' }, t('plt_activity_roster_review')),
+          ...row.activityRosterCandidates.map(profile => h('button', { class:'btn ' +
+            (String(draft.activityRosterProfileId || '')===String(profile.id)?'btn-primary':'btn-soft'), type:'button',
+            onclick:()=>{draft.activityRosterProfileId=String(profile.id);draft.activityRosterVersion=String(profile.version);render();} },
+            `${t('plt_activity_link')} · ${profile.displayName} · ${[profile.organization,profile.school].filter(Boolean).join(' · ')}`)),
+          h('button', { class:'btn btn-ghost', type:'button', onclick:()=>{delete draft.activityRosterProfileId;delete draft.activityRosterVersion;render();} },t('plt_activity_create_only')),
+        ]) : null,
         h('button', { class: 'btn btn-primary', type:'button', onclick: () => {
           const renameExisting = Object.entries(draft.renameExisting || {}).map(([personId, displayName]) => ({ personId, displayName }));
-          decisions[String(row.rowNumber)] = { kind:'different', displayName:draft.displayName, renameExisting };
+          decisions[String(row.rowNumber)] = { kind:'different', displayName:draft.displayName, renameExisting,
+            ...(draft.activityRosterProfileId?{activityRosterProfileId:String(draft.activityRosterProfileId),activityRosterVersion:String(draft.activityRosterVersion)}:{}) };
           render();
         } }, t('plt_apply_identity')));
     }

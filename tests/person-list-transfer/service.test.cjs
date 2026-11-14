@@ -22,9 +22,10 @@ test('a field override takes precedence over the batch conflict policy', () => {
   assert.equal(chooseValue('system','incoming',{mode:'keep',mergeText:false,fieldOverrides:{notes:'import'}},'notes').value,'incoming');
 });
 
-function fixture(seed = []) {
+function fixture(seed = [], rosterProfiles = []) {
   const persons = seed.map(person => ({ deleted_at: null, updated_at: stamp, ...person }));
   const commands = [];
+  const rpcCalls = [];
   const filter = (row, params = {}) => Object.entries(params).every(([key, value]) => {
     if (key === 'select' || key === 'order' || key === 'limit' || key === 'offset') return true;
     if (value.startsWith('eq.')) return String(row[key]) === value.slice(3);
@@ -73,6 +74,9 @@ function fixture(seed = []) {
     },
   };
   const rpc = async (name, args) => {
+    rpcCalls.push({ name, args });
+    if (name === 'crm_activity_roster_v1') return { profiles: rosterProfiles.filter(profile =>
+      (args.p_input.keys || []).includes(profile.name_key)) };
     if (name === 'crm_person_list_transfer_create_v1') {
       for (const rename of args.p_existing) {
         const row = persons.find(value => String(value.id) === String(rename.personId));
@@ -96,7 +100,7 @@ function fixture(seed = []) {
   };
   let time = Date.parse(stamp);
   const service = new PersonListTransferService({ request, rpc, personService, now: () => new Date(time++).toISOString() });
-  return { service, persons, commands };
+  return { service, persons, commands, rpcCalls, rosterProfiles };
 }
 
 async function preview(service, rows) {
@@ -109,6 +113,35 @@ test('parenthetical name resolution exposes one normalized-base candidate', asyn
   assert.equal(result.preview.rows[0].status, 'needs_identity');
   assert.equal(result.preview.rows[0].baseName, '张三');
   assert.equal(result.preview.rows[0].candidates[0].display_name, '张三');
+});
+
+test('Person list import reviews activity profiles and passes an explicit versioned link to the server transaction', async () => {
+  const profile = { id: '91', version: '3', person_id: null, display_name: '王五', name_key: '王五',
+    phone: '00123', wechat: 'wx-wang', organization: '活动公司', school: '活动学校' };
+  const { service, rpcCalls } = fixture([], [profile]);
+  const result = await preview(service, [{ rowNumber: 2, values: { display_name: '王五', phone: '00123' } }]);
+  assert.equal(result.preview.rows[0].status, 'needs_activity_roster_review');
+  assert.equal(result.preview.rows[0].activityRosterCandidates[0].id, '91');
+  await service.saveDecisions({ previewId: result.previewId, decisions: [{ rowNumber: 2,
+    decision: { kind:'activity_roster', profileId:'91', version:'3' } }], fieldPolicy:{mode:'keep'} }, ACTOR);
+  const executed = await service.execute({ previewId: result.previewId }, ACTOR);
+  assert.equal(executed.rows[0].activityRosterLinked, true);
+  const create = rpcCalls.find(call => call.name === 'crm_person_list_transfer_create_v1');
+  assert.deepEqual(create.args.p_new_person.activityRosterLink, { id:'91', version:'3', displayName:'王五' });
+});
+
+test('different-person import can explicitly link the newly qualified Person to an activity profile', async () => {
+  const profile = { id:'92', version:'6', person_id:null, display_name:'张三', name_key:'张三',
+    phone:'', wechat:'', organization:'活动单位', school:'活动学校' };
+  const { service, rpcCalls } = fixture([{ id:'1', display_name:'张三', name_key:'张三', phone:'111' }], [profile]);
+  const result = await preview(service, [{ rowNumber:2, values:{ display_name:'张三（老师）', phone:'222' } }]);
+  await service.saveDecisions({ previewId:result.previewId, decisions:[{rowNumber:2,decision:{
+    kind:'different',displayName:'张三（老师）',renameExisting:[{personId:'1',displayName:'张三（客户）'}],
+    activityRosterProfileId:'92',activityRosterVersion:'6',
+  }}],fieldPolicy:{mode:'keep'} },ACTOR);
+  await service.execute({previewId:result.previewId},ACTOR);
+  const create=rpcCalls.find(call=>call.name==='crm_person_list_transfer_create_v1');
+  assert.deepEqual(create.args.p_new_person.activityRosterLink,{id:'92',version:'6',displayName:'张三'});
 });
 
 test('different person decision qualifies a plain existing name and creates a distinct person', async () => {

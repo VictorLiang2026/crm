@@ -1293,6 +1293,7 @@ export function openPersonNew(ctx, { onDone } = {}) {
 
   function render(res, name) {
     const candidates = res.candidates || [];
+    const rosterCandidates = res.activityRosterCandidates || [];
     // 服务端契约（previewIdentity 同口径）：仅在无同名过多、无回收站同名且可人工确认时允许新建
     const canCreate = !res.hasMore && !res.deletedIdentity &&
       (['available', 'confirm_new_qualified'].includes(res.status) ||
@@ -1332,10 +1333,34 @@ export function openPersonNew(ctx, { onDone } = {}) {
       rows.push(h('p', { class: 'sheet-note', style: 'margin:0 0 8px' },
         res.status === 'available' ? t('identity_available') : t('identity_confirm_new')));
     }
+    let rosterChoice = null;
+    if (canCreate && rosterCandidates.length) {
+      const normalizeName = value => String(value || '').replace(/[（]/g,'(').replace(/[）]/g,')').replace(/\s+/g,' ').trim().toLowerCase();
+      const exact = rosterCandidates.filter(row => normalizeName(row.displayName) === normalizeName(name));
+      const preferred = exact.length === 1 && rosterCandidates.length === 1 ? exact[0] : null;
+      const none = h('input', { type: 'radio', name: 'activity-roster-link', checked: !preferred });
+      const options = [h('label', { class: 'field-stack' }, [none, h('span', {}, t('identity_roster_no_link'))])];
+      rosterCandidates.forEach((row, index) => {
+        const choice = h('input', { type: 'radio', name: 'activity-roster-link', checked: row.id === preferred?.id });
+        if (row.id === preferred?.id) rosterChoice = row;
+        choice.onchange = () => { rosterChoice = row; };
+        none.onchange = () => { rosterChoice = null; };
+        options.push(h('label', { class: 'field-stack act-warning' }, [
+          choice,
+          h('span', {}, `${row.displayName} · ${[row.organization, row.school, ...(row.events || [])].filter(Boolean).join(' · ')}`),
+          h('span', { class: 'row-sub' }, `${t('identity_roster_fields')}: ${[row.phone, row.wechat].filter(Boolean).join(' · ') || '—'}`),
+        ]));
+      });
+      rows.push(h('section', { class: 'act-warning' }, [
+        h('strong', {}, t('identity_roster_heading')),
+        h('p', { class: 'sheet-note' }, preferred ? t('identity_roster_exact') : t('identity_roster_review')),
+        ...options,
+      ]));
+    }
     if (canCreate) {
       rows.push(h('div', { class: 'sheet-actions' }, [
         h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => sheet.overlay.remove() }, t('cancel')),
-        h('button', { class: 'btn btn-primary', type: 'button', onclick: (e) => previewCreate(e.currentTarget, name) }, t('btn_create')),
+        h('button', { class: 'btn btn-primary', type: 'button', onclick: (e) => previewCreate(e.currentTarget, name, () => rosterChoice) }, t('btn_create')),
       ]));
     }
     sheet.swap(h('div', {}, [
@@ -1345,16 +1370,19 @@ export function openPersonNew(ctx, { onDone } = {}) {
     nameInput.readOnly = true;
   }
 
-  async function previewCreate(btn, name) {
+  async function previewCreate(btn, name, getRosterChoice) {
     busy(btn, true, t('creating'));
     try {
+      const rosterChoice = getRosterChoice?.();
       const pv = await p360(ctx, 'previewIdentity', { data: {
         kind: 'person', idempotencyKey: uuid(), displayName: name,
+        ...(rosterChoice ? { activityRosterId: rosterChoice.id, activityRosterVersion: rosterChoice.version } : {}),
       } });
       busy(btn, false, t('btn_create'));
       sheet.swap(h('div', {}, [
         previewBlock([
           kvRow(t('new_person_name'), name),
+          rosterChoice ? h('div', { class: 'act-warning' }, `${t('identity_roster_link_confirm')}: ${rosterChoice.displayName} · ${[rosterChoice.organization, rosterChoice.school, ...(rosterChoice.events || [])].filter(Boolean).join(' · ')}`) : null,
           h('div', { class: 'sheet-note', style: 'margin-top:8px' }, t('new_person_preview_note')),
         ]),
         h('div', { class: 'sheet-actions' }, [

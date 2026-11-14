@@ -44,28 +44,7 @@ async function activityRoster(actor,op,input,rpc){
   if(operation==='import'){
    if(r.choice==='profile')profile=profiles.find(p=>String(p.id)===String(r.id));
    else if(r.choice==='person')person=candidates.find(p=>String(p.id)===String(r.personId))||(identity.hasMore&&found.persons.find(p=>p.name_key===key&&String(p.id)===String(r.personId)));
-   else if(r.choice==='different'){
-    const parsed=parsePersonName(v.display_name);
-    if(identity.hasMore||!parsed.hasQualifier||parsed.nameKey!==key)throw Error('ROSTER_IDENTITY');
-    const plain=candidates.filter(p=>!parsePersonName(p.display_name).hasQualifier);
-    const rename=Array.isArray(r.renameExisting)?r.renameExisting:[];
-    if(plain.length!==rename.length)throw Error('ROSTER_IDENTITY');
-    const used=new Set(candidates.map(p=>parsePersonName(p.display_name)).filter(p=>p.hasQualifier).map(p=>p.qualifierKey));
-    if(used.has(parsed.qualifierKey))throw Error('ROSTER_IDENTITY');
-    used.add(parsed.qualifierKey);
-    const renameExisting=rename.map(item=>{
-     const candidate=plain.find(p=>String(p.id)===String(item?.personId));
-     const name=parsePersonName(String(item?.displayName||''));
-     if(!candidate||!name.hasQualifier||name.nameKey!==key||used.has(name.qualifierKey))throw Error('ROSTER_IDENTITY');
-     used.add(name.qualifierKey);
-     return {personId:String(candidate.id),expectedUpdatedAt:candidate.updated_at,displayName:name.displayName};
-    });
-    person={id:'different',name_key:key,display_name:v.display_name};
-    profile=profiles.find(p=>p.name_key===key&&!p.person_id)||null;
-    r._personCreation={display_name:parsed.displayName,name_key:key,phone:v.phone,wechat:v.wechat,organization:v.organization};
-    r._renameExisting=renameExisting;
-   }
-   else if(r.choice!=='independent')throw Error('ROSTER_IDENTITY');
+   else if(!['independent','different'].includes(r.choice))throw Error('ROSTER_IDENTITY');
    if((r.choice==='profile'&&!profile)||(r.choice==='person'&&!person))throw Error('ROSTER_CONFLICT');
    if(r.choice==='different')profile=null;
    else if(person)profile=profiles.find(p=>String(p.person_id)===String(person.id))||null;
@@ -84,7 +63,7 @@ async function activityRoster(actor,op,input,rpc){
   if(used.has(signature))throw Error('ROSTER_DUPLICATE_ROW');
   used.add(signature);
   plan.push({number:r.number||i+1,name_key:key,values:v,id:profile?.id??null,version:profile?.version??null,personId:r.choice==='different'?null:person?.id??null,
-   personVersion:person?.updated_at??null,choice:r.choice,...(r._personCreation?{newPerson:r._personCreation,renameExisting:r._renameExisting}:{}),changes,knownProfiles:profiles.map(p=>String(p.id)),knownPersons:found.persons.filter(p=>p.name_key===key).map(p=>String(p.id))});
+  personVersion:person?.updated_at??null,choice:r.choice==='different'?'independent':r.choice,changes,knownProfiles:profiles.map(p=>String(p.id)),knownPersons:found.persons.filter(p=>p.name_key===key).map(p=>String(p.id))});
  }
  if(op==='analyze')return {rows:output};
  if(!plan.length)throw Error('ROSTER_EMPTY');

@@ -46,28 +46,29 @@ export function renderRoster(ctx,preset=''){
   const matches=stack();
   async function analyze(rows){
    const analysis=await call(ctx,'analyze',{activityId:activity,rows});const decisions=[];
+   const normalizeName=value=>String(value||'').replace(/[（]/g,'(').replace(/[）]/g,')').replace(/\s+/g,' ').trim().toLowerCase();
+   const fileNameCounts=new Map();for(const row of rows){const key=normalizeName(row.values?.display_name);fileNameCounts.set(key,(fileNameCounts.get(key)||0)+1);}
    const nodes=analysis.rows.map((r,rowIndex)=>{
-    const normalizeName=value=>String(value||'').replace(/[（]/g,'(').replace(/[）]/g,')').replace(/\s+/g,' ').trim().toLowerCase();
-    const preferred=r.candidates.find(p=>normalizeName(p.display_name)===normalizeName(r.values.display_name))||r.candidates[0];
-    const initial=preferred?'p'+preferred.id:r.profiles.length?'r'+r.profiles[0].id:'new';
-    const choices=sel([...r.profiles.map(p=>['r'+p.id,tr('reuse')+' #'+p.id+' '+[p.display_name,p.school,p.organization,p.wechat,p.phone].filter(Boolean).join(' · ')]),...r.candidates.map(p=>['p'+p.id,'Person #'+p.id+' '+[p.display_name,p.organization,p.phone,p.wechat].filter(Boolean).join(' · ')]),...(r.candidates.length?[['different',tr('differentPerson')]]:[]),['new',tr('independent')],['skip',tr('skip')]],initial);
+    const fullName=normalizeName(r.values.display_name),duplicateFile=(fileNameCounts.get(fullName)||0)>1;
+    const relatedProfiles=r.profiles.filter(p=>p.person_id==null),exactProfiles=relatedProfiles.filter(p=>normalizeName(p.display_name)===fullName);
+    const exactCandidates=r.candidates.filter(p=>normalizeName(p.display_name)===fullName);
+    const exactCount=exactCandidates.length+exactProfiles.length;
+    const uniqueExact=exactCount===1?(exactCandidates.length?{type:'person',row:exactCandidates[0]}:{type:'profile',row:exactProfiles[0]}):null;
+    const initial=!duplicateFile&&uniqueExact?(uniqueExact.type==='person'?'p':'r')+uniqueExact.row.id:(r.candidates.length||relatedProfiles.length?'':'new');
+    const choices=sel([...relatedProfiles.map(p=>['r'+p.id,tr('reuse')+' #'+p.id+' '+[p.display_name,p.school,p.organization,p.wechat,p.phone].filter(Boolean).join(' · ')]),...r.candidates.map(p=>['p'+p.id,'Person #'+p.id+' '+[p.display_name,p.organization,p.phone,p.wechat].filter(Boolean).join(' · ')]),['new',tr('independent')],['skip',tr('skip')]],initial);
     const exact=r.hasMore?h('input',{type:'text',inputmode:'numeric',placeholder:tr('personId')}):null;
-    const changed=stack(),decisionHelp=stack();let picks=[];const sameConfirmed=h('input',{type:'checkbox'}),differentConfirmed=h('input',{type:'checkbox'});
-    const qualifier=h('input',{value:r.values.display_name,'aria-label':tr('qualify')});
-    const plainCandidates=r.candidates.filter(p=>!/(?:（[^（）]+）|\([^()]+\))\s*$/.test(p.display_name));
-    const renameEditors=plainCandidates.map(p=>({person:p,name:h('input',{value:'','aria-label':tr('renameExisting')+' '+p.display_name}),confirmed:h('input',{type:'checkbox'})}));
+    const changed=stack(),decisionHelp=stack();let picks=[];const sameConfirmed=h('input',{type:'checkbox',checked:!!uniqueExact&&!duplicateFile});
     const compare=()=>{picks=[];changed.replaceChildren();decisionHelp.replaceChildren();let p=choices.value[0]==='r'?r.profiles.find(x=>String(x.id)===choices.value.slice(1)):r.profiles.find(x=>x.person_id&&'p'+x.person_id===choices.value);if(!p)return;
      for(const f of fields.filter(k=>k!=='display_name'&&r.values[k]&&String(p[k]??'')!==r.values[k])){const cb=h('input',{type:'checkbox',disabled:p.person_id&&shared.includes(f)});changed.append(box(tr(f)+' · '+(p[f]||'—')+' → '+r.values[f],bar(cb,h('span',{},p.person_id&&shared.includes(f)?tr('personEdit'):tr('accept')))));picks.push([f,cb]);}};
-    const renderDecision=()=>{decisionHelp.replaceChildren();if(['p','r'].includes(choices.value[0]))decisionHelp.append(h('p',{class:'row-sub'},tr('samePersonPrompt')),box(tr('confirmSame'),sameConfirmed));
-     if(choices.value==='different'){decisionHelp.append(h('p',{class:'row-sub'},tr('differentPersonPrompt')),box(tr('qualify'),qualifier),...renameEditors.map(item=>card(h('strong',{},item.person.display_name),box(tr('renameExisting'),item.name),box(tr('confirmRename'),item.confirmed))),box(tr('confirmDifferent'),differentConfirmed));}
-     if(choices.value==='new')decisionHelp.append(h('p',{class:'row-sub'},tr('newPersonNoMatch')));};
-    choices.onchange=()=>{compare();renderDecision();};compare();renderDecision();
-    decisions.push(()=>{const v=exact?.value.trim()?'p'+exact.value.trim():choices.value;if(!v)throw Error('ROSTER_IDENTITY');const base={number:r.number,values:r.values,updateFields:picks.filter(([,c])=>c.checked).map(([k])=>k)};
+    const hasRelated=relatedProfiles.length>0||r.candidates.length>0;
+    const manualConfirmed=h('input',{type:'checkbox'});
+    const renderDecision=()=>{decisionHelp.replaceChildren();if(duplicateFile)decisionHelp.append(h('p',{class:'act-warning'},tr('duplicateFile')));if(hasRelated&&!uniqueExact)decisionHelp.append(h('p',{class:'act-warning'},tr('ambiguousName')));if((duplicateFile||(hasRelated&&!uniqueExact))&&choices.value!=='skip')decisionHelp.append(box(tr('confirmManualReview'),manualConfirmed));if(['p','r'].includes(choices.value[0]))decisionHelp.append(h('p',{class:'row-sub'},tr('samePersonPrompt')),box(tr('confirmSame'),sameConfirmed));};
+    choices.onchange=()=>{sameConfirmed.checked=false;compare();renderDecision();};compare();renderDecision();
+    decisions.push(()=>{const v=exact?.value.trim()?'p'+exact.value.trim():choices.value;if(!v)throw Error('ROSTER_IDENTITY');if(v!=='skip'&&(duplicateFile||(hasRelated&&!uniqueExact))&&!manualConfirmed.checked)throw Error('ROSTER_IDENTITY');const base={number:r.number,values:r.values,updateFields:picks.filter(([,c])=>c.checked).map(([k])=>k)};
      if(['p','r'].includes(v[0])){if(!sameConfirmed.checked)throw Error('ROSTER_IDENTITY');return {...base,choice:v[0]==='r'?'profile':'person',...(v[0]==='r'?{id:v.slice(1)}:{personId:v.slice(1)})};}
-     if(v==='different'){if(!differentConfirmed.checked||renameEditors.some(x=>!x.confirmed.checked))throw Error('ROSTER_IDENTITY');return {...base,choice:'different',values:{...r.values,display_name:qualifier.value},renameExisting:renameEditors.map(x=>({personId:String(x.person.id),displayName:x.name.value}))};}
      return {...base,choice:v==='new'?'independent':'skip'};});
     const rename=h('input',{value:r.values.display_name,'aria-label':tr('qualify')});
-    return card(h('strong',{},tr('row')+' '+r.number+' · '+r.values.display_name),r.hasMore?h('p',{},tr('more')):null,bar(rename,btn(tr('lookup'),safe(()=>analyze(rows.map((item,index)=>index===rowIndex?{...item,values:{...item.values,display_name:rename.value}}:item)),err))),h('p',{class:'row-sub'},fields.slice(1).map(f=>r.values[f]).filter(Boolean).join(' · ')),choices,exact,decisionHelp,changed);
+    return card(h('strong',{},tr('row')+' '+r.number+' · '+r.values.display_name),r.hasMore?h('p',{class:'act-warning'},tr('more')):null,bar(rename,btn(tr('lookup'),safe(()=>analyze(rows.map((item,index)=>index===rowIndex?{...item,values:{...item.values,display_name:rename.value}}:item)),err))),h('p',{class:'row-sub'},fields.slice(1).map(f=>r.values[f]).filter(Boolean).join(' · ')),choices,exact,decisionHelp,changed);
    });
    matches.replaceChildren(...nodes,btn(tr('preview'),safe(()=>preview('import',decisions.map(fn=>fn()),file.name,()=>body.replaceChildren(mapUI,matches)),err),true));
   }

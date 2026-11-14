@@ -13,7 +13,7 @@ const key = '5d998643-4c9a-44a5-a9b3-7605904b7ed2';
 const previewId = 'a45da2ae-b2ed-42c0-992e-e68e53085acc';
 const name = '【系统测试·勿联系】虚构目录甲';
 
-function fixture(people = []) {
+function fixture(people = [], rosterProfiles = []) {
   const calls = [];
   const request = async (table, method, filters) => {
     calls.push({ table, method, filters });
@@ -32,10 +32,35 @@ function fixture(people = []) {
   };
   const rpc = async (operation, body) => {
     calls.push({ operation, body });
+    if (operation === 'crm_activity_roster_v1') {
+      if (body.p_op === 'lookup') return { profiles: rosterProfiles, persons: [] };
+      if (body.p_op === 'history') return { rows: [{ name: '【系统测试·勿联系】活动甲' }] };
+    }
+    if (operation === 'person_identity_execute_with_roster_v1') return { personId: 990, activityRosterLinked: true };
     return { previewId, preview: { kind: body.p_kind }, status: 'preview' };
   };
   return { service: createService({ request, rpc }), calls };
 }
+
+test('new Person preview can link a reviewed unlinked activity profile with a version check', async () => {
+  const profile = { id: 81, person_id: null, display_name: name, name_key: name.toLowerCase(),
+    version: 4, organization: 'Fictional Studio', school: 'Fictional School', phone: '', wechat: '' };
+  const f = fixture([], [profile]);
+  const resolution = await f.service.resolveIdentity(name, 'test-uid');
+  assert.equal(resolution.activityRosterCandidates[0].id, '81');
+  assert.deepEqual(resolution.activityRosterCandidates[0].events, ['【系统测试·勿联系】活动甲']);
+  const preview = await f.service.previewIdentity({ kind: 'person', idempotencyKey: key,
+    displayName: name, activityRosterId: '81', activityRosterVersion: '4' }, 'test-uid');
+  assert.equal(preview.activityRoster.id, '81');
+  const command = f.calls.find(call => call.operation === 'person_identity_preview_v1');
+  assert.deepEqual(command.body.p_payload.activityRosterLink,
+    { id: '81', version: '4', displayName: name });
+  await assert.rejects(f.service.previewIdentity({ kind: 'person', idempotencyKey: key,
+    displayName: name, activityRosterId: '81', activityRosterVersion: '3' }, 'test-uid'), /candidate changed/);
+  const result = await f.service.executeIdentity({ previewId }, 'test-uid');
+  assert.equal(result.activityRosterLinked, true);
+  assert.ok(f.calls.some(call => call.operation === 'person_identity_execute_with_roster_v1'));
+});
 
 test('new Person requires resolution and defaults to no business role', async () => {
   const f = fixture();
