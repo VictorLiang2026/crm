@@ -26,4 +26,6 @@ The confirmation preview shows each Person's current and proposed display name. 
 
 ## Release record
 
-Git commit, release tag, and post-push local/CloudBase/GitHub consistency results are recorded here after the final release run.
+- Implementation commit: `4b5ac635afa9b83f2e8a9de0fd477d7fcb6da2de`; code release tag: `release-20261114-114915`.
+- Pushed atomically to GitHub `master` with the release tag. Post-push verification passed: GitHub `master` and the tag point to the local commit; online `admin.html` returned HTTP 200 with matching SHA-256; all 103 reachable static resources and 30 Cloud Functions / 336 source and config files match local.
+- The follow-up commit/tag records this receipt only; it does not change or redeploy CloudBase artifacts.
