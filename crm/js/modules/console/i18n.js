@@ -92,6 +92,7 @@ const DICT = {
   roster_personId: {"zh-CN":"候选过多时输入 Person ID","en":"Enter a Person ID if there are many matches"},
   roster_duplicateFile: {"zh-CN":"导入文件中有重复姓名，请核对后修改姓名或跳过重复行。","en":"This name appears more than once in the file. Review it, change the name, or skip duplicates."},
   roster_ambiguousName: {"zh-CN":"发现括号外相同或多个同名记录，请人工选择并确认身份；未确认前不能导入。","en":"The base name matches or multiple records exist. Choose and confirm the identity before importing."},
+  roster_confirmManualReview: {"zh-CN":"我已人工核对本行身份、同名候选和重复记录","en":"I reviewed this row's identity, matching candidates, and duplicates"},
   roster_savedInfo: {"zh-CN":"保留现有值","en":"Keep existing value"},
   advice_review_basis: {"zh-CN":"判断依据","en":"Basis for this advice"},
   advice_review_facts: {"zh-CN":"已记录事实","en":"Recorded facts"},
