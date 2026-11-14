@@ -62,7 +62,16 @@ test('iPad import defaults to Person reuse and requires explicit same or differe
   assert.equal(await p.evaluate(()=>[...document.querySelectorAll('main select')].find(s=>[...s.options].some(o=>o.value==='p11')).value),'p11');
   const confirmSame=await p.$('label input[type=checkbox]');assert.equal(await confirmSame.evaluate(node=>node.checked),true);
   await click('预览变更');await p.waitForFunction(()=>window.prepared!==null);
-  const staged=await p.evaluate(()=>window.prepared.rows[0]);assert.equal(staged.choice,'person');assert.equal(staged.personId,'11');
+  let staged=await p.evaluate(()=>window.prepared.rows[0]);assert.equal(staged.choice,'person');assert.equal(staged.personId,'11');
+  await click('取消');
+  await p.evaluate(()=>{const s=[...document.querySelectorAll('main select')].find(x=>[...x.options].some(o=>o.value==='different'));s.value='different';s.dispatchEvent(new Event('change'));});
+  await p.waitForSelector('input[aria-label="本次导入姓名（需加括号限定词）"]');
+  await p.$eval('input[aria-label="本次导入姓名（需加括号限定词）"]',n=>{n.value='Rae（讲师）';n.dispatchEvent(new Event('input',{bubbles:true}));});
+  await p.$eval('input[aria-label="已有 Person 姓名（需加括号限定词） #11"]',n=>{n.value='Rae（原联系人）';n.dispatchEvent(new Event('input',{bubbles:true}));});
+  await p.evaluate(()=>{const label=[...document.querySelectorAll('label')].find(x=>x.textContent.includes('确认不是同一人'));label.querySelector('input').click();});
+  await click('预览变更');await p.waitForFunction(()=>window.prepared?.rows?.[0]?.choice==='different');
+  staged=await p.evaluate(()=>window.prepared.rows[0]);assert.equal(staged.values.display_name,'Rae（讲师）');assert.deepEqual(staged.personRenames,[{personId:'11',displayName:'Rae（原联系人）'}]);
+  assert.equal(await p.evaluate(()=>document.querySelector('main').textContent.includes('Rae（原联系人）')),true);
   assert.equal(await p.evaluate(()=>document.documentElement.scrollWidth>innerWidth+2),false);
  }finally{if(browser)await browser.close();server.closeAllConnections();await new Promise(r=>server.close(r));}
 });
