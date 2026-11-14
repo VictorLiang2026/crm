@@ -29,5 +29,6 @@
 - 批量导入迁移候选版本 `20261114154500` 因 DO 块分隔符错误失败；平台任务确认该版本未应用。修正版本 `20261114154600` 已登记，远端迁移详情与 `public.crm_person_list_transfer_create_v1` 更新指纹确认发布成功。MCP 首次响应误报 `verified=false`，随后 read-only `migrationDetail` 和函数指纹确认目标版本已生效。
 - `person_360` 已部署；`activity-roster.js`、`person-list-transfer.js`、`write.js`、`i18n.js` 四个模块已逐文件上传。静态校验确认 103 个可达页面资源一致；云函数只读核对确认 30 个函数的 336 个源码/配置文件一致。
 - 迁移后重新采集的 public catalog 发现新增 identity 执行 RPC，已按仅 `service_role` 可执行的权限更新安全基线；最终 WP01 对该快照复核无漂移、无阻断。
-- 本地 Git commit/tag 与 GitHub 推送待执行。
+- 业务发布提交：`941b946a25cdb05febbeb52f35bd091b9a5cbf02`；发布标签：`release-20261114-1031`。GitHub `master`、标签及本地 HEAD 相同。
+- 发布后 `sync-check.ps1` 通过：线上 admin.html SHA-256 一致、103 个页面可达资源一致、30 个云函数的 336 个源码/配置文件一致。该记录更正属于文档更新，未改变业务云端产物。
 
