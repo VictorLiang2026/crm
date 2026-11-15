@@ -3649,6 +3649,8 @@ const DICT = {
   'fa_generation_output_blocked': { 'zh-CN': '模型输出包含测试内容，未保存。请重试；若持续出现，请联系管理员。', 'en': 'The model output contained test content and was not saved. Retry, or contact an administrator if this continues.' },
   'fa_generation_timeout': { 'zh-CN': '生成超时，任务状态已核对。请刷新列表后重试。', 'en': 'Generation timed out. The task status was checked. Refresh the list before retrying.' },
   'fa_generation_status_unknown': { 'zh-CN': '无法核实生成任务状态，请刷新列表确认后再重试。', 'en': 'The task status could not be verified. Refresh the list before retrying.' },
+  'fa_current_read_failed': { 'zh-CN': '当前跟进建议读取失败。', 'en': 'Could not load current follow-up advice.' },
+  'fa_history_read_failed': { 'zh-CN': '历史跟进建议读取失败。', 'en': 'Could not load follow-up advice history.' },
   'fa_load_failed': { 'zh-CN': '读取失败，请刷新后重试。', 'en': 'Could not load advice. Refresh and try again.' },
   'fa_save_failed': { 'zh-CN': '保存失败或记录已被其他人更新，请刷新后重试。', 'en': 'Save failed or the record changed. Refresh and try again.' },
   'fa_empty': { 'zh-CN': '还没有跟进建议。可从生成系统建议开始。', 'en': 'No follow-up advice yet. Start by generating system advice.' },

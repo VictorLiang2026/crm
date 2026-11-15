@@ -44,12 +44,35 @@ export function renderRoster(ctx,preset=''){
   const table=await readRosterFile(file);const mappings=table.headers.map(header=>sel([['__skip__',tr('ignore')],...fields.map(f=>[f,tr(f)])],fields.find(f=>aliases[f].includes(header.trim().toLowerCase()))||'__skip__'));
   const mapUI=card(h('h3',{},tr('mapping')+' · '+activityName()),h('p',{},file.name+' · '+table.rows.length),h('div',{class:'grid-2'},table.headers.map((header,i)=>box(header,mappings[i]))));
   const matches=stack();
-  async function analyze(rows){
-   const analysis=await call(ctx,'analyze',{activityId:activity,rows});const decisions=[];
-   const normalizeName=value=>String(value||'').replace(/[（]/g,'(').replace(/[）]/g,')').replace(/\s+/g,' ').trim().toLowerCase();
-   const fileNameCounts=new Map();for(const row of rows){const key=normalizeName(row.values?.display_name);fileNameCounts.set(key,(fileNameCounts.get(key)||0)+1);}
-   const nodes=analysis.rows.map((r,rowIndex)=>{
-    const fullName=normalizeName(r.values.display_name),duplicateFile=(fileNameCounts.get(fullName)||0)>1;
+  let reviewedRows = new Map();
+  let inputRows = [];
+  let checking = false;
+  async function analyze(rows, editedNumber) {
+   if (checking) return;
+   checking = true;
+   matches.inert = mapUI.inert = true;
+   try {
+    const analysis = await call(ctx,'analyze',{activityId:activity,rows});
+    const normalizeName = value => String(value||'').replace(/（/g,'(').replace(/）/g,')').replace(/\s+/g,' ').trim().toLowerCase();
+    const nameGroups = new Map();
+    for (const row of analysis.rows) {
+     const key = normalizeName(row.values.display_name);
+     if (!nameGroups.has(key)) nameGroups.set(key, []);
+     nameGroups.get(key).push(row.number);
+    }
+    const nextRows = new Map();
+    for (const r of analysis.rows) {
+     const fullName = normalizeName(r.values.display_name);
+     const peers = nameGroups.get(fullName);
+     const duplicateFile = peers.length > 1;
+     const signature = JSON.stringify([r.values, r.profiles, r.candidates, !!r.hasMore, peers]);
+     const previous = editedNumber === undefined ? null : reviewedRows.get(r.number);
+     // Keep the original controls, including partial decisions and field selections.
+     if (previous && r.number !== editedNumber && previous.signature === signature) {
+      nextRows.set(r.number, previous);
+      continue;
+     }
+     const needsReview = !!previous;
     const relatedProfiles=r.profiles.filter(p=>p.person_id==null),exactProfiles=relatedProfiles.filter(p=>normalizeName(p.display_name)===fullName);
     const exactCandidates=r.candidates.filter(p=>normalizeName(p.display_name)===fullName);
     const exactCount=exactCandidates.length+exactProfiles.length;
@@ -62,19 +85,29 @@ export function renderRoster(ctx,preset=''){
      for(const f of fields.filter(k=>k!=='display_name'&&r.values[k]&&String(p[k]??'')!==r.values[k])){const cb=h('input',{type:'checkbox',disabled:p.person_id&&shared.includes(f)});changed.append(box(tr(f)+' · '+(p[f]||'—')+' → '+r.values[f],bar(cb,h('span',{},p.person_id&&shared.includes(f)?tr('personEdit'):tr('accept')))));picks.push([f,cb]);}};
     const hasRelated=relatedProfiles.length>0||r.candidates.length>0;
     const manualConfirmed=h('input',{type:'checkbox'});
+    const requiresCheck=needsReview||duplicateFile||(hasRelated&&!uniqueExact);
     const differentName=h('input',{value:r.values.display_name,'aria-label':tr('qualifyIncoming')});
     const personNameInputs=r.candidates.map(p=>({person:p,input:h('input',{value:p.display_name,'aria-label':tr('qualifyExisting')+' #'+p.id})}));
     const differentConfirmed=h('input',{type:'checkbox'});
-    const renderDecision=()=>{decisionHelp.replaceChildren();if(duplicateFile)decisionHelp.append(h('p',{class:'act-warning'},tr('duplicateFile')));if(hasRelated&&!uniqueExact)decisionHelp.append(h('p',{class:'act-warning'},tr('ambiguousName')));if((duplicateFile||(hasRelated&&!uniqueExact))&&choices.value!=='skip')decisionHelp.append(box(tr('confirmManualReview'),manualConfirmed));if(['p','r'].includes(choices.value[0]))decisionHelp.append(h('p',{class:'row-sub'},tr('samePersonPrompt')),box(tr('confirmSame'),sameConfirmed));if(choices.value==='different'){decisionHelp.append(h('p',{class:'act-warning'},tr(r.hasMore?'differentTooMany':'differentPersonPrompt')),box(tr('qualifyIncoming'),differentName),...personNameInputs.map(x=>box(tr('qualifyExisting')+' · '+x.person.display_name+' #'+x.person.id,x.input)),box(tr('confirmDifferent'),differentConfirmed));}};
+    const renderDecision=()=>{decisionHelp.replaceChildren();if(duplicateFile)decisionHelp.append(h('p',{class:'act-warning'},tr('duplicateFile')));if(hasRelated&&!uniqueExact)decisionHelp.append(h('p',{class:'act-warning'},tr('ambiguousName')));if(requiresCheck&&choices.value!=='skip')decisionHelp.append(box(tr('confirmManualReview'),manualConfirmed));if(['p','r'].includes(choices.value[0]))decisionHelp.append(h('p',{class:'row-sub'},tr('samePersonPrompt')),box(tr('confirmSame'),sameConfirmed));if(choices.value==='different'){decisionHelp.append(h('p',{class:'act-warning'},tr(r.hasMore?'differentTooMany':'differentPersonPrompt')),box(tr('qualifyIncoming'),differentName),...personNameInputs.map(x=>box(tr('qualifyExisting')+' · '+x.person.display_name+' #'+x.person.id,x.input)),box(tr('confirmDifferent'),differentConfirmed));}};
     choices.onchange=()=>{sameConfirmed.checked=false;compare();renderDecision();};compare();renderDecision();
-    decisions.push(()=>{const v=exact?.value.trim()?'p'+exact.value.trim():choices.value;if(!v)throw Error('ROSTER_IDENTITY');if(v!=='skip'&&(duplicateFile||(hasRelated&&!uniqueExact))&&!manualConfirmed.checked)throw Error('ROSTER_IDENTITY');const base={number:r.number,values:r.values,updateFields:picks.filter(([,c])=>c.checked).map(([k])=>k)};
+    if (previous?.skipped()) { choices.value='skip'; compare(); renderDecision(); }
+    const decision=()=>{const v=exact?.value.trim()?'p'+exact.value.trim():choices.value;if(!v)throw Error('ROSTER_IDENTITY');if(v!=='skip'&&requiresCheck&&!manualConfirmed.checked)throw Error('ROSTER_IDENTITY');const base={number:r.number,values:r.values,updateFields:picks.filter(([,c])=>c.checked).map(([k])=>k)};
      if(v==='different'){if(r.hasMore||!differentConfirmed.checked)throw Error('ROSTER_IDENTITY');return {...base,values:{...base.values,display_name:differentName.value.trim()},choice:'different',personRenames:personNameInputs.map(x=>({personId:String(x.person.id),displayName:x.input.value.trim()}))};}
      if(['p','r'].includes(v[0])){if(!sameConfirmed.checked)throw Error('ROSTER_IDENTITY');return {...base,choice:v[0]==='r'?'profile':'person',...(v[0]==='r'?{id:v.slice(1)}:{personId:v.slice(1)})};}
-     return {...base,choice:v==='new'?'independent':'skip'};});
+     return {...base,choice:v==='new'?'independent':'skip'};};
     const rename=h('input',{value:r.values.display_name,'aria-label':tr('qualify')});
-    return card(h('strong',{},tr('row')+' '+r.number+' · '+r.values.display_name),r.hasMore?h('p',{class:'act-warning'},tr('more')):null,bar(rename,btn(tr('lookup'),safe(()=>analyze(rows.map((item,index)=>index===rowIndex?{...item,values:{...item.values,display_name:rename.value}}:item)),err))),h('p',{class:'row-sub'},fields.slice(1).map(f=>r.values[f]).filter(Boolean).join(' · ')),choices,exact,decisionHelp,changed);
-   });
-   matches.replaceChildren(...nodes,btn(tr('preview'),safe(()=>preview('import',decisions.map(fn=>fn()),file.name,()=>body.replaceChildren(mapUI,matches)),err),true));
+    const node=card(h('strong',{},tr('row')+' '+r.number+' · '+r.values.display_name),r.hasMore?h('p',{class:'act-warning'},tr('more')):null,bar(rename,btn(tr('lookup'),safe(()=>analyze(inputRows.map(item=>item.number===r.number?{...item,values:{...item.values,display_name:rename.value}}:item),r.number),err))),h('p',{class:'row-sub'},fields.slice(1).map(f=>r.values[f]).filter(Boolean).join(' · ')),choices,exact,decisionHelp,changed);
+    nextRows.set(r.number,{node,decision,signature,skipped:()=>choices.value==='skip'&&!exact?.value.trim()});
+   }
+   inputRows = rows;
+   reviewedRows = nextRows;
+   const reviewed = [...nextRows.values()];
+   matches.replaceChildren(...reviewed.map(row=>row.node),btn(tr('preview'),safe(()=>preview('import',reviewed.map(row=>row.decision()),file.name,()=>body.replaceChildren(mapUI,matches)),err),true));
+   } finally {
+    checking = false;
+    matches.inert = mapUI.inert = false;
+   }
   }
   mapUI.append(btn(tr('analyze'),safe(async()=>{const keys=mappings.map(m=>m.value==='other_info'?'notes':m.value),unique=keys.filter(k=>!['__skip__','notes'].includes(k));if(!unique.includes('display_name'))throw Error('ROSTER_INVALID');if(new Set(unique).size!==unique.length)throw Error('ROSTER_DUPLICATE_ROW');
     await analyze(table.rows.map(r=>{const v=mapMappedValues(r,table.headers,keys);const {notes,...values}=v;return {number:r.rowNumber,values:{...values,other_info:notes||''}};}));},err),true));

@@ -119,6 +119,11 @@ export function renderFollowupAdvice(ctx, personId) {
   let rows = [], legacyRows = [], busy = false, modal = null;
   const status = h('p', { class: 'fa-page-status', role: 'status' });
   const listRoot = h('div', { class: 'fa-list' });
+  const historyHost = h('div', {});
+  const reads = {
+    current: {state:'loading', request:0, fetch:()=>data.followupAdviceList(ctx, personId)},
+    history: {state:'loading', request:0, fetch:()=>data.dualFollowupHistory(ctx, personId)},
+  };
   const scriptsButton = h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => { void showScripts(); } }, [
     ic('chat'), text('scripts_button'),
   ]);
@@ -132,12 +137,34 @@ export function renderFollowupAdvice(ctx, personId) {
     } catch (error) { status.textContent = text(generationErrorKey(error?.code)); }
     finally { busy = false; createButton.disabled = false; }
   } }, [ic('sparkle'), text('generate_system')]);
-  async function load() {
-    const [current, legacy] = await Promise.all([
-      data.followupAdviceList(ctx, personId),
-      data.dualFollowupHistory(ctx, personId).catch(() => ({ rows: [] })),
-    ]);
-    rows = current.rows || []; legacyRows = legacy.rows || []; draw();
+  async function readList(key) {
+    const source = reads[key];
+    const request = ++source.request;
+    source.state = 'loading';
+    draw();
+    try {
+      const result = await source.fetch();
+      if (request !== source.request) return;
+      if (!Array.isArray(result.rows)) throw new Error('Invalid advice list');
+      if (key === 'current') rows = result.rows;
+      else legacyRows = result.rows;
+      source.state = 'ready';
+    } catch {
+      if (request !== source.request) return;
+      source.state = 'error';
+    }
+    draw();
+  }
+  function load() {
+    return Promise.all([readList('current'),readList('history')]);
+  }
+  function readNotice(key) {
+    if (reads[key].state === 'ready') return [];
+    if (reads[key].state === 'loading') return [h('p',{role:'status'},t('loading'))];
+    return [h('div',{class:'fa-muted',role:'status'},[
+      h('span',{},text(key+'_read_failed')+' '),
+      h('button',{class:'btn btn-ghost btn-sm',type:'button',onclick:()=>readList(key)},text('scripts_retry')),
+    ])];
   }
   async function showScripts() {
     if (busy || modal) return;
@@ -216,7 +243,7 @@ export function renderFollowupAdvice(ctx, personId) {
     } catch (_) { status.textContent = text('save_failed'); }
   }
   function draw() {
-    listRoot.replaceChildren(...(rows.length ? rows.map(row => h('article', { class: 'fa-row' }, [
+    listRoot.replaceChildren(...readNotice('current'), ...rows.map(row => h('article', { class: 'fa-row' }, [
       h('header', { class: 'fa-row-head' }, [h('div', {}, [h('h2', {}, row.title || row.system.title || '—'),
         h('p', {}, `${text('system_version')} ${row.system.version} · ${new Date(row.updatedAt).toLocaleString()}`)]),
         ['ready', 'failed'].includes(row.system.status) ? h('div', { class: 'fa-row-actions' }, [
@@ -230,17 +257,24 @@ export function renderFollowupAdvice(ctx, personId) {
           text(row.system.status === 'failed' ? 'system_failed' : 'system_generating'),ctx,row),
         compareLane(text('gpt'), row.gpt, 'gpt', text(`gpt_${row.gpt.status}`), text('gpt_skill_pending'),ctx,row),
       ]),
-    ])) : [h('p', { class: 'fa-empty' }, text('empty'))]));
-    if (modal) main.append(modal);
+    ])));
+    if (!rows.length && !legacyRows.length && reads.current.state==='ready' && reads.history.state==='ready') {
+      listRoot.append(h('p',{class:'fa-empty'},text('empty')));
+    }
+    const open = historyHost.querySelector('details')?.open ?? !rows.length;
+    historyHost.replaceChildren(...readNotice('history'));
+    if (legacyRows.length) historyHost.append(h('details',{class:'fa-legacy',open},[
+      h('summary',{},text('legacy_history')),
+      ...legacyRows.map(item=>h('article',{class:'fa-legacy-row'},[
+        h('b',{},new Date(item.createdAt).toLocaleString()),
+        ...(item.candidates||[]).map(candidate=>h('p',{},candidate.candidate?.summary||'—')),
+      ])),
+    ]));
+    if (modal && main.contains(listRoot)) main.append(modal);
   }
   const head = pageHead({ kicker: text('kicker'), title: text('title'), sub: text('person_description'), actions: [scriptsButton, createButton] });
-  const legacy = legacyRows.length ? h('details', { class: 'fa-legacy' }, [h('summary', {}, text('legacy_history')),
-    ...legacyRows.slice(0, 10).map(item => h('article', { class: 'fa-legacy-row' }, [
-      h('b', {}, new Date(item.createdAt).toLocaleString()),
-      ...(item.candidates || []).map(candidate => h('p', {}, candidate.candidate?.summary || '—')),
-    ]))]) : null;
-  main.replaceChildren(head, h('p', { class: 'fa-page-status' }, text('parallel_notice')), status, listRoot, legacy);
-  void load().catch(() => { status.textContent = text('load_failed'); });
+  main.replaceChildren(head, h('p', { class: 'fa-page-status' }, text('parallel_notice')), status, listRoot, historyHost);
+  void load();
 }
 
 // Keep the old route resolvable while the ChatGPT SKILL is being built.
