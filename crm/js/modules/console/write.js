@@ -1701,21 +1701,23 @@ export function openPersonEdit(ctx, { personId, onDone } = {}) {
     const customerPriorityOptions = [['', '—'], ...['A', 'B', 'C', 'D', 'E'].map(v => [v, t(`priority_${v.toLowerCase()}`)])];
     const recruitPrioritySel = sel(customerPriorityOptions, f.recruitment_priority || '');
     const nodes = [
-      fieldRow(t('field_name'), nameInput),
-      h('div', { style: 'display:flex;gap:10px' }, [
-        h('div', { class: 'sheet-field', style: 'flex:1' }, [h('label', {}, t('field_phone')), phoneInput]),
-        h('div', { class: 'sheet-field', style: 'width:170px' }, [h('label', {}, t('field_birthday')), birthdayInput]),
+      h('div', { class: 'person-edit-grid person-edit-grid-identity' }, [
+        h('div', { class: 'sheet-field' }, [h('label', {}, t('field_name')), nameInput]),
+        h('div', { class: 'sheet-field' }, [h('label', {}, t('field_gender')), genderSel]),
+        h('div', { class: 'sheet-field' }, [h('label', {}, t('field_birthday')), birthdayInput]),
       ]),
-      h('div', { style: 'display:flex;gap:10px' }, [
-        h('div', { class: 'sheet-field', style: 'flex:1' }, [h('label', {}, t('field_gender')), genderSel]),
-        h('div', { class: 'sheet-field', style: 'flex:1' }, [h('label', {}, t('field_wechat')), wechatInput]),
+      h('div', { class: 'person-edit-grid person-edit-grid-pair' }, [
+        h('div', { class: 'sheet-field' }, [h('label', {}, t('field_phone')), phoneInput]),
+        h('div', { class: 'sheet-field' }, [h('label', {}, t('field_wechat')), wechatInput]),
       ]),
-      h('div', { style: 'display:flex;gap:10px' }, [
-        h('div', { class: 'sheet-field', style: 'flex:1' }, [h('label', {}, t('field_occupation')), occupationInput]),
-        h('div', { class: 'sheet-field', style: 'flex:1' }, [h('label', {}, t('field_graduation_school')), graduationSchoolInput]),
-        h('div', { class: 'sheet-field', style: 'flex:1' }, [h('label', {}, t('field_department_or_major')), departmentOrMajorInput]),
+      h('div', { class: 'person-edit-grid person-edit-grid-pair' }, [
+        h('div', { class: 'sheet-field' }, [h('label', {}, t('field_occupation')), occupationInput]),
+        h('div', { class: 'sheet-field' }, [h('label', {}, t('field_source')), sourceInput]),
       ]),
-      fieldRow(t('field_source'), sourceInput),
+      h('div', { class: 'person-edit-grid person-edit-grid-pair' }, [
+        h('div', { class: 'sheet-field' }, [h('label', {}, t('field_graduation_school')), graduationSchoolInput]),
+        h('div', { class: 'sheet-field' }, [h('label', {}, t('field_department_or_major')), departmentOrMajorInput]),
+      ]),
       fieldRow(t('field_hobbies'), hobbiesTa),
       h('div', { style: 'display:flex;gap:10px' }, [
         h('div', { class: 'sheet-field', style: 'flex:1' }, [h('label', {}, t('field_customer_stage')), stageSel]),
