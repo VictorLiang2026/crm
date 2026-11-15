@@ -116,7 +116,7 @@ async function loadAll() {
     ),
     // PMC-10：展示姓名切换——customers 有 person_id 且 Person 未软删时，展示名/性别取 persons；
     // PMC-20：customers.customer_name/gender 已退出（CL-02），统计字段（customer_stage/sales_priority 等）不动
-    rdb.from('persons').select('id, display_name, gender, organization, customer_stage, sales_priority, first_contact_date').is('deleted_at', null),
+    rdb.from('persons').select('id, display_name, gender, graduation_school, customer_stage, sales_priority, first_contact_date').is('deleted_at', null),
   ]);
   if (vac && vac.error) throw new Error('v_action_center 读取失败：' + vac.error);
   // PMC-20：customers.customer_name/gender 已退出（CL-02），当前姓名/性别直接取 Person
@@ -139,7 +139,7 @@ async function loadAll() {
     const person = speaker.person_id ? personNameMap[speaker.person_id] : null;
     if (person) {
       speaker.name = person.display_name;
-      speaker.organization = person.organization || '';
+      speaker.organization = person.graduation_school || '';
     } else speaker.organization = '';
   }
   return {

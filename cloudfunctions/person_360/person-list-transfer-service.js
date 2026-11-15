@@ -7,7 +7,7 @@ const TABLE = 'crm_person_list_transfer_commands';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const FIELD_LIMITS = Object.freeze({
   display_name: 160, phone: 80, wechat: 160, gender: 16, birthday: 10,
-  occupation: 120, organization: 160, education: 120, source: 160,
+  occupation: 120, graduation_school: 160, department_or_major: 120, source: 160,
   hobbies: 8000, customer_stage: 32, sales_priority: 1, referral_priority: 1,
   marital_status: 40, first_contact_date: 10, notes: 8000,
 });
@@ -25,6 +25,7 @@ const idOf = value => {
   return id;
 };
 const stringValue = value => value == null ? '' : String(value).trim();
+const canonicalField = key => key === 'organization' ? 'graduation_school' : key === 'education' ? 'department_or_major' : key;
 
 function validateField(key, value) {
   if (!Object.hasOwn(FIELD_LIMITS, key)) throw new Error('FIELD_NOT_ALLOWED');
@@ -48,7 +49,9 @@ function rowValues(row) {
   const result = {};
   for (const [key, value] of Object.entries(row.values)) {
     if (key === 'PersonID') { result.PersonID = stringValue(value); continue; }
-    result[key] = validateField(key, value);
+    const field = canonicalField(key);
+    if (Object.hasOwn(result, field)) throw new Error('DUPLICATE_FIELD_MAPPING');
+    result[field] = validateField(field, value);
   }
   if (!result.display_name) throw new Error('NAME_REQUIRED');
   parsePersonName(result.display_name);
@@ -61,7 +64,9 @@ function evidenceFor(candidate, incoming) {
   if (candidate.display_name === incoming.display_name) evidence.push('exact_name');
   if (incoming.phone && candidate.phone && incoming.phone === candidate.phone) evidence.push('exact_phone');
   if (incoming.wechat && candidate.wechat && incoming.wechat === candidate.wechat) evidence.push('exact_wechat');
-  if (incoming.organization && candidate.organization && incoming.organization === candidate.organization) evidence.push('same_organization');
+  const incomingSchool = incoming.graduation_school || incoming.organization;
+  const candidateSchool = candidate.graduation_school || candidate.organization;
+  if (incomingSchool && candidateSchool && incomingSchool === candidateSchool) evidence.push('same_organization');
   if (incoming.occupation && candidate.occupation && incoming.occupation === candidate.occupation) evidence.push('same_occupation');
   const strong = evidence.includes('exact_phone') || evidence.includes('exact_wechat');
   return { evidence, suggested: strong || (candidate.display_name === incoming.display_name && evidence.includes('same_organization')) };
@@ -123,18 +128,20 @@ class PersonListTransferService {
     const activityRosterCandidates = (rosterResult?.profiles || []).filter(profile => !profile.person_id)
       .map(profile => ({ id: String(profile.id), version: String(profile.version), displayName: profile.display_name,
         nameKey: profile.name_key, phone: profile.phone || '', wechat: profile.wechat || '',
-        organization: profile.organization || '', school: profile.school || '' }));
+        graduation_school: profile.graduation_school || '', organization: profile.graduation_school || '', school: profile.school || '' }));
     let current = [];
     if (candidates.length) {
       current = await this.request('persons', 'GET', {
-        select: 'id,display_name,name_key,phone,wechat,gender,birthday,occupation,organization,education,source,hobbies,customer_stage,sales_priority,referral_priority,marital_status,first_contact_date,notes,updated_at',
+        select: 'id,display_name,name_key,phone,wechat,gender,birthday,occupation,graduation_school,department_or_major,source,hobbies,customer_stage,sales_priority,referral_priority,marital_status,first_contact_date,notes,updated_at',
         id: `in.(${candidates.map(candidate => candidate.id).join(',')})`, deleted_at: 'is.null', limit: String(candidates.length + 1),
       });
     }
     const snapshots = current.map(person => {
       const original = candidates.find(candidate => candidate.id === String(person.id));
       const match = evidenceFor(person, values);
-      return { ...person, organization: original?.organization ?? person.organization ?? null,
+      return { ...person, graduation_school: original?.graduation_school ?? person.graduation_school ?? null,
+        department_or_major: person.department_or_major ?? null,
+        organization: original?.graduation_school ?? person.graduation_school ?? null,
         occupation: original?.occupation ?? person.occupation ?? null, evidence: match.evidence,
         suggested: match.suggested };
     });
@@ -275,7 +282,7 @@ class PersonListTransferService {
 
   async currentPerson(personId) {
     const rows = await this.request('persons', 'GET', {
-      select: 'id,display_name,name_key,phone,wechat,gender,birthday,occupation,organization,education,source,hobbies,customer_stage,sales_priority,referral_priority,marital_status,first_contact_date,notes,updated_at',
+      select: 'id,display_name,name_key,phone,wechat,gender,birthday,occupation,graduation_school,department_or_major,source,hobbies,customer_stage,sales_priority,referral_priority,marital_status,first_contact_date,notes,updated_at',
       id: `eq.${idOf(personId)}`, deleted_at: 'is.null', limit: '1',
     });
     return rows[0] || null;
@@ -445,7 +452,7 @@ class PersonListTransferService {
   async exportPeople(data, actorValue) {
     this.assertActor(actorValue);
     const afterId = data?.afterId == null || data.afterId === '' ? null : idOf(data.afterId);
-    const allowed = new Set(['phone','wechat','gender','birthday','occupation','organization','education','source','hobbies',
+    const allowed = new Set(['phone','wechat','gender','birthday','occupation','graduation_school','department_or_major','source','hobbies',
       'customer_stage','sales_priority','referral_priority','marital_status','first_contact_date','notes']);
     const fields = Array.isArray(data?.fields) ? [...new Set(data.fields.map(String).filter(field => allowed.has(field)))] : [];
     const select = ['id','display_name',...fields].join(',');

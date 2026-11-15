@@ -122,7 +122,7 @@ function overviewNode(ctx, id, setName) {
     const isReferrer = (profile.roles || []).some(role => role.role === 'referrer');
     const infoPairs = [
       [t('field_phone'), f.phone], [t('field_gender'), translateEnum('gender', f.gender)], [t('field_birthday'), f.birthday],
-      [t('field_occupation'), f.occupation], [t('field_organization'), f.organization], [t('field_education'), f.education],
+      [t('field_occupation'), f.occupation], [t('field_graduation_school'), f.graduation_school], [t('field_department_or_major'), f.department_or_major],
       [t('field_wechat'), f.wx_account], [t('field_source'), translateEnum('person_source', f.source)], [t('field_hobbies'), f.hobbies],
       [t('field_customer_stage'), translateEnum('customer_stage', f.customer_stage)], [t('field_sales_priority'), translateEnum('sales_priority', f.sales_priority)],
       [t('col_recruit_priority'), translateEnum('sales_priority', f.recruitment_priority)],

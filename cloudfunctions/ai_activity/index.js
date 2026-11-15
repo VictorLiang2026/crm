@@ -51,12 +51,12 @@ async function enrichSpeakerPeople(rows) {
   const ids = [...new Set((rows || []).map(row => row.person_id).filter(Boolean).map(String))];
   if (!ids.length) return rows || [];
   const people = assertOk(await rdb.from('persons')
-    .select('id,display_name,organization')
+    .select('id,display_name,graduation_school')
     .in('id', ids).is('deleted_at', null)).data || [];
   const byId = new Map(people.map(person => [String(person.id), person]));
   return (rows || []).map(row => {
     const person = byId.get(String(row.person_id));
-    return person ? { ...row, name: person.display_name, organization: person.organization } : row;
+    return person ? { ...row, name: person.display_name, organization: person.graduation_school } : row;
   });
 }
 

@@ -26,7 +26,7 @@ const SKILLS = [
       mappings: { type: 'array', maxItems: 100, items: object({
         columnIndex: { type: 'integer', minimum: 0 },
         field: { anyOf: [
-          { enum: ['display_name','phone','wechat','gender','birthday','occupation','organization','education','source',
+          { enum: ['display_name','phone','wechat','gender','birthday','occupation','graduation_school','department_or_major','source',
             'hobbies','customer_stage','sales_priority','referral_priority','marital_status','first_contact_date','notes'] },
           { type: 'null' },
         ] },

@@ -53,7 +53,7 @@ async function loadPersonIdentity(rdb, row) {
   var identity = { source: 'customers_legacy', person_id: null, unmapped: true, conflicts: [] };
   if (row.person_id == null) return Object.assign({}, fallback, { identity: identity });
   var r = await rdb.from('persons')
-    .select('id, display_name, phone, wechat, gender, birthday, occupation, organization, education, source, hobbies, customer_stage, sales_priority, referral_priority, marital_status, first_contact_date')
+    .select('id, display_name, phone, wechat, gender, birthday, occupation, graduation_school, department_or_major, source, hobbies, customer_stage, sales_priority, referral_priority, marital_status, first_contact_date')
     .eq('id', row.person_id).is('deleted_at', null).maybeSingle();
   if (r.error) throw new Error(r.error);
   var p = r.data;
@@ -73,8 +73,10 @@ async function loadPersonIdentity(rdb, row) {
       if (lv && pv !== lv) identity.conflicts.push({ field: pair[1], person: pv, legacy: lv });
     } else merged[pair[1]] = pair[2] || null;
   });
-  merged.organization = p.organization || null;
-  merged.education = p.education || null;
+  merged.graduation_school = p.graduation_school || null;
+  merged.department_or_major = p.department_or_major || null;
+  merged.organization = p.graduation_school || null;
+  merged.education = p.department_or_major || null;
   return Object.assign({}, fallback, merged, { source: p.source, hobbies: p.hobbies, customer_stage: p.customer_stage, sales_priority: p.sales_priority, referral_priority: p.referral_priority, marital_status: p.marital_status, first_contact_date: p.first_contact_date, identity: identity });
 }
 
@@ -298,7 +300,7 @@ async function analyzeRecruitProfile(event) {
     '候选人：' + (ident.name || '') +
     (ident.occupation ? '\n现职/行业：' + ident.occupation : '') +
     (cand.annual_income ? '\n年收入：' + cand.annual_income : '') +
-    (ident.education ? '\n学历：' + ident.education : '') +
+    (ident.department_or_major ? '\n院系或专业：' + ident.department_or_major : '') +
     (cand.marital_status ? '\n婚况：' + cand.marital_status : '') +
     (cand.hobbies ? '\n爱好：' + cand.hobbies : '') +
     '\n已知增员资料（仅供参考，可补充纠正）：' +

@@ -91,7 +91,7 @@ async function loadPersonIdentity(rdb, customer) {
   const identity = { source: 'customers_legacy', person_id: null, unmapped: true, conflicts: [] };
   if (customer.person_id == null) return Object.assign({}, fallback, { identity: identity });
   const r = await rdb.from('persons')
-    .select('id, display_name, phone, wechat, gender, birthday, occupation, organization, education, source, hobbies, customer_stage, sales_priority, referral_priority, marital_status, first_contact_date')
+    .select('id, display_name, phone, wechat, gender, birthday, occupation, graduation_school, department_or_major, source, hobbies, customer_stage, sales_priority, referral_priority, marital_status, first_contact_date')
     .eq('id', customer.person_id).is('deleted_at', null).maybeSingle();
   if (r.error) throw new Error(r.error);
   const p = r.data;
@@ -111,8 +111,10 @@ async function loadPersonIdentity(rdb, customer) {
       if (lv && pv !== lv) identity.conflicts.push({ field: pair[1], person: pv, legacy: lv });
     } else merged[pair[1]] = pair[2] || null;
   });
-  merged.organization = p.organization || null;
-  merged.education = p.education || null;
+  merged.graduation_school = p.graduation_school || null;
+  merged.department_or_major = p.department_or_major || null;
+  merged.organization = p.graduation_school || null;
+  merged.education = p.department_or_major || null;
   return Object.assign({}, fallback, merged, { source: p.source, hobbies: p.hobbies, customer_stage: p.customer_stage, sales_priority: p.sales_priority, referral_priority: p.referral_priority, marital_status: p.marital_status, first_contact_date: p.first_contact_date, identity: identity });
 }
 
@@ -200,7 +202,8 @@ exports.main = async (event, context) => {
         name: ident.name, gender: ident.gender, birthday: ident.birthday,
         stage: customer.customer_stage, priority: customer.sales_priority,
         recruitment_priority: customer.recruitment_priority, referral_priority: customer.referral_priority,
-        occupation: ident.occupation, organization: ident.organization, education: ident.education,
+        occupation: ident.occupation, graduation_school: ident.graduation_school,
+        department_or_major: ident.department_or_major,
         annual_income: customer.annual_income,
         household_income: customer.household_income, hobbies: customer.hobbies,
         marital: customer.marital_status, children: customer.children_info,

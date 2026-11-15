@@ -2383,6 +2383,35 @@
     },
     {
       "kind": "relation",
+      "name": "person_profile_field_rename_backup_20261115",
+      "detail": {
+        "rls": true,
+        "type": "r",
+        "policies": [
+          {
+            "name": "person_profile_field_rename_backup_service_read",
+            "roles": [
+              "service_role"
+            ],
+            "command": "r",
+            "check_hash": "d41d8cd98f00b204e9800998ecf8427e",
+            "permissive": true,
+            "using_hash": "b326b5062b2f0e69046810717534cb09"
+          }
+        ],
+        "force_rls": false,
+        "privileges": {
+          "anon": [],
+          "service_role": [
+            "SELECT"
+          ],
+          "authenticated": []
+        },
+        "security_invoker": false
+      }
+    },
+    {
+      "kind": "relation",
       "name": "persons",
       "detail": {
         "rls": true,

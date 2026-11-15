@@ -96,7 +96,7 @@ async function enrichIdentity(rows, strict = false) {
   if (pids.length) {
     try {
       var pr = assertOk(await rdb.from('persons')
-        .select('id, display_name, phone, wechat, organization, occupation')
+        .select('id, display_name, phone, wechat, graduation_school, occupation')
         .in('id', pids).is('deleted_at', null));
       (pr.data || []).forEach(function (p) { pmap[p.id] = p; });
     } catch (e) { if (strict) throw e; /* Legacy Person 合并失败不阻塞 */ }
@@ -129,7 +129,7 @@ async function enrichIdentity(rows, strict = false) {
       name: person && person.display_name ? person.display_name : r.name,
       phone: person ? person.phone : null,
       wechat: person ? person.wechat : null,
-      organization: person ? person.organization : null,
+      organization: person ? person.graduation_school : null,
       linked_person: person ? { id: r.person_id, name: person.display_name } : null,
       linked_customer: r.customer_id != null ? (cmap[r.customer_id] || null) : null,
       linked_recruit: r.recruit_candidate_id != null ? (rmap[r.recruit_candidate_id] || null) : null,

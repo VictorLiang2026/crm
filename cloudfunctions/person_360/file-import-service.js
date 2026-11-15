@@ -3,7 +3,7 @@
 const { createHash } = require('node:crypto');
 const { TextDecoder } = require('node:util');
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const FIELDS = new Set(['customer_name','phone','gender','birthday','occupation','education',
+const FIELDS = new Set(['customer_name','phone','gender','birthday','occupation','department_or_major','education',
   'marital_status','customer_stage','sales_priority','referral_priority','hobbies','source','additional_info']);
 const MAX_BYTES = 4 * 1024 * 1024;
 function object(value) { return value && typeof value === 'object' && !Array.isArray(value); }

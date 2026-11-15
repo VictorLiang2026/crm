@@ -267,10 +267,13 @@ async function listActivityData(event) {
 }
 
 function createService({ request = pgRequest, rpc = pgRpc, disclosure = disclose } = {}) {
-  const findPerson = async id => one(await request('persons', 'GET', {
-    select: 'id,display_name,occupation,organization,updated_at',
-    id: `eq.${idOf(id)}`, deleted_at: 'is.null', limit: 1,
-  }));
+  const findPerson = async id => {
+    const person = one(await request('persons', 'GET', {
+      select: 'id,display_name,occupation,graduation_school,updated_at',
+      id: `eq.${idOf(id)}`, deleted_at: 'is.null', limit: 1,
+    }));
+    return person ? { ...person, organization: person.graduation_school } : null;
+  };
   const findHousehold = async anchorId => one(await request('households', 'GET', {
     select: 'id,anchor_person_id,important_facts',
     anchor_person_id: `eq.${idOf(anchorId)}`, deleted_at: 'is.null', limit: 1,
@@ -522,8 +525,8 @@ function createService({ request = pgRequest, rpc = pgRpc, disclosure = disclose
       display_name: resolution.displayName, name_key: resolution.nameKey,
       ...(selected ? { person_id: selected } : {}),
       occupation: String(data.occupation || '').trim().slice(0, 120),
-      organization: String(data.organization || '').trim().slice(0, 120),
-      education: String(data.education || '').trim().slice(0, 120),
+      graduation_school: String(data.graduation_school || data.graduationSchool || data.organization || '').trim().slice(0, 120),
+      department_or_major: String(data.department_or_major || data.departmentOrMajor || data.education || '').trim().slice(0, 120),
       source: kind === 'capture' ? '快速记录' : '人工新增',
     };
     let rosterLink = null;
@@ -597,13 +600,15 @@ function createService({ request = pgRequest, rpc = pgRpc, disclosure = disclose
   // 与 resolveName（解析候选身份）严格区分：本 action 只接受已知 personId，不凭姓名匹配
   const PERSON_EDITABLE_FIELDS = new Set([
     'display_name', 'phone', 'birthday', 'gender',
-    'occupation', 'organization', 'education', 'wechat', 'notes', 'source', 'hobbies',
+    'occupation', 'graduation_school', 'department_or_major', 'wechat', 'notes', 'source', 'hobbies',
     'customer_stage', 'sales_priority', 'referral_priority', 'marital_status', 'first_contact_date',
   ]);
   const PERSON_FIELD_MAP = {
     displayName: 'display_name', phone: 'phone', birthday: 'birthday',
-    gender: 'gender', occupation: 'occupation', organization: 'organization',
-    education: 'education', wechat: 'wechat', notes: 'notes', source: 'source',
+    gender: 'gender', occupation: 'occupation', graduationSchool: 'graduation_school',
+    graduation_school: 'graduation_school', departmentOrMajor: 'department_or_major',
+    department_or_major: 'department_or_major', organization: 'graduation_school', education: 'department_or_major',
+    wechat: 'wechat', notes: 'notes', source: 'source',
     hobbies: 'hobbies', customerStage: 'customer_stage', salesPriority: 'sales_priority',
     referralPriority: 'referral_priority', maritalStatus: 'marital_status',
     firstContactDate: 'first_contact_date',
@@ -984,10 +989,11 @@ function createService({ request = pgRequest, rpc = pgRpc, disclosure = disclose
   async function search(name) {
     const { nameKey } = parsePersonName(name);
     const candidates = await request('persons', 'GET', {
-      select: 'id,display_name,occupation,organization',
+      select: 'id,display_name,occupation,graduation_school',
       name_key: `eq.${nameKey}`, deleted_at: 'is.null', order: 'id.asc', limit: 11,
     });
-    return { candidates: candidates.slice(0, 10), hasMore: candidates.length > 10 };
+    const normalized = candidates.slice(0, 10).map(row => ({ ...row, organization: row.graduation_school }));
+    return { candidates: normalized, hasMore: candidates.length > 10 };
   }
 
   const personService = new PersonService({ request });

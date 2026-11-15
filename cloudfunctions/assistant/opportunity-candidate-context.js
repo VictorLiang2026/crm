@@ -23,7 +23,7 @@ async function buildCandidateContext(data, personId) {
   const id = idOf(personId);
   const read = data.read;
   const person = (await read('persons', { select: 'id,display_name,'+
-    'occupation,organization,updated_at', id: `eq.${id}`, deleted_at: 'is.null', limit: 1 }))[0];
+    'occupation,graduation_school,updated_at', id: `eq.${id}`, deleted_at: 'is.null', limit: 1 }))[0];
   if (!person) { const error = new Error('Person not found'); error.code='INVALID_INPUT'; throw error; }
   // PMC-19 CL-03: legacy_customer_id removed; resolve customer_id via customers.person_id
   const customer = (await read('customers', { select: 'Id', person_id: `eq.${id}`,
@@ -116,7 +116,8 @@ async function buildCandidateContext(data, personId) {
     `证据资料：${clip(row.category,70)} ${clip(row.photo_notes,160)}`,false,row.created_at,'photo_metadata');
   const deduped=[...new Map(evidence.map(x=>[x.ref,x])).values()].slice(0,30);
   return { person:{ id, displayName:clip(person.display_name,160),
-    occupation:clip(person.occupation,120),organization:clip(person.organization,120) },
+    occupation:clip(person.occupation,120),graduation_school:clip(person.graduation_school,120),
+    organization:clip(person.graduation_school,120) },
     evidence:deduped,
     existing_opportunities:opportunities.map(o=>({id:o.id,type:o.opportunity_type,
       status:o.status,reason:clip(o.last_progress,160)})),

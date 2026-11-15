@@ -89,7 +89,7 @@ async function get(event) {
   // PMC-09: 基础字段从 persons 读取（经 person_id），persons 无值时回退 customers
   if (c.data.person_id) {
     const p = assertOk(await rdb.from('persons')
-      .select('display_name, phone, wechat, gender, birthday, occupation, education,source,hobbies,customer_stage,sales_priority,referral_priority,marital_status,first_contact_date')
+      .select('display_name, phone, wechat, gender, birthday, occupation, department_or_major,source,hobbies,customer_stage,sales_priority,referral_priority,marital_status,first_contact_date')
       .eq('id', c.data.person_id).is('deleted_at', null).maybeSingle());
     if (p.data) {
       c.data.customer_name = p.data.display_name || c.data.customer_name;
@@ -98,7 +98,7 @@ async function get(event) {
       c.data.gender = p.data.gender || c.data.gender;
       c.data.birthday = p.data.birthday || c.data.birthday;
       c.data.occupation = p.data.occupation || c.data.occupation;
-      c.data.education = p.data.education || c.data.education;
+      c.data.education = p.data.department_or_major || c.data.education;
       Object.assign(c.data, {
         source: p.data.source, hobbies: p.data.hobbies, customer_stage: p.data.customer_stage,
         sales_priority: p.data.sales_priority, referral_priority: p.data.referral_priority,
@@ -268,7 +268,7 @@ async function update(event) {
       .select('person_id').eq('Id', id).maybeSingle());
     const prowOCR = crowOCR.data && crowOCR.data.person_id
       ? assertOk(await rdb.from('persons')
-          .select('display_name, phone, wechat, gender, birthday, occupation, education,source,hobbies,customer_stage,sales_priority,referral_priority,marital_status,first_contact_date')
+          .select('display_name, phone, wechat, gender, birthday, occupation, department_or_major,source,hobbies,customer_stage,sales_priority,referral_priority,marital_status,first_contact_date')
           .eq('id', crowOCR.data.person_id).maybeSingle())
       : { data: null };
     const curData = {};
@@ -279,7 +279,7 @@ async function update(event) {
       curData.gender = prowOCR.data.gender;
       curData.birthday = prowOCR.data.birthday;
       curData.occupation = prowOCR.data.occupation;
-      curData.education = prowOCR.data.education;
+      curData.education = prowOCR.data.department_or_major;
       curData.source = prowOCR.data.source;
       curData.hobbies = prowOCR.data.hobbies;
       curData.customer_stage = prowOCR.data.customer_stage;

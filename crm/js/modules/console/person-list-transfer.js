@@ -11,8 +11,8 @@ const PERSON_ID_ALIASES = new Set(['personid','person id','person_id']);
 const ALIASES = Object.freeze({
   phone: ['电话','手机','手机号','联系电话','phone','mobile'],
   wechat: ['微信','微信号','wechat','wechat id'], gender: ['性别','gender'], birthday: ['生日','出生日期','birthday'],
-  occupation: ['职业','职位','occupation','job','title'], organization: ['机构','单位','公司','组织','organization','company','institution'],
-  education: ['教育','学历','education'], source: ['来源','介绍来源','source'], hobbies: ['兴趣','爱好','hobbies','interests'],
+  occupation: ['职业','职位','occupation','job','title'], graduation_school: ['毕业院校','毕业学校','学校','院校','graduation school','university','alma mater'],
+  department_or_major: ['院系','院系或专业','专业','department','major'], source: ['来源','介绍来源','source'], hobbies: ['兴趣','爱好','hobbies','interests'],
   customer_stage: ['客户阶段','customer_stage','customer stage'], sales_priority: ['销售优先级','sales_priority','sales priority'],
   referral_priority: ['转介绍优先级','referral_priority','referral priority'], marital_status: ['婚姻状况','婚姻','marital_status','marital status'],
   first_contact_date: ['首次联系日期','初次联系日期','first_contact_date','first contact date'],
@@ -97,7 +97,7 @@ export function renderPersonListTransfer(ctx) {
   let draftDifferent = {};
   let policy = { mode: 'keep', mergeText: false, fieldOverrides: {} };
   let results = null;
-  let selectedExportFields = new Set(['phone','wechat','gender','birthday','occupation','organization','education','source','hobbies','notes']);
+  let selectedExportFields = new Set(['phone','wechat','gender','birthday','occupation','graduation_school','department_or_major','source','hobbies','notes']);
   let exportFormat = 'csv';
   let statusMessage = '';
   let statusError = false;
@@ -358,7 +358,7 @@ export function renderPersonListTransfer(ctx) {
       ]);
       for (const candidate of candidates) card.append(h('div', { class:'plt-candidate act-warning' }, [
         h('div', {}, [h('strong', {}, candidate.displayName),
-          h('p', { class:'foot-note' }, [candidate.organization,candidate.school,candidate.phone,candidate.wechat].filter(Boolean).join(' · ') || '—')]),
+          h('p', { class:'foot-note' }, [candidate.graduation_school,candidate.school,candidate.phone,candidate.wechat].filter(Boolean).join(' · ') || '—')]),
         h('button', { class:'btn ' + (rowDecision?.kind==='activity_roster'&&rowDecision.profileId===String(candidate.id)?'btn-primary':'btn-soft'),
           type:'button', onclick:()=>{decisions[String(row.rowNumber)]={kind:'activity_roster',profileId:String(candidate.id),version:String(candidate.version)};render();} }, t('plt_activity_link')),
       ]));
@@ -374,7 +374,7 @@ export function renderPersonListTransfer(ctx) {
     ]);
     for (const candidate of row.candidates) {
       const candidateBlock = h('div', { class: 'plt-candidate' }, [h('div', {}, [h('strong', {}, `Person #${candidate.id} · ${candidate.display_name}`),
-        h('p', { class: 'foot-note' }, [candidate.organization || '', candidate.occupation || ''].filter(Boolean).join(' · ')),
+        h('p', { class: 'foot-note' }, [candidate.graduation_school || candidate.organization || '', candidate.occupation || ''].filter(Boolean).join(' · ')),
         h('div', { class: 'plt-evidence' }, (candidate.evidence || []).map(key => t(({exact_name:'plt_evidence_name',exact_phone:'plt_evidence_phone',exact_wechat:'plt_evidence_wechat',same_organization:'plt_evidence_org'}[key] || 'plt_evidence_name'))).join(' · '))]),
         h('button', { class: 'btn ' + (rowDecision?.kind === 'same' && rowDecision.personId === String(candidate.id) ? 'btn-primary' : 'btn-soft'),
           type: 'button', onclick: () => { decisions[String(row.rowNumber)] = { kind:'same', personId:String(candidate.id) }; delete draftDifferent[String(row.rowNumber)]; render(); } }, t('plt_same_person'))]);

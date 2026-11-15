@@ -38,7 +38,7 @@ async function run(event, { app, rdb, gateway, engine } = {}) {
   const speakers = speakerResponse.data.filter(row => idOf(row.id) && idOf(row.person_id));
   const personIds = [...new Set(speakers.map(row => idOf(row.person_id)))];
   const personResponse = personIds.length ? await database.from('persons')
-    .select('id,display_name,organization').in('id', personIds)
+    .select('id,display_name,graduation_school').in('id', personIds)
     .is('deleted_at', null).limit(20) : { data: [] };
   if (personResponse?.error || !Array.isArray(personResponse?.data)) throw new Error('PERSON_POOL_READ_FAILED');
   const people = new Map(personResponse.data.map(row => [idOf(row.id), row]));
@@ -51,7 +51,7 @@ async function run(event, { app, rdb, gateway, engine } = {}) {
       const person = people.get(idOf(row.person_id));
       return { speakerId: idOf(row.id), personId: idOf(row.person_id),
         displayName: String(person.display_name || '').slice(0, 160),
-        organization: String(person.organization || '').slice(0, 200),
+        organization: String(person.graduation_school || '').slice(0, 200),
         position: String(row.position || '').slice(0, 200),
         expertise: String(row.expertise || '').slice(0, 600),
         topicSummary: String(row.topic_summary || '').slice(0, 600),

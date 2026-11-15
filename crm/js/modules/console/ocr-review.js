@@ -7,7 +7,7 @@ import { personFileHistory } from './person-files.js';
 
 const FIELDS = [
   ['phone', 'ocr_field_phone'], ['gender', 'ocr_field_gender'], ['birthday', 'ocr_field_birthday'],
-  ['occupation', 'ocr_field_occupation'], ['education', 'ocr_field_education'],
+  ['occupation', 'ocr_field_occupation'], ['department_or_major', 'ocr_field_department_or_major'],
   ['marital_status', 'ocr_field_marital'], ['customer_stage', 'ocr_field_stage'],
   ['sales_priority', 'ocr_field_sales_priority'], ['referral_priority', 'ocr_field_referral_priority'],
   ['hobbies', 'ocr_field_hobbies'], ['source', 'ocr_field_source'], ['additional_info', 'ocr_field_additional'],

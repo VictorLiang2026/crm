@@ -40,7 +40,7 @@ class MeetingPrepContextBuilder {
   async build(personId, { objection = '', scenario = '' } = {}) {
     const id = idOf(personId);
     const read = (table, filters) => this.request(table, 'GET', filters);
-    const person = (await read('persons', { select: 'id,display_name,occupation,organization',
+    const person = (await read('persons', { select: 'id,display_name,occupation,graduation_school',
       id: `eq.${id}`, deleted_at: 'is.null', limit: 1 }))[0];
     if (!person) throw new Error('Person not found');
     // PMC-19 CL-03: legacy_customer_id removed; resolve customer_id via customers.person_id
@@ -124,7 +124,8 @@ class MeetingPrepContextBuilder {
 
     return {
       person: { data: { id: person.id, display_name: clip(person.display_name, 120),
-        occupation: clip(person.occupation, 120), organization: clip(person.organization, 120) },
+        occupation: clip(person.occupation, 120), graduation_school: clip(person.graduation_school, 120),
+        organization: clip(person.graduation_school, 120) },
       source: { ...SOURCE('persons'), id: person.id } },
       household: primaryHousehold ? { important_facts: primaryFacts?.content || '',
         members: householdContext.members, households: householdGroups.map(group => ({ ...group,

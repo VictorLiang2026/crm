@@ -3,7 +3,7 @@ const testData = require('./test-data');
 // PMC-20：customers 人物基础列已退出（CL-02：customer_name/phone/gender/birthday/occupation/
 // wx_account/education）；当前基础信息只来自 persons。mbti 仍为 customers 域列。
 const CUSTOMER_FIELDS = 'Id,person_id,additional_info,tags,annual_income,household_income,properties_info,mbti,updated_at';
-const PERSON_FIELDS = 'id,display_name,phone,wechat,gender,birthday,occupation,organization,education,source,notes,hobbies,customer_stage,sales_priority,referral_priority,marital_status,first_contact_date,updated_at';
+const PERSON_FIELDS = 'id,display_name,phone,wechat,gender,birthday,occupation,graduation_school,department_or_major,source,notes,hobbies,customer_stage,sales_priority,referral_priority,marital_status,first_contact_date,updated_at';
 
 // Read the explicitly linked customer afresh; never reconcile identities by name.
 async function getCustomerProfile(personId, { request, disclose = testData.disclose }) {
@@ -37,7 +37,8 @@ async function getCustomerProfile(personId, { request, disclose = testData.discl
   const personFields = {
     customer_name: person.display_name, phone: person.phone, wx_account: person.wechat,
     gender: person.gender, birthday: person.birthday, occupation: person.occupation,
-    organization: person.organization, education: person.education, source: person.source,
+    graduation_school: person.graduation_school, department_or_major: person.department_or_major,
+    organization: person.graduation_school, education: person.department_or_major, source: person.source,
     hobbies: person.hobbies, customer_stage: person.customer_stage,
     sales_priority: person.sales_priority, referral_priority: person.referral_priority,
     marital_status: person.marital_status, first_contact_date: person.first_contact_date,
@@ -49,7 +50,8 @@ async function getCustomerProfile(personId, { request, disclose = testData.discl
   const personIdentity = {
     customer_name: person.display_name, phone: person.phone, wx_account: person.wechat,
     gender: person.gender, birthday: person.birthday, occupation: person.occupation,
-    organization: person.organization, education: person.education,
+    graduation_school: person.graduation_school, department_or_major: person.department_or_major,
+    organization: person.graduation_school, education: person.department_or_major,
     source: person.source, hobbies: person.hobbies, customer_stage: person.customer_stage,
     sales_priority: person.sales_priority, referral_priority: person.referral_priority,
     marital_status: person.marital_status, first_contact_date: person.first_contact_date,

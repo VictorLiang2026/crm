@@ -8,7 +8,7 @@ const LIMITS = Object.freeze({ interactions: 5, interactionsMax: 10, opportuniti
 const FIELDS = Object.freeze({
   // PMC-20: identity fields (name/occupation) live only on persons (CL-02 dropped
   // customers.customer_name/occupation); customers keeps domain state only.
-  persons: ['id', 'display_name', 'gender', 'birthday', 'occupation', 'organization', 'education'],
+  persons: ['id', 'display_name', 'gender', 'birthday', 'occupation', 'graduation_school', 'department_or_major'],
   customers: ['Id', 'person_id', 'customer_stage', 'sales_priority', 'first_contact_date', 'next_action', 'next_action_date'],
   followups: ['Id', 'customer_id', 'followup_date', 'interaction_summary', 'followup_notes', 'next_action', 'next_action_date', 'next_followup_date'],
   opportunities: ['id', 'customer_id', 'person_id', 'opportunity_type', 'status', 'last_progress', 'next_action', 'next_action_date'],

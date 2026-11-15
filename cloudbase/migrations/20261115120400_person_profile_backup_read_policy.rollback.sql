@@ -1,0 +1,3 @@
+REVOKE SELECT ON public.person_profile_field_rename_backup_20261115 FROM service_role;
+DROP POLICY person_profile_field_rename_backup_service_read
+  ON public.person_profile_field_rename_backup_20261115;

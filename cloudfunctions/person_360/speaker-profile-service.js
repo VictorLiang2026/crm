@@ -66,7 +66,7 @@ class SpeakerProfileService {
       throw new Error('Selected Person changed; resolve identity again');
     }
     const people = await this.request('persons', 'GET', {
-      select: 'id,display_name,phone,wechat,organization,occupation',
+      select: 'id,display_name,phone,wechat,graduation_school,occupation',
       id: `eq.${personId}`, deleted_at: 'is.null', limit: 1,
     });
     if (people.length !== 1 || people[0].display_name !== data.selectedDisplayName) {

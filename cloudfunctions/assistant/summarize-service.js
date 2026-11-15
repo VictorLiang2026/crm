@@ -40,7 +40,7 @@ async function runSummarize(event, options = {}) {
   }
 
   const persons = await restGet('persons', {
-    select: 'id,display_name,occupation,organization',
+    select: 'id,display_name,occupation,graduation_school',
     id: `eq.${personId}`, deleted_at: 'is.null', limit: 1,
   });
   const person = Array.isArray(persons) && persons[0];
@@ -67,7 +67,8 @@ async function runSummarize(event, options = {}) {
       id: person.id,
       display_name: person.display_name,
       occupation: person.occupation || null,
-      organization: person.organization || null,
+      graduation_school: person.graduation_school || null,
+      organization: person.graduation_school || null,
     },
     recent_interactions: (Array.isArray(interactions) ? interactions : []).map((i) => ({
       id: i.id, type: i.interaction_type, at: i.interaction_at,

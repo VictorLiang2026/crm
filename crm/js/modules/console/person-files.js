@@ -5,7 +5,7 @@ import {pageHead,sectionTitle,fmtDate} from './ui.js';
 import {fileImportNode} from './file-import.js';
 
 const FIELDS=[['phone','ocr_field_phone'],['gender','ocr_field_gender'],['birthday','ocr_field_birthday'],
- ['occupation','ocr_field_occupation'],['education','ocr_field_education'],['marital_status','ocr_field_marital'],
+ ['occupation','ocr_field_occupation'],['department_or_major','ocr_field_department_or_major'],['marital_status','ocr_field_marital'],
  ['hobbies','ocr_field_hobbies'],['source','ocr_field_source'],['notes','l04_person_notes']];
 const button=(key,fn)=>h('button',{class:'btn btn-ghost btn-sm',type:'button',onclick:fn},t(key));
 function key(){if(!globalThis.crypto?.randomUUID)throw Error(t('ocr_secure_ids_unavailable'));return crypto.randomUUID();}
@@ -106,7 +106,7 @@ export async function reviewPersonFile(ctx,job,host,onDone=()=>{}){
    if(generation!==epoch||query!==name.value.trim())return;
    const pick=c=>{selected=c;selectedNote.textContent=c.displayName+(c.id?' #'+c.id:' · '+t('btn_new_person'));previewButton.disabled=false;};
    for(const candidate of resolution.candidates||[]){
-    choices.append(buttonWithText(candidate.displayName+' · '+(candidate.occupation||t('occupation_empty'))+' · '+(candidate.organization||'')+' #'+candidate.id,()=>pick(candidate)));
+    choices.append(buttonWithText(candidate.displayName+' · '+(candidate.occupation||t('occupation_empty'))+' · '+(candidate.graduation_school||candidate.organization||'')+' #'+candidate.id,()=>pick(candidate)));
    }
    const canCreate=!resolution.hasMore&&!resolution.deletedIdentity&&
     (['available','confirm_new_qualified'].includes(resolution.status)||resolution.canCreateAfterConfirmation===true);

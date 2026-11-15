@@ -3,7 +3,7 @@
 const { createAIGateway } = require('./ai-gateway');
 const { createSearchData } = require('./search-data');
 
-const ALLOWED = new Set(['display_name','phone','wechat','gender','birthday','occupation','organization','education',
+const ALLOWED = new Set(['display_name','phone','wechat','gender','birthday','occupation','graduation_school','department_or_major',
   'source','hobbies','customer_stage','sales_priority','referral_priority','marital_status','first_contact_date','notes']);
 
 async function mapPersonListFields(data, deps = {}) {

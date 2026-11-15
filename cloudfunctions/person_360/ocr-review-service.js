@@ -1,7 +1,7 @@
 'use strict';
 
 const ALLOWED_FIELDS = new Set([
-  'phone', 'gender', 'birthday', 'occupation', 'education', 'marital_status',
+  'phone', 'gender', 'birthday', 'occupation', 'department_or_major', 'marital_status',
   'customer_stage', 'sales_priority', 'referral_priority', 'hobbies', 'source', 'additional_info',
 ]);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -105,13 +105,14 @@ function selectedFields(fields, selected) {
   const result = {};
   const seen = new Set();
   for (const key of selected) {
-    if (typeof key !== 'string' || !ALLOWED_FIELDS.has(key) || seen.has(key)) {
+    const field = key === 'education' ? 'department_or_major' : key;
+    if (typeof key !== 'string' || !ALLOWED_FIELDS.has(field) || seen.has(field)) {
       throw new Error('OCR field is outside the approved scope');
     }
-    seen.add(key);
-    const value = fields[key];
+    seen.add(field);
+    const value = fields[field] ?? fields[key];
     if (typeof value !== 'string' || !value.trim()) throw new Error(`OCR field is empty: ${key}`);
-    result[key] = value.trim();
+    result[field] = value.trim();
   }
   return result;
 }

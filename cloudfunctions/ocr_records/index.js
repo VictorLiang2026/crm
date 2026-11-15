@@ -89,7 +89,7 @@ async function remove(event) {
       .maybeSingle());
     if (custR.data?.person_id) {
       const personR = assertOk(await rdb.from('persons')
-        .select('id, display_name, phone, birthday, gender, occupation, organization, education, wechat, updated_at')
+        .select('id, display_name, phone, birthday, gender, occupation, graduation_school, department_or_major, wechat, updated_at')
         .eq('id', custR.data.person_id)
         .is('deleted_at', null)
         .maybeSingle());

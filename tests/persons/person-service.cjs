@@ -74,7 +74,7 @@ function installRestFetch(store) {
 }
 
 const person = (id, displayName, nameKey = '张玮') => ({
-  id, display_name: displayName, name_key: nameKey, organization: null,
+  id, display_name: displayName, name_key: nameKey, graduation_school: null,
   occupation: null, deleted_at: null,
 });
 
@@ -98,7 +98,7 @@ test('zero results allow a new person without selecting an identity', async () =
   assert.equal(result.selectedPersonId, null);
   assert.equal(calls[0].table, 'persons');
   assert.equal(calls[0].filters.name_key, '张玮');
-  assert.equal(calls[0].fields, 'id,display_name,name_key,organization,occupation');
+  assert.equal(calls[0].fields, 'id,display_name,name_key,graduation_school,occupation');
 });
 
 test('one result always needs human confirmation, even with a different qualifier', async () => {
@@ -159,12 +159,15 @@ test('createPerson POSTs whitelisted fields and returns id', async () => {
   try {
     const svc = new PersonService({ rdb: fixture().rdb });
     const out = await svc.createPerson({
-      display_name: '李雷', name_key: '李雷', phone: '139', occupation: '', source: '客户建档',
+      display_name: '李雷', name_key: '李雷', phone: '139', occupation: '',
+      graduation_school: '复旦大学', department_or_major: '经济系', source: '客户建档',
     });
     assert.equal(out.id, '1');
     assert.equal(rest.received[0].method, 'POST');
     assert.equal(rest.received[0].body.phone, '139');
     assert.equal(rest.received[0].body.occupation, null, '空串转 null');
+    assert.equal(rest.received[0].body.graduation_school, '复旦大学');
+    assert.equal(rest.received[0].body.department_or_major, '经济系');
     assert.equal(rest.received[0].body.source, '客户建档');
     await assert.rejects(svc.createPerson({ display_name: 'x', name_key: 'x', id: 9 }),
       e => e.code === 'FIELD_NOT_ALLOWED');
@@ -196,6 +199,22 @@ test('updateBasicsWithProjection writes via REST and reports lock conflicts', as
     await assert.rejects(
       service.updateBasicsWithProjection(11, { id: 11 }, {}),
       e => e.code === 'FIELD_NOT_ALLOWED');
+  } finally { rest.restore(); }
+});
+
+test('legacy Person field keys map to the renamed database columns', async () => {
+  const rows = [{ id: 12, display_name: '李雷', name_key: '李雷', occupation: '教师',
+    deleted_at: null, updated_at: '2026-10-01T00:00:00Z' }];
+  const rest = installRestFetch({ rows });
+  try {
+    const { service } = fixture(rows);
+    const result = await service.updateBasicsWithProjection(12,
+      { organization: '复旦大学', education: '经济系' }, {});
+    assert.equal(result.ok, true);
+    assert.deepEqual(rest.received[0].body, {
+      graduation_school: '复旦大学', department_or_major: '经济系',
+      updated_at: rest.received[0].body.updated_at,
+    });
   } finally { rest.restore(); }
 });
 

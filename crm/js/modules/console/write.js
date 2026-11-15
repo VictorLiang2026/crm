@@ -1667,8 +1667,8 @@ export function openPersonEdit(ctx, { personId, onDone } = {}) {
     const birthdayInput = h('input', { class: 'sheet-input', type: 'date', value: String(f.birthday || '').slice(0, 10) });
     const genderSel = sel([['', '—'], ['男', t('gender_male')], ['女', t('gender_female')], ['未知', t('gender_unknown')]], f.gender || '');
     const occupationInput = h('input', { class: 'sheet-input', maxlength: '120', value: f.occupation || '' });
-    const organizationInput = h('input', { class: 'sheet-input', maxlength: '120', value: f.organization || '' });
-    const educationInput = h('input', { class: 'sheet-input', maxlength: '120', value: f.education || '' });
+    const graduationSchoolInput = h('input', { class: 'sheet-input', maxlength: '120', value: f.graduation_school || f.organization || '' });
+    const departmentOrMajorInput = h('input', { class: 'sheet-input', maxlength: '120', value: f.department_or_major || f.education || '' });
     const wechatInput = h('input', { class: 'sheet-input', maxlength: '80', value: f.wx_account || '' });
     const sourceInput = h('input', { class: 'sheet-input', maxlength: '120', value: f.source || '' });
     const hobbiesTa = h('textarea', { class: 'sheet-textarea', style: 'min-height:56px', maxlength: '1000' }, f.hobbies || '');
@@ -1712,8 +1712,8 @@ export function openPersonEdit(ctx, { personId, onDone } = {}) {
       ]),
       h('div', { style: 'display:flex;gap:10px' }, [
         h('div', { class: 'sheet-field', style: 'flex:1' }, [h('label', {}, t('field_occupation')), occupationInput]),
-        h('div', { class: 'sheet-field', style: 'flex:1' }, [h('label', {}, t('field_organization')), organizationInput]),
-        h('div', { class: 'sheet-field', style: 'flex:1' }, [h('label', {}, t('field_education')), educationInput]),
+        h('div', { class: 'sheet-field', style: 'flex:1' }, [h('label', {}, t('field_graduation_school')), graduationSchoolInput]),
+        h('div', { class: 'sheet-field', style: 'flex:1' }, [h('label', {}, t('field_department_or_major')), departmentOrMajorInput]),
       ]),
       fieldRow(t('field_source'), sourceInput),
       fieldRow(t('field_hobbies'), hobbiesTa),
@@ -1766,8 +1766,8 @@ export function openPersonEdit(ctx, { personId, onDone } = {}) {
       putPerson('birthday', birthdayInput.value, String(f.birthday || '').slice(0, 10));
       putPerson('gender', genderSel.value, f.gender || '');
       putPerson('occupation', occupationInput.value.trim(), f.occupation);
-      putPerson('organization', organizationInput.value.trim(), f.organization);
-      putPerson('education', educationInput.value.trim(), f.education);
+      putPerson('graduation_school', graduationSchoolInput.value.trim(), f.graduation_school || f.organization);
+      putPerson('department_or_major', departmentOrMajorInput.value.trim(), f.department_or_major || f.education);
       putPerson('wechat', wechatInput.value.trim(), f.wx_account);
       putPerson('source', sourceInput.value.trim(), f.source);
       putPerson('hobbies', hobbiesTa.value.trim(), f.hobbies);

@@ -38,7 +38,7 @@ async function loadPersonIdentity(rdb, row) {
   const identity = { source: 'customers_legacy', person_id: null, unmapped: true, conflicts: [] };
   if (row.person_id == null) return Object.assign({}, fallback, { identity: identity });
   const r = await rdb.from('persons')
-    .select('id, display_name, phone, wechat, gender, birthday, occupation, organization, education')
+    .select('id, display_name, phone, wechat, gender, birthday, occupation, graduation_school, department_or_major')
     .eq('id', row.person_id).is('deleted_at', null).maybeSingle();
   if (r.error) throw new Error(r.error);
   const p = r.data;
@@ -58,8 +58,10 @@ async function loadPersonIdentity(rdb, row) {
       if (lv && pv !== lv) identity.conflicts.push({ field: pair[1], person: pv, legacy: lv });
     } else merged[pair[1]] = pair[2] || null;
   });
-  merged.organization = p.organization || null;
-  merged.education = p.education || null;
+  merged.graduation_school = p.graduation_school || null;
+  merged.department_or_major = p.department_or_major || null;
+  merged.organization = p.graduation_school || null;
+  merged.education = p.department_or_major || null;
   return Object.assign({}, fallback, merged, { identity: identity });
 }
 
@@ -114,7 +116,7 @@ function buildUser(c, ident, notice) {
     ['出生', ident.birthday],
     ['现职/行业', ident.occupation],
     ['年收入', c.annual_income],
-    ['学历', ident.education],
+    ['院系或专业', ident.department_or_major],
     ['MBTI', c.mbti],
     ['求职动机', c.motivation],
     ['顾虑点', c.concerns],

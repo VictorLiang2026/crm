@@ -51,7 +51,7 @@ class ConversationPlaybookContextBuilder {
     defaultRegistry.validateInput(SKILL, input);
     const personId = idOf(input.person_id);
     const read = (table, filters) => this.request(table, 'GET', filters);
-    const person = (await read('persons', { select: 'id,display_name,occupation,organization',
+    const person = (await read('persons', { select: 'id,display_name,occupation,graduation_school',
       id: `eq.${personId}`, deleted_at: 'is.null', limit: 1 }))[0];
     if (!person) throw new Error('Person not found');
 
@@ -91,7 +91,8 @@ class ConversationPlaybookContextBuilder {
     const context = {
       guidance: { principle: '先理解异议，不生成通用或逐字照读的话术。潜在原因只能作为待确认假设；先提出澄清问题，再给响应逻辑与下一步目标。只引用 reliable_evidence 中的 ID。没有可信证据时 evidenceRefs 为空，明确需要人工核实；不将推断写为事实。' },
       person: { display_name: clip(person.display_name, 120), occupation: clip(person.occupation, 120),
-        organization: clip(person.organization, 120), source: { ...SOURCE('persons'), id: person.id } },
+        graduation_school: clip(person.graduation_school, 120),
+        organization: clip(person.graduation_school, 120), source: { ...SOURCE('persons'), id: person.id } },
       recent_interactions: interactionRows.slice(0, 6).map(row => ({ type: clip(row.interaction_type, 80),
         at: row.interaction_at, summary: clip(row.summary, 400), importance: row.importance,
         source: { ...SOURCE('interactions'), id: row.id } })),
