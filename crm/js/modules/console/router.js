@@ -14,6 +14,7 @@ import {
 
 import { renderFollowupList } from './business-report.js';
 import { renderActionCenter } from './action-center.js';
+import { renderEducationBackfill } from './education-backfill.js';
 import { renderAssistantActionCreate } from '../assistant-action-create.js';
 import { renderAssistantActionChange } from '../assistant-action-change.js';
 import { renderAssistantOpportunityChange } from '../assistant-opportunity-change.js';
@@ -24,6 +25,7 @@ const EXACT = new Map([
   ['#/people', renderPeople],
   ['#/people/import', renderPersonFileImport],
   ['#/people-list-transfer', renderPersonListTransfer],
+  ['#/people-education', renderEducationBackfill],
   ['#/people-trash', renderPeopleTrash],
   ['#/recycle', renderRecycleHub],
   ['#/recycle/customers', renderCustomerTrash],
@@ -88,6 +90,7 @@ const NAV_OF = {
   '#/people': '#/people',
   '#/people/import': '#/people',
   '#/people-list-transfer': '#/more',
+  '#/people-education': '#/more',
   '#/people-trash': '#/people',
   '#/recycle': '#/more',
   '#/recycle/customers': '#/more',

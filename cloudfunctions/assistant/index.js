@@ -167,6 +167,12 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
     if (typeof identity?.uid !== 'string' || !identity.uid.trim() || identity.isAnonymous !== false) {
       return { ok: false, error: { code: 'UNAUTHORIZED', message: 'Login required' } };
     }
+    if (event?.action === 'educationBackfill') {
+      if (process.env.EDUCATION_BACKFILL_ENABLED !== 'true') {
+        return { ok:false,error:{code:'EDUCATION_NOT_ENABLED'} };
+      }
+      return require('./education-backfill-dispatch').dispatchEducationBackfill(event,identity);
+    }
     if (event?.action === 'mapPersonListFields') {
       if (!event || Object.keys(event).some(key => !['action','headers','language'].includes(key))) {
         return { ok: false, error: { code: 'INVALID_INPUT', message: 'Field mapping request is invalid' } };
@@ -517,6 +523,14 @@ exports.aiExperienceInput = aiExperienceInput;
 // Verify the caller before dispatching any private business operation.
 const protectedAssistant = require('./device-runtime').protect('assistant', exports.main);
 exports.main = function(event, context, callback) {
+  // A dedicated authenticated machine entrance. Never forward timer fields as a user action.
+  // Kept outside the shared device runtime so no other function's device paths change.
+  if (event?.TriggerName === 'educationBackfillWorker' && process.env.EDUCATION_BACKFILL_ENABLED === 'true') {
+    const education = require('./education-backfill-service');
+    if (education.isEducationTimer(event,process.env.EDUCATION_BACKFILL_TRIGGER_SECRET)) {
+      return require('./education-backfill-dispatch').dispatchEducationTimer(event);
+    }
+  }
   if (typeof callback === 'function' && requestsEarlyResponse(event?.__deviceRequest)) {
     if (context) context.callbackWaitsForEmptyEventLoop = false;
     return protectedAssistant(event, context, callback);

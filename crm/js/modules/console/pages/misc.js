@@ -14,14 +14,6 @@ function searchExamples() {
     t('search_example_3'),
   ];
 }
-function searchLabels() {
-  return {
-    activity_no_followup: t('search_label_activity_no_followup'),
-    child_education_no_insurance: t('search_label_child_education_no_insurance'),
-    declining_priority: t('search_label_declining_priority'),
-  };
-}
-
 function searchReasonText(reason, criteria) {
   const key = 'search_v2_condition_' + reason.condition;
   const translated = t(key);
@@ -39,16 +31,6 @@ function searchReasonText(reason, criteria) {
   if (references.length) details.push(references.join(', '));
   if (reason.verifiedAbsence) details.push(t('search_v2_no_recent_followup'));
   return details.length ? `${label}: ${details.join(' · ')}` : label;
-}
-
-function evidenceFor(row, template) {
-  if (template === 'activity_no_followup') {
-    return t('evidence_attendance_prefix') + row.participant_id + t('evidence_activity_prefix') + row.activity_id + ' · ' + (row.activity_date || '');
-  }
-  if (template === 'child_education_no_insurance') {
-    return t('evidence_family_prefix') + row.child_member_id + t('evidence_education_prefix') + 'public.' + row.education_source_table + ' #' + row.education_source_id;
-  }
-  return t('evidence_priority_prefix') + row.sales_priority + t('evidence_relationship_prefix') + row.relationship_id + t('evidence_trend_prefix') + row.trend;
 }
 
 function searchPanel(ctx) {
@@ -289,6 +271,7 @@ export function renderMore(ctx) {
     { kind: 'native', icon: 'check', key: 'ac_title', descKey: 'ac_desc', hash: '#/actions' },
     { kind: 'native', icon: 'book', key: 'nav_knowledge_library', descKey: 'tile_knowledge_library_desc', hash: '#/knowledge-library' },
     { kind: 'native', icon: 'file', key: 'plt_more_title', descKey: 'plt_more_desc', hash: '#/people-list-transfer' },
+    { kind: 'native', icon: 'book', key: 'edu_title', descKey: 'edu_intro', hash: '#/people-education' },
     { kind: 'native', icon: 'chart', key: 'm16_title', descKey: 'm16_desc', hash: '#/analytics' },
     { kind: 'native', icon: 'gear', key: 'nav_settings', descKey: 'tile_settings_desc', hash: '#/settings' },
     { kind: 'native', icon: 'refresh', key: 'more_recycle_title', descKey: 'trash_hub_note', hash: '#/recycle' },

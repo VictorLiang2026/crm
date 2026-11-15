@@ -18,14 +18,36 @@ test('search action keeps the old router and requires a real login', async () =>
   assert.equal(calls, 1);
 });
 
-test('model chooses only a template; names and evidence come from the database', async () => {
+test('model chooses only a template; names and evidence come from the database', async (t) => {
+  const previousEnv=process.env.TCB_ENV,previousKey=process.env.CRM_ASSISTANT_DB_API_KEY;
+  process.env.TCB_ENV='crm-search-fixture';
+  process.env.CRM_ASSISTANT_DB_API_KEY='fixture-only-service-key';
+  t.after(()=>{
+    if(previousEnv===undefined)delete process.env.TCB_ENV;else process.env.TCB_ENV=previousEnv;
+    if(previousKey===undefined)delete process.env.CRM_ASSISTANT_DB_API_KEY;else process.env.CRM_ASSISTANT_DB_API_KEY=previousKey;
+  });
+  let customerReads=0;
+  t.mock.method(global,'fetch',async(url,options)=>{
+    const request=new URL(String(url));
+    assert.equal(request.origin,'https://crm-search-fixture.api.tcloudbasegateway.com');
+    assert.equal(request.pathname,'/v1/rdb/rest/customers');
+    assert.equal(request.searchParams.get('person_id'),'in.(17)');
+    assert.equal(request.searchParams.get('deleted_at'),'is.null');
+    assert.equal(options.headers['Accept-Profile'],'public');
+    customerReads++;
+    return {ok:true,json:async()=>[{Id:27,person_id:17}]};
+  });
   const modelResult = { template: 'activity_no_followup', months: 3 };
   const calls = [];
   const gateway = { runAITask: async request => {
     calls.push(request);
     return { taskId: 7, resultId: 8, result: modelResult };
   } };
-  const data = { search: async (template, months, limit) => {
+  const data = { testDataReader:async(refs)=>{
+    assert.ok(refs.some(r=>r.table==='customers'&&r.id==='27'));
+    assert.ok(refs.some(r=>r.table==='persons'&&r.id==='17'));
+    return {status:'verified',containsTestData:false,recordCount:0,sources:[]};
+  }, search: async (template, months, limit) => {
     assert.deepEqual([template, months, limit], ['activity_no_followup', 3, 30]);
     return { total: 1, coverage: { source: 'attended_participants', rows: 2 },
       rows: [{ person_id: 17, display_name: '[CRM_TEST_ONLY]甲', activity_id: 4,
@@ -38,6 +60,7 @@ test('model chooses only a template; names and evidence come from the database',
   assert.equal(response.execution.businessDataWritten, false);
   assert.equal(calls[0].context.guidance.rules.includes('Never output SQL'), true);
   assert.equal(JSON.stringify(calls[0]).includes('[CRM_TEST_ONLY]甲'), false);
+  assert.equal(customerReads,1);
 });
 
 test('unsupported model interpretation never runs a database search', async () => {
