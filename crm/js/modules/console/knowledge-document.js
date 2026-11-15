@@ -77,21 +77,54 @@ export function overviewRow(ctx,id){
   const button=(label,fn)=>h('button',{class:'btn btn-ghost btn-sm',onclick:async e=>{
     const b=e.currentTarget;b.disabled=true;try{await fn();}catch(err){ctx.toast(err.message||tr('unavailable'),'error');}finally{b.disabled=false;}
   }},tr(label));
-  const draw=overview=>{
+  const draw=(overview,verified=false,draft)=>{
     const list=overview.parts||[];
     panel.replaceChildren(h('h3',{},tr('overview')),h('p',{},tr('coverage')+' '+(list.map(r=>r.start+'–'+r.end).join(', ')||'—')+' / '+overview.pages),
       ...list.map(r=>h('p',{},[h('b',{},volumeNumber(id,r.part)+' · '+r.start+'–'+r.end+' '),r.summary])));
     if(overview.originalReady)panel.append(button('original',()=>download(ctx,id)));
-    panel.append(h('h3',{},tr('gpt')),h('p',{},overview.needsReview?tr('stale'):(overview.gpt||tr('empty'))));
-    const edit=async generate=>{
+    panel.append(h('h3',{},tr('gpt')),h('p',{class:'kg-document-summary-text'},overview.needsReview?tr('stale'):(overview.gpt||tr('empty'))),
+      h('p',{role:'status'},tr(verified?'verified':'version').replace('{v}',String(overview.gptVersion))));
+    const edit=async (generate,retained)=>{
       const initial=generate?(await api(ctx,'documentDraft',{id,basis:overview.basis})).summary:overview.gpt;
-      const field=h('textarea',{class:'kg-document-summary-editor',rows:'6',maxlength:12000,'aria-label':tr('gpt')});field.value=initial||'';
-      const editor=h('div',{},[field,button('saveGpt',async()=>draw(await api(ctx,'documentGpt',{id,basis:overview.basis,version:overview.gptVersion,summary:field.value})))]);
+      const field=h('textarea',{class:'kg-document-summary-editor',rows:'6',maxlength:12000,'aria-label':tr('gpt')});field.value=retained??initial??'';
+      const notice=h('p',{role:'status'},retained===undefined?'':tr('changed'));
+      const save=button('saveGpt',async()=>{
+        if (!field.value.trim()) {notice.textContent=tr('required');return;}
+        const submitted=field.value;
+        field.readOnly=true;
+        const verify=current=>{
+          if (current.gpt===submitted && current.gptVersion===overview.gptVersion+1 &&
+              current.basis===overview.basis && !current.needsReview) draw(current,true);
+          else draw(current,false,submitted);
+        };
+        const reread=async()=>{
+          try { verify(await api(ctx,'documentOverview',{id})); }
+          catch { notice.textContent=tr('unverified'); }
+        };
+        try {
+          // documentGpt returns a fresh database overview after the conditional write.
+          verify(await api(ctx,'documentGpt',{id,basis:overview.basis,version:overview.gptVersion,summary:submitted}));
+        } catch {
+          save.replaceWith(button('retry',reread));
+          await reread();
+        }
+      });
+      const editor=h('div',{},[field,notice,save]);
       panel.querySelector('textarea')?.parentElement.remove();panel.append(editor);field.focus();
     };
-    if(list.length)panel.append(button('generate',()=>edit(true)),button('editGpt',()=>edit(false)));
+    if(list.length){
+      const controls=h('div',{},[button('generate',()=>start(true)),button('editGpt',()=>start(false))]);
+      async function start(generate,retained) {
+        controls.hidden=true;
+        try {await edit(generate,retained);} catch(err){controls.hidden=false;throw err;}
+      }
+      panel.append(controls);
+      if(draft!==undefined)void start(false,draft);
+    } else if(draft!==undefined) {
+      panel.append(h('p',{role:'alert'},tr('changed')),h('pre',{class:'kg-document-summary-text'},draft));
+    }
   };
-  const load=()=>api(ctx,'documentOverview',{id}).then(draw).catch(()=>panel.replaceChildren(button('retry',load)));
+  const load=()=>api(ctx,'documentOverview',{id}).then(overview=>draw(overview)).catch(()=>panel.replaceChildren(button('retry',load)));
   void load();
   return h('tr',{},h('td',{colspan:8},panel));
 }

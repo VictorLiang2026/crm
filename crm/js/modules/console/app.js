@@ -80,6 +80,8 @@ function forceReLogin() {
         persistActivity(true);
         const waiters = sessionWaiters; sessionWaiters = []; reloginShowing = false;
         waiters.forEach((r) => { try { r(); } catch (e) { /* 忽略 */ } });
+        visits.clear();
+        activeVisit = null;
         route();
       },
     });
@@ -106,12 +108,65 @@ async function changeCurrentPassword(oldPassword, newPassword) {
 }
 
 // ---------- 路由 ----------
+// Keep list context in this signed-in tab. History contains only an opaque entry key.
+const visits = new Map();
+let activeVisit = null;
+let stopTracking = () => {};
+function visitFor(hash) {
+  const entry = history.state?.crmVisit;
+  let visit = visits.get(entry);
+  if (!visit || visit.hash !== hash) {
+    const key = crypto.randomUUID();
+    const fromPerson = activeVisit?.hash.startsWith('#/person/');
+    const source = fromPerson ? activeVisit.directory : activeVisit;
+    visit = { hash };
+    if (hash.startsWith('#/person/') && source?.hash.startsWith('#/people')) visit.directory = source;
+    if (hash === '#/people' && fromPerson && source?.list) visit.list = structuredClone(source.list);
+    visits.set(key, visit);
+    if (visits.size > 150) visits.delete(visits.keys().next().value);
+    history.replaceState({ ...history.state, crmVisit: key }, '');
+  }
+  activeVisit = visit;
+  return visit;
+}
 function route() {
   if (!loginReady || !shell) return;
   const raw = location.hash || '#/today';
+  stopTracking();
+  const visit = visitFor(raw);
+  const main = shell.main.cloneNode(false);
+  shell.main.replaceWith(main);
+  shell.main = main;
   shell.setActive(navHashFor(raw));
   dispatch(raw, {
-    main: shell.main,
+    main,
+    restoredList: Boolean(visit.list),
+    listContext(state, scrollSelector) {
+      const saved = visit.list;
+      if (saved) Object.assign(state, structuredClone(saved.state));
+      visit.list = {state, top: saved?.top || 0, left: saved?.left || 0};
+      const list = visit.list;
+      let restoring = Boolean(saved);
+      const remember = () => {
+        if (restoring || location.hash !== raw || !main.isConnected) return;
+        list.top = window.scrollY;
+        list.left = scrollSelector ? main.querySelector(scrollSelector)?.scrollLeft || 0 : 0;
+      };
+      window.addEventListener('scroll', remember, true);
+      main.addEventListener('click', remember, true);
+      stopTracking = () => {
+        window.removeEventListener('scroll', remember, true);
+        main.removeEventListener('click', remember, true);
+      };
+      return () => {
+        if (restoring) requestAnimationFrame(() => {
+          if (!restoring || !main.isConnected) return;
+          if (scrollSelector) main.querySelector(scrollSelector)?.scrollTo(list.left, 0);
+          window.scrollTo(0, list.top);
+          restoring = false;
+        });
+      };
+    },
     api,
     callFn,
     recruitFiles: deviceFiles(callFn,'recruit'),
@@ -149,8 +204,11 @@ function enterApp(appRoot) {
   });
   if (!hashBound) {
     hashBound = true;
-    window.addEventListener('hashchange', route);
-    window.addEventListener('popstate', route);
+    window.addEventListener('hashchange', event => {
+      if (!event.newURL || event.newURL === location.href) route();
+    });
+    // Settings requests a same-page refresh after switching language.
+    window.addEventListener('popstate', event => { if (!event.isTrusted) route(); });
   }
   route();
 }

@@ -89,7 +89,7 @@ function documentService(request,rpc,generateSummary){
     if(op==='documentGpt'){
       const overview=await read();
       if(!overview.parts.length||d.basis!==overview.basis||d.version!==overview.gptVersion||typeof d.summary!=='string'||!d.summary.trim()||d.summary.length>12000)invalid('DOCUMENT_CONFLICT');
-      const saved=await request('knowledge_documents','PATCH',{id:'eq.'+doc.id,gpt_version:'eq.'+overview.gptVersion,select:'id'},{gpt_summary:d.summary.trim(),gpt_basis:d.basis,gpt_version:overview.gptVersion+1});
+      const saved=await request('knowledge_documents','PATCH',{id:'eq.'+doc.id,gpt_version:'eq.'+overview.gptVersion,select:'id'},{gpt_summary:d.summary,gpt_basis:d.basis,gpt_version:overview.gptVersion+1});
       if(saved.length!==1)invalid('DOCUMENT_CONFLICT');return read();
     }
     invalid();

@@ -67,9 +67,12 @@ export function renderPeople(ctx,initialPolicyFilter) {
   const iphoneLayout = document.documentElement.classList.contains('crm-iphone-layout');
   const emptyFilters = () => ({ roles: [], customerPriorities: [], recruitPriorities: [], referralPriorities: [] });
   const state = { page: 1, keyword: '', sortField: 'id', sortDir: 'desc', worklistStatus: 'all', policyFilter: 'all', filters: emptyFilters(), pendingFilters: emptyFilters() };
+  const restorePosition = ctx.listContext?.(state, '.people-directory-scroll');
+  state.pendingFilters = structuredClone(state.filters);
   const listEl = h('div', {});
   const metaEl = h('span', { class: 'foot-note' }, '');
   const input = h('input', { placeholder: t('search_name_ph') });
+  input.value = state.keyword;
   const prevBtn = h('button', { class: 'btn btn-ghost btn-sm', type: 'button' }, t('btn_prev'));
   const nextBtn = h('button', { class: 'btn btn-ghost btn-sm', type: 'button' }, t('btn_next'));
   const pageInfo = h('span', { class: 'pager-info' }, '');
@@ -84,6 +87,8 @@ export function renderPeople(ctx,initialPolicyFilter) {
   const policyFilter = h('select',{'aria-label':t('policy_service'),onchange:()=>{
     state.policyFilter=policyFilter.value;state.page=1;runQuery();
   }},['all','review','renewal','verify'].map(value=>h('option',{value},t('policy_filter_'+value))));
+  worklistFilter.value = state.worklistStatus;
+  policyFilter.value = state.policyFilter;
   const worklistTools = h('div', { class: 'toolbar', hidden: true, style: 'display:none' }, [
     h('label', {}, [t('l01_status'), ' ', worklistFilter]),
     h('label', {}, [t('policy_service'),' ',policyFilter]),
@@ -118,6 +123,12 @@ export function renderPeople(ctx,initialPolicyFilter) {
         ...(customerView && state.policyFilter!=='all'?{policyFilter:state.policyFilter}:{}),
       });
       if (version !== queryVersion) return h('span', {});
+      if (Number.isInteger(res.totalPages) && state.page > Math.max(1, res.totalPages)) {
+        state.page = Math.max(1, res.totalPages);
+        runQuery();
+        return h('span');
+      }
+      restorePosition?.();
       const rows = res.rows || [];
       metaEl.textContent = state.keyword
         ? t('meta_total_kw').replace('{kw}', state.keyword).replace('{total}', res.total)
@@ -207,7 +218,7 @@ export function renderPeople(ctx,initialPolicyFilter) {
         ];
         // Keep existing responsive labels aligned with the localized table headers.
         cells.forEach((td, i) => { if (i > 0) td.setAttribute('data-label', cols[i].label); });
-        return h('tr', { onclick: () => { location.hash = `#/person/${p.id}`; } }, cells);
+        return h('tr', { onclick: event => { if (!event.target.closest('a,button')) location.hash = `#/person/${p.id}`; } }, cells);
       }));
       const iphoneView = iphoneLayout
         ? participantView ? 'participant' : customerView ? 'customer' : 'default'
@@ -297,6 +308,11 @@ export function renderPeople(ctx,initialPolicyFilter) {
   function selectView(role) {
     const next = { ...emptyFilters(), roles: role ? [role] : [] };
     state.filters = next;
+    if (!role) {
+      input.value = '';
+      state.worklistStatus = worklistFilter.value = 'all';
+      state.policyFilter = policyFilter.value = 'all';
+    }
     state.keyword = input.value.trim().slice(0, 40);
     state.sortField = role === 'customer' ? 'wb_status' : 'id';
     state.sortDir = role === 'customer' ? 'asc' : 'desc';
@@ -383,7 +399,7 @@ export function renderPeople(ctx,initialPolicyFilter) {
       ]),
     ]),
   );
-  if (['review','renewal','verify'].includes(initialPolicyFilter)) {
+  if (!ctx.restoredList && ['review','renewal','verify'].includes(initialPolicyFilter)) {
     state.policyFilter=initialPolicyFilter;policyFilter.value=initialPolicyFilter;selectView('customer');
   } else {updateViewButtons();runQuery();}
 }

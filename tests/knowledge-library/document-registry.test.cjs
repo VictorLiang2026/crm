@@ -46,7 +46,7 @@ test('service scopes writes, checks original hash, resumes chunks and rejects st
    if(method==='POST'){if(chunks.length)throw Object.assign(Error(),{code:'DUPLICATE_SOURCE'});chunks.push(body[0]);}
    return chunks;
  };
- const svc=documentService(req,async()=>({data:{parts:[{}],basis:'v',gptVersion:2}}));
+ const svc=documentService(req,async()=>({data:{parts:[{}],basis:'v',gptVersion:doc.gpt_version??2,gpt:doc.gpt_summary}}));
  await assert.rejects(svc.run('documentOverview',{id:123},'outsider'),/UNAVAILABLE/);
  await assert.rejects(svc.run('documentComplete',{id:123},'staff'),/INCOMPLETE/);
  const d={id:123,part:0,data:bytes.toString('base64')};
@@ -56,6 +56,10 @@ test('service scopes writes, checks original hash, resumes chunks and rejects st
  assert.throws(()=>checkedVolume({index:2,start:30,end:35},doc));
  assert.equal(checkedVolume({index:2,start:31,end:35},doc).end,35);
  await assert.rejects(svc.run('documentGpt',{id:123,basis:'v',version:1,summary:'x'},'staff'),/CONFLICT/);
+ const exact='  Reviewed，  correctly.\n\n  Final paragraph.\n';
+ const saved=await svc.run('documentGpt',{id:123,basis:'v',version:2,summary:exact},'staff');
+ assert.equal(saved.gpt,exact);assert.equal(saved.gptVersion,3);
+ await assert.rejects(svc.run('documentGpt',{id:123,basis:'v',version:3,summary:'  '},'staff'),/CONFLICT/);
  assert.equal(volumeNumber('100001',2),'0001-02');
  assert.equal(volumeNumber(109999,99),'9999-99');
  assert.equal(volumeNumber(110001,2),'110001-02');

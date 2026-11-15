@@ -61,8 +61,11 @@ function actionRow(ctx,row,refresh,controls) {
   return h('article',{class:'list-row',style:'flex-wrap:wrap;overflow-wrap:anywhere','data-action-id':row.id},[
     h('div',{style:'flex:1 1 14rem;min-width:0'},[
       h('div',{class:'row-title'},titleLink(row)),
-      h('div',{class:'row-sub'},[row.person_name,actionDay(row.due_at)||t('no_date'),
-        translateEnum('work_status',row.status)].filter(Boolean).join(' · ')),
+      h('div',{class:'row-sub'},[
+        row.person_name && /^[1-9]\d*$/.test(String(row.person_id))
+          ? h('a',{href:'#/person/'+row.person_id+'/timeline'},row.person_name) : row.person_name,
+        row.person_name ? ' · ' : '', actionDay(row.due_at)||t('no_date'),
+        ' · ', translateEnum('work_status',row.status)]),
       row.waiting_for?h('p',{class:'row-sub'},t('ac_waiting_for')+' · '+row.waiting_for):null,
     ]),
     controls?h('div',{class:'sheet-actions'},[
@@ -134,15 +137,18 @@ export function renderActionCenter(ctx,section) {
   const host=h('div',{}), tabs=h('div',{class:'toolbar',role:'group','aria-label':t('ac_title')});
   const actionId=/^[1-9]\d*$/.test(section||'') ? section : null;
   const view=actionId?'item':views.includes(section)?section:'today';
-  let page=1,cancel=()=>{};
+  const state={page:1};
+  const restorePosition=ctx.listContext?.(state);
+  let cancel=()=>{};
   function load() {
     cancel();
     for(const tab of tabs.children)tab.setAttribute('aria-pressed',String(tab.dataset.view===view));
     cancel=loadInto(host,async()=>{
-      const res=await data.actionCenter(ctx,{view,page,...(view==='item'?{actionId}:{})});
-      if(!res.rows.length && page>1){page--;load();return h('div');}
+      const res=await data.actionCenter(ctx,{view,page:state.page,...(view==='item'?{actionId}:{})});
+      if(!res.rows.length && state.page>1){state.page=Math.max(1,Math.min(state.page-1,Math.ceil(res.total/20)||1));load();return h('div');}
+      restorePosition?.();
       return h('div',{},[...(res.rows.length?res.rows.map(r=>actionRow(ctx,r,load,true)):[emptyNote(t('ac_empty'))]),
-        pager(res,page,p=>{page=p;load();})]);
+        pager(res,state.page,p=>{state.page=p;load();})]);
     });
   }
   for(const key of views)tabs.append(h('button',{class:'btn btn-soft',type:'button','data-view':key,

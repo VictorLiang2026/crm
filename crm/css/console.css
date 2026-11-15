@@ -1539,3 +1539,21 @@ body:has(.login), body.is-login { padding-top: env(safe-area-inset-top); }
 .people-directory-view .people-view-label-iphone { display: none; }
 .crm-iphone-layout .people-directory-view .people-view-label-wide { display: none; }
 .crm-iphone-layout .people-directory-view .people-view-label-iphone { display: block; }
+
+.kg-document-summary-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+
+@media (max-width: 700px) {
+  .recruit-analysis-page, .recruit-analysis-targets, .recruit-analysis-detail-content,
+  .recruit-analysis-filter, .recruit-analysis-target-heading, .kg-list-tools {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .recruit-analysis-filter-controls {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 145px), 1fr));
+  }
+  .recruit-analysis-filter-controls .sheet-field, .recruit-analysis-page .sheet-input,
+  .kg-list-tools > * { min-width: 0; }
+  .recruit-analysis-goal-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .kg-search input[type=search] { width: 100%; min-width: 0; }
+  .kg-category-options { max-width: min(100%, 310px); }
+  .kg-document-summary-editor { box-sizing: border-box; width: 100%; }
+}
