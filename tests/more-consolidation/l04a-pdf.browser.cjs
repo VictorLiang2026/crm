@@ -4,7 +4,7 @@ const {Browser}=require('../regression/browser.cjs');
 for(const lang of ['zh-CN','en'])test(`L04a PDF imports preserve originals, localized failure history and human review (${lang})`,async()=>{
  const b=new Browser(path.resolve(__dirname,'../..'));
  try{
-  await b.start();await b.open('#/ai');
+  await b.start();await b.openConsole('#/ai');
   await b.evaluate(`(async()=>{
    const {fileImportNode}=await import('/crm/js/modules/console/file-import.js');
    const {data}=await import('/crm/js/modules/console/data.js');
@@ -13,7 +13,7 @@ for(const lang of ['zh-CN','en'])test(`L04a PDF imports preserve originals, loca
    data.fileImports=async()=>({rows:pdfCase.jobs.map(x=>({...x})),hasMore:false});
    data.saveFileOriginal=async(ctx,p)=>{pdfCase.calls.push('save');const job={id:p.idempotencyKey,file_name:p.fileName,content_type:p.contentType,status:'saved',sourceAvailable:true,created_at:'2026-10-25'};pdfCase.jobs.push(job);return {job:{...job}};};
    data.parseFileDraft=async(ctx,id)=>{pdfCase.calls.push('parse');const job=pdfCase.jobs.find(x=>x.id===id);Object.assign(job,{status:pdfCase.code?'failed':'draft',error_code:pdfCase.code,ocr_record_id:pdfCase.code?null:101});return {job:{...job}};};
-   document.getElementById('view').replaceChildren(await fileImportNode({},1,2,{onReview:async()=>{pdfCase.reviews++;}}));
+   const host=document.createElement('div');document.body.append(host);host.replaceChildren(await fileImportNode({},1,2,{onReview:async()=>{pdfCase.reviews++;}}));
    const input=document.querySelector('.file-import input[type=file]');
    Object.defineProperty(input,'files',{configurable:true,value:[new File(['%PDF-fixture'],'fictional.pdf',{type:'application/pdf'})]});input.dispatchEvent(new Event('change'));
   })()`);

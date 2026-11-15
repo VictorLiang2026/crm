@@ -164,7 +164,7 @@ async function pgRpc(name, body) {
     'crm_relationship_preview_v1','crm_relationship_execute_v1',
     'crm_ocr_parse_preview_v1','crm_ocr_parse_undo_preview_v1','crm_ocr_parse_execute_v1',
     'crm_recruit_candidate_create_v1','crm_recruit_candidate_transition_v1','crm_recruit_coach_outcome_v1',
-    'crm_knowledge_review_v1','crm_proactive_coach_decision_v1','crm_file_import_v1','crm_person_list_transfer_create_v1',
+    'crm_knowledge_review_v1','crm_proactive_coach_decision_v1','crm_file_import_v1','crm_person_file_v1','crm_person_list_transfer_create_v1',
     'crm_person_profile_save_v1','crm_person_interaction_v1',
     'crm_legacy_opportunity_v1','crm_recycle_batch_v1','person_role_recovery_v1']).has(name)) throw new Error('Invalid RPC');
   const env = process.env.TCB_ENV;

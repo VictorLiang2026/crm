@@ -4,7 +4,7 @@ const {Browser}=require('../regression/browser.cjs');
 test('M09 save-only, uncertain response retry, parse retry, stored review, pagination and bilingual iPad',async()=>{
  const b=new Browser(path.resolve(__dirname,'../..'));
  try{
-  await b.start();await b.open('#/ai');
+  await b.start();await b.openConsole('#/ai');
   await b.evaluate(`(async()=>{
    const {renderOcrReview}=await import('/crm/js/modules/console/ocr-review.js');
    const {data}=await import('/crm/js/modules/console/data.js');
@@ -26,7 +26,7 @@ test('M09 save-only, uncertain response retry, parse retry, stored review, pagin
    data.resolvePersonName=async()=>({candidates:[{id:12,displayName:'虚构甲'}]});
    data.previewOcrParse=async()=>{m09.calls.push({action:'preview'});return {previewId:'00000000-0000-4000-8000-000000000201',preview:{before:{occupation:'旧职业'},after:{occupation:'新职业'}}};};
    data.executeOcrParse=async()=>{m09.calls.push({action:'execute'});return {commandId:'receipt'};};
-   window.m09Render=async()=>document.getElementById('view').replaceChildren(await renderOcrReview({toast:()=>{},onWriteDone:()=>{}},12));
+   const host=document.createElement('div');document.body.append(host);window.m09Render=async()=>host.replaceChildren(await renderOcrReview({toast:()=>{},onWriteDone:()=>{}},12));
    await m09Render();
   })()`);
   await b.evaluate(`(()=>{const input=document.querySelector('.file-import input[type=file]');

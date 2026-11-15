@@ -42,6 +42,7 @@ test('server claim determines source, retries reuse draft, failures retain origi
 test('ai_parse new draft timeout preserves legacy and Quick Capture dispatch',async()=>{
  const code=fs.readFileSync('cloudfunctions/ai_parse/index.js','utf8'),calls=[],ocrCalls=[];
  const exports={};const sandbox={exports,process:{env:{AI_MODEL:'configured-text',VISION_MODEL:'configured-vision'}},require:name=>{
+   if(name==='./device-internal-delegation')return {unwrap:async(_app,event,context)=>({event,context})};
    if(name==='./db')return {rdb:{},generateText:async(m,o)=>{calls.push(o);return {text:'{"phone":"123"}'};},extractJson:JSON.parse,assertOk(){}};
    if(name==='./knowledge-ocr-service')return {createKnowledgeOcr:options=>{ocrCalls.push(options);return {run:async event=>({ocr:true,event})};}};
    if(name==='./quick-capture-v2')return {quickCaptureV2:async()=>({v2:true})};

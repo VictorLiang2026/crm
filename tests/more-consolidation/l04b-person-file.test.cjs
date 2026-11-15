@@ -1,7 +1,14 @@
 'use strict';
-const test=require('node:test'),assert=require('node:assert/strict'),crypto=require('node:crypto');
+const test=require('node:test'),assert=require('node:assert/strict'),crypto=require('node:crypto'),fs=require('node:fs');
 const {PersonFileService}=require('../../cloudfunctions/person_360/person-file-service');
 const job='11111111-1111-4111-8111-111111111111',key='22222222-2222-4222-8222-222222222222',preview='33333333-3333-4333-8333-333333333333';
+test('L04b dedicated database RPC remains allowlisted alongside legacy customer imports',()=>{
+ const source=fs.readFileSync('cloudfunctions/person_360/index.js','utf8');
+ const whitelist=source.match(/new Set\(\[([\s\S]*?)\]\)\.has\(name\)/);
+ assert.ok(whitelist,'person_360 RPC whitelist must be explicit');
+ assert.match(whitelist[1],/'crm_person_file_v1'/);
+ assert.match(whitelist[1],/'crm_file_import_v1'/);
+});
 test('L04b audit history follows original ownership and stays actor/job bounded',async()=>{
  const calls=[],s=new PersonFileService({rpc:async()=>{calls.push('owned');return{job:{id:job}};},request:async(table,method,params)=>{
   calls.push({table,method,params});return[{id:preview,operation:'apply',status:'undone'}];}});
