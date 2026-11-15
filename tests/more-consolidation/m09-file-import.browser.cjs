@@ -30,22 +30,27 @@ test('M09 save-only, uncertain response retry, parse retry, stored review, pagin
    await m09Render();
   })()`);
   await b.evaluate(`(()=>{const input=document.querySelector('.file-import input[type=file]');
-   Object.defineProperty(input,'files',{configurable:true,value:[new File(['姓名虚构甲'],'note.txt',{type:'text/plain'}),new File(['docx'],'manual.docx',{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'})]});input.dispatchEvent(new Event('change'));})()`);
-  assert.equal(await b.evaluate("document.querySelectorAll('.file-import-item').length"),2);
+   Object.defineProperty(input,'files',{configurable:true,value:[new File(['姓名虚构甲'],'note.txt',{type:'text/plain'}),new File(['docx'],'manual.docx',{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}),new File(['xlsx'],'赖茂生老师学生名单.xlsx',{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})]});input.dispatchEvent(new Event('change'));})()`);
+  assert.equal(await b.evaluate("document.querySelectorAll('.file-import-item').length"),3);
+  assert.equal(await b.evaluate("[...document.querySelectorAll('.file-import-item')].find(x=>x.textContent.includes('学生名单.xlsx'))?.querySelector('a')?.getAttribute('href')"),'#/people-list-transfer');
+  assert.match(await b.evaluate("[...document.querySelectorAll('.file-import-item')].find(x=>x.textContent.includes('学生名单.xlsx')).textContent"),/批量导入学生/);
+  assert.equal(await b.evaluate("Boolean([...document.querySelectorAll('.file-import-item')].find(x=>x.textContent.includes('manual.docx'))?.querySelector('a'))"),false,'other unsupported documents keep the generic note');
   await b.click('.file-import > .care-record-actions button','保存全部原件');
   await b.wait("document.querySelector('.file-import-item').textContent.includes('尚未确认保存成功')");
   assert.equal(await b.evaluate("m09.calls.filter(x=>x.action==='parse').length"),0,'save only never parses');
   await b.click('.file-import-item:first-child button','保存原件');
   await b.wait("document.querySelector('.file-import-item').textContent.includes('原件已保存，尚未解析')");
-  assert.equal(await b.evaluate('m09.jobs.length'),2,'uncertain response retry does not duplicate');
+  assert.equal(await b.evaluate('m09.jobs.length'),3,'uncertain response retry does not duplicate');
+  await b.wait("document.querySelectorAll('.file-import-history article').length===3");
+  assert.equal(await b.evaluate("document.querySelector('.file-import-history .file-import-roster-note a')?.getAttribute('href')"),'#/people-list-transfer','saved XLSX history links to the roster importer too');
   const keys=await b.evaluate("m09.calls.filter(x=>x.action==='save'&&x.payload.fileName==='note.txt').map(x=>x.payload.idempotencyKey)");
   assert.equal(keys.length,2);assert.equal(keys[0],keys[1]);
   await b.click('.file-import > .care-record-actions button','保存并解析支持的文件');
   await b.wait("document.querySelector('.file-import-item').textContent.includes('解析暂未完成')");
-  assert.equal(await b.evaluate("m09.calls.filter(x=>x.action==='parse').length"),1,'unsupported DOCX not sent for parsing');
+  assert.equal(await b.evaluate("m09.calls.filter(x=>x.action==='parse').length"),1,'unsupported DOCX/XLSX not sent for single-Person parsing');
   await b.click('.file-import-item:first-child button','保存并解析');
   await b.wait("document.querySelector('.file-import-item').textContent.includes('草稿已保存')");
-  assert.equal(await b.evaluate("m09.calls.filter(x=>x.action==='save').length"),3,'parse retry does not upload again');
+  assert.equal(await b.evaluate("m09.calls.filter(x=>x.action==='save').length"),4,'parse retry does not upload again');
   assert.equal(await b.evaluate("m09.calls.some(x=>x.action==='execute')"),false);
   await b.click('.file-import-item:first-child button','审核已保存草稿');
   await b.wait("document.querySelector('.file-import-review .ocr-candidate-panel')");
@@ -63,14 +68,16 @@ test('M09 save-only, uncertain response retry, parse retry, stored review, pagin
   await b.click('.file-import > details button','刷新导入状态');
   await b.wait("[...document.querySelectorAll('.file-import > details button')].some(x=>x.textContent==='下一页'&&!x.disabled)");
   await b.click('.file-import > details button','下一页');await b.wait("document.querySelector('.file-import > details').textContent.includes('暂无导入记录')");
-  await b.click('.file-import > details button','上一页');await b.wait("document.querySelectorAll('.file-import-history article').length===2");
+  await b.click('.file-import > details button','上一页');await b.wait("document.querySelectorAll('.file-import-history article').length===3");
   await b.evaluate('m09.pageFail=true');await b.click('.file-import > details button','刷新导入状态');
   await b.wait("document.querySelector('.file-import > details').textContent.includes('加载失败')");
-  assert.equal(await b.evaluate("document.querySelectorAll('.file-import-history article').length"),2);
+  assert.equal(await b.evaluate("document.querySelectorAll('.file-import-history article').length"),3);
   await b.evaluate('m09.pageFail=false');
   for(const lang of ['zh-CN','en']){
    await b.evaluate(`(async()=>{(await import('/crm/js/modules/console/i18n.js')).setLang('${lang}');await m09Render()})()`);
    assert.match(await b.evaluate("document.querySelector('.file-import').textContent"),lang==='en'?/Import Documents/:/导入资料/);
+   assert.match(await b.evaluate("document.querySelector('.file-import-roster-note').textContent"),lang==='en'?/People Import \/ Export/:/人物名单导入\/导出/);
+   assert.equal(await b.evaluate("document.querySelector('.file-import-roster-note a').getAttribute('href')"),'#/people-list-transfer');
    for(const [width,height]of [[820,1180],[1180,820]]){await b.send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:false});
     assert.equal(await b.evaluate('document.documentElement.scrollWidth<=innerWidth+1'),true,lang+' '+width);}
   }

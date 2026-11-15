@@ -828,6 +828,8 @@ const DICT = {
   'file_import_status_draft': { 'zh-CN': '草稿已保存；档案变更请查看下方应用历史', 'en': 'Draft saved; check the application history below for profile changes' },
   'file_import_wait_note': { 'zh-CN': '稍后刷新查看结果。若处理已中断，两分钟后可重试。', 'en': 'Refresh shortly for results. Interrupted processing can be retried after two minutes.' },
   'file_import_unsupported': { 'zh-CN': '此格式可保存原件，暂不支持自动解析。', 'en': 'This format can be saved as an original; automatic parsing is not supported yet.' },
+  'file_import_roster_hint': { 'zh-CN': '这是一份 Excel 名单。本页已将原件保存在当前人物资料中；批量导入学生请使用名单导入流程，预览并人工核对后再确认。', 'en': 'This is an Excel roster. This page saved the original under the current Person; use the roster importer to review rows before confirming a bulk import.' },
+  'file_import_roster_link': { 'zh-CN': '前往人物名单导入/导出', 'en': 'Open People Import / Export' },
   'file_import_invalid_files': { 'zh-CN': '未加入文件：请检查文件不为空、每个不超过4MB、文件名不超过255字符，本次列表合计不超过10个。', 'en': 'Files not added. Check for empty files, the 4 MB limit, names up to 255 characters and at most 10 queued files.' },
   'file_import_invalid_content': { 'zh-CN': '原件已保存，但内容格式或文本长度不符合解析要求，请核对文件。', 'en': 'Original saved. Its format or text length is not supported for parsing; check the file.' },
   'file_import_invalid_result': { 'zh-CN': '原件已保存，AI结果未通过校验。可重试解析或人工核对原件。', 'en': 'Original saved. AI output failed validation. Retry parsing or review the original manually.' },

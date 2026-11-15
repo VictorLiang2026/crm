@@ -15,6 +15,13 @@ function base64(file) {
   });
 }
 function supported(file) {return TYPES.has(file.content_type||file.type||'application/octet-stream');}
+function unsupportedNote(file) {
+  const name=String(file?.file_name||file?.name||'');
+  if(/\.xlsx$/i.test(name))return h('p',{class:'file-import-roster-note'},[
+    t('file_import_roster_hint'),' ',h('a',{href:'#/people-list-transfer'},t('file_import_roster_link')),
+  ]);
+  return h('p',{},t('file_import_unsupported'));
+}
 function errorText(code) {
   return t(({UNSUPPORTED_TYPE:'file_import_unsupported',INVALID_CONTENT:'file_import_invalid_content',
     INVALID_RESULT:'file_import_invalid_result',SOURCE_UNAVAILABLE:'file_import_source_missing',
@@ -73,7 +80,7 @@ export async function fileImportNode(ctx,personId,customerId,{onReview,onSaved,o
       !available||job.status==='draft'&&job.draftAvailable===false?h('p',{},t('file_import_source_missing')):null,
       job.status==='parsing'?h('p',{},t('file_import_wait_note')):null,
       job.error_code?h('p',{role:'status'},errorText(job.error_code)):null,
-      !supported(job)?h('p',{},t('file_import_unsupported')):null,actions,
+      !supported(job)?unsupportedNote(job):null,actions,
     ]);
   }
   function draw() {
@@ -90,7 +97,7 @@ export async function fileImportNode(ctx,personId,customerId,{onReview,onSaved,o
       return h('article',{class:'care-record file-import-item'},[
         h('strong',{class:'care-record-title'},item.file.name),
         h('p',{role:'status'},item.error||t('file_import_status_'+item.status)),
-        !supported(item.file)?h('p',{},t('file_import_unsupported')):null,actions,
+        !supported(item.file)?unsupportedNote(item.file):null,actions,
       ]);
     }));
     history.replaceChildren(...jobs.map(jobRow));
