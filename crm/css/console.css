@@ -170,6 +170,11 @@ button.btn[aria-pressed="true"] { background: var(--red); border-color: var(--re
 .people-table th { background: #f8fafc; white-space: nowrap; color: var(--muted); font-weight: 600; }
 .people-date-mobile { display: none; }
 .people-table .sortable-th { cursor: pointer; user-select: none; }
+.people-sort-button {
+  font: inherit; color: inherit; text-align: inherit; white-space: inherit;
+  width: 100%; padding: 0; border: 0; background: transparent; cursor: pointer;
+}
+.people-sort-button:focus-visible { outline: 2px solid var(--ink); outline-offset: -1px; }
 .people-table tbody tr { cursor: pointer; }
 .people-table tbody tr:last-child td { border-bottom: 0; }
 .people-table a { color: var(--ink); text-decoration: none; font-weight: 650; }

@@ -52,6 +52,10 @@ class Browser {
         res.end(new URL(req.url, 'http://127.0.0.1').searchParams.get('v2') === '1'
           ? html.replace('quick_capture_v2: false', 'quick_capture_v2: true') : html);
       }
+      else if (pathname === '/component.html') {
+        res.setHeader('Content-Type', 'text/html; charset=utf-8');
+        res.end('<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><script src="/fixtures.js"></script></head><body><main id="view"></main><div id="toast-root"></div></body></html>');
+      }
       else if (pathname === '/console.html') { res.setHeader('Content-Type', 'text/html; charset=utf-8'); res.end(consoleHtml); }
       else if (pathname === '/fixtures.js') { res.setHeader('Content-Type', 'text/javascript; charset=utf-8'); res.end('(' + installFixtures.toString() + ')();'); }
       else if (pathname === '/crm/js/modules/person-360.js') { res.setHeader('Content-Type', 'text/javascript; charset=utf-8'); res.end(fs.readFileSync(path.join(this.root, 'crm/js/modules/person-360.js'))); }
@@ -216,6 +220,13 @@ class Browser {
     this.currentRoute = target;
     await this.send('Page.navigate', { url: target });
     await this.wait('location.href === ' + JSON.stringify(target) + ' && Boolean(window.__crmTest && document.getElementById("view"))', 45000);
+  }
+  async openComponent() {
+    this.stage = 'component.navigate';
+    const target = this.origin + '/component.html';
+    this.currentRoute = target;
+    await this.send('Page.navigate', {url:target});
+    await this.wait('location.href === '+JSON.stringify(target)+' && Boolean(window.__crmTest && document.getElementById("view"))');
   }
   async openConsole(hash = '#/today', query = '') {
     this.runtimeErrors.length = 0;

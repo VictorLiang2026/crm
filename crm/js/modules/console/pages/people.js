@@ -3,7 +3,7 @@ import { h } from '../dom.js';
 import { ic } from '../icons.js';
 import { data } from '../data.js';
 import { openPersonNew, openPersonRoleConversion } from '../write.js';
-import { wpTag, pageHead, emptyNote, loadInto, bdg, textOf, dueLabel } from '../ui.js';
+import { pageHead, emptyNote, loadInto, bdg, textOf, dueLabel } from '../ui.js';
 import { t, translateEnum } from '../i18n.js';
 
 const DESKTOP_PAGE_SIZE = 20;
@@ -101,7 +101,7 @@ export function renderPeople(ctx,initialPolicyFilter) {
     return state.sortDir === 'asc' ? ' ▲' : ' ▼';
   }
 
-  function runQuery() {
+  function runQuery(keepSortFocus = false) {
     cancelQuery();
     const version = ++queryVersion;
     cancelQuery = loadInto(listEl, async () => {
@@ -143,7 +143,14 @@ export function renderPeople(ctx,initialPolicyFilter) {
       }
       const columns = SORT_COLUMNS(customerView, showConversions, participantView);
       const thead = h('thead', {}, h('tr', {}, columns.map((col) => {
-        const th = h('th', {
+        const sortable = col.sortable !== false;
+        const label = h('span', { class:'people-header-full', 'data-mobile-label':col.mobileLabel || undefined }, col.label);
+        const button = sortable && h('button', {
+          type:'button', class:'people-sort-button', 'data-sort-field':col.field, 'aria-label':col.full || col.label,
+        }, [label, h('span', {class:'people-sort-arrow','aria-hidden':'true'}, arrow(col.field))]);
+        return h('th', {
+          scope: 'col',
+          'aria-sort': sortable && state.sortField === col.field ? (state.sortDir === 'asc' ? 'ascending' : 'descending') : undefined,
           class: `people-col-${col.key}${col.sortable === false ? '' : ' sortable-th'}`,
           title: col.full || undefined,
           onclick: col.sortable === false ? undefined : () => {
@@ -154,13 +161,9 @@ export function renderPeople(ctx,initialPolicyFilter) {
               state.sortDir = 'asc';
             }
             state.page = 1;
-            runQuery();
+            runQuery(true);
           },
-        }, [
-          h('span', { class: 'people-header-full', 'data-mobile-label': col.mobileLabel || undefined }, col.label),
-          h('span', { class: 'people-sort-arrow' }, arrow(col.field)),
-        ]);
-        return th;
+        }, button || label);
       })));
       const tbody = h('tbody', {}, rows.map((p) => {
         const cols = columns;
@@ -226,7 +229,7 @@ export function renderPeople(ctx,initialPolicyFilter) {
       return h('div', { class: 'table-scroll people-directory-scroll' }, h('table', {
         class: 'people-table people-directory-table', 'data-iphone-view': iphoneView,
       }, [thead, tbody]));
-    });
+    }, undefined, keepSortFocus === true ? 'data-sort-field' : undefined);
   }
 
   prevBtn.onclick = () => { if (state.page > 1) { state.page--; runQuery(); } };
@@ -370,7 +373,7 @@ export function renderPeople(ctx,initialPolicyFilter) {
 
   ctx.main.replaceChildren(
     pageHead({
-      kicker: t('kicker_people'), title: t('title_people'), tag: wpTag(t('wp1_readonly')),
+      kicker: t('kicker_people'), title: t('title_people'),
       sub: t('sub_people'),
     }),
     h('div', { class: 'toolbar people-directory-toolbar' }, [

@@ -39,6 +39,10 @@ function service(name, tables) {
   } };
   const exports = {};
   const context = vm.createContext({ exports, require: dependency => {
+    if (dependency === './device-runtime') return {protect(serviceName, handler) {
+      assert.equal(serviceName, name);
+      return handler; // Device authentication is exercised separately by the release gate.
+    }};
     if (dependency === './db') return { rdb, assertOk: result => result };
     if (dependency === './resource-directory') return require(`../../cloudfunctions/${name}/resource-directory`);
     throw Error(`unexpected dependency ${dependency}`);

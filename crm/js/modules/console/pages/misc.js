@@ -236,7 +236,7 @@ export function renderAI(ctx) {
   ];
   ctx.main.replaceChildren(
     pageHead({
-      kicker: t('kicker_ai'), title: t('title_ai'), tag: wpTag(t('wp3_tag')),
+      kicker: t('kicker_ai'), title: t('title_ai'),
       sub: t('sub_ai'),
     }),
     h('div', { class: 'ai-grid ai-assistant-links' }, links.map(([icon, titleKey, descKey, href]) =>

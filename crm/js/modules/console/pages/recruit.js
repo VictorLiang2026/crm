@@ -254,7 +254,7 @@ export function renderRecruit(ctx) {
 
   ctx.main.replaceChildren(
     pageHead({
-      kicker: t('kicker_recruit'), title: t('title_recruit'), tag: wpTag(t('wp1_readonly')),
+      kicker: t('kicker_recruit'), title: t('title_recruit'),
       sub: t('sub_recruit'),
       actions: [
         h('button', { class: 'btn btn-ghost', type: 'button', title: t('recruit_analysis_entry'), onclick: () => { location.hash = '#/recruit/goals'; } }, [ic('calendar'), t('recruit_analysis_entry')]),

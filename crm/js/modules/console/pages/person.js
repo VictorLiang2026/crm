@@ -20,7 +20,7 @@ import { renderInsuranceReports } from '../insurance-reports.js';
 import { openWorkItemEditor, openWorkItemTransition, openQuickCapture, openPersonEdit, openPersonDelete,
   openPersonInteraction, openPersonFollowup, openPersonCustomerRemove, openReferrerRoleAction } from '../write.js';
 import {
-  wpTag, pageHead, emptyNote, loadInto, bdg, kvGrid, sectionTitle,
+  pageHead, emptyNote, loadInto, bdg, kvGrid, sectionTitle,
   fmtDate, weekdayCN, dueLabel, toneByDue, textOf,
 } from '../ui.js';
 import { t, translateEnum } from '../i18n.js';
@@ -903,7 +903,7 @@ export function renderPerson(ctx, id, initialSection) {
     ocr: ['tab_ocr_review', renderOcrReview],
   };
   ctx.main.replaceChildren(
-    pageHead({ kicker: t('kicker_person'), title: titleNode, tag: wpTag(t('wp3_ai')), sub: t('person_sub'), actions: [
+    pageHead({ kicker: t('kicker_person'), title: titleNode, sub: t('person_sub'), actions: [
         h('button', {
           class: 'btn btn-soft', type: 'button',
           onclick: () => openPersonEdit(wctx, { personId: String(id), onDone: wctx.onWriteDone }),

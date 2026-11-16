@@ -47,14 +47,25 @@ export function errorBox(err, onRetry) {
 }
 
 // 异步加载：先骨架，成功替换内容，失败显示可重试错误；离开页面后回调写入已分离节点，无副作用。
-export function loadInto(el, loader, skele) {
-  el.replaceChildren(skele || skeletonRows(3));
+export function loadInto(el, loader, skele, focusAttribute) {
+  if (!focusAttribute) el.replaceChildren(skele || skeletonRows(3));
+  // Sorting keeps the previous table usable while the next page is loading.
+  function replace(node, failed = false) {
+    if (!alive) return;
+    const active = document.activeElement;
+    const key = focusAttribute && el.contains(active) && active.getAttribute(focusAttribute);
+    el.replaceChildren(node);
+    if (key) {
+      const selector = failed ? 'button' : `[${focusAttribute}="${CSS.escape(key)}"]`;
+      el.querySelector(selector)?.focus({ preventScroll: true });
+    }
+  }
   let alive = true;
   const refresh = () => loadInto(el, loader, skele);
   Promise.resolve()
     .then(loader)
-    .then((node) => { if (alive) el.replaceChildren(node); })
-    .catch((err) => { if (alive) el.replaceChildren(errorBox(err, refresh)); });
+    .then(node => replace(node))
+    .catch(err => replace(errorBox(err, refresh), true));
   return () => { alive = false; };
 }
 

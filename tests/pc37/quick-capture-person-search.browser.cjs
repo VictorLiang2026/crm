@@ -8,19 +8,19 @@ test('legacy Quick Capture search opens exact Person capture preview before writ
   const b = new Browser(path.resolve(__dirname, '../..'));
   try {
     await b.start();
-    await b.open('#/ai', 'mode=quick-capture-search');
+    await b.open('#/today', 'mode=quick-capture-search');
     await b.click('#qc-entry-btn', '快速记录');
     await b.evaluate(`(()=>{
       document.querySelector('.modal-overlay textarea').value='【CRM_TEST_ONLY】虚构原话';
       [...document.querySelectorAll('.modal-overlay button')].find(x=>x.textContent.includes('AI 理解')).click();
     })()`);
-    await b.wait("document.querySelector('.modal-overlay input[type=search]')");
+    await b.wait("[...document.querySelectorAll('.modal-overlay button')].some(x=>x.textContent.includes('搜索人物') && !x.disabled)");
     await b.evaluate(`(()=>{
       const input=document.querySelector('.modal-overlay input[type=search]');input.value='客户甲';
       input.dispatchEvent(new Event('input',{bubbles:true}));
       [...document.querySelectorAll('.modal-overlay button')].find(x=>x.textContent.includes('搜索人物')).click();
     })()`);
-    await b.wait("[...document.querySelectorAll('.modal-overlay button')].some(x=>x.textContent.includes('客户甲'))");
+    await b.wait("[...document.querySelectorAll('.modal-overlay button')].some(x=>x.textContent.includes('客户甲') && x.textContent.includes('#980001'))");
     await b.evaluate("[...document.querySelectorAll('.modal-overlay button')].find(x=>x.textContent.includes('客户甲')&&x.textContent.includes('#980001')).click()");
     await b.evaluate("[...document.querySelectorAll('.modal-overlay .btn-primary')].at(-1).click()");
     await b.wait("document.querySelector('.phase14-command')?.innerText.includes('Person #980001')");

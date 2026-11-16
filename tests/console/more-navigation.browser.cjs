@@ -12,6 +12,7 @@ const LEGACY_ROUTES = [
   ['#/more/followups', '传统跟进'],
   ['#/funnels', '漏斗'],
   ['#/ai-suggestions', 'AI 建议'],
+  ['#/ai', 'AI 助手'],
   ['#/more/policy-review', '保单检视'],
   ['#/more/products', '产品'],
   ['#/more/gifts', '伴手礼'],
@@ -27,6 +28,7 @@ const LEGACY_ROUTES = [
 
 const CONSOLE_REDIRECTS = {
   '#/account': { hash: '#/settings', selector: '.settings-password-form' },
+  '#/ai': { hash: '#/ai', selector: '.ai-assistant-links' },
   '#/ai-suggestions': { hash: '#/ai/experience', selector: '.crm-ai-exp-page' },
   '#/speakers': { hash: '#/activity-speakers', selector: '.resource-directory-results' },
   '#/topics': { hash: '#/activity-topics', selector: '.resource-directory-results' },
@@ -39,7 +41,7 @@ const CONSOLE_REDIRECTS = {
 
 const REMAINING_MORE_ROUTES = [];
 
-test('Console More keeps only uncovered gaps bilingual and preserves all 17 old URLs', async () => {
+test('Console More keeps only uncovered gaps bilingual and preserves legacy URLs including the AI redirect', async () => {
   const browser = new Browser(path.resolve(__dirname, '../..'));
   try {
     await browser.start();

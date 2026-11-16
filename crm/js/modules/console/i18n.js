@@ -2082,6 +2082,7 @@ const DICT = {
   'opp_default_title': { 'zh-CN': '机会', 'en': 'Opportunity' },
 
   // people page
+  'login_idle_notice': { 'zh-CN': '5 分钟无操作后需重新登录。', 'en': 'Sign in again after 5 minutes of inactivity.' },
   'wp1_readonly': { 'zh-CN': 'WP1 只读', 'en': 'WP1 Read-only' },
   'col_name': { 'zh-CN': '姓名', 'en': 'Name' },
   'col_priority': { 'zh-CN': '优先级', 'en': 'Priority' },
@@ -2929,7 +2930,7 @@ const DICT = {
 
   'act_load_failed': { 'zh-CN': '加载失败', 'en': 'Load Failed' },
   'act_no_interactions': { 'zh-CN': '暂无互动记录', 'en': 'No interactions' },
-  'act_interactions_note': { 'zh-CN': '互动由 WP12 写入闭环产生，仅在活动后逐人确认时记录。', 'en': 'Interactions from WP12 closed-loop, recorded per person after event.' },
+  'act_interactions_note': { 'zh-CN': '活动结束后，逐人确认的互动会显示在这里。', 'en': 'Interactions appear here after individual confirmation following the event.' },
   'act_interactions': { 'zh-CN': '互动记录', 'en': 'Interactions' },
   'act_channel': { 'zh-CN': '渠道', 'en': 'Channel' },
   'act_importance': { 'zh-CN': '重要性', 'en': 'Importance' },

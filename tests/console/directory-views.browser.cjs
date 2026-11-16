@@ -7,7 +7,7 @@ test('six directory lists preserve role, event and navigation contracts across l
   const b = new Browser(path.resolve(__dirname, '../..'));
   try {
     await b.start();
-    await b.open('#/ai');
+    await b.openComponent();
     await b.evaluate("document.head.insertAdjacentHTML('beforeend','<link rel=stylesheet href=/crm/css/console.css>')");
     await b.wait("!!document.querySelector('link[href=\"/crm/css/console.css\"]')?.sheet");
     for (const [width,height] of [[390,844],[844,390],[820,1180],[1180,820],[1440,900]]) {

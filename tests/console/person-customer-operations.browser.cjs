@@ -7,7 +7,7 @@ const { Browser } = require('../regression/browser.cjs');
 test('Person editor saves Person, Customer, and Recruit fields with one atomic form submission', async () => {
   const b = new Browser(path.resolve(__dirname, '../..'));
   try {
-    await b.start(); await b.open('#/ai');
+    await b.start(); await b.openComponent();
     await b.evaluate(`(async()=>{
       const {openPersonEdit}=await import('/crm/js/modules/console/write.js');
       window.profileMode='linked';window.personWrites=[];
@@ -58,7 +58,7 @@ test('People directory customer view is additive, keeps the full directory, and 
   const b = new Browser(path.resolve(__dirname, '../..'));
   try {
     await b.start();
-    await b.open('#/ai');
+    await b.openComponent();
     await b.evaluate(`(async()=>{
       const {renderPeople}=await import('/crm/js/modules/console/pages/people.js');
       window.peopleRequests=[];
@@ -75,7 +75,7 @@ test('People directory customer view is additive, keeps the full directory, and 
     await b.wait("document.querySelector('.people-table tbody tr')");
     await b.evaluate("document.head.insertAdjacentHTML('beforeend','<link rel=stylesheet href=/crm/css/console.css>')");
     assert.equal(await b.evaluate("document.querySelector('.people-table thead').innerText.includes('客户经营阶段')"), false);
-    await b.evaluate("[...document.querySelectorAll('.toolbar button')].find(x=>x.textContent.trim()==='客户经营视图').click()");
+    await b.evaluate("document.querySelector('[data-directory-view=\"customer\"]').click()");
     await b.wait("document.querySelector('.people-table thead').innerText.includes('客户阶段')");
     const req = await b.evaluate('window.peopleRequests.at(-1).args');
     assert.deepEqual(req.roles, ['customer']);
@@ -85,7 +85,7 @@ test('People directory customer view is additive, keeps the full directory, and 
       await b.send('Emulation.setDeviceMetricsOverride', {width,height,deviceScaleFactor:1,mobile:false});
       assert.equal(await b.evaluate('document.documentElement.scrollWidth<=innerWidth+1'), true, `${width}x${height} horizontal overflow`);
     }
-    await b.evaluate("[...document.querySelectorAll('.toolbar button')].find(x=>x.textContent.trim()==='全部人物').click()");
+    await b.evaluate("document.querySelector('[data-directory-view=\"\"]').click()");
     await b.wait("window.peopleRequests.at(-1).args.roles.length===0");
     await b.healthy();
     assert.deepEqual(b.networkViolations, []);

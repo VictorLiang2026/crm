@@ -1,5 +1,6 @@
 // 登录 / 重新登录视图：复用 admin.html 相同的 CloudBase 用户名密码认证，仅更换界面。
 import { h, toast } from './dom.js';
+import { t } from './i18n.js';
 import { LOGO_SVG } from './icons.js';
 
 export function renderLogin({ mount, brand, signIn, onSuccess }) {
@@ -14,7 +15,7 @@ export function renderLogin({ mount, brand, signIn, onSuccess }) {
     h('div', { class: 'field' }, [h('label', {}, '密码'), p]),
     btn,
     msg,
-    h('p', { class: 'login-foot' }, '5 分钟无操作需重新登录 · 本页为控制台骨架（WP0），业务数据按排期接入'),
+    h('p', { class: 'login-foot' }, t('login_idle_notice')),
   ]);
   form.addEventListener('submit', async (ev) => {
     ev.preventDefault();
