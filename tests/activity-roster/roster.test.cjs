@@ -103,5 +103,61 @@ test('employee roster import, identity, history, edits, concurrency and replay',
  assert.deepEqual((await db.query('SELECT public.person_identity_execute_with_roster_v1($1,$2) result',['tester',preview])).rows[0].result,linkedResult);
  await db.exec('RESET ROLE; SET ROLE anon');
  const acl=(await db.query("select has_table_privilege(current_user,'public.activity_roster_people','SELECT') AS r,has_function_privilege(current_user,'public.crm_activity_roster_v1(text,text,jsonb)','EXECUTE') AS e")).rows[0];assert.deepEqual(acl,{r:false,e:false});
+ await db.exec('RESET ROLE; ALTER TABLE public.persons RENAME COLUMN organization TO graduation_school;');
+ const sqlFile = suffix => fs.readFileSync(path.resolve(__dirname,
+   '../../cloudbase/migrations/20261116232000_roster_lookup_person_school' + suffix + '.sql'), 'utf8');
+ const lookup = keys => db.query("SELECT public.crm_activity_roster_v1('test','lookup',$1) AS result", [{keys}]);
+ const aclState = () => db.query("SELECT oid, proacl::text FROM pg_proc WHERE oid='public.crm_activity_roster_v1(text,text,jsonb)'::regprocedure");
+ const originalAcl = (await aclState()).rows;
+ await db.exec('SET ROLE service_role');
+ await assert.rejects(lookup(['lin']), error => error.code === '42703');
+ await db.exec('RESET ROLE');
+ await db.exec(sqlFile(''));
+ await db.exec(sqlFile('.rollback'));
+ await db.exec(sqlFile('.rollback'));
+ await db.exec('SET ROLE service_role');
+ await assert.rejects(lookup(['lin']), error => error.code === '42703');
+ await db.exec('RESET ROLE');
+ await db.exec(sqlFile(''));
+ await db.exec(sqlFile(''));
+ assert.deepEqual((await aclState()).rows, originalAcl);
+ await db.exec("SET ROLE service_role; UPDATE public.persons SET graduation_school='Fixture University' WHERE name_key='lin';");
+ await db.exec("INSERT INTO public.persons(display_name,name_key,deleted_at) VALUES ('Lin (removed)','lin',now());");
+ await db.exec("INSERT INTO public.activity_roster_people(display_name,name_key,school,organization) VALUES ('Independent','independent','Roster School','Roster Company');");
+ const rpc = async (name, params) => {
+   assert.equal(name, 'crm_activity_roster_v1');
+   return (await db.query('SELECT public.crm_activity_roster_v1($1,$2,$3) AS r',
+     [params.p_actor,params.p_op,params.p_input])).rows[0].r;
+ };
+ const Module = require('node:module');
+const originalLoad = Module._load;
+Module._load = function(name, parent, main) {
+  if (name === '@cloudbase/node-sdk') return { init: () => ({ auth: () => ({ getUserInfo: () => ({ uid: '' }) }) }) };
+  return originalLoad.call(this, name, parent, main);
+};
+const { createService } = require('../../cloudfunctions/person_360/index.js');
+Module._load = originalLoad;
+
+ const service = createService({rpc, request: async (table, method, filter) => {
+   assert.equal(method, 'GET');
+   if (table === 'customers') return [];
+   assert.equal(table, 'persons');
+   if (filter.display_name) return (await db.query('SELECT id FROM public.persons WHERE display_name=$1 AND deleted_at IS NOT NULL', [filter.display_name.slice(3)])).rows;
+   return (await db.query('SELECT * FROM public.persons WHERE name_key=$1 AND deleted_at IS NULL ORDER BY id', [filter.name_key.slice(3)])).rows;
+ }});
+ const matched = (await lookup(['lin'])).rows[0].result;
+ assert.equal(matched.persons.length, 2);
+ assert.ok(matched.persons.every(p => p.graduation_school === 'Fixture University' && p.organization === null));
+ assert.deepEqual((await lookup(['unknown'])).rows[0].result, {persons:[], profiles:[]});
+ const resolution = await service.resolveIdentity('Lin','tester');
+ assert.equal(resolution.candidates.length,2);
+ assert.equal(resolution.canCreate,false);
+ assert.equal((await service.resolveIdentity('Lin (removed)','tester')).deletedIdentity,true);
+ assert.equal((await service.resolveIdentity('Unknown','tester')).canCreate,true);
+ const [candidate] = (await service.resolveIdentity('Independent','tester')).activityRosterCandidates;
+ assert.deepEqual([candidate.school,candidate.organization], ['Roster School','Roster Company']);
+ const analyzed = (await run('analyze',{rows:[{values:{display_name:'Lin'}}]})).rows[0];
+ assert.equal(analyzed.candidates.length,2);
+ await assert.rejects(run('prepare',{operation:'import',activityId:1,rows:[{values:{display_name:'Lin'}}]}),/ROSTER_IDENTITY/);
  }finally{await db.close();}
 });

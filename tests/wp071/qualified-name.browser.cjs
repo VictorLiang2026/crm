@@ -9,11 +9,13 @@ const newName = '【系统测试·勿联系】虚构刘芬（上海外国语学�
 const revisedName = '【系统测试·勿联系】虚构刘芬（外国语学校）';
 const baseName = '【系统测试·勿联系】虚构刘芬';
 
-test('manual Person creation keeps the candidate visible and previews a different qualifier', async () => {
+for (const [device, width, height] of [['desktop', 1440, 900], ['iPad', 820, 1180], ['iPhone', 390, 844]]) {
+test(device + ' manual Person creation keeps the candidate visible and previews a different qualifier', async () => {
   const browser = new Browser(path.resolve(__dirname, '../..'));
   try {
     await browser.start();
-    await browser.open('#/ai');
+    await browser.send('Emulation.setDeviceMetricsOverride', {width, height, deviceScaleFactor: 1, mobile: device === 'iPhone'});
+    await browser.openComponent();
     await browser.evaluate(`(async()=>{
       const {openPersonNew}=await import('/crm/js/modules/console/write.js');
       const {setLang}=await import('/crm/js/modules/console/i18n.js');
@@ -52,6 +54,7 @@ test('manual Person creation keeps the candidate visible and previews a differen
     await browser.healthy();
   } finally { await browser.close(); }
 });
+}
 
 test('Quick Capture permits a reviewed new Person when only a different qualifier exists', async () => {
   const browser = new Browser(path.resolve(__dirname, '../..'));

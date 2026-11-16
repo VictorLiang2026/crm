@@ -76,7 +76,7 @@ test('iPad import defaults to Person reuse and requires explicit same or differe
  }finally{if(browser)await browser.close();server.closeAllConnections();await new Promise(r=>server.close(r));}
 });
 
-test('iPad visibly explains and requires manual review for an ambiguous non-skipped row',async()=>{
+for(const [device,width,height] of [['desktop',1440,900],['iPad',820,1180],['iPhone',390,844]])test(device+' requires manual review for an ambiguous non-skipped row',async()=>{
  const server=http.createServer((req,res)=>{const p=new URL(req.url,'http://localhost').pathname;
   if(p==='/'){res.setHeader('Content-Type','text/html;charset=utf-8');res.end('<meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="/crm/css/console.css"><main></main>');return;}
   const f=path.resolve(root,'.'+p);if(!f.startsWith(root+path.sep)||!fs.existsSync(f)){res.writeHead(404);return res.end();}
@@ -84,7 +84,7 @@ test('iPad visibly explains and requires manual review for an ambiguous non-skip
  });await new Promise(r=>server.listen(0,'127.0.0.1',r));let browser;
  try{
   browser=await puppeteer.launch({executablePath:process.env.CRM_TEST_BROWSER||'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',headless:true,args:['--no-first-run','--disable-sync']});
-  const p=await browser.newPage();await p.setViewport({width:820,height:1180});await p.goto('http://127.0.0.1:'+server.address().port);
+  const p=await browser.newPage();await p.setViewport({width,height,isMobile:device==='iPhone',deviceScaleFactor:1});await p.goto('http://127.0.0.1:'+server.address().port);
   await p.evaluate(async()=>{
    const {renderRoster}=await import('/crm/js/modules/console/activity-roster.js');window.prepared=null;
    renderRoster({main:document.querySelector('main'),api:{call:async(name,event)=>{
