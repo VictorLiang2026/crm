@@ -29,3 +29,20 @@
 - 教育专项回归：21 PASS、0 FAIL、0 SKIP。新用例覆盖最近入库优先、相同时间 ID 倒序、rollback 恢复旧规则，且断言已有批次与人物字段不变。
 - WP01：`PASS_WITH_LIMITATIONS`；目录检查 1,646 项通过，WP04 身份审计无例外，隔离回归 102 PASS、0 FAIL、5 个历史预设 SKIP，匿名权限 113/113。登录、service-runtime、live-writes、mobile 仍为未验证项。
 - GitHub 发布、标签及发布后 CloudBase 源码一致性检查待完成；当前变更的线上数据库 migration 已应用，静态资源和云函数没有变更。
+
+## 发布闭环（2026-11-17）
+
+- 提交：`e4834cdb52d7f4cec6025317b15695c9aaff3407`；GitHub `master` 已推送，标签：`release-20261117-161829`。
+- 发布前和发布后完整 `sync-check.ps1` 均通过：本地/GitHub/CloudBase 一致；106 个可达静态资源及 30 个函数的 340 个源码/配置文件匹配；线上 `admin.html` HTTP 200 且 SHA-256 相同。云端复核证据目录：`D:\Temp\crm-cloud-audit-9982cd3a7bf949d8aa569fc26b5913c3`。
+- 业务产物只包含已执行的 PostgreSQL migration `20261117160700`；未修改或部署云函数、页面资源。远端迁移历史总数 204，最新版本为 `20261117160700`；函数体与 service_role 独占执行权限已只读核实。
+- CloudBase 首次 apply 响应一度显示 `MIGRATION_NOT_APPLIED`，但异步任务结果为 Succeed。按流程检查 task、listMigrations 与 migrationDetail 后确认 migration 已登记并生效；未重复 apply、未绕过 migration 历史。
+- 发布门禁为 `PASS_WITH_LIMITATIONS`：目录 1,646 项通过，WP04 无例外，回归 102 PASS / 0 FAIL / 5 个历史预设 SKIP，匿名权限 113/113；真实登录、service-runtime、live-writes、mobile 仍未验证。
+- 当前最新排序下的第二个生产试点尚未创建。此前 15:46 创建的批次先于 16:12 migration，仍保留旧样本；7 项待审核、43 项无证据，预览和 Person 字段变更为 0。
+
+## 补记：Person 互动日期改动纳入后续发布
+
+- 首次教育发布后的复核发现线上 `i18n.js` 和 `person-interaction.js` 存在日期录入/清除改动；用户随后明确批准纳入本轮，本次跟踪记录见 [person-interaction-followup-dates-20261117.md](person-interaction-followup-dates-20261117.md)。
+- CloudBase 迁移历史已含 `20261117170000_person_interaction_followup_dates`，`public.interactions.next_followup_date` 已存在；39 条人工互动中该列当前非空为 0。故本轮不重复 apply，只把与线上 migration/rollback 哈希一致的文件补入 Git。
+- CloudBase 两份静态资源已按路径上传；互动日期 browser、旧互动 migration、目录聚合/rollback、教育排序回归及最终 WP01 均已通过。详见互动专项记录。
+- GitHub 在期间收到互动功能提交 `23cbe60f5b4373dc1b6b2c60cf83d7d36c1e0fed`；本地发布工作树已 fast-forward 到该提交。最终发布记录准备使用标签 `release-20261117-173700`，提交/标签推送和发布后完整 sync-check 待发布脚本完成。
+- 第二个最新入库排序的教育试点批次仍未创建；旧批次与 Person 字段保持不变。

@@ -31,3 +31,16 @@
 - 数据库：只执行 `20261117170000_person_interaction_followup_dates`。
 - 静态托管：仅上传 `crm/js/modules/console/person-interaction.js` 和 `crm/js/modules/console/i18n.js` 到对应 `/crm/js/modules/console/` 路径。
 - 不部署云函数；不触及 `pr` schema 或 `pr_*` 函数。
+
+## 本轮补充复核（2026-11-17）
+
+- GitHub 在发布检查期间由 `e4834cd` 前进至 `23cbe60`，内容正是本互动功能与 migration；发布脚本在检测到本地落后时安全停止，未提交/打标/推送。随后发布工作树 fast-forward 至 `23cbe60`，未强推，也未覆盖并发提交。
+- CloudBase 中 `20261117170000_person_interaction_followup_dates` 已存在；新列存在，39 条人工互动里非空 0 条。RPC 只读核对通过日期型输入、旧时间戳兼容、显式清除及 Asia/Shanghai 处理；未重复执行 migration。
+- 本轮将两份对应静态文件按明确路径上传，CloudBase 返回 `successCount=2`、`failedFiles=0`。上传后 `tests/wp01/static.cjs` 确认 106 个可达资源与线上一致。
+- 定向验证：`node --test tests/interactions/unified-editor.browser.cjs` 1 PASS；`node tests/interactions/unified-migration.cjs` 通过；`node tests/console/directory-participation.cjs <PGlite module>` 通过；变更 JS/测试文件语法检查通过。
+- 在干净 GitHub 提交 `23cbe60` 上运行 `npm run test:interactions`，27 项中 19 PASS、8 FAIL。失败集中于既有 `person360-dispatch.cjs` 对无设备授权请求预期 `UNAUTHORIZED`、实际返回 `DEVICE_ACCESS_DENIED`；本工作包未改 Person 360 服务端鉴权代码。最终 WP01 会单独覆盖发布门禁及隔离回归，不能把该套件失败记作通过。
+- 教育排序回归：21 PASS / 0 FAIL / 0 SKIP；本互动工作未改教育业务或教育 migration。
+- 最终 `npm run test:wp01`：`PASS_WITH_LIMITATIONS`。Catalog 1,646 checks / 0 drift（93 tables、20 views、42 sequences、114 routines）；WP04 0 例外；隔离 regression 102 PASS / 0 FAIL / 5 历史预设 SKIP；匿名权限 113/113。登录、service-runtime、live-writes、mobile 保持未验证。
+- `npm run test:interactions` 在干净 GitHub `23cbe60` 上为 19 PASS / 8 FAIL。失败是现有 `person360-dispatch.cjs` 预期与设备访问拒绝码不一致；本工作包没有改该服务端路径。WP01 隔离回归通过。
+- 发布前 `npm run check:release-gate` 通过。静态托管上传成功 2/2；完整 `sync-check.ps1 -CloudOnly`：106 个静态资源、30 个函数/340 个源码配置文件一致，线上 `admin.html` HTTP 200 且 SHA-256 一致。
+- GitHub 当时已有互动提交 `23cbe60f5b4373dc1b6b2c60cf83d7d36c1e0fed`；本轮拟在其上发布最终闭环提交与标签 `release-20261117-173700`。提交、标签推送和发布后完整 sync-check 结果待脚本完成。

@@ -9,6 +9,7 @@ test('one bilingual iPad entry creates and edits general and customer interactio
   await b.wait("document.querySelector('.tab-stack .stack-head button')");
   assert.deepEqual(await b.evaluate("[...document.querySelectorAll('.tab-stack .stack-head button')].map(x=>x.textContent).filter(x=>/互动|跟进/.test(x))"),['记录互动']);
   await b.click('.stack-head button','记录互动');await b.wait("document.querySelector('[name=summary]')");
+  assert.equal(await b.evaluate("document.querySelector('[name=interaction_date]').type"),'date');
   await b.evaluate(`(()=>{document.querySelector('[name=interaction_date]').value='2026-10-30';document.querySelector('[name=summary]').value='[CRM_TEST_ONLY] general';document.querySelector('[name=raw_note]').value='Full note';const save=[...document.querySelectorAll('.sheet button')].find(x=>x.textContent==='保存');save.click();save.click();})()`);
   await b.wait("!document.querySelector('.sheet')");
   const first=await b.evaluate("window.__crmTest.calls.filter(x=>x.action==='saveUnifiedInteraction')");
@@ -35,6 +36,10 @@ test('one bilingual iPad entry creates and edits general and customer interactio
   assert.equal(await b.evaluate("document.querySelector('[name=next_action_date]').value"),'2026-11-02');
   assert.equal(await b.evaluate("document.querySelector('[name=next_followup_date]').value"),'2026-11-01');
   await b.click('.sheet button','清除下次跟进日期');
+  assert.equal(await b.evaluate("document.querySelector('[name=next_followup_date]').disabled"),true);
+  await b.click('.sheet button','保留原下次跟进日期');
+  assert.equal(await b.evaluate("document.querySelector('[name=next_followup_date]').value"),'2026-11-01');
+  await b.click('.sheet button','清除下次跟进日期');
   await b.evaluate("[...document.querySelectorAll('.sheet button')].find(x=>x.textContent==='保存').click()");await b.wait("!document.querySelector('.sheet')");
   const cleared=await b.evaluate("window.__crmTest.calls.filter(x=>x.action==='saveUnifiedInteraction').at(-1).payload");
   assert.equal(Object.hasOwn(cleared,'next_followup_date'),true);assert.equal(cleared.next_followup_date,null);
@@ -45,6 +50,9 @@ test('one bilingual iPad entry creates and edits general and customer interactio
   await b.wait("[...document.querySelectorAll('.tab-stack .stack-head button')].some(x=>x.textContent==='Record interaction')");
   await b.click('.stack-head button','Record interaction');await b.wait("document.querySelector('[name=scene]')");
   assert.equal(await b.evaluate("document.querySelector('[name=scene] option').textContent"),'General conversation');
+  assert.equal(await b.evaluate("document.querySelector('[name=interaction_date]').type"),'date');
+  await b.evaluate("const s=document.querySelector('[name=scene]');s.value='customer';s.dispatchEvent(new Event('change'))");
+  assert.equal(await b.evaluate("[...document.querySelectorAll('.sheet button')].some(x=>x.textContent==='Clear next follow-up date')"),true);
   await b.healthy();
  }finally{await b.close();}
 });
