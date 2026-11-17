@@ -312,10 +312,14 @@ function installFixtures() {
       let interaction=manualInteractions.find(row=>row.id===payload.id);
       if(!interaction){interaction={id:990401+manualInteractions.length,person_id:data.personId,source_type:payload.customer_id?'followups':'manual',source_id:null};manualInteractions.push(interaction);}
       Object.assign(interaction,payload);
+      if(Object.hasOwn(payload,'interaction_date')){
+        interaction.interaction_at=payload.interaction_date?`${payload.interaction_date}T16:00:00.000Z`:null;
+        interaction.time_precision=payload.interaction_date?'day':payload.time_precision;
+      }
       if(payload.customer_id){
         let f=followups.find(row=>row.interaction_id===interaction.id);
         if(!f){f={Id:920002+followups.length-1,interaction_id:interaction.id,customer_id:payload.customer_id};followups.push(f);}
-        Object.assign(f,payload,{interaction_summary:payload.summary,followup_notes:payload.raw_note,followup_date:payload.interaction_at?.slice(0,10)});
+        Object.assign(f,payload,{interaction_summary:payload.summary,followup_notes:payload.raw_note,followup_date:payload.interaction_date||payload.interaction_at?.slice(0,10)||f.followup_date});
         interaction.source_id=f.Id;
       }
       return {ok:true,interaction};
