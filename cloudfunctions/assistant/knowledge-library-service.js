@@ -157,7 +157,7 @@ function decodeXml(value) {
     .replace(/&apos;/g,"'").replace(/&amp;/g,'&').replace(/&#(\d+);/g,(_,n)=>String.fromCodePoint(Number(n)))
     .replace(/&#x([0-9a-f]+);/gi,(_,n)=>String.fromCodePoint(parseInt(n,16)));
 }
-function zipTextEntries(bytes, accepted, maxEntries) {
+function zipTextEntries(bytes, accepted, maxEntries, raw=false) {
   if (!bytes.subarray(0,4).equals(Buffer.from([0x50,0x4b,0x03,0x04]))) fail('INVALID_CONTENT');
   let eocd = -1;
   for (let i = bytes.length - 22; i >= Math.max(0, bytes.length - 65557); i--) {
@@ -186,7 +186,7 @@ function zipTextEntries(bytes, accepted, maxEntries) {
     const start=offset+30+nameLength+extraLength,end=start+target.compressed;
     if(end>bytes.length)fail('INVALID_CONTENT');
     try{const compressed=bytes.subarray(start,end);const xml=target.method===0?compressed:inflateRawSync(compressed,{maxOutputLength:20*1024*1024});
-      if(xml.length!==target.uncompressed)fail('INVALID_CONTENT');return {name:target.name,xml:xml.toString('utf8')};}
+      if(xml.length!==target.uncompressed)fail('INVALID_CONTENT');return raw?{name:target.name,bytes:xml}:{name:target.name,xml:xml.toString('utf8')};}
     catch(error){if(error?.code==='INVALID_CONTENT'||error?.code==='UNSUPPORTED_TYPE')throw error;fail('INVALID_CONTENT');}
   });
 }
@@ -199,7 +199,7 @@ function extractDocx(bytes) {
   const entries=zipTextEntries(bytes,name=>name==='word/document.xml');
   return boundedText(xmlPlainText(entries[0].xml));
 }
-function extractManualDocx(bytes) {
+function extractManualDocx(bytes,{full=false}={}) {
   const [document]=zipTextEntries(bytes,name=>name==='word/document.xml',1);
   const lines=[],headings=[];
   for(const paragraph of document.xml.matchAll(/<w:p(?:\s[^>]*)?>([\s\S]*?)<\/w:p>/g)){
@@ -214,7 +214,9 @@ function extractManualDocx(bytes) {
     if(outline||level)headings.push({index:lines.length,level:outline?Number(outline[1])+1:Number(level[1])});
     lines.push(text);
   }
-  boundedText(lines.join('\n'));
+  const content=lines.join('\n');
+  if(full){if(content.length>500000||content.includes('\0')||!content&&!/<(?:w:drawing|w:pict)\b/.test(document.xml))fail('UNSUPPORTED_CONTENT');}
+  else if(lines.length||!/<(?:w:drawing|w:pict)\b/.test(document.xml))boundedText(content);
   return {lines,headings};
 }
 function extractPptx(bytes) {
@@ -362,7 +364,17 @@ function createKnowledgeLibrary(options={}) {
   const documents=require('./knowledge-documents').documentService(request,(name,args)=>searchDataFactory({env,key,fetchImpl}).auditRdb.rpc(name,args),generateSummary);
   const references=require('./communication-reference-service').createCommunicationReferences({request,key,check:testDataReader,
     rpc:(name,args)=>searchDataFactory({env,key,fetchImpl}).auditRdb.rpc(name,args)});
+  const optimization=require('./reference-optimization-service').createReferenceOptimization({
+    rpc:(name,args)=>searchDataFactory({env,key,fetchImpl}).auditRdb.rpc(name,args),check:testDataReader,
+    gateway:(uid,skillRegistry)=>gatewayFactory({app:client,rdb:searchDataFactory({env,key,fetchImpl}).auditRdb,skillRegistry,timeoutMs:60000,maxAttempts:1,
+      actorResolver:async()=>({uid,isAnonymous:false})}),
+    parseStep:require('./reference-manual-parser').createParseStep({
+      load:async(id,actor)=>{const r=await searchDataFactory({env,key,fetchImpl}).auditRdb.rpc('crm_manual_import_v1',{p_operation:'load',p_actor_uid:actor,p_data:{id}});if(r.error||!r.data)fail('MANUAL_IMPORT_FAILED');return r.data;},
+      entries:zipTextEntries,decode:decodeXml,ocr:(name,mime,bytes)=>extractImageText(name,mime,bytes,{app:client}),
+    }),
+  });
   const manualImport=require('./manual-docx-import').createManualImport({extractDocx:extractManualDocx,catalog:references.all,
+    parse:optimization.parse,
     rpc:(name,args)=>searchDataFactory({env,key,fetchImpl}).auditRdb.rpc(name,args)});
   const contentService=createKnowledgeContentService({
     rpc:(name,args)=>searchDataFactory({env,key,fetchImpl}).auditRdb.rpc(name,args),
@@ -1764,6 +1776,15 @@ function createKnowledgeLibrary(options={}) {
       return contentService.run(event.contentOperation,actor,item);
     }
     if(event?.operation==='manualDocx')return manualImport.run(event.manualOperation,event.data||{},actorUid(actor));
+    if(event?.operation==='referenceOptimization')return optimization.run(event.referenceOperation,event.data||{},actorUid(actor));
+    if(event?.operation==='referenceGpt'){
+      if(options.internalReferenceMcp!==true)fail('PERMISSION_DENIED');
+      return optimization.run(event.referenceOperation,event.data||{},actorUid(actor),{mcp:true});
+    }
+    if(event?.operation==='referenceWorker'){
+      if(options.internalReferenceWorker!==true)fail('PERMISSION_DENIED');
+      return optimization.work();
+    }
     if(event?.operation==='referenceMaintenance')return references.run(event.referenceOperation,event.data||{},actorUid(actor));
     if(event?.operation==='communicationDraft'){
       const actorId=actorUid(actor),input=event.data||{},basis=await references.adviceBasis(input.adviceId);

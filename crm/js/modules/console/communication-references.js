@@ -2,6 +2,7 @@ import {wordImport} from './manual-docx-import.js';
 import {h} from './dom.js';
 import {t} from './i18n.js';
 import {data} from './data.js';
+import {referenceOptimization} from './reference-optimization.js';
 const text=key=>t('kr_'+key);
 const call=(ctx,operation,payload={})=>data.knowledgeLibrary(ctx,'referenceMaintenance',{referenceOperation:operation,data:payload});
 const button=(label,action,primary=false)=>h('button',{type:'button',class:'btn '+(primary?'btn-primary':'btn-ghost'),onclick:async e=>{
@@ -81,7 +82,8 @@ async function importManuals(ctx,onChange){
 export function renderCommunicationReferences(ctx){
  let rows=[],query='',kind='',enabled='enabled',page=1;
  const root=ctx.main,list=h('div',{class:'kg-table-wrap'}),status=h('p',{role:'status'});
- const load=async()=>{try{const r=await call(ctx,'list');rows=r.rows;draw();}catch(_){status.textContent=text('load_failed');}};
+ const load=async()=>{try{const [r]=await Promise.all([call(ctx,'list'),optimization.load()]);rows=r.rows;draw();}catch(_){status.textContent=text('load_failed');}};
+ const optimization=referenceOptimization(ctx,{dialog,onChange:load,status,legacyHistory:row=>openKnowledgeHistory(ctx,{...row,table:'playbooks'},load)});
  const draw=()=>{
   const q=query.trim().toLowerCase(),filtered=rows.filter(r=>(!kind||r.metadata?.kind===kind)&&
    (enabled==='all'||(enabled==='enabled')===(r.metadata?.enabled!==false))&&
@@ -90,11 +92,11 @@ export function renderCommunicationReferences(ctx){
   list.replaceChildren(h('table',{class:'kg-table kr-table'},[
    h('thead',{},h('tr',{},['number','title','kind','keywords','state','actions'].map(v=>h('th',{},text(v))))),
    h('tbody',{},filtered.slice((page-1)*20,page*20).map(row=>h('tr',{},[
-    h('td',{},String(row.id)),h('td',{},buttonTitle(row)),h('td',{},text(row.metadata?.kind||'wording')),
-    h('td',{},(row.metadata?.keywords||[]).join('、')),h('td',{},text(row.metadata?.enabled===false?'disabled':'enabled')),
+    h('td',{},[optimization.select(row),String(row.id)]),h('td',{},buttonTitle(row)),h('td',{},text(row.metadata?.kind||'wording')),
+    h('td',{},(row.metadata?.keywords||[]).join('、')),h('td',{},[h('small',{},text(row.metadata?.enabled===false?'disabled':'enabled')),optimization.cell(row)]),
     h('td',{},[button('edit',()=>edit(ctx,row,load)),button(row.metadata?.enabled===false?'enable':'disable',async()=>{
      try{await toggleKnowledgeEnabled(ctx,{...row,table:'playbooks'},load);}catch(_){status.textContent=text('save_failed');}}),
-     button('history',()=>openKnowledgeHistory(ctx,{...row,table:'playbooks'},load))])]))),
+     h('button',{type:'button',class:'btn btn-ghost',onclick:()=>optimization.versions(row).catch(()=>{status.textContent=text('load_failed');})},t('ro_versions'))])]))),
   ]),h('div',{class:'kg-pager'},[button('previous',()=>{page=Math.max(1,page-1);draw();}),
    h('span',{},`${page} / ${pages} · ${filtered.length}`),button('next',()=>{page=Math.min(pages,page+1);draw();})]));
  };
@@ -109,7 +111,7 @@ export function renderCommunicationReferences(ctx){
    h('form',{onsubmit:e=>{e.preventDefault();query=search.value;page=1;draw();}},[search,h('button',{type:'submit',class:'btn btn-ghost'},text('search'))]),
    h('select',{'aria-label':text('kind'),onchange:e=>{kind=e.target.value;page=1;draw();}},['','wording','objection'].map(v=>h('option',{value:v},text(v||'all')))),
    h('select',{'aria-label':text('state'),onchange:e=>{enabled=e.target.value;page=1;draw();}},['enabled','disabled','all'].map(v=>h('option',{value:v},text(v)))),
-  ]),status,list]));load();
+  ]),optimization.tools,status,list]));load();
 }
 export function communicationDraftControl(ctx,row){
  if(!['ready','manual'].includes(row.system?.status))return null;

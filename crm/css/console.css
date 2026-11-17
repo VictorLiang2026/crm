@@ -1565,7 +1565,16 @@ body:has(.login), body.is-login { padding-top: env(safe-area-inset-top); }
 
 /* Communication reference maintenance: iPad-first, existing tables and controls. */
 .kr-page{padding:20px}.kr-page .kg-list-tools{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
-.kr-table th,.kr-table td{padding:10px;vertical-align:top}.kr-table td:last-child{min-width:200px}
+.ro-tools,.ro-bulk{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:14px 0}.ro-bulk:empty{display:none}
+.ro-flags{display:grid;gap:6px;margin-top:8px}.ro-flag{display:flex;align-items:center;gap:7px;cursor:pointer;font-size:13px;line-height:1.4}
+.ro-flag input,.kr-table input[type=checkbox]{width:18px;height:18px;accent-color:var(--primary,#2563eb);margin-right:6px;flex:none}
+.ro-new{color:var(--primary,#2563eb)}.ro-job{display:flex;align-items:center;flex-wrap:wrap;gap:12px;padding:10px 0;border-bottom:1px solid var(--border,#e5e7eb)}
+.ro-options{max-width:100%;font-size:14px}.ro-options p{max-width:62ch;line-height:1.65}.ro-options summary{cursor:pointer;padding:10px}
+.kr-page button:focus-visible,.kr-dialog button:focus-visible,.ro-flag input:focus-visible{outline:2px solid var(--primary,#2563eb);outline-offset:3px}
+.kr-dialog details summary{cursor:pointer;line-height:1.6;padding:8px 0}.kr-dialog details[open]{border-bottom:1px solid var(--border,#e5e7eb);padding-bottom:12px}
+.kr-table{min-width:0;table-layout:fixed}.kr-table th,.kr-table td{padding:10px;vertical-align:top;overflow-wrap:anywhere;white-space:normal}
+.kr-table th:nth-child(1){width:8%}.kr-table th:nth-child(2){width:25%}.kr-table th:nth-child(3){width:10%}.kr-table th:nth-child(4){width:17%}.kr-table th:nth-child(5){width:20%}.kr-table th:nth-child(6){width:20%}
+.kr-table td:first-child,.kr-table td:last-child{min-width:0;max-width:none}.kr-table .btn{white-space:normal;text-align:left;max-width:100%;margin-bottom:4px}.kr-page .btn:disabled,.kr-dialog .btn:disabled{opacity:.55;cursor:wait}
 .kr-overlay{position:fixed;inset:0;z-index:1200;background:#0007;display:flex;align-items:center;justify-content:center;padding:24px}
 .kr-dialog{background:var(--surface,#fff);color:var(--text,#111);border-radius:12px;width:min(900px,100%);max-height:88vh;overflow:auto;padding:24px}
 .kr-dialog header{display:flex;justify-content:space-between;align-items:center}.kr-field{display:grid;gap:6px;margin:12px 0}

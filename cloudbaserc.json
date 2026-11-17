@@ -21,6 +21,11 @@
           "name": "knowledgeOcrWorker",
           "type": "timer",
           "config": "0 */1 * * * * *"
+          },
+          {
+            "name": "referenceOptimizationWorker",
+            "type": "timer",
+            "config": "30 */1 * * * * *"
         }
       ]
     },

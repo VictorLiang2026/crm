@@ -99,7 +99,7 @@ test('MCP metadata and tool contract expose text-only read and summary-only subm
   const resource=process.env.CRM_KNOWLEDGE_MCP_RESOURCE_URL;
   const metadataUrl='https://crm.example/.well-known/oauth-protected-resource/mcp/knowledge';
   const metadata=await main({httpMethod:'GET',url:metadataUrl,headers:{}},{httpContext:{httpMethod:'GET',url:metadataUrl,headers:{}}});
-  assert.deepEqual(JSON.parse(metadata.body).scopes_supported,['knowledge:read','knowledge:gpt:submit','followup:read','followup:gpt:submit','followup:gpt:direct_write']);
+  assert.deepEqual(JSON.parse(metadata.body).scopes_supported,['knowledge:read','knowledge:gpt:submit','followup:read','followup:gpt:submit','followup:gpt:direct_write','references:read','references:gpt:submit']);
   mockCall=async({data})=>({result:data.input.operation==='access'?{ok:true,actorUid:'crm-user',resource,
     scopes:['knowledge:read','knowledge:gpt:submit']}:{ok:true,record:{}}});
   const url=resource;
@@ -139,6 +139,18 @@ test('MCP metadata and tool contract expose text-only read and summary-only subm
   assert.equal(direct.inputSchema.properties.rows.maxItems,10);
   assert.match(direct.description,/directly/);
   assert.match(direct.description,/does not create a preview/);
+});
+
+test('reference tools require dedicated scopes and reject injected tool names',async()=>{
+ const resource=process.env.CRM_KNOWLEDGE_MCP_RESOURCE_URL,url=resource,headers={authorization:'Bearer '+'b'.repeat(40),'content-type':'application/json'};
+ let scopes=['knowledge:read','knowledge:gpt:submit'],delegated=null;
+ mockCall=async({data})=>{if(data.input.operation==='access')return {result:{ok:true,actorUid:'crm-user',resource,scopes}};delegated=data.input;return {result:{ok:true,rows:[]}};};
+ const send=async(name,args)=>main({httpMethod:'POST',url,headers,body:JSON.stringify({jsonrpc:'2.0',id:91,method:'tools/call',params:{name,arguments:args}})},{httpContext:{httpMethod:'POST',url,headers}});
+ const batchId='11111111-1111-1111-1111-111111111111';
+ let r=await send('reference_gpt_package',{batchId});assert.equal(JSON.parse(r.body).result.isError,true);assert.equal(delegated,null);
+ scopes=['references:read'];r=await send('reference_gpt_package',{batchId});assert.equal(JSON.parse(r.body).result.isError,false);assert.equal(delegated.tool,'reference_gpt_package');
+ delegated=null;r=await send('reference_gpt_start',{requestId:batchId});assert.equal(JSON.parse(r.body).result.isError,true);assert.equal(delegated,null);
+ scopes.push('references:gpt:submit');r=await send('reference_gpt_start',{requestId:batchId,tool:'knowledge_records_list'});assert.equal(r.statusCode,400);assert.equal(delegated,null);
 });
 
 test('follow-up-only grants can read task packages but cannot call knowledge or submit without the write scope',async()=>{

@@ -13,6 +13,7 @@ test('iPad bilingual communication table has six columns and enabled filtering',
     {id:2,scenario:'Disabled reference',response_logic:'Never selected.',metadata:{kind:'wording',enabled:false}}];
    data.knowledgeLibrary=async(_ctx,op,payload)=>{
     calls.push([op,payload]);
+    if(op==='referenceOptimization'&&payload.referenceOperation==='states')return {ok:true,rows:[]};
     if(op==='manualDocx'){
      if(payload.manualOperation==='stage')return {id:'synthetic'};
      if(payload.manualOperation==='preview')return {status:'ready',mode:'structured',previewId:'verified',uncovered:0,rows:[
@@ -62,7 +63,7 @@ test('iPad bilingual communication table has six columns and enabled filtering',
     }finally{window.confirm=originalConfirm;}
     dialog.querySelector('header button').click();
    }
-   return {checks,writes:calls.filter(c=>c[0]!=='manualDocx'&&!['list','importPreview','importConfirm'].includes(c[1]?.referenceOperation)).length};
+   return {checks,writes:calls.filter(c=>c[0]!=='manualDocx'&&!['list','states','importPreview','importConfirm'].includes(c[1]?.referenceOperation)).length};
   })()`);
   assert.ok(result.checks.every(Boolean),JSON.stringify(result));assert.equal(result.writes,0);
  }finally{await b.close();}

@@ -8,7 +8,7 @@ const HMAC_KEY = process.env.CRM_KNOWLEDGE_MCP_HMAC_KEY;
 const CONSENT_URI = process.env.CRM_KNOWLEDGE_MCP_CONSENT_URI;
 const RESOURCE_URL = process.env.CRM_KNOWLEDGE_MCP_RESOURCE_URL;
 const ISSUER_ORIGIN = process.env.CRM_KNOWLEDGE_MCP_ISSUER_URL;
-const SCOPES = ['knowledge:read','knowledge:gpt:submit','followup:read','followup:gpt:submit','followup:gpt:direct_write'];
+const SCOPES = ['knowledge:read','knowledge:gpt:submit','followup:read','followup:gpt:submit','followup:gpt:direct_write','references:read','references:gpt:submit'];
 const MCP_PATH = '/mcp/knowledge';
 const OAUTH_PATH = '/oauth';
 const ISSUER_PATH = '/knowledge-mcp';
@@ -111,7 +111,7 @@ async function actorFor(headers,scope){
   const grant=await rpc('access',{accessHash:digest(match[1])});
   if(grant.resource!==RESOURCE_URL)fail('INVALID_AUDIENCE',401);
   if(!Array.isArray(grant.scopes)||scope&&!grant.scopes.includes(scope)||scope==null&&
-      !grant.scopes.some(value=>value==='knowledge:read'||value==='followup:read'))fail('INSUFFICIENT_SCOPE',403);
+      !grant.scopes.some(value=>['knowledge:read','followup:read','references:read'].includes(value)))fail('INSUFFICIENT_SCOPE',403);
   return {actorUid:grant.actorUid,scopes:grant.scopes};
 }
 async function invokeAssistant(actorUid,input){
@@ -150,6 +150,7 @@ function compactList(result){
   return safeResult;
 }
 const TOOLS=[
+ ...require('./reference-mcp-tools').tools.map(({operation,...tool})=>tool),
  {name:'knowledge_records_list',description:'List one bounded page of CRM knowledge records and GPT coverage. Repeat with returned nextOffsets until all hasMore values are false.',securitySchemes:[{type:'oauth2',scopes:['knowledge:read']}],inputSchema:{type:'object',properties:{sourceOffset:{type:'integer',minimum:0},knowledgeOffset:{type:'integer',minimum:0},playbookOffset:{type:'integer',minimum:0},limit:{type:'integer',minimum:1,maximum:100},},additionalProperties:false}},
  {name:'knowledge_documents_list',description:'List bounded pages of explicitly linked multi-volume knowledge documents and all source records marked as volume parts. Includes child knowledge record IDs, part metadata, system-volume summary readiness, and GPT total-summary coverage. Uses document IDs and part metadata, not titles, to identify groups.',securitySchemes:[{type:'oauth2',scopes:['knowledge:read']}],inputSchema:{type:'object',properties:{offset:{type:'integer',minimum:0},volumeOffset:{type:'integer',minimum:0},limit:{type:'integer',minimum:1,maximum:20}},additionalProperties:false}},
  {name:'knowledge_document_get',description:'Read coverage and readiness for one exact multi-volume document ID, including its GPT total summary and per-volume status. The server checks the complete system original from stored text chunks; it never reads linked files.',securitySchemes:[{type:'oauth2',scopes:['knowledge:read']}],inputSchema:{type:'object',properties:{documentId:{type:'string',pattern:'^[1-9][0-9]*$'}},required:['documentId'],additionalProperties:false}},
@@ -198,6 +199,7 @@ async function mcp(req){
     if(!tool)return response(200,{jsonrpc:'2.0',id,error:{code:-32602,message:'Unknown tool'}});
     const requiredScopes=tool.securitySchemes?.[0]?.scopes||[];
     if(requiredScopes.some(scope=>!scopes.includes(scope)))return toolAuthError(id,'INSUFFICIENT_SCOPE',requiredScopes);
+    if(name.startsWith('reference_')&&!require('./reference-mcp-tools').validate(name,args))fail('INVALID_ARGUMENTS',400);
     if(name==='knowledge_records_list'&&Object.entries(args).some(([k,v])=>!['sourceOffset','knowledgeOffset','playbookOffset','limit'].includes(k)||!Number.isSafeInteger(v)||v<0||(k==='limit'&&(v<1||v>100))))fail('INVALID_ARGUMENTS',400);
     if(name==='knowledge_documents_list'&&Object.entries(args).some(([k,v])=>!['offset','volumeOffset','limit'].includes(k)||!Number.isSafeInteger(v)||v<0||(k==='limit'&&(v<1||v>20))))fail('INVALID_ARGUMENTS',400);
     if(name==='knowledge_document_get'&&!/^[1-9][0-9]*$/.test(String(args.documentId)))fail('INVALID_ARGUMENTS',400);
@@ -279,11 +281,12 @@ async function main(event,context){
       requiredConfig();
       const clientId=req.url.searchParams.get('client_id'),redirectUri=req.url.searchParams.get('redirect_uri'),resource=req.url.searchParams.get('resource');
       const state=req.url.searchParams.get('state'),challenge=req.url.searchParams.get('code_challenge'),scope=(req.url.searchParams.get('scope')||'').split(/\s+/).filter(Boolean);
-      const hasRead=scope.includes('knowledge:read')||scope.includes('followup:read');
+      const hasRead=scope.includes('knowledge:read')||scope.includes('followup:read')||scope.includes('references:read');
       if(!clientId||!redirectUri||resource!==RESOURCE_URL||req.url.searchParams.get('response_type')!=='code'||
          req.url.searchParams.get('code_challenge_method')!=='S256'||!(state&&state.length<=1024)||
          !/^[A-Za-z0-9_-]{43}$/.test(challenge||'')||!hasRead||scope.some(s=>!SCOPES.includes(s))||new Set(scope).size!==scope.length||
          scope.includes('knowledge:gpt:submit')&&!scope.includes('knowledge:read')||
+         scope.includes('references:gpt:submit')&&!scope.includes('references:read')||
          (scope.includes('followup:gpt:submit')||scope.includes('followup:gpt:direct_write'))&&!scope.includes('followup:read'))
         fail('INVALID_OAUTH_REQUEST');
       await rpc('validate_client',{clientId,redirectUri});

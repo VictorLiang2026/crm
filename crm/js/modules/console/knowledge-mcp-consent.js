@@ -26,6 +26,7 @@ export async function initKnowledgeMcpConsent() {
     for (const [id, key] of [['title','kmcp_title'],['requester','kmcp_requester'],['intro','kmcp_intro'],['read','kmcp_read'],
       ['write','kmcp_write'],['followupRead','kmcp_followup_read'],['followupWrite','kmcp_followup_write'],
       ['followupReview','kmcp_followup_review'],['followupDirectWrite','kmcp_followup_direct_write'],
+      ['referenceRead','ro_scope_read'],['referenceWrite','ro_scope_write'],
       ['review','kmcp_review'],['loginTitle','kmcp_login'],['usernameLabel','kmcp_username'],
       ['passwordLabel','kmcp_password'],['signin','kmcp_signin'],['allow','kmcp_allow'],['deny','kmcp_deny'],['lang','kmcp_lang_toggle']]) {
       byId(id).textContent = t(key);
@@ -37,6 +38,8 @@ export async function initKnowledgeMcpConsent() {
     byId('followupWrite').classList.toggle('hidden', !requested.has('followup:gpt:submit'));
     byId('followupReview').classList.toggle('hidden', !requested.has('followup:gpt:submit'));
     byId('followupDirectWrite').classList.toggle('hidden', !requested.has('followup:gpt:direct_write'));
+    byId('referenceRead').classList.toggle('hidden', !requested.has('references:read'));
+    byId('referenceWrite').classList.toggle('hidden', !requested.has('references:gpt:submit'));
   }
   function validRequest() {
     return params.get('response_type') === 'code' && params.get('code_challenge_method') === 'S256' &&

@@ -92,6 +92,11 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
       const input = event.input;
       if (!input || typeof input !== 'object' || Array.isArray(input)) return {ok:false,error:{code:'INVALID_INPUT',message:'Invalid request'} };
       try {
+        if(typeof input.tool==='string'&&input.tool.startsWith('reference_')){
+          const contract=require('./reference-mcp-tools'),{tool,...args}=input;
+          if(!contract.validate(tool,args))return {ok:false,error:{code:'INVALID_INPUT',message:'Invalid reference request'}};
+          return knowledgeLibraryRunner({operation:'referenceGpt',referenceOperation:contract.tools.find(t=>t.name===tool).operation,data:args},actorUid,{internalReferenceMcp:true});
+        }
         if(input.kind==='oauth'&&Object.keys(input).every(k=>['kind','operation','data'].includes(k))&&typeof input.operation==='string')
           return {ok:true,...await mcpAuth.runOAuth(input.operation,input.data)};
         if (input.tool === 'knowledge_records_list') {
@@ -523,6 +528,7 @@ exports.aiExperienceInput = aiExperienceInput;
 // Verify the caller before dispatching any private business operation.
 const protectedAssistant = require('./device-runtime').protect('assistant', exports.main);
 exports.main = function(event, context, callback) {
+  if(event?.TriggerName==='referenceOptimizationWorker')return require('./reference-worker-dispatch').dispatch(event);
   // A dedicated authenticated machine entrance. Never forward timer fields as a user action.
   // Kept outside the shared device runtime so no other function's device paths change.
   if (event?.TriggerName === 'educationBackfillWorker' && process.env.EDUCATION_BACKFILL_ENABLED === 'true') {

@@ -103,7 +103,7 @@ function makePlan(lines,sections,job,catalog,mode){
    matches:ranked.map(({row})=>({id:String(row.id),title:row.scenario,content:row.response_logic,updatedAt:row.updated_at}))};
  });
 }
-function createManualImport({rpc,extractDocx,catalog,infer=privateSections}){
+function createManualImport({rpc,extractDocx,catalog,infer=privateSections,parse}){
  async function run(op,data,actor){
   if(typeof actor!=='string'||!actor.trim())fail('UNAUTHORIZED');
   const db=async(operation,input)=>{
@@ -116,26 +116,37 @@ function createManualImport({rpc,extractDocx,catalog,infer=privateSections}){
     typeof data.original!=='string'||data.original.length>2796204)fail('INVALID_DOCX');
    const bytes=Buffer.from(data.original,'base64');
    if(!bytes.length||bytes.length>2097152||bytes.toString('base64')!==data.original)fail('INVALID_DOCX');
-   extractDocx(bytes);
-   return db('stage',{filename:data.filename,original:data.original,sha256:hash(bytes)});
+   extractDocx(bytes,{full:!!parse});
+   const staged=await db('stage',{filename:data.filename,original:data.original,sha256:hash(bytes)});
+   if(parse)await parse(actor,{id:staged.id});
+   return staged;
   }
   if(!/^[0-9a-f-]{36}$/i.test(data?.id||''))fail('INVALID_INPUT');
   if(op==='confirm')return db('apply',{id:data.id,previewId:data.previewId,choices:data.choices});
   if(op!=='preview')fail('INVALID_OPERATION');
   const job=await db('load',{id:data.id});
-  const extracted=extractDocx(Buffer.from(job.original,'base64'));
-  const lines=typeof extracted==='string'?extracted.split(/\n/).map(v=>v.trim()).filter(Boolean):extracted.lines;
-  let sections,mode;
-  try{sections=await infer(lines);}catch{return {status:'pending',reason:'model'};}
-  if(sections){mode='model';}else{mode='structured';sections=structuralSections(lines,extracted.headings);}
-  if(!sections.length||sections.length>300)return {status:'pending',reason:'structure'};
+  const extracted=extractDocx(Buffer.from(job.original,'base64'),{full:!!parse});
+  let lines=typeof extracted==='string'?extracted.split(/\n/).map(v=>v.trim()).filter(Boolean):extracted.lines;
+  let sections,mode,coverage;
+  if(parse){
+   const result=await parse(actor,{id:data.id,retry:data.retry===true}),task=result.job;
+   if(task.status!=='completed')return {status:'pending',reason:task.status==='failed'?'model':'queue',failed:task.status==='failed',progress:{done:task.output?.cursor||0,total:task.output?.lines?.length||0},error:task.last_error};
+   coverage=task.output;lines=coverage.lines;sections=coverage.sections;mode='cloudbase';
+  }else{
+   try{sections=await infer(lines);}catch{return {status:'pending',reason:'model'};}
+   if(sections){mode='model';}else{mode='structured';sections=structuralSections(lines,extracted.headings);}
+  }
+  if(!sections.length||sections.length>300)return {status:'pending',reason:'structure',
+   ...(coverage?{coverage:{processed:coverage.cursor,total:lines.length,omitted:coverage.omitted,warnings:coverage.warnings}}:{})};
   let plan;
   try{plan=makePlan(lines,sections,job,await catalog(actor),mode);}catch(e){if(e.code==='SECTION_SIZE')return {status:'pending',reason:'size'};throw e;}
+  if(coverage)plan.forEach((row,i)=>{const s=sections[i];row.entry.origin=job.filename+' · '+coverage.locations[s.start]+' – '+coverage.locations[s.end];});
   if(Buffer.byteLength(JSON.stringify(plan))>2*1024*1024)return {status:'pending',reason:'size'};
   const verifiedPlan=plan.map(row=>({...row,matches:row.matches.map(({id,updatedAt})=>({id,updatedAt}))}));
   const {previewId}=await db('preview',{id:data.id,plan:verifiedPlan});
   const covered=sections.reduce((n,s)=>n+s.end-s.start+1,0);
-  return {status:'ready',mode,uncovered:lines.length-covered,previewId,rows:plan};
+  return {status:'ready',mode,uncovered:lines.length-covered,previewId,rows:plan,
+   ...(coverage?{coverage:{processed:coverage.cursor,total:lines.length,omitted:coverage.omitted.map(o=>({...o,source:coverage.locations[o.index],text:lines[o.index]})),warnings:coverage.warnings}}:{})};
  }
  return {run};
 }
