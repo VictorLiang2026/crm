@@ -43,4 +43,7 @@
 - 最终 `npm run test:wp01`：`PASS_WITH_LIMITATIONS`。Catalog 1,646 checks / 0 drift（93 tables、20 views、42 sequences、114 routines）；WP04 0 例外；隔离 regression 102 PASS / 0 FAIL / 5 历史预设 SKIP；匿名权限 113/113。登录、service-runtime、live-writes、mobile 保持未验证。
 - `npm run test:interactions` 在干净 GitHub `23cbe60` 上为 19 PASS / 8 FAIL。失败是现有 `person360-dispatch.cjs` 预期与设备访问拒绝码不一致；本工作包没有改该服务端路径。WP01 隔离回归通过。
 - 发布前 `npm run check:release-gate` 通过。静态托管上传成功 2/2；完整 `sync-check.ps1 -CloudOnly`：106 个静态资源、30 个函数/340 个源码配置文件一致，线上 `admin.html` HTTP 200 且 SHA-256 一致。
-- GitHub 当时已有互动提交 `23cbe60f5b4373dc1b6b2c60cf83d7d36c1e0fed`；本轮拟在其上发布最终闭环提交与标签 `release-20261117-173700`。提交、标签推送和发布后完整 sync-check 结果待脚本完成。
+- GitHub 当时已有互动提交 `23cbe60f5b4373dc1b6b2c60cf83d7d36c1e0fed`；最终闭环提交为 `a3ccac5cbfdb5e204fb7bd490712838805966e3d`，标签 `release-20261117-173700`，已原子推送到 `master` 与远端标签。
+- 发布后 `sync-check.ps1` 完整通过：本地/GitHub/CloudBase 一致，106 个可达静态资源、30 个函数的 340 个源码/配置文件匹配，线上 `admin.html` HTTP 200 且 SHA-256 一致。复核证据：`D:\Temp\crm-cloud-audit-8e3d04a81738468dbf3e57ea0e18f19c`。
+- 发布范围：数据库 migration 已在生产历史中，本轮没有重复应用；静态托管上传 2 个模块；没有云函数、`admin.html` 或权限变更。没有对生产业务记录执行创建、更新、删除、AI 调用或回滚。
+- 本地 `D:\CRM\crm` 工作区的旧分支已在确认其为远端祖先且四份未跟踪 migration blob 与 GitHub 完全相同后 fast-forward 到提交 `a3ccac5`；工作区清洁。
