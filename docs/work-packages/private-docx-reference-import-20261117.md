@@ -17,10 +17,10 @@ CRM 服务端提取 Word 自然段、编号和标题。配置了 CRM 私有模�
 ## 发布闭环记录（2026-11-17）
 
 - 发布候选：`d287da222aaef6a57b74e8173c8347c10278f159`（GitHub `master` 与生产代码基线一致）。
-- 本次发布标签：`release-20261117-131000`。本次闭环只提交发布记录和一项测试断言修正；没有改动业务实现、云函数、页面资源或数据库迁移，因此无需重新部署业务产物。
+- 业务发布标签：`release-20261117-131000`。闭环记录补记标签：`release-20261117-133200`。本轮仅提交发布记录和一项测试断言修正；没有改动业务实现、云函数、页面资源或数据库迁移，因此无需重新部署业务产物。
 - 专项回归：知识库/私有 Word 导入与话术页面共 122 PASS、0 FAIL、0 SKIP（`node --test --test-concurrency=1 tests/knowledge-library/*.test.cjs tests/knowledge-library/*.browser.cjs`）。并行运行曾出现一项页面导航超时；单项及串行套件复跑通过。另一个旧断言把默认收起的沟通草稿控件误判为可见操作，本记录仅将测试改为验证控件默认收起、打开历史不写入；业务行为未改变。
 - WP01：`PASS_WITH_LIMITATIONS`。目录/权限快照 1,646 项检查通过；WP04 身份审计通过且无例外；隔离回归 102 PASS、0 FAIL、5 个历史预设 SKIP；匿名网关 113/113 通过。发布门禁结果为 `PASS`。
 - 明示未验证项：真实账号登录（`MANUAL_LOGIN`）、service_role 运行时探针、生产业务写入、手机真机验收。没有以源码一致性代替这些验证。
 - 生产核对：106 个页面引用资源、30 个云函数的 340 个源码/配置文件与 GitHub 基线一致；`public.knowledge_manual_imports` 与 `public.crm_manual_import_v1` 已存在，导入表当前 0 行。本轮未导入手册或写入业务数据。
 - 回滚：迁移配对文件为 `cloudbase/migrations/20261117103000_private_docx_import.rollback.sql`；仅在私有导入表为空时才适用。本轮未执行回滚。
-- 后续完整 `sync-check.ps1` 结果记录于本次发布后的发布报告；真实手册仍须由使用者在 CRM 内预览并人工确认。
+- 发布脚本发布后完整 `sync-check.ps1`：PASS；本地/GitHub/CloudBase 源码一致，`admin.html` HTTP 200 且 SHA-256 匹配，106 个页面资源、30 个云函数的 340 个源码/配置文件全部匹配。云端审计证据目录：`D:\Temp\crm-cloud-audit-344e61f6fae541519447a150b805c476`。业务回归另见本记录上方；真实手册仍须由使用者在 CRM 内预览并人工确认。
