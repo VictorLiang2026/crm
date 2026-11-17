@@ -28,7 +28,7 @@
 - 迁移应用后尚未创建第二个试点批次，因此尚无生产证据验证新 cohort 的识别质量。下一次由用户在真实登录的 Console 选择试点并新建批次；预期为最近入库的人物。此过程仍不会自动写 Person。
 - 教育专项回归：21 PASS、0 FAIL、0 SKIP。新用例覆盖最近入库优先、相同时间 ID 倒序、rollback 恢复旧规则，且断言已有批次与人物字段不变。
 - WP01：`PASS_WITH_LIMITATIONS`；目录检查 1,646 项通过，WP04 身份审计无例外，隔离回归 102 PASS、0 FAIL、5 个历史预设 SKIP，匿名权限 113/113。登录、service-runtime、live-writes、mobile 仍为未验证项。
-- GitHub 发布、标签及发布后 CloudBase 源码一致性检查待完成；当前变更的线上数据库 migration 已应用，静态资源和云函数没有变更。
+- 本段记录的是首次教育专项检查时的阶段状态；GitHub 发布、标签及互动页面纳入后的完整 CloudBase 核对已在下方“发布闭环”与补记中完成。
 
 ## 发布闭环（2026-11-17）
 
@@ -46,5 +46,5 @@
 - CloudBase 两份静态资源已按路径上传；互动日期 browser、旧互动 migration、目录聚合/rollback、教育排序回归及最终 WP01 均已通过。详见互动专项记录。
 - GitHub 在期间收到互动功能提交 `23cbe60f5b4373dc1b6b2c60cf83d7d36c1e0fed`；最终闭环提交 `a3ccac5cbfdb5e204fb7bd490712838805966e3d` 已推送，标签为 `release-20261117-173700`。
 - 发布后完整 sync-check 通过：本地/GitHub/CloudBase 一致，106 个静态资源、30 个函数的 340 个源码/配置文件匹配，线上 `admin.html` HTTP 200 且 SHA-256 一致。证据目录：`D:\Temp\crm-cloud-audit-8e3d04a81738468dbf3e57ea0e18f19c`。
-- 原始 `D:\CRM\crm` 工作区已在核实四份 migration 与 GitHub blob 完全相同后 fast-forward 至闭环提交，工作区清洁。
+- 原始 `D:\CRM\crm` 工作区已快进至最终文档闭环提交 `0a807bbb1f8a997f2dd2e26a1f43b33032cf3f3c`，与 GitHub `master` 一致且工作区清洁。
 - 第二个最新入库排序的教育试点批次仍未创建；旧批次与 Person 字段保持不变。
