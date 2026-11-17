@@ -157,7 +157,7 @@ function decodeXml(value) {
     .replace(/&apos;/g,"'").replace(/&amp;/g,'&').replace(/&#(\d+);/g,(_,n)=>String.fromCodePoint(Number(n)))
     .replace(/&#x([0-9a-f]+);/gi,(_,n)=>String.fromCodePoint(parseInt(n,16)));
 }
-function zipTextEntries(bytes, accepted) {
+function zipTextEntries(bytes, accepted, maxEntries) {
   if (!bytes.subarray(0,4).equals(Buffer.from([0x50,0x4b,0x03,0x04]))) fail('INVALID_CONTENT');
   let eocd = -1;
   for (let i = bytes.length - 22; i >= Math.max(0, bytes.length - 65557); i--) {
@@ -177,7 +177,7 @@ function zipTextEntries(bytes, accepted) {
     cursor += 46 + nameLength + extraLength + commentLength;
     if (cursor > bytes.length) fail('INVALID_CONTENT');
   }
-  if(!targets.length)fail('UNSUPPORTED_TYPE');
+  if(!targets.length||maxEntries&&targets.length>maxEntries)fail('UNSUPPORTED_TYPE');
   return targets.sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true})).map(target=>{
     if(target.uncompressed>20*1024*1024||![0,8].includes(target.method))fail('UNSUPPORTED_TYPE');
     const offset=target.localOffset;
@@ -198,6 +198,24 @@ function xmlPlainText(value) {
 function extractDocx(bytes) {
   const entries=zipTextEntries(bytes,name=>name==='word/document.xml');
   return boundedText(xmlPlainText(entries[0].xml));
+}
+function extractManualDocx(bytes) {
+  const [document]=zipTextEntries(bytes,name=>name==='word/document.xml',1);
+  const lines=[],headings=[];
+  for(const paragraph of document.xml.matchAll(/<w:p(?:\s[^>]*)?>([\s\S]*?)<\/w:p>/g)){
+    const xml=paragraph[1],runs=[];
+    for(const part of xml.matchAll(/<w:t(?:\s[^>]*)?>([\s\S]*?)<\/w:t>|<w:(tab|br)\b[^>]*\/>/g)){
+      runs.push(part[2] ? (part[2]==='tab'?'\t':'\n') : decodeXml(part[1]));
+    }
+    const text=runs.join('').trim();if(!text)continue;
+    const style=xml.match(/<w:pStyle\b[^>]*\bw:val="([^"]+)"/)?.[1]||'';
+    const outline=xml.match(/<w:outlineLvl\b[^>]*\bw:val="([0-8])"/);
+    const level=style.match(/^(?:Heading|标题)\s*([1-9])$/iu);
+    if(outline||level)headings.push({index:lines.length,level:outline?Number(outline[1])+1:Number(level[1])});
+    lines.push(text);
+  }
+  boundedText(lines.join('\n'));
+  return {lines,headings};
 }
 function extractPptx(bytes) {
   const entries=zipTextEntries(bytes,name=>/^ppt\/slides\/slide\d+\.xml$/.test(name));
@@ -343,6 +361,8 @@ function createKnowledgeLibrary(options={}) {
   const callFunction=options.callFunction||client.callFunction.bind(client);
   const documents=require('./knowledge-documents').documentService(request,(name,args)=>searchDataFactory({env,key,fetchImpl}).auditRdb.rpc(name,args),generateSummary);
   const references=require('./communication-reference-service').createCommunicationReferences({request,key,check:testDataReader,
+    rpc:(name,args)=>searchDataFactory({env,key,fetchImpl}).auditRdb.rpc(name,args)});
+  const manualImport=require('./manual-docx-import').createManualImport({extractDocx:extractManualDocx,catalog:references.all,
     rpc:(name,args)=>searchDataFactory({env,key,fetchImpl}).auditRdb.rpc(name,args)});
   const contentService=createKnowledgeContentService({
     rpc:(name,args)=>searchDataFactory({env,key,fetchImpl}).auditRdb.rpc(name,args),
@@ -1743,6 +1763,7 @@ function createKnowledgeLibrary(options={}) {
       }
       return contentService.run(event.contentOperation,actor,item);
     }
+    if(event?.operation==='manualDocx')return manualImport.run(event.manualOperation,event.data||{},actorUid(actor));
     if(event?.operation==='referenceMaintenance')return references.run(event.referenceOperation,event.data||{},actorUid(actor));
     if(event?.operation==='communicationDraft'){
       const actorId=actorUid(actor),input=event.data||{},basis=await references.adviceBasis(input.adviceId);
@@ -1814,4 +1835,4 @@ function createKnowledgeLibrary(options={}) {
 async function handleKnowledgeLibrary(event,actor,options={}) {
   return createKnowledgeLibrary().run(event,actor,options);
 }
-module.exports={createKnowledgeLibrary,handleKnowledgeLibrary,extractDocx,extractPptx,extractXlsx,extractText,decodeBase64,likelySensitive,MAX_FILE_BYTES,UPLOAD_CHUNK_BYTES};
+module.exports={createKnowledgeLibrary,handleKnowledgeLibrary,extractDocx,extractManualDocx,extractPptx,extractXlsx,extractText,decodeBase64,likelySensitive,MAX_FILE_BYTES,UPLOAD_CHUNK_BYTES};

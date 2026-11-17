@@ -1,3 +1,4 @@
+import {wordImport} from './manual-docx-import.js';
 import {h} from './dom.js';
 import {t} from './i18n.js';
 import {data} from './data.js';
@@ -52,11 +53,13 @@ function edit(ctx,row,onChange){
 async function importManuals(ctx,onChange){
  const {panel}=dialog(text('import'));
  const status=h('p',{role:'status'}),results=h('div',{});
- const picker=h('input',{type:'file',accept:'.json,application/json',onchange:async()=>{
-  results.replaceChildren();status.textContent='';
+ const word=wordImport(ctx,results,status,onChange);
+ const picker=h('input',{type:'file',accept:'.docx,.json,application/json,application/vnd.openxmlformats-officedocument.wordprocessingml.document',onchange:async()=>{
+  word.reset();
   const file=picker.files[0];if(!file)return;
   picker.disabled=true;
   try{
+   if(/\.docx$/i.test(file.name)){await word.upload(file);return;}
    if(file.size>512*1024)throw new Error();
    const entries=JSON.parse(await file.text());
    const preview=await call(ctx,'importPreview',{entries});
@@ -73,7 +76,7 @@ async function importManuals(ctx,onChange){
    results.append(confirm);
   }catch(_){status.textContent=text('file_invalid');}finally{picker.disabled=false;}
  }});
- panel.append(field('private_file',picker),status,results);
+ panel.append(field('private_file',picker),word.recent,status,results);
 }
 export function renderCommunicationReferences(ctx){
  let rows=[],query='',kind='',enabled='enabled',page=1;

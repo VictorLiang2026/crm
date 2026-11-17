@@ -81,6 +81,6 @@ function createCommunicationReferences({rpc,request,key,check,expectedManualDige
    id:'eq.'+adviceId,deleted_at:'is.null',limit:1});
   const r=rows[0];if(!r||r.system_status!=='ready')bad('ADVICE_NOT_READY');return r;
  }
- return {run,candidates,adviceBasis};
+ return {run,candidates,adviceBasis,all};
 }
 module.exports={createCommunicationReferences,scoreReference};

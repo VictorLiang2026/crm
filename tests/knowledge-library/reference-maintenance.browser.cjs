@@ -13,6 +13,14 @@ test('iPad bilingual communication table has six columns and enabled filtering',
     {id:2,scenario:'Disabled reference',response_logic:'Never selected.',metadata:{kind:'wording',enabled:false}}];
    data.knowledgeLibrary=async(_ctx,op,payload)=>{
     calls.push([op,payload]);
+    if(op==='manualDocx'){
+     if(payload.manualOperation==='stage')return {id:'synthetic'};
+     if(payload.manualOperation==='preview')return {status:'ready',mode:'structured',previewId:'verified',uncovered:0,rows:[
+      {action:'new',entry:{kind:'wording',title:'New topic',origin:'fixture.docx',content:'New text'},matches:[]},
+      {action:'ambiguous',entry:{kind:'wording',title:'Revised topic',origin:'fixture.docx',content:'Revised text'},matches:[{id:'7',title:'Existing topic',content:'Old text'}]}
+     ]};
+     if(payload.manualOperation==='confirm')return {added:1,revised:1};
+    }
     if(payload.referenceOperation==='importPreview')return {ok:true,count:payload.data.entries.length,previewToken:'synthetic-preview'};
     if(payload.referenceOperation==='importConfirm')return {ok:true,added:1,skipped:0};
     return {ok:true,rows:records};
@@ -35,9 +43,26 @@ test('iPad bilingual communication table has six columns and enabled filtering',
     const confirm=[...dialog.querySelectorAll('button')].find(b=>b.textContent===lang.t('kr_import_confirm'));
     await confirm.onclick({currentTarget:confirm});
     checks.push(count()===before+1&&!dialog.contains(confirm));
+    const wordFile=new DataTransfer();
+    wordFile.items.add(new File(['synthetic bytes'],'fixture.docx'));
+    picker.files=wordFile.files;await picker.onchange();
+    const selectors=dialog.querySelectorAll('select');
+    checks.push(picker.accept.includes('.docx')&&selectors.length===2&&selectors[1].value===''&&dialog.textContent.includes('Old text'));
+    selectors[1].value='7';selectors[1].onchange();
+    const apply=[...dialog.querySelectorAll('button')].find(b=>b.textContent===lang.t('dw_confirm'));
+    const originalConfirm=window.confirm;let human=false;
+    try{
+     window.confirm=()=>human;
+     const prior=calls.filter(c=>c[1].manualOperation==='confirm').length;
+     await apply.onclick({currentTarget:apply});
+     checks.push(calls.filter(c=>c[1].manualOperation==='confirm').length===prior);
+     human=true;await apply.onclick({currentTarget:apply});
+     const latest=calls.filter(c=>c[1].manualOperation==='confirm').at(-1)[1].data;
+     checks.push(latest.previewId==='verified'&&latest.choices.length===2&&latest.choices[1].target==='7');
+    }finally{window.confirm=originalConfirm;}
     dialog.querySelector('header button').click();
    }
-   return {checks,writes:calls.filter(c=>!['list','importPreview','importConfirm'].includes(c[1]?.referenceOperation)).length};
+   return {checks,writes:calls.filter(c=>c[0]!=='manualDocx'&&!['list','importPreview','importConfirm'].includes(c[1]?.referenceOperation)).length};
   })()`);
   assert.ok(result.checks.every(Boolean),JSON.stringify(result));assert.equal(result.writes,0);
  }finally{await b.close();}

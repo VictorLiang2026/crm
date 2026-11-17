@@ -122,3 +122,66 @@ test('private manuals cannot enter generic model prompts or the MCP record and g
   await assert.rejects(svc.run({operation:'content',contentOperation,data:{table:'playbooks',id:'9'}},'staff'),/RECORD_UNAVAILABLE/);
  }
 });
+
+test('private Word batch binds source, actor, verified choices and versions, and rolls the entire batch back on conflict',async()=>{
+ const {createManualImport}=require('../../cloudfunctions/assistant/manual-docx-import');
+ const db=await database();
+ try{
+  await db.exec("RESET ROLE");
+  const migration='20261117103000_private_docx_import';
+  await db.exec(sql(migration+'.sql'));
+  await db.exec(sql(migration+'.rollback.sql'));
+  await db.exec(sql(migration+'.sql'));
+  const effective=(await db.query("SELECT has_table_privilege('anon','public.knowledge_manual_imports','SELECT') a,has_function_privilege('authenticated','public.crm_manual_import_v1(text,text,jsonb)','EXECUTE') b")).rows[0];
+  assert.deepEqual(effective,{a:false,b:false});
+  await db.exec("SET ROLE service_role");
+  const rpc=async(name,{p_operation,p_actor_uid,p_data})=>{
+   assert.equal(name,'crm_manual_import_v1');
+   return {data:(await db.query('SELECT public.crm_manual_import_v1($1,$2,$3::jsonb) AS r',[p_operation,p_actor_uid,JSON.stringify(p_data)])).rows[0].r};
+  };
+  const svc=createManualImport({rpc,extractDocx:buf=>buf.toString('utf8'),infer:async()=>null,catalog:async actor=>(await invoke(db,'list',{},actor)).rows});
+  const execute=(op,data,actor='staff')=>svc.run(op,data,actor);
+  const upload=async source=>execute('stage',{filename:'fixture.docx',original:Buffer.from(source).toString('base64')});
+  const input='01 First subject\nOriginal answer.\n02 Different topic\nIndependent answer.';
+  const job=await upload(input);assert.equal((await upload(input)).id,job.id);
+  assert.equal((await execute('recent',{},'other')).rows.length,0);
+  await assert.rejects(execute('preview',job,'other'));
+  const p=await execute('preview',job);assert.deepEqual(p.rows.map(x=>x.action),['new','new']);
+  assert.equal((await invoke(db,'list',{})).rows.length,0);
+  const choices=[{index:0,target:'new'},{index:1,target:'new'}];
+  const confirm={id:job.id,previewId:p.previewId,choices};
+  await assert.rejects(execute('confirm',{...confirm,choices:[choices[0],{index:1,target:'50'}]}));
+  assert.equal((await invoke(db,'list',{})).rows.length,0);
+  assert.deepEqual(await execute('confirm',confirm),{added:2,revised:0});
+  assert.deepEqual(await execute('confirm',confirm),{added:2,revised:0});
+  assert.deepEqual((await execute('preview',job)).rows.map(x=>x.action),['skip','skip']);
+  const revised=await upload(input.replace('Original answer.','Updated answer.'));
+  let revision=await execute('preview',revised);
+  const row=(await invoke(db,'list',{})).rows[0];
+  const decision={id:revised.id,previewId:revision.previewId,choices:[{index:0,target:String(row.id)}]};
+  await invoke(db,'saveReference',{table:'playbooks',id:row.id,expectedUpdatedAt:row.updated_at,kind:'wording',title:row.scenario,content:'Human edit.',keywords:['curated']});
+  await assert.rejects(execute('confirm',decision),/STALE/);
+  revision=await execute('preview',revised);
+  assert.equal(revision.rows[0].matches[0].content,'Human edit.');
+  assert.deepEqual(await execute('confirm',{...decision,previewId:revision.previewId}),{added:0,revised:1});
+  const after=(await invoke(db,'list',{})).rows[0];
+  assert.equal(after.id,row.id);assert.equal(after.response_logic,'Updated answer.');assert.deepEqual(after.metadata.keywords,['curated']);
+  const free=await upload('Unstructured source without headings.');
+  assert.equal((await execute('preview',free)).status,'pending');
+  await db.exec('RESET ROLE');await assert.rejects(db.exec(sql(migration+'.rollback.sql')),/Export private/);
+ }finally{await db.close();}
+});
+test('private inference accepts only configured internal endpoints and validated original paragraph ranges',async()=>{
+ const {privateSections}=require('../../cloudfunctions/assistant/manual-docx-import');
+ assert.equal(await privateSections(['one'],{}),null);
+ const env={CRM_MANUAL_PRIVATE_MODEL:'configured',CRM_MANUAL_PRIVATE_MODEL_URL:'https://public.example/model'};
+ await assert.rejects(privateSections(['one'],env,()=>assert.fail('unexpected request')),/PRIVATE_MODEL_CONFIG/);
+ env.CRM_MANUAL_PRIVATE_MODEL_URL='https://10.10.10.10/model';
+ const infer=sections=>privateSections(['one','two'],env,async(_url,options)=>{
+  assert.equal(options.redirect,'error');
+  return {ok:true,json:async()=>({choices:[{message:{content:JSON.stringify({sections})}}]})};
+ });
+ const valid=[{start:0,end:1,title:'Example',kind:'wording'}];
+ assert.deepEqual(await infer(valid),valid);
+ await assert.rejects(infer([{...valid[0],end:3}]),/INVALID_MODEL_RESULT/);
+});
