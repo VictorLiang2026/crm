@@ -8,11 +8,14 @@ const {createEducationBackfill}=require('../../cloudfunctions/assistant/educatio
 const root=path.resolve(__dirname,'../..');
 const migration=fs.readFileSync(path.join(root,'cloudbase/migrations/20261116000100_person_education_backfill.sql'),'utf8');
 const rollback=fs.readFileSync(path.join(root,'cloudbase/migrations/20261116000100_person_education_backfill.rollback.sql'),'utf8');
+const pilotOrderMigration=fs.readFileSync(path.join(root,'cloudbase/migrations/20261117160700_person_education_pilot_order.sql'),'utf8');
+const pilotOrderRollback=fs.readFileSync(path.join(root,'cloudbase/migrations/20261117160700_person_education_pilot_order.rollback.sql'),'utf8');
 async function fixture(){
   const db=new PGlite();
   await db.exec(`CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role;
     CREATE TABLE public.persons(id bigint PRIMARY KEY,display_name text,graduation_school text,department_or_major text,
-      notes text,occupation text,updated_at timestamptz DEFAULT clock_timestamp(),deleted_at timestamptz);
+      notes text,occupation text,created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+      updated_at timestamptz DEFAULT clock_timestamp(),deleted_at timestamptz);
     CREATE TABLE public.interactions(id bigint PRIMARY KEY,person_id bigint,summary text,raw_note text,updated_at timestamptz,deleted_at timestamptz);
     CREATE TABLE public.customers("Id" bigint PRIMARY KEY,person_id bigint,additional_info text,updated_at timestamptz,deleted_at timestamptz);
     CREATE TABLE public.followups("Id" bigint PRIMARY KEY,customer_id bigint,interaction_summary text,followup_notes text,updated_at timestamptz,deleted_at timestamptz);
@@ -130,6 +133,37 @@ test('migration rollback succeeds only before any batches exist',async()=>{
     await f.db.exec('RESET ROLE');await f.db.exec(rollback);
     assert.equal((await f.db.query("SELECT to_regclass('public.person_education_batches') AS n")).rows[0].n,null);
     assert.equal((await f.db.query('SELECT count(*)::int AS n FROM public.persons')).rows[0].n,2);
+  }finally{await f.db.close();}
+});
+
+test('pilot ordering selects newest-created eligible people and rollback restores ID order',async()=>{
+  const f=await fixture();
+  try{
+    await f.db.exec(`RESET ROLE;
+      UPDATE public.persons SET created_at=CASE WHEN id=1 THEN '2021-12-31T00:00:00Z'::timestamptz
+        ELSE '2026-11-16T00:00:00Z'::timestamptz END;
+      INSERT INTO public.persons(id,display_name,notes,created_at)
+        VALUES(3,'Sample Three','no education evidence','2026-11-16T00:00:00Z');
+      SET ROLE service_role;`);
+    await f.db.exec('RESET ROLE');
+    await f.db.exec(pilotOrderMigration);
+    await f.db.exec('SET ROLE service_role');
+    const create=async()=>f.rpc('create',{requestKey:(await f.db.query('SELECT gen_random_uuid() AS id')).rows[0].id,
+      maxCalls:20,sampleSize:1});
+    const recent=await create();
+    const recentStatus=await f.rpc('status',{batchId:recent.batchId});
+    assert.deepEqual(recentStatus.items.map(item=>String(item.person_id)),['3']);
+    assert.equal((await f.db.query('SELECT count(*)::int AS n FROM public.person_education_changes')).rows[0].n,0);
+    assert.deepEqual((await f.db.query('SELECT graduation_school,department_or_major FROM public.persons ORDER BY id'))
+      .rows.map(row=>[row.graduation_school,row.department_or_major]),[[null,null],[null,null],[null,null]]);
+
+    await f.db.exec('RESET ROLE');
+    await f.db.exec(pilotOrderRollback);
+    await f.db.exec('SET ROLE service_role');
+    const legacy=await create();
+    const legacyStatus=await f.rpc('status',{batchId:legacy.batchId});
+    assert.deepEqual(legacyStatus.items.map(item=>String(item.person_id)),['1']);
+    assert.deepEqual((await f.rpc('status',{batchId:recent.batchId})).items.map(item=>String(item.person_id)),['3']);
   }finally{await f.db.close();}
 });
 
