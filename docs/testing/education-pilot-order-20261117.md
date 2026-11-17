@@ -46,5 +46,5 @@
 - CloudBase 两份静态资源已按路径上传；互动日期 browser、旧互动 migration、目录聚合/rollback、教育排序回归及最终 WP01 均已通过。详见互动专项记录。
 - GitHub 在期间收到互动功能提交 `23cbe60f5b4373dc1b6b2c60cf83d7d36c1e0fed`；最终闭环提交 `a3ccac5cbfdb5e204fb7bd490712838805966e3d` 已推送，标签为 `release-20261117-173700`。
 - 发布后完整 sync-check 通过：本地/GitHub/CloudBase 一致，106 个静态资源、30 个函数的 340 个源码/配置文件匹配，线上 `admin.html` HTTP 200 且 SHA-256 一致。证据目录：`D:\Temp\crm-cloud-audit-8e3d04a81738468dbf3e57ea0e18f19c`。
-- 原始 `D:\CRM\crm` 工作区已快进至最终文档闭环提交 `0a807bbb1f8a997f2dd2e26a1f43b33032cf3f3c`，与 GitHub `master` 一致且工作区清洁。
+- 原始 `D:\CRM\crm` 工作区已快进至当前 GitHub `master`，两边提交一致且工作区清洁。
 - 第二个最新入库排序的教育试点批次仍未创建；旧批次与 Person 字段保持不变。
