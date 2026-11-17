@@ -1,5 +1,6 @@
 import { h } from './dom.js';
 import { pageHead, emptyNote } from './ui.js';
+import {openKnowledgeHistory,toggleKnowledgeEnabled} from './communication-references.js';
 import { t } from './i18n.js';
 import { data } from './data.js';
 import { openKnowledgeContent } from './knowledge-content.js';
@@ -32,7 +33,7 @@ const retryErrorText = error => errorCodeOf(error)==='PDF_NO_TEXT'?text('pdf_no_
 
 export function renderKnowledgeGovernance(ctx) {
   let pollTimer=null;
-  let records={knowledge:[],playbooks:[],sources:[]},categoryFilter=[],statusFilter='all',keyword='',fullText=false;
+  let records={knowledge:[],playbooks:[],sources:[]},categoryFilter=[],statusFilter='all',enabledFilter='enabled',keyword='',fullText=false;
   let sortField='updated_at',sortDir='desc',page=1,categoryFilterOpen=false;
   // Scoped to this page instance; never retain knowledge text across sessions.
   const contentCache=new Map();
@@ -156,6 +157,7 @@ export function renderKnowledgeGovernance(ctx) {
   const draw=()=>{
     const all=rows(),query=keyword.trim().toLocaleLowerCase();
     const matches=row=>{
+      if(enabledFilter!=='all'&&row.table!=='knowledge_sources'&&((row.metadata?.enabled!==false)!==(enabledFilter==='enabled')))return false;
       if(categoryFilter.length&&!categoriesOf(row).some(category=>categoryFilter.includes(category)))return false;
       if(statusFilter==='active'&&!active(row))return false;
       if(statusFilter==='invalid'&&active(row))return false;
@@ -182,6 +184,8 @@ export function renderKnowledgeGovernance(ctx) {
         const superseded=row.lifecycle_status==='superseded';
         const editHref=isSource?'':`#/knowledge/edit/${row.table}/${row.id}`;
         const actions=[
+          !isSource&&!superseded?h('button',{class:'btn btn-ghost btn-sm',type:'button',onclick:()=>toggleKnowledgeEnabled(ctx,row,load).catch(()=>ctx.toast(t('kr_save_failed'),'error'))},t(row.metadata?.enabled===false?'kr_enable':'kr_disable')):null,
+          !isSource?h('button',{class:'btn btn-ghost btn-sm',type:'button',onclick:()=>openKnowledgeHistory(ctx,row,load)},t('kr_history')):null,
           !isSource&&!superseded?h('button',{class:'btn btn-ghost btn-sm kg-action-content',type:'button',onclick:()=>openKnowledgeContent(ctx,row,load).catch(error=>ctx.toast(error.message,'error'))},t('kc_title')):null,
           !isSource&&!superseded?h('a',{class:'btn btn-ghost btn-sm kg-action-edit',href:editHref},text(isPlaybook?'edit':'basic_info')):null,
           isSource&&row.extractionStatus==='failed'?h('button',{class:'btn btn-ghost btn-sm kg-action-retry',type:'button',
@@ -197,7 +201,7 @@ export function renderKnowledgeGovernance(ctx) {
             !isSource?h('small',{class:'kg-table-meta'},`${t('kc_selected')}: ${t(row.selected_content_source==='gpt'?'kc_gpt':'kc_original')}${row.contentPaused?' · '+t('kc_paused'):''}`):null]),
           h('td',{class:'kg-category-tags'},categoriesOf(row).map(category=>h('span',{class:'kg-category-chip'},text(`category_${category}`)))),
           ...contentCells(row),
-          h('td',{},h('span',{class:`kg-status ${live?'kg-verified':'kg-invalidated'}`},text(sourceFailed?'status_extraction_failed':sourceProcessing?'status_processing':live?'status_active':pending?'status_pending_review':'status_invalid'))),
+          h('td',{},h('span',{class:`kg-status ${live?'kg-verified':'kg-invalidated'}`},(row.metadata?.enabled===false?t('kr_disabled')+' · ':'')+text(sourceFailed?'status_extraction_failed':sourceProcessing?'status_processing':live?'status_active':pending?'status_pending_review':'status_invalid'))),
           h('td',{},row.updated_at?String(row.updated_at).slice(0,10):'—'),
           h('td',{class:'kg-table-actions'},actions),
         ]);
@@ -242,13 +246,15 @@ export function renderKnowledgeGovernance(ctx) {
     searchInput,h('label',{class:'kg-full-search'},[fullSearch,text('full_search')]),h('button',{class:'btn btn-primary',type:'submit'},text('search')),
   ]);
   main.replaceChildren(pageHead({kicker:text('kicker'),title:text('title'),sub:text('description'),actions:[
+    h('a',{class:'btn btn-ghost',href:'#/knowledge/communication'},t('kr_heading')),
     h('a',{class:'btn btn-ghost',href:'#/knowledge/upload'},text('upload_button')),
     h('a',{class:'btn btn-primary',href:'#/knowledge/new'},text('new_knowledge_button')),
     h('a',{class:'btn btn-ghost',href:'#/knowledge/playbook'},text('new_playbook_button')),
     h('a',{class:'btn btn-ghost',href:'#/knowledge/trash'},text('trash_button')),
   ]}),h('section',{class:'card kg-home-card'},[
     h('div',{class:'card-body kg-list-tools'},[
-      searchForm,h('div',{class:'kg-filters'},[categoryFilterNode(),statusNode()]),
+      searchForm,h('div',{class:'kg-filters'},[categoryFilterNode(),statusNode(),
+        h('select',{'aria-label':t('kr_state'),onchange:e=>{enabledFilter=e.target.value;page=1;draw();}},['enabled','disabled','all'].map(v=>h('option',{value:v,selected:enabledFilter===v},t('kr_'+v))))]),
       h('div',{class:'kg-table-wrap'}),h('div',{class:'kg-pager'}),
     ]),
   ]));

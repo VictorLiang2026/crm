@@ -6,7 +6,7 @@ const { createSkillRegistry, defaultRegistry, SkillValidationError, TIMEOUT_CLAS
   require('../../cloudfunctions/_shared/skill-registry');
 const { defaultRegistry: assistantRegistry } = require('../../cloudfunctions/assistant/skill-registry');
 
-const names = ['quick_capture', 'person_summary', 'meeting_prep', 'today_coach',
+const names = ['communication_wording','quick_capture', 'person_summary', 'meeting_prep', 'today_coach',
   'opportunity_analysis', 'opportunity_candidate', 'activity_prepare', 'activity_speaker_recommend', 'activity_topic_recommend', 'activity_review', 'recruit_coach',
   'conversation_playbook', 'knowledge_extract', 'dual_followup', 'ai_search', 'crm_search_parse'];
 names.push('assistant_read_intent_v1', 'assistant_action_update_v1', 'assistant_opportunity_update_v1', 'crm_search_query_v2');
@@ -62,6 +62,9 @@ test('deployed assistant registry carries the same PC27 Opportunity command cont
 
 test('every initial skill accepts a representative input, context and output', () => {
   const examples = {
+    communication_wording: [{adviceId:'1',focus:'Budget concern'},
+      {established_strategy:'Maintain relationship',reference_entries:[],guardrails:'Do not change strategy'},
+      {message:'Would you like to discuss your concern?'}],
     quick_capture: [{ text: 'Call tomorrow' }, {},
       { people: [], events: [], facts: [], needs: [], nextActions: [] }],
     person_summary: [{ personId: '1' }, { person: {} },

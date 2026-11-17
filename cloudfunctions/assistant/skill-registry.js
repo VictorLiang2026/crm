@@ -16,6 +16,14 @@ const recipe = (required, optional = [], limits = {}) => ({ required, optional, 
 
 const SKILLS = [
   {
+    name:'communication_wording',version:'1.0.0',capability:'coaching',
+    contextRecipe:recipe(['established_strategy','reference_entries','guardrails'],[],{reference_entries:3}),
+    inputSchema:object({adviceId:{type:'string',pattern:'^[1-9][0-9]*$'},focus:text(1000)},['adviceId','focus']),
+    outputSchema:object({message:text(1000)},['message']),
+    confirmationLevel:'review',timeoutClass:'standard',
+  },
+
+  {
     name: 'person_list_field_mapping', version: '1.0.0', capability: 'analysis',
     contextRecipe: recipe([], []),
     inputSchema: object({

@@ -5236,6 +5236,67 @@
         "security_definer": false,
         "authenticated_execute": false
       }
+    },
+    {
+      "kind": "relation",
+      "name": "knowledge_record_history",
+      "detail": {
+        "rls": true,
+        "type": "r",
+        "policies": [
+          {
+            "name": "knowledge_history_service",
+            "roles": [
+              "service_role"
+            ],
+            "command": "*",
+            "check_hash": "b326b5062b2f0e69046810717534cb09",
+            "permissive": true,
+            "using_hash": "b326b5062b2f0e69046810717534cb09"
+          }
+        ],
+        "force_rls": true,
+        "privileges": {
+          "anon": [],
+          "service_role": [
+            "INSERT",
+            "SELECT"
+          ],
+          "authenticated": []
+        },
+        "security_invoker": false
+      }
+    },
+    {
+      "kind": "sequence",
+      "name": "knowledge_record_history_id_seq",
+      "detail": {
+        "anon_read": false,
+        "anon_usage": false,
+        "service_usage": true,
+        "authenticated_read": false,
+        "authenticated_usage": false
+      }
+    },
+    {
+      "kind": "routine",
+      "name": "crm_knowledge_history_stamp_v1()",
+      "detail": {
+        "anon_execute": false,
+        "service_execute": true,
+        "security_definer": false,
+        "authenticated_execute": false
+      }
+    },
+    {
+      "kind": "routine",
+      "name": "crm_knowledge_maintain_v1(p_operation text, p_actor_uid text, p_data jsonb)",
+      "detail": {
+        "anon_execute": false,
+        "service_execute": true,
+        "security_definer": false,
+        "authenticated_execute": false
+      }
     }
   ]
 }

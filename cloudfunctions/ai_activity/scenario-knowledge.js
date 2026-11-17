@@ -34,6 +34,7 @@ async function readScenarioKnowledge(scenario, {env = process.env.TCB_ENV, key, 
   const parents = new Map(sources.map(source=>[String(source.id),source]));
   const refs = [];
   for (const row of rows) {
+    if(row.metadata?.usage==='communication_reference')continue;
     const tags = row.metadata?.categories?.length ? row.metadata.categories : [legacy[row.metadata?.domain]];
     if (!tags.some(tag=>kinds.includes(tag)) || row.verified!==true || row.lifecycle_status!=='verified') continue;
     const parent = parents.get(String(row.source_id));

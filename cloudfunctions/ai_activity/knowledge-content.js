@@ -1,5 +1,6 @@
 'use strict';
 const { createHash } = require('node:crypto');
+const isCommunicationReference = row => row?.metadata?.usage === 'communication_reference';
 const CONTENT_COLUMNS = 'gpt_summary,selected_content_source,content_state';
 const nonempty = value => typeof value === 'string' && !!value.trim();
 function contentVersions(row, table = 'knowledge_items', source = null) {
@@ -19,6 +20,7 @@ function contentVersions(row, table = 'knowledge_items', source = null) {
 }
 function effectiveContent(row, table = 'knowledge_items', source = null, today = new Date().toISOString().slice(0,10)) {
   const v = contentVersions(row, table, source), pair = v[v.selected];
+  if (row.metadata?.enabled === false) return null;
   if (row.deleted_at || ['invalidated','superseded'].includes(row.lifecycle_status)) return null;
   // Current library validity is manual. Do not revive retired date-based expiration rules.
   if (row.source_id && (!source || source.deleted_at || source.lifecycle_status !== 'verified' ||
@@ -34,7 +36,8 @@ function volumeNumber(number, part) {
   const prefix = /^10\d{4}$/.test(id) ? id.slice(2) : id.padStart(4, '0');
   return prefix + '-' + String(part).padStart(2, '0');
 }
-function projectContent(row, table, source, today) {
+function projectContent(row, table, source, today, includeCommunicationReference = false) {
+  if (isCommunicationReference(row) && !includeCommunicationReference) return null;
   const content = effectiveContent(row, table, source, today);
   if (!content) return null;
   // Do not carry unselected text or metadata summaries into AI prompts/ranking.
@@ -45,6 +48,7 @@ function projectContent(row, table, source, today) {
     documentTitle:doc.title,locator:volumeNumber(doc.number,doc.part)+' pp. '+doc.start+'–'+doc.end});
   return { ...safe, [table === 'playbooks' ? 'response_logic' : 'content']: content.text,
     metadata: { categories: row.metadata?.categories, domain: row.metadata?.domain,
+      origin: row.metadata?.origin, entryKey: row.metadata?.entryKey, usage: row.metadata?.usage, enabled: row.metadata?.enabled, keywords: row.metadata?.keywords, kind: row.metadata?.kind,
       published_at: row.metadata?.published_at, locator: row.metadata?.locator, summary: content.summary },
     contentReference: { ...ref, contentSource: content.source, contentVersion: content.version } };
 }
@@ -57,4 +61,4 @@ function managementRow(row, table, source) {
     contentPaused: !effectiveContent(row, table, source),
     gpt_summary_preview: (gpt_summary || '').slice(0,180) };
 }
-module.exports = { CONTENT_COLUMNS, contentVersions, effectiveContent, projectContent, managementRow, volumeNumber };
+module.exports = { isCommunicationReference, CONTENT_COLUMNS, contentVersions, effectiveContent, projectContent, managementRow, volumeNumber };

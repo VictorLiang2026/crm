@@ -1,3 +1,4 @@
+import {communicationDraftControl} from './communication-references.js';
 import { knowledgeLine, strategyEvidence, versionFeedback } from './advice-evidence.js';
 import { h } from './dom.js';
 import { ic } from './icons.js';
@@ -212,6 +213,7 @@ export function renderFollowupAdvice(ctx, personId) {
             h('p', { class: 'fa-script-meta' }, new Date(row.updatedAt).toLocaleString())])]),
           h('div', { class: 'fa-compare fa-script-compare' }, [
             scriptLane('scripts_cloudbase_heading', row.system, 'system', title),
+            communicationDraftControl(ctx,row),
             scriptLane('scripts_gpt_heading', row.gpt, 'gpt', title),
           ]),
           ]);

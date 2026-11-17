@@ -95,9 +95,9 @@ class MeetingPrepContextBuilder {
     const recent = Array.isArray(interactions?.rows) ? interactions.rows : [];
     const [knowledgeRaw, playbookRaw] = await Promise.all([
       read('knowledge_items', { select: 'id,source_id,item_type,source,verified,confidence,content,metadata,lifecycle_status,deleted_at,valid_from,valid_to,'+CONTENT_COLUMNS,
-        lifecycle_status: 'eq.verified', verified: 'eq.true', deleted_at:'is.null', order: 'updated_at.desc,id.desc', limit: 30 }),
+        lifecycle_status: 'eq.verified', verified: 'eq.true', deleted_at:'is.null', and:'(or(metadata->>usage.is.null,metadata->>usage.neq.communication_reference),or(metadata->>enabled.is.null,metadata->>enabled.eq.true))', order: 'updated_at.desc,id.desc', limit: 30 }),
       read('playbooks', { select: 'id,scenario,objection,possible_underlying_reasons,clarifying_questions,response_logic,do_not_say,next_objective,source,confidence,metadata,lifecycle_status,deleted_at,valid_from,valid_to,'+CONTENT_COLUMNS,
-        lifecycle_status: 'eq.verified', deleted_at:'is.null', order: 'updated_at.desc,id.desc', limit: 30 }),
+        lifecycle_status: 'eq.verified', deleted_at:'is.null', and:'(or(metadata->>usage.is.null,metadata->>usage.neq.communication_reference),or(metadata->>enabled.is.null,metadata->>enabled.eq.true))', order: 'updated_at.desc,id.desc', limit: 30 }),
     ]);
     const sourceIds = [...new Set(knowledgeRaw.map(row => row.source_id).filter(value => value != null).map(String))];
     const sourceRows = sourceIds.length ? await read('knowledge_sources', {
@@ -105,8 +105,8 @@ class MeetingPrepContextBuilder {
     }) : [];
     const availableSources = new Set(sourceRows.filter(row => row.lifecycle_status === 'verified').map(row => String(row.id)));
     const today=this.now().toISOString().slice(0,10);
-    const knowledgeRows=knowledgeRaw.map(row=>projectContent(row,'knowledge_items',sourceRows.find(s=>String(s.id)===String(row.source_id)),today)).filter(Boolean);
-    const playbookRows=playbookRaw.map(row=>projectContent(row,'playbooks',null,today)).filter(Boolean);
+    const knowledgeRows=knowledgeRaw.filter(row=>row.metadata?.usage!=='communication_reference').map(row=>projectContent(row,'knowledge_items',sourceRows.find(s=>String(s.id)===String(row.source_id)),today)).filter(Boolean);
+    const playbookRows=playbookRaw.filter(row=>row.metadata?.usage!=='communication_reference').map(row=>projectContent(row,'playbooks',null,today)).filter(Boolean);
     const evidenceById = new Map(knowledgeRows.filter(row => row.item_type === 'evidence' && row.verified === true &&
       (row.source_id == null || availableSources.has(String(row.source_id))) &&
       row.confidence != null && Number(row.confidence) >= 0.7 && clip(row.source, 500) && clip(row.content, 5000))

@@ -1,3 +1,4 @@
+import {renderCommunicationReferences} from './communication-references.js';
 // Console 路由：hash 精确表 + 详情正则；未知路由回落到今日。
 import {
   renderToday, renderPeople, renderPeopleTrash, renderCustomerTrash, renderRecruitTrash, renderPerson, renderOpportunities,
@@ -53,6 +54,7 @@ const EXACT = new Map([
   ['#/test-scenario/action', renderTestAction],
   ['#/knowledge-governance', renderKnowledgeGovernance],
   ['#/knowledge-library', renderKnowledgeGovernance],
+  ['#/knowledge/communication', renderCommunicationReferences],
   ['#/knowledge/upload', ctx => renderKnowledgeEditor(ctx,{mode:'upload'})],
   ['#/knowledge/new', ctx => renderKnowledgeEditor(ctx,{mode:'new'})],
   ['#/knowledge/playbook', ctx => renderKnowledgeEditor(ctx,{mode:'playbook'})],
@@ -117,6 +119,7 @@ const NAV_OF = {
   '#/test-scenario/action': '#/more',
   '#/knowledge-governance': '#/knowledge-library',
   '#/knowledge-library': '#/knowledge-library',
+  '#/knowledge/communication': '#/knowledge-library',
   '#/knowledge/upload': '#/knowledge-library',
   '#/knowledge/new': '#/knowledge-library',
   '#/knowledge/playbook': '#/knowledge-library',
