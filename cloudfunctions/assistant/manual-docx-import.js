@@ -130,14 +130,16 @@ function createManualImport({rpc,extractDocx,catalog,infer=privateSections,parse
   let sections,mode,coverage;
   if(parse){
    const result=await parse(actor,{id:data.id,retry:data.retry===true}),task=result.job;
-   if(task.status!=='completed')return {status:'pending',reason:task.status==='failed'?'model':'queue',failed:task.status==='failed',progress:{done:task.output?.cursor||0,total:task.output?.lines?.length||0},error:task.last_error};
+   if(task.status!=='completed')return {status:'pending',reason:task.status==='failed'?'model':'queue',failed:task.status==='failed',progress:{done:task.output?.cursor||0,total:task.output?.lines?.length||0},failureCode:task.last_error};
    coverage=task.output;lines=coverage.lines;sections=coverage.sections;mode='cloudbase';
   }else{
    try{sections=await infer(lines);}catch{return {status:'pending',reason:'model'};}
    if(sections){mode='model';}else{mode='structured';sections=structuralSections(lines,extracted.headings);}
   }
+  const coverageInfo=coverage?{processed:coverage.cursor,total:lines.length,
+   omitted:coverage.omitted.map(o=>({...o,source:coverage.locations[o.index],text:lines[o.index]})),warnings:coverage.warnings}:null;
   if(!sections.length||sections.length>300)return {status:'pending',reason:'structure',
-   ...(coverage?{coverage:{processed:coverage.cursor,total:lines.length,omitted:coverage.omitted,warnings:coverage.warnings}}:{})};
+   ...(coverageInfo?{canRetry:true,coverage:coverageInfo}:{})};
   let plan;
   try{plan=makePlan(lines,sections,job,await catalog(actor),mode);}catch(e){if(e.code==='SECTION_SIZE')return {status:'pending',reason:'size'};throw e;}
   if(coverage)plan.forEach((row,i)=>{const s=sections[i];row.entry.origin=job.filename+' · '+coverage.locations[s.start]+' – '+coverage.locations[s.end];});
@@ -146,7 +148,7 @@ function createManualImport({rpc,extractDocx,catalog,infer=privateSections,parse
   const {previewId}=await db('preview',{id:data.id,plan:verifiedPlan});
   const covered=sections.reduce((n,s)=>n+s.end-s.start+1,0);
   return {status:'ready',mode,uncovered:lines.length-covered,previewId,rows:plan,
-   ...(coverage?{coverage:{processed:coverage.cursor,total:lines.length,omitted:coverage.omitted.map(o=>({...o,source:coverage.locations[o.index],text:lines[o.index]})),warnings:coverage.warnings}}:{})};
+   ...(coverageInfo?{coverage:coverageInfo}:{})};
  }
  return {run};
 }

@@ -366,7 +366,7 @@ function createKnowledgeLibrary(options={}) {
     rpc:(name,args)=>searchDataFactory({env,key,fetchImpl}).auditRdb.rpc(name,args)});
   const optimization=require('./reference-optimization-service').createReferenceOptimization({
     rpc:(name,args)=>searchDataFactory({env,key,fetchImpl}).auditRdb.rpc(name,args),check:testDataReader,
-    gateway:(uid,skillRegistry)=>gatewayFactory({app:client,rdb:searchDataFactory({env,key,fetchImpl}).auditRdb,skillRegistry,timeoutMs:60000,maxAttempts:1,
+    gateway:(uid,skillRegistry)=>gatewayFactory({app:client,rdb:searchDataFactory({env,key,fetchImpl}).auditRdb,skillRegistry,timeoutMs:120000,maxAttempts:1,
       actorResolver:async()=>({uid,isAnonymous:false})}),
     parseStep:require('./reference-manual-parser').createParseStep({
       load:async(id,actor)=>{const r=await searchDataFactory({env,key,fetchImpl}).auditRdb.rpc('crm_manual_import_v1',{p_operation:'load',p_actor_uid:actor,p_data:{id}});if(r.error||!r.data)fail('MANUAL_IMPORT_FAILED');return r.data;},

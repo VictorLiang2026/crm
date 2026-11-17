@@ -18,9 +18,15 @@ export function wordImport(ctx,results,status,onChange){
   const ticket=generation;status.textContent=label('processing');
   const preview=await call('preview',{id,...(retry?{retry:true}:{})});
   if(ticket!==generation)return;
+  if(preview.coverage){
+   results.append(h('details',{},[h('summary',{},label('coverage')),
+    h('p',{},`${preview.coverage.processed} / ${preview.coverage.total}`),
+    ...preview.coverage.warnings.map(w=>h('p',{},w.source+' · '+label('warning_'+w.reason))),
+    ...preview.coverage.omitted.map(o=>h('details',{},[h('summary',{},o.source+' · '+o.reason),h('pre',{},o.text)]))]));
+  }
   if(preview.status==='pending'){
    status.textContent=label('pending_'+preview.reason).replace('{done}',preview.progress?.done||0).replace('{total}',preview.progress?.total||0);
-   results.append(action('retry',()=>review(id,preview.failed===true)));
+   results.append(action('retry',()=>review(id,preview.failed===true||preview.canRetry===true)));
    if(preview.reason==='queue')setTimeout(()=>{if(ticket===generation&&results.isConnected)review(id).catch(()=>{status.textContent=label('error');});},5000);
    return;
   }
@@ -30,11 +36,7 @@ export function wordImport(ctx,results,status,onChange){
     label('uncovered')+' '+preview.uncovered].join(' · ');
   const selected=new Map();
   if(preview.coverage){
-   const coverage=h('details',{},[h('summary',{},label('coverage')),
-    h('p',{},`${preview.coverage.processed} / ${preview.coverage.total}`),
-    ...preview.coverage.warnings.map(w=>h('p',{},w.source+' · '+label('warning_'+w.reason))),
-    ...preview.coverage.omitted.map(o=>h('details',{},[h('summary',{},o.source+' · '+o.reason),h('pre',{},o.text)]))]);
-   results.append(coverage,action('reparse',()=>review(id,true)));
+   results.append(action('reparse',()=>review(id,true)));
   }
   for(const [index,row] of rows.entries()){
    const previous=h('div',{}),incoming=h('div',{},[h('strong',{},label('incoming')),h('pre',{},row.entry.content)]);

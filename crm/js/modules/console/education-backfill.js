@@ -116,7 +116,7 @@ export async function renderEducationBackfill(ctx) {
     if(!lastStatus)return;
     const {items,counts,batch}=lastStatus;
     for(const item of items)knownItems.set(item.id,item);
-    const nodes=[h('p',{},`${t('edu_status_'+batch.status)} · ${batch.calls_used}/${batch.max_calls}`),
+    const nodes=[h('p',{},`${t('edu_status_'+batch.status)} · ${t('edu_attempt_progress')}: ${batch.calls_used}/${batch.max_calls}`),
       h('p',{class:'row-sub'},Object.entries(counts).map(([s,n])=>`${t('edu_status_'+s)} ${n} `))];
     for(const item of items){
       const body=[h('a',{href:`#/person/${item.person_id}`},item.display_name||String(item.person_id)),

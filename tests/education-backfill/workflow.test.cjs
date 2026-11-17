@@ -12,6 +12,8 @@ const pilotOrderMigration=fs.readFileSync(path.join(root,'cloudbase/migrations/2
 const pilotOrderRollback=fs.readFileSync(path.join(root,'cloudbase/migrations/20261117160700_person_education_pilot_order.rollback.sql'),'utf8');
 const reviewSelectionMigration=fs.readFileSync(path.join(root,'cloudbase/migrations/20261117231025_person_education_review_selection.sql'),'utf8');
 const reviewSelectionRollback=fs.readFileSync(path.join(root,'cloudbase/migrations/20261117231025_person_education_review_selection.rollback.sql'),'utf8');
+const fairQueueMigration=fs.readFileSync(path.join(root,'cloudbase/migrations/20261118010002_education_batch_fair_queue.sql'),'utf8');
+const fairQueueRollback=fs.readFileSync(path.join(root,'cloudbase/migrations/20261118010002_education_batch_fair_queue.rollback.sql'),'utf8');
 async function fixture(){
   const db=new PGlite();
   await db.exec(`CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role;
@@ -28,7 +30,7 @@ async function fixture(){
     GRANT USAGE ON SCHEMA public TO service_role;
     GRANT SELECT ON ALL TABLES IN SCHEMA public TO service_role;
     GRANT UPDATE(graduation_school,department_or_major,updated_at) ON public.persons TO service_role;`);
-  try { await db.exec(migration);await db.exec(pilotOrderMigration);await db.exec(reviewSelectionMigration); }
+  try { await db.exec(migration);await db.exec(pilotOrderMigration);await db.exec(reviewSelectionMigration);await db.exec(fairQueueMigration); }
   catch(error) { delete error.query; await db.close(); throw error; }
   await db.exec('SET ROLE service_role');
   const rpc=async(op,data={},actor='owner')=>(await db.query('SELECT public.crm_education_backfill_v1($1,$2,$3::jsonb) AS value',[actor,op,JSON.stringify(data)])).rows[0].value;
@@ -238,6 +240,29 @@ test('old Console checkbox payload stays usable during rollout but cannot overwr
     const second=await f.start();const item2=await f.prepare(second.batchId);const plan2=await f.rpc('plan',{batchId:second.batchId,kind:'apply'});
     await assert.rejects(f.rpc('preview',{batchId:second.batchId,planId:plan2.planId,
       rows:[{itemId:item2.id,candidateIndex:0,school:true,major:true}]}),/EDUCATION_SCHOOL_MAJOR_CONFLICT/);
+  }finally{await f.db.close();}
+});
+
+test('active batches rotate by normalized attempt usage; equal usage stays FIFO and rollback restores FIFO',async()=>{
+  const f=await fixture();
+  try{
+    const older=await f.start(50);
+    await f.db.exec('RESET ROLE');
+    await f.db.query('UPDATE public.person_education_batches SET calls_used=10 WHERE id=$1',[older.batchId]);
+    await f.db.exec('SET ROLE service_role');
+    const newer=await f.start(100);
+    let jobs=(await f.rpc('queue',{},'education-worker')).jobs;
+    assert.deepEqual(jobs.map(job=>job.id),[newer.batchId,older.batchId]);
+
+    await f.db.exec('RESET ROLE');
+    await f.db.query('UPDATE public.person_education_batches SET calls_used=20 WHERE id=$1',[newer.batchId]);
+    await f.db.exec('SET ROLE service_role');
+    jobs=(await f.rpc('queue',{},'education-worker')).jobs;
+    assert.deepEqual(jobs.map(job=>job.id),[older.batchId,newer.batchId]);
+
+    await f.db.exec('RESET ROLE');await f.db.exec(fairQueueRollback);await f.db.exec('SET ROLE service_role');
+    jobs=(await f.rpc('queue',{},'education-worker')).jobs;
+    assert.deepEqual(jobs.map(job=>job.id),[older.batchId,newer.batchId]);
   }finally{await f.db.close();}
 });
 

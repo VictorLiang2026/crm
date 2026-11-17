@@ -43,6 +43,7 @@ test('iPad: unique episode and empty fields default selected; preview appears be
   try{
     await browser.start();await browser.setViewport(820,1180);await mount(browser);
     assert.match(await browser.evaluate('window.eduRoot.innerText'),/教育资料补全/);
+    assert.match(await browser.evaluate('window.eduRoot.innerText'),/AI 尝试额度（已用 \/ 上限）/);
     assert.equal(await browser.evaluate("window.eduRoot.querySelector('input[type=radio]').checked"),true);
     assert.deepEqual(await browser.evaluate("[...window.eduRoot.querySelectorAll('.edu-field select')].map(x=>x.value)"),['candidate','candidate']);
     assert.equal(await browser.evaluate("window.eduRoot.querySelector('button').textContent.includes('确认执行')"),false);
