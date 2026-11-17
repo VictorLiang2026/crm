@@ -1,0 +1,23 @@
+.edu-people-panel[hidden]{display:none}
+.edu-search-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;margin-top:12px}
+.edu-people-list{display:grid;gap:8px;margin-top:10px}
+.edu-person-option{display:flex;gap:12px;align-items:flex-start;padding:12px;border:1px solid var(--line,#d8dde5);border-radius:10px;background:var(--card,#fff);cursor:pointer}
+.edu-person-option input,.edu-episode-choice input,.edu-undo-option input{flex:none;margin-top:4px;accent-color:var(--red,#b42335)}
+.edu-person-option span{display:grid;gap:5px;min-width:0}
+.edu-person-option small{color:var(--text-secondary,#586274);overflow-wrap:anywhere}
+.edu-field-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:12px}
+.edu-field{display:grid;gap:7px;align-content:start;padding:12px;border:1px solid var(--line,#d8dde5);border-radius:10px;min-width:0}
+.edu-field>b{font-size:14px}
+.edu-field p{margin:0;line-height:1.45;overflow-wrap:anywhere}
+.edu-current,.edu-candidate{color:var(--text-secondary,#586274)}
+.edu-value-changed{color:#9a3412}
+.edu-value-equal{color:#166534}
+.edu-value-normal{color:var(--text,#1f2937)}
+.edu-match-tag{margin-left:8px;color:#166534;font-weight:600}
+.edu-field select,.edu-field .edu-manual-value{width:100%;min-width:0}
+.edu-warning{margin:8px 0;padding:9px 12px;border-left:3px solid #b45309;background:#fffbeb;color:#78350f;line-height:1.45}
+.edu-blocked{padding:9px 12px;border-left:3px solid #b42335;background:#fff1f2;color:#8f1d2c;line-height:1.45}
+.edu-episode-choice,.edu-undo-option{display:inline-flex;align-items:center;gap:8px;min-height:40px}
+.edu-existing-values{color:var(--text-secondary,#586274);font-size:13px;overflow-wrap:anywhere}
+.edu-preview-field{padding:8px 10px;border-left:3px solid #667085;background:#f8fafc;overflow-wrap:anywhere}
+.edu-preview-field:not(:last-child){margin-bottom:6px}

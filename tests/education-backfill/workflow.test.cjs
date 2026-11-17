@@ -10,6 +10,8 @@ const migration=fs.readFileSync(path.join(root,'cloudbase/migrations/20261116000
 const rollback=fs.readFileSync(path.join(root,'cloudbase/migrations/20261116000100_person_education_backfill.rollback.sql'),'utf8');
 const pilotOrderMigration=fs.readFileSync(path.join(root,'cloudbase/migrations/20261117160700_person_education_pilot_order.sql'),'utf8');
 const pilotOrderRollback=fs.readFileSync(path.join(root,'cloudbase/migrations/20261117160700_person_education_pilot_order.rollback.sql'),'utf8');
+const reviewSelectionMigration=fs.readFileSync(path.join(root,'cloudbase/migrations/20261117231025_person_education_review_selection.sql'),'utf8');
+const reviewSelectionRollback=fs.readFileSync(path.join(root,'cloudbase/migrations/20261117231025_person_education_review_selection.rollback.sql'),'utf8');
 async function fixture(){
   const db=new PGlite();
   await db.exec(`CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role;
@@ -26,7 +28,7 @@ async function fixture(){
     GRANT USAGE ON SCHEMA public TO service_role;
     GRANT SELECT ON ALL TABLES IN SCHEMA public TO service_role;
     GRANT UPDATE(graduation_school,department_or_major,updated_at) ON public.persons TO service_role;`);
-  try { await db.exec(migration); }
+  try { await db.exec(migration);await db.exec(pilotOrderMigration);await db.exec(reviewSelectionMigration); }
   catch(error) { delete error.query; await db.close(); throw error; }
   await db.exec('SET ROLE service_role');
   const rpc=async(op,data={},actor='owner')=>(await db.query('SELECT public.crm_education_backfill_v1($1,$2,$3::jsonb) AS value',[actor,op,JSON.stringify(data)])).rows[0].value;
@@ -42,7 +44,7 @@ async function fixture(){
   const preview=async(batchId,item,kind='apply',overrides={})=>{
     const plan=await rpc('plan',{batchId,kind});
     return rpc(kind==='apply'?'preview':'undoPreview',{batchId,planId:plan.planId,
-      rows:[kind==='apply'?{itemId:item.id,candidateIndex:0,school:true,major:true,...overrides}:{itemId:item.id}]});
+      rows:[kind==='apply'?{itemId:item.id,candidateIndex:0,schoolAction:'candidate',majorAction:'candidate',...overrides}:{itemId:item.id}]});
   };
   const execute=async(batchId,v)=>{
     const confirmation=await rpc('confirm',{batchId,previewId:v.previewId});
@@ -61,7 +63,7 @@ test('actual SQL: permissions, actor scope, explicit plan/confirm, atomic audit,
     const {batchId}=await f.start();
     await assert.rejects(f.rpc('status',{batchId},'different-owner'),/EDUCATION_NOT_FOUND/);
     const item=await f.prepare(batchId);
-    await assert.rejects(f.rpc('preview',{batchId,rows:[{itemId:item.id,candidateIndex:0,school:true,major:true}]}),/EDUCATION_PLAN_REQUIRED/);
+    await assert.rejects(f.rpc('preview',{batchId,rows:[{itemId:item.id,candidateIndex:0,schoolAction:'candidate',majorAction:'candidate'}]}),/EDUCATION_PLAN_REQUIRED/);
     const v=await f.preview(batchId,item);
     await assert.rejects(f.rpc('execute',{batchId,previewId:v.previewId,confirmed:true}),/EDUCATION_CONFIRMATION_REQUIRED/);
     assert.equal((await f.db.query('SELECT graduation_school FROM public.persons WHERE id=1')).rows[0].graduation_school,null);
@@ -93,8 +95,8 @@ test('actual SQL: source edits, stale previews, school-major conflict, refusal t
     assert.equal((await f.db.query('SELECT count(*)::int AS n FROM public.person_education_changes')).rows[0].n,0);
     await f.db.exec("RESET ROLE; UPDATE public.persons SET notes='本人毕业于北京大学，经济学专业。',graduation_school='复旦大学',updated_at=clock_timestamp() WHERE id=1; SET ROLE service_role;");
     const second=await f.start();const item2=await f.prepare(second.batchId);
-    await assert.rejects(f.preview(second.batchId,item2),/EDUCATION_SCHOOL_MAJOR_CONFLICT/);
-    await assert.rejects(f.preview(second.batchId,item2,'apply',{major:false}),/EDUCATION_EMPTY_PATCH/);
+    await assert.rejects(f.preview(second.batchId,item2,'apply',{schoolAction:'keep',majorAction:'candidate'}),/EDUCATION_SCHOOL_MAJOR_CONFLICT/);
+    await assert.rejects(f.preview(second.batchId,item2,'apply',{schoolAction:'keep',majorAction:'keep'}),/EDUCATION_EMPTY_PATCH/);
     await f.db.exec("RESET ROLE; UPDATE public.persons SET graduation_school=NULL,updated_at=clock_timestamp() WHERE id=1; SET ROLE service_role;");
     const third=await f.start();const item3=await f.prepare(third.batchId);
     const v3=await f.preview(third.batchId,item3);await f.execute(third.batchId,v3);
@@ -103,7 +105,8 @@ test('actual SQL: source edits, stale previews, school-major conflict, refusal t
     assert.equal((await f.db.query('SELECT department_or_major FROM public.persons WHERE id=1')).rows[0].department_or_major,'人工改正');
     await f.db.exec("RESET ROLE; UPDATE public.persons SET graduation_school=NULL,department_or_major='计算机',updated_at=clock_timestamp() WHERE id=1; SET ROLE service_role;");
     const fourth=await f.start();const item4=await f.prepare(fourth.batchId);
-    await assert.rejects(f.preview(fourth.batchId,item4,'apply',{major:false}),/EDUCATION_SCHOOL_MAJOR_CONFLICT/);
+    const replacement=await f.preview(fourth.batchId,item4);
+    assert.deepEqual(replacement.rows[0].patch,{graduation_school:'北京大学',department_or_major:'经济学'});
   }finally{await f.db.close();}
 });
 
@@ -158,12 +161,83 @@ test('pilot ordering selects newest-created eligible people and rollback restore
       .rows.map(row=>[row.graduation_school,row.department_or_major]),[[null,null],[null,null],[null,null]]);
 
     await f.db.exec('RESET ROLE');
-    await f.db.exec(pilotOrderRollback);
+    await f.db.exec(reviewSelectionRollback);await f.db.exec(pilotOrderRollback);
     await f.db.exec('SET ROLE service_role');
     const legacy=await create();
     const legacyStatus=await f.rpc('status',{batchId:legacy.batchId});
     assert.deepEqual(legacyStatus.items.map(item=>String(item.person_id)),['1']);
     assert.deepEqual((await f.rpc('status',{batchId:recent.batchId})).items.map(item=>String(item.person_id)),['3']);
+  }finally{await f.db.close();}
+});
+
+test('server-side people search returns only incomplete active People newest first with literal name search',async()=>{
+  const f=await fixture();
+  try{
+    await f.db.exec(`RESET ROLE;
+      UPDATE public.persons SET created_at=CASE WHEN id=1 THEN '2021-12-31T00:00:00Z'::timestamptz
+        ELSE '2026-11-16T00:00:00Z'::timestamptz END;
+      INSERT INTO public.persons(id,display_name,notes,created_at)
+        VALUES(3,'Sample Three','', '2026-11-17T00:00:00Z'),(4,'100% Sample','', '2026-11-15T00:00:00Z');
+      UPDATE public.persons SET graduation_school='复旦大学',department_or_major='经济学' WHERE id=2;
+      SET ROLE service_role;`);
+    const result=await f.rpc('people',{query:'Sample',offset:0});
+    assert.deepEqual(result.people.map(p=>p.person_id),['3','4','1']);
+    assert.equal(result.people[0].graduation_school,null);
+    assert.equal(Date.parse(result.people[0].created_at),Date.parse('2026-11-17T00:00:00Z'));
+    assert.deepEqual((await f.rpc('people',{query:'100%',offset:0})).people.map(p=>p.person_id),['4']);
+    assert.deepEqual((await f.rpc('people',{query:'2',offset:0})).people,[]);
+    await assert.rejects(f.rpc('people',{query:'x'.repeat(101)}),/EDUCATION_INVALID_INPUT/);
+    await assert.rejects(f.rpc('people',{offset:-1}),/EDUCATION_INVALID_INPUT/);
+    await assert.rejects(f.rpc('people',{query:'Sample'},''),/EDUCATION_ACCESS_DENIED/);
+  }finally{await f.db.close();}
+});
+
+test('explicit candidate replacement and manual edits are previewed, confirmed, audited, and safely reversible',async()=>{
+  const f=await fixture();
+  try{
+    await f.db.exec("RESET ROLE; UPDATE public.persons SET graduation_school='旧校名',department_or_major=NULL WHERE id=1; SET ROLE service_role;");
+    const {batchId}=await f.start();const item=await f.prepare(batchId);
+    const v=await f.preview(batchId,item,'apply',{schoolAction:'manual',schoolValue:'人工修订校名',majorAction:'candidate'});
+    assert.deepEqual(v.rows[0].patch,{graduation_school:'人工修订校名',department_or_major:'经济学'});
+    assert.deepEqual(v.rows[0].fieldActions,{school:'manual',major:'candidate'});
+    assert.deepEqual((await f.db.query('SELECT graduation_school,department_or_major FROM public.persons WHERE id=1')).rows[0],
+      {graduation_school:'旧校名',department_or_major:null});
+    await f.execute(batchId,v);
+    assert.deepEqual((await f.db.query('SELECT graduation_school,department_or_major FROM public.persons WHERE id=1')).rows[0],
+      {graduation_school:'人工修订校名',department_or_major:'经济学'});
+    const change=(await f.db.query('SELECT before_values,after_values FROM public.person_education_changes WHERE item_id=$1',[item.id])).rows[0];
+    assert.deepEqual(change.before_values,{graduation_school:'旧校名',department_or_major:null});
+    assert.deepEqual(change.after_values,{graduation_school:'人工修订校名',department_or_major:'经济学'});
+    await f.execute(batchId,await f.preview(batchId,item,'undo'));
+    assert.deepEqual((await f.db.query('SELECT graduation_school,department_or_major FROM public.persons WHERE id=1')).rows[0],
+      {graduation_school:'旧校名',department_or_major:null});
+  }finally{await f.db.close();}
+});
+
+test('review migration rollback removes search and restores fill-empty-only preview rules',async()=>{
+  const f=await fixture();
+  try{
+    await f.db.exec('RESET ROLE');await f.db.exec(reviewSelectionRollback);await f.db.exec('SET ROLE service_role');
+    await assert.rejects(f.rpc('people',{query:'Sample'}),/EDUCATION_NOT_FOUND/);
+    await f.db.exec("RESET ROLE; UPDATE public.persons SET graduation_school='旧校名' WHERE id=1; SET ROLE service_role;");
+    const {batchId}=await f.start();const item=await f.prepare(batchId);
+    const plan=await f.rpc('plan',{batchId,kind:'apply'});
+    await assert.rejects(f.rpc('preview',{batchId,planId:plan.planId,rows:[{itemId:item.id,candidateIndex:0,school:true,major:true}]}),
+      /EDUCATION_SCHOOL_MAJOR_CONFLICT/);
+    assert.equal((await f.db.query('SELECT graduation_school,department_or_major FROM public.persons WHERE id=1')).rows[0].department_or_major,null);
+  }finally{await f.db.close();}
+});
+
+test('old Console checkbox payload stays usable during rollout but cannot overwrite existing fields',async()=>{
+  const f=await fixture();
+  try{
+    const {batchId}=await f.start();const item=await f.prepare(batchId);const plan=await f.rpc('plan',{batchId,kind:'apply'});
+    const preview=await f.rpc('preview',{batchId,planId:plan.planId,rows:[{itemId:item.id,candidateIndex:0,school:true,major:true}]});
+    assert.deepEqual(preview.rows[0].patch,{graduation_school:'北京大学',department_or_major:'经济学'});
+    await f.db.exec("RESET ROLE; UPDATE public.persons SET graduation_school='旧校名' WHERE id=1; SET ROLE service_role;");
+    const second=await f.start();const item2=await f.prepare(second.batchId);const plan2=await f.rpc('plan',{batchId:second.batchId,kind:'apply'});
+    await assert.rejects(f.rpc('preview',{batchId:second.batchId,planId:plan2.planId,
+      rows:[{itemId:item2.id,candidateIndex:0,school:true,major:true}]}),/EDUCATION_SCHOOL_MAJOR_CONFLICT/);
   }finally{await f.db.close();}
 });
 
@@ -176,7 +250,7 @@ test('actual SQL: snapshots contain old history and person-only notes; sample co
       INSERT INTO public.followups("Id",customer_id,followup_notes,updated_at) VALUES(1,1,'旧跟进资料',clock_timestamp());
       SET ROLE service_role;`);
     const requestKey=(await f.db.query('SELECT gen_random_uuid() AS id')).rows[0].id;
-    const data={requestKey,maxCalls:10,sampleSize:1};
+    const data={requestKey,maxCalls:10,sampleSize:1,personIds:['1']};
     const first=await f.rpc('create',data);
     assert.equal((await f.rpc('create',data)).batchId,first.batchId);
     await assert.rejects(f.rpc('create',{...data,sampleSize:2}),/IDEMPOTENCY_CONFLICT/);
@@ -214,7 +288,7 @@ test('end-to-end: queued extraction to reviewed education update and safe undo u
     assert.equal(item.status,'ready');assert.equal(item.result.candidates[0].taskRefs[0].resultId,'201');
     assert.equal((await f.db.query('SELECT graduation_school FROM public.persons WHERE id=1')).rows[0].graduation_school,null);
     const plan=await call('plan',{batchId,kind:'apply'});
-    const preview=await call('preview',{batchId,planId:plan.planId,rows:[{itemId:item.id,candidateIndex:0,school:true,major:true}]});
+    const preview=await call('preview',{batchId,planId:plan.planId,rows:[{itemId:item.id,candidateIndex:0,schoolAction:'candidate',majorAction:'candidate'}]});
     assert.deepEqual(preview.rows[0].patch,{graduation_school:'北京大学',department_or_major:'经济学'});
     assert.equal((await f.db.query('SELECT graduation_school FROM public.persons WHERE id=1')).rows[0].graduation_school,null);
     const confirmation=await call('confirm',{batchId,previewId:preview.previewId});

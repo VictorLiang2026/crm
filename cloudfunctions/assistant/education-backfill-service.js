@@ -153,7 +153,7 @@ function productionGateway(actorUid) {
 }
 
 const FIELDS={
-  create:['requestKey','maxCalls','personIds','sampleSize'],batches:[],status:['batchId','offset'],pause:['batchId'],resume:['batchId'],
+  create:['requestKey','maxCalls','personIds','sampleSize'],batches:[],people:['query','offset'],status:['batchId','offset'],pause:['batchId'],resume:['batchId'],
   retry:['batchId','itemId'],skip:['batchId','itemId'],plan:['batchId','kind'],preview:['batchId','planId','rows'],undoPreview:['batchId','planId','rows'],
   confirm:['batchId','previewId'],execute:['batchId','previewId','confirmationToken'],
 };
@@ -170,15 +170,32 @@ function validateRequest(event) {
       data.personIds!==undefined&&(!Array.isArray(data.personIds)||data.personIds.length>1500||
         data.personIds.some(p=>!id(p))||new Set(data.personIds).size!==data.personIds.length))) fail('EDUCATION_INVALID_INPUT');
   if (op==='status'&&data.offset!==undefined&&(!Number.isInteger(data.offset)||data.offset<0||data.offset>100000)) fail('EDUCATION_INVALID_INPUT');
+  if (op==='people'&&((data.query!==undefined&&(typeof data.query!=='string'||data.query.length>100))||
+      data.offset!==undefined&&(!Number.isInteger(data.offset)||data.offset<0||data.offset>100000))) fail('EDUCATION_INVALID_INPUT');
   if (op==='create'&&data.sampleSize!==undefined&&(!Number.isInteger(data.sampleSize)||data.sampleSize<1||data.sampleSize>1500)) fail('EDUCATION_INVALID_INPUT');
   if (op==='plan'&&!['apply','undo'].includes(data.kind)) fail('EDUCATION_INVALID_INPUT');
   if (op==='preview'||op==='undoPreview') {
     if (!Array.isArray(data.rows)||data.rows.length<1||data.rows.length>50||new Set(data.rows.map(r=>r?.itemId)).size!==data.rows.length) fail('EDUCATION_INVALID_INPUT');
     for (const row of data.rows) {
-      const keys=op==='preview'?['itemId','candidateIndex','school','major']:['itemId'];
-      if (!row||typeof row!=='object'||Object.keys(row).some(k=>!keys.includes(k))||!uuid(row.itemId)||
-        op==='preview'&&(!Number.isInteger(row.candidateIndex)||row.candidateIndex<0||row.candidateIndex>99||
-          typeof row.school!=='boolean'||typeof row.major!=='boolean'||!row.school&&!row.major)) fail('EDUCATION_INVALID_INPUT');
+      const hasNewActions=!!row&&(Object.hasOwn(row,'schoolAction')||Object.hasOwn(row,'majorAction'));
+      const legacy=!!row&&(Object.hasOwn(row,'school')||Object.hasOwn(row,'major'));
+      const keys=op==='preview'?(hasNewActions?['itemId','candidateIndex','schoolAction','schoolValue','majorAction','majorValue']:
+        ['itemId','candidateIndex','school','major']):['itemId'];
+      if (!row||typeof row!=='object'||Object.keys(row).some(k=>!keys.includes(k))||!uuid(row.itemId)) fail('EDUCATION_INVALID_INPUT');
+      if (op==='preview') {
+        const actions=['keep','candidate','manual'];
+        if (!Number.isInteger(row.candidateIndex)||row.candidateIndex<0||row.candidateIndex>99) fail('EDUCATION_INVALID_INPUT');
+        if (hasNewActions) {
+          if (legacy||!actions.includes(row.schoolAction)||!actions.includes(row.majorAction)||
+              row.schoolAction==='keep'&&row.majorAction==='keep') fail('EDUCATION_INVALID_INPUT');
+          for (const [actionKey,valueKey] of [['schoolAction','schoolValue'],['majorAction','majorValue']]) {
+            if (row[actionKey]==='manual'&&(typeof row[valueKey]!=='string'||!row[valueKey].trim()||row[valueKey].length>160)||
+                row[actionKey]!=='manual'&&row[valueKey]!==undefined) fail('EDUCATION_INVALID_INPUT');
+          }
+        } else if (!legacy||typeof row.school!=='boolean'||typeof row.major!=='boolean'||!row.school&&!row.major) {
+          fail('EDUCATION_INVALID_INPUT');
+        }
+      }
     }
   }
   return {op,data};

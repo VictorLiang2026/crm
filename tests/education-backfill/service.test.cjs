@@ -21,9 +21,16 @@ test('reject anonymous, worker operations, forged actor, results and confirmatio
   assert.equal(calls.length,0);
 });
 test('validate distinct selections and mandatory server plan',()=>{
-  assert.throws(()=>validateRequest({action:'educationBackfill',operation:'preview',data:{batchId:batch,rows:[{itemId,candidateIndex:0,school:true,major:false}]}}),/INVALID_INPUT/);
+  const row={itemId,candidateIndex:0,schoolAction:'candidate',majorAction:'keep'};
+  assert.equal(validateRequest({action:'educationBackfill',operation:'preview',data:{batchId:batch,planId:lease,rows:[row]}}).op,'preview');
+  assert.equal(validateRequest({action:'educationBackfill',operation:'preview',data:{batchId:batch,planId:lease,
+    rows:[{itemId,candidateIndex:0,school:true,major:true}]}}).op,'preview');
+  assert.throws(()=>validateRequest({action:'educationBackfill',operation:'preview',data:{batchId:batch,planId:lease,rows:[{...row,schoolAction:'manual',schoolValue:' '}]}}),/INVALID_INPUT/);
+  assert.throws(()=>validateRequest({action:'educationBackfill',operation:'preview',data:{batchId:batch,planId:lease,rows:[{...row,majorAction:'keep',schoolAction:'keep'}]}}),/INVALID_INPUT/);
+  assert.equal(validateRequest({action:'educationBackfill',operation:'people',data:{query:'Sample',offset:50}}).op,'people');
+  assert.throws(()=>validateRequest({action:'educationBackfill',operation:'people',data:{query:'x'.repeat(101)}}),/INVALID_INPUT/);
   assert.throws(()=>validateRequest({action:'educationBackfill',operation:'preview',data:{batchId:batch,planId:lease,rows:
-    [0,1].map(candidateIndex=>({itemId,candidateIndex,school:true,major:false}))}}),/INVALID_INPUT/);
+    [0,1].map(candidateIndex=>({itemId,candidateIndex,schoolAction:'candidate',majorAction:'keep'}))}}),/INVALID_INPUT/);
   assert.throws(()=>validateRequest({action:'educationBackfill',operation:'create',data:{requestKey:lease,maxCalls:20,personIds:['7','7']}}),/INVALID_INPUT/);
 });
 test('all history is chunked, overlapping boundaries are kept, duplicates do not consume calls',()=>{
