@@ -48,7 +48,10 @@ test('follow-up advice generates one CloudBase lane and manages each model indep
   assert.deepEqual(scriptView.content,['您好，方便时想和您确认一下近期安排。','GPT版：您好，方便时我们可以继续聊聊。']);
   assert.match(scriptView.text,/退休准备复盘/);
   assert.doesNotMatch(scriptView.text,/先确认客户近期目标|核实需求后再介绍/);
-  assert.equal(await b.evaluate("document.querySelectorAll('.fa-scripts-modal .fa-script-card button').length"),0);
+  assert.equal(await b.evaluate("document.querySelectorAll('.fa-scripts-modal .fa-script-card details.kr-wording').length"),1);
+  assert.equal(await b.evaluate("document.querySelector('.fa-scripts-modal .fa-script-card details.kr-wording').open"),false,
+    'optional wording generation stays collapsed until the user opens it');
+  assert.equal(await b.evaluate("window.faCalls.length"),0,'opening saved script history performs no writes');
   assert.equal(await b.evaluate("document.querySelector('.fa-script-page').textContent"),'第 1 页');
   assert.equal(await b.evaluate("document.querySelector('.fa-script-pager button:last-child').disabled"),false);
   await b.evaluate("document.querySelector('.fa-script-pager button:last-child').click()");
