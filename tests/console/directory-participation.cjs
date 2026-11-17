@@ -37,6 +37,18 @@ const undo = readFileSync(enumBase + '.rollback.sql','utf8').replace(/\r\n/g,'\n
     await db.exec(rollback.slice(rollback.indexOf('CREATE OR REPLACE FUNCTION'),rollback.lastIndexOf('COMMIT;')));
     await db.exec(migration);
     await db.exec(fix);
+    await db.exec(`CREATE TABLE interactions(person_id int,interaction_at timestamptz,next_followup_date date,source_type text,deleted_at date);
+      INSERT INTO interactions VALUES(1,current_date-1,current_date+5,'manual',null),(1,current_date-2,current_date+3,'manual',null);
+      GRANT SELECT ON public.interactions TO service_role;`);
+    const datesSql=readFileSync(path.resolve(__dirname,'../../cloudbase/migrations/20261117170000_person_interaction_followup_dates.sql'),'utf8').replace(/\r\n/g,'\n');
+    const directoryBlock=datesSql.slice(datesSql.indexOf('DO $directory_dates$'),datesSql.indexOf('DO $worklist_dates$'));
+    const pageHash=(await db.query("SELECT md5(prosrc) AS hash FROM pg_catalog.pg_proc WHERE oid='public.person_directory_page_v1(integer,integer,text,text,text)'::regprocedure")).rows[0].hash;
+    const filteredHash=(await db.query("SELECT md5(prosrc) AS hash FROM pg_catalog.pg_proc WHERE oid='public.person_directory_filtered_page_v1(integer,integer,text,text,text,text[],text[],text[],text[])'::regprocedure")).rows[0].hash;
+    try { await db.exec(directoryBlock.replace('4c91f63d77285aef52db34f223dada69',pageHash).replace('1dd354f40716ef1f92729f7b0af1a21a',filteredHash)); }
+    catch (error) { throw new Error('interaction directory migration: '+error.message+' position='+error.position+' detail='+JSON.stringify(error)); }
+    const worklistBlock=datesSql.slice(datesSql.indexOf('DO $worklist_dates$'),datesSql.indexOf("NOTIFY pgrst"));
+    const worklistHash=(await db.query("SELECT md5(prosrc) AS hash FROM pg_catalog.pg_proc WHERE oid='public.person_customer_worklist_v1(jsonb)'::regprocedure")).rows[0].hash;
+    await db.exec(worklistBlock.replace('9b4ac08e6c8bfbdc9a02cc9366fe1d79',worklistHash));
     async function rpc(call,params=[]) {
       await db.exec('SET ROLE service_role');
       try { return (await db.query('SELECT public.'+call+' AS result',params)).rows[0].result; }
@@ -58,6 +70,17 @@ const undo = readFileSync(enumBase + '.rollback.sql','utf8').replace(/\r\n/g,'\n
     assert.equal((await filtered(['participant'],2,1)).total,2);
     assert.deepEqual((await all()).rows.filter(r=>r.roles.includes('participant')).map(r=>r.id),[1,2]);
     assert.equal((await work()).rows[0].activity_count,2);
+    const updatedPerson=(await all()).rows.find(row=>row.id===1);
+    const dateKey=value=>value instanceof Date?value.toISOString().slice(0,10):String(value).slice(0,10);
+    assert.equal(dateKey(updatedPerson.latest_followup_date),dateKey((await db.query('SELECT current_date-1 AS d')).rows[0].d));
+    assert.equal(dateKey(updatedPerson.next_followup_date),dateKey((await db.query('SELECT current_date+3 AS d')).rows[0].d));
+    const dirRollback=readFileSync(path.resolve(__dirname,'../../cloudbase/migrations/20261117170000_person_interaction_followup_dates.rollback.sql'),'utf8').replace(/\r\n/g,'\n');
+    const rollbackBlock=dirRollback.slice(dirRollback.indexOf('DO $directory_dates_rollback$'),dirRollback.indexOf('DO $worklist_dates_rollback$'));
+    await db.exec(rollbackBlock);
+    const worklistRollback=dirRollback.slice(dirRollback.indexOf('DO $worklist_dates_rollback$'),dirRollback.indexOf('ALTER TABLE public.interactions DROP COLUMN'));
+    await db.exec(worklistRollback);
+    const rolledBackBody=(await db.query("SELECT prosrc FROM pg_catalog.pg_proc WHERE oid='public.person_directory_page_v1(integer,integer,text,text,text)'::regprocedure")).rows[0].prosrc;
+    assert.equal(rolledBackBody.includes('FROM public.interactions mi'),false,'directory rollback restores previous source set');
     await db.exec('UPDATE activities SET deleted_at=current_date WHERE id=11');
     assert.equal((await filtered(['participant'])).rows[0].activity_count,1);
     await db.exec('UPDATE activity_participants SET deleted_at=current_date WHERE id=20');
@@ -71,6 +94,6 @@ const undo = readFileSync(enumBase + '.rollback.sql','utf8').replace(/\r\n/g,'\n
     await db.exec(migration);
     await db.exec(fix);
     assert.deepEqual((await filtered(['participant'])).rows.map(r=>r.id),[1,2]);
-    console.log('PASS directory RPCs, pagination, identity, combined roles, independent priorities, delete/restore and migration round trip');
+    console.log('PASS directory RPCs, manual interaction date aggregation and rollback, pagination, identity, combined roles, independent priorities, delete/restore and migration round trip');
   } finally { await db.close(); }
-})().catch(e=>{ console.error(e.message);process.exitCode=1; });
+})().catch(e=>{ console.error(e.stack || e.message);process.exitCode=1; });
