@@ -32,6 +32,14 @@ test('validate distinct selections and mandatory server plan',()=>{
   assert.throws(()=>validateRequest({action:'educationBackfill',operation:'preview',data:{batchId:batch,planId:lease,rows:
     [0,1].map(candidateIndex=>({itemId,candidateIndex,schoolAction:'candidate',majorAction:'keep'}))}}),/INVALID_INPUT/);
   assert.throws(()=>validateRequest({action:'educationBackfill',operation:'create',data:{requestKey:lease,maxCalls:20,personIds:['7','7']}}),/INVALID_INPUT/);
+  assert.equal(validateRequest({action:'educationBackfill',operation:'create',data:{requestKey:lease,maxCalls:20,sampleSize:20,selectionMode:'recent_updated'}}).op,'create');
+  for(const data of [
+    {requestKey:lease,maxCalls:20,sampleSize:20,selectionMode:'unknown'},
+    {requestKey:lease,maxCalls:20,selectionMode:'recent_updated'},
+    {requestKey:lease,maxCalls:20,sampleSize:20,personIds:['7'],selectionMode:'recent_updated'},
+    {requestKey:lease,maxCalls:20,selectionMode:'selected'},
+    {requestKey:lease,maxCalls:20,sampleSize:20,selectionMode:'all'},
+  ]) assert.throws(()=>validateRequest({action:'educationBackfill',operation:'create',data}),/INVALID_INPUT/);
 });
 test('all history is chunked, overlapping boundaries are kept, duplicates do not consume calls',()=>{
   const text='x'.repeat(7990)+'毕业于北京大学经济系'+'z'.repeat(9000);

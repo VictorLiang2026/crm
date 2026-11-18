@@ -153,7 +153,7 @@ function productionGateway(actorUid) {
 }
 
 const FIELDS={
-  create:['requestKey','maxCalls','personIds','sampleSize'],batches:[],people:['query','offset'],status:['batchId','offset'],pause:['batchId'],resume:['batchId'],
+  create:['requestKey','maxCalls','personIds','sampleSize','selectionMode'],batches:[],people:['query','offset'],status:['batchId','offset'],pause:['batchId'],resume:['batchId'],
   retry:['batchId','itemId'],skip:['batchId','itemId'],plan:['batchId','kind'],preview:['batchId','planId','rows'],undoPreview:['batchId','planId','rows'],
   confirm:['batchId','previewId'],execute:['batchId','previewId','confirmationToken'],
 };
@@ -169,10 +169,17 @@ function validateRequest(event) {
   if (op==='create'&&(!Number.isInteger(data.maxCalls)||data.maxCalls<1||data.maxCalls>5000||
       data.personIds!==undefined&&(!Array.isArray(data.personIds)||data.personIds.length>1500||
         data.personIds.some(p=>!id(p))||new Set(data.personIds).size!==data.personIds.length))) fail('EDUCATION_INVALID_INPUT');
+  if (op==='create'&&data.selectionMode!==undefined&&
+      !['recent_created','recent_updated','selected','all'].includes(data.selectionMode)) fail('EDUCATION_INVALID_INPUT');
   if (op==='status'&&data.offset!==undefined&&(!Number.isInteger(data.offset)||data.offset<0||data.offset>100000)) fail('EDUCATION_INVALID_INPUT');
   if (op==='people'&&((data.query!==undefined&&(typeof data.query!=='string'||data.query.length>100))||
       data.offset!==undefined&&(!Number.isInteger(data.offset)||data.offset<0||data.offset>100000))) fail('EDUCATION_INVALID_INPUT');
   if (op==='create'&&data.sampleSize!==undefined&&(!Number.isInteger(data.sampleSize)||data.sampleSize<1||data.sampleSize>1500)) fail('EDUCATION_INVALID_INPUT');
+  if (op==='create'&&data.selectionMode!==undefined&&(
+      ['recent_created','recent_updated'].includes(data.selectionMode)&&
+        (data.sampleSize===undefined||data.personIds?.length)||
+      data.selectionMode==='selected'&&(!data.personIds?.length)||
+      data.selectionMode==='all'&&(data.sampleSize!==undefined||data.personIds?.length))) fail('EDUCATION_INVALID_INPUT');
   if (op==='plan'&&!['apply','undo'].includes(data.kind)) fail('EDUCATION_INVALID_INPUT');
   if (op==='preview'||op==='undoPreview') {
     if (!Array.isArray(data.rows)||data.rows.length<1||data.rows.length>50||new Set(data.rows.map(r=>r?.itemId)).size!==data.rows.length) fail('EDUCATION_INVALID_INPUT');

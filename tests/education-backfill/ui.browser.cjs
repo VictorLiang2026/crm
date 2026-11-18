@@ -92,7 +92,7 @@ test('iPad: existing values default to keep; different candidate/manual values c
   }finally{await browser.close();}
 });
 
-test('iPad: custom recent count and search multi-select both create fixed cohorts',async()=>{
+test('iPad: created-time, updated-time and search modes create fixed cohorts in both languages',async()=>{
   const browser=new Browser(path.resolve(__dirname,'../..'));
   try{
     await browser.start();await browser.setViewport(820,1180);await mount(browser);
@@ -100,12 +100,28 @@ test('iPad: custom recent count and search multi-select both create fixed cohort
     await browser.evaluate("[...window.eduRoot.querySelectorAll('button')].find(b=>b.textContent==='开始生成候选').click()");
     await browser.wait("window.eduCreated.length===1");
     assert.equal(await browser.evaluate('window.eduCreated[0].sampleSize'),75);
+    assert.equal(await browser.evaluate('window.eduCreated[0].selectionMode'),'recent_created');
+    await browser.evaluate(`(()=>{const s=window.eduRoot.querySelector('select[aria-label="选择处理人群"]');
+      s.value='recent_updated';s.dispatchEvent(new Event('change',{bubbles:true}));
+      window.eduRoot.querySelector('input[type=number]').value='40';})()`);
+    assert.equal(await browser.evaluate("window.eduRoot.querySelector('input[type=number]').parentElement.hidden"),false);
+    assert.match(await browser.evaluate("window.eduRoot.querySelector('input[type=number]').parentElement.innerText"),/最近更新时间倒序/);
+    await browser.evaluate("[...window.eduRoot.querySelectorAll('button')].find(b=>b.textContent==='开始生成候选').click()");
+    await browser.wait("window.eduCreated.length===2");
+    assert.deepEqual(await browser.evaluate('[window.eduCreated[1].selectionMode,window.eduCreated[1].sampleSize]'),['recent_updated',40]);
+    await browser.evaluate("(async()=>{const {setLang}=await import('/crm/js/modules/console/i18n.js');setLang('en');await window.eduRender();})()");
+    assert.equal(await browser.evaluate("[...window.eduRoot.querySelectorAll('select option')].some(o=>o.textContent==='Recently updated People')"),true);
+    await browser.evaluate(`(()=>{const s=window.eduRoot.querySelector('select[aria-label="Choose people to process"]');
+      s.value='recent_updated';s.dispatchEvent(new Event('change',{bubbles:true}));})()`);
+    assert.match(await browser.evaluate("window.eduRoot.querySelector('input[type=number]').parentElement.innerText"),/last update/);
+    await browser.evaluate("(async()=>{const {setLang}=await import('/crm/js/modules/console/i18n.js');setLang('zh-CN');await window.eduRender();})()");
     await browser.evaluate(`(()=>{const s=window.eduRoot.querySelector('select[aria-label="选择处理人群"]');s.value='search';s.dispatchEvent(new Event('change',{bubbles:true}));})()`);
     await browser.wait("window.eduRoot.querySelectorAll('.edu-person-option').length===2");
     await browser.evaluate("window.eduRoot.querySelectorAll('.edu-person-option input')[1].click()");
     await browser.evaluate("[...window.eduRoot.querySelectorAll('button')].find(b=>b.textContent==='开始生成候选').click()");
-    await browser.wait("window.eduCreated.length===2");
-    assert.deepEqual(await browser.evaluate('window.eduCreated[1].personIds'),['8']);
+    await browser.wait("window.eduCreated.length===3");
+    assert.deepEqual(await browser.evaluate('window.eduCreated[2].personIds'),['8']);
+    assert.equal(await browser.evaluate('window.eduCreated[2].selectionMode'),'selected');
     assert.equal(await browser.evaluate("window.eduCalls.filter(r=>r.operation==='people').length>0"),true);
     assert.equal(await browser.evaluate("window.eduCalls.some(r=>r.operation==='execute')"),false);
   }finally{await browser.close();}

@@ -14,7 +14,9 @@ const reviewSelectionMigration=fs.readFileSync(path.join(root,'cloudbase/migrati
 const reviewSelectionRollback=fs.readFileSync(path.join(root,'cloudbase/migrations/20261117231025_person_education_review_selection.rollback.sql'),'utf8');
 const fairQueueMigration=fs.readFileSync(path.join(root,'cloudbase/migrations/20261118010002_education_batch_fair_queue.sql'),'utf8');
 const fairQueueRollback=fs.readFileSync(path.join(root,'cloudbase/migrations/20261118010002_education_batch_fair_queue.rollback.sql'),'utf8');
-async function fixture(){
+const recentUpdatedMigration=fs.readFileSync(path.join(root,'cloudbase/migrations/20261118084800_education_recently_updated_cohort.sql'),'utf8');
+const recentUpdatedRollback=fs.readFileSync(path.join(root,'cloudbase/migrations/20261118084800_education_recently_updated_cohort.rollback.sql'),'utf8');
+async function fixture({includeLegacy=true}={}){
   const db=new PGlite();
   await db.exec(`CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role;
     CREATE TABLE public.persons(id bigint PRIMARY KEY,display_name text,graduation_school text,department_or_major text,
@@ -30,7 +32,14 @@ async function fixture(){
     GRANT USAGE ON SCHEMA public TO service_role;
     GRANT SELECT ON ALL TABLES IN SCHEMA public TO service_role;
     GRANT UPDATE(graduation_school,department_or_major,updated_at) ON public.persons TO service_role;`);
-  try { await db.exec(migration);await db.exec(pilotOrderMigration);await db.exec(reviewSelectionMigration);await db.exec(fairQueueMigration); }
+  try {
+    await db.exec(migration);await db.exec(pilotOrderMigration);await db.exec(reviewSelectionMigration);await db.exec(fairQueueMigration);
+    if(includeLegacy) await db.exec(`INSERT INTO public.person_education_batches(actor_uid,request_key,max_calls,person_ids,sample_size,status) VALUES
+        ('legacy','00000000-0000-4000-8000-000000000101',20,'[]',1,'paused'),
+        ('legacy','00000000-0000-4000-8000-000000000102',20,'["1"]',NULL,'paused'),
+        ('legacy','00000000-0000-4000-8000-000000000103',20,'[]',NULL,'paused')`);
+    await db.exec(recentUpdatedMigration);
+  }
   catch(error) { delete error.query; await db.close(); throw error; }
   await db.exec('SET ROLE service_role');
   const rpc=async(op,data={},actor='owner')=>(await db.query('SELECT public.crm_education_backfill_v1($1,$2,$3::jsonb) AS value',[actor,op,JSON.stringify(data)])).rows[0].value;
@@ -133,7 +142,7 @@ test('actual SQL: foreign/ambiguous candidates are never executable; lease, budg
 });
 
 test('migration rollback succeeds only before any batches exist',async()=>{
-  const f=await fixture();
+  const f=await fixture({includeLegacy:false});
   try{
     await f.db.exec('RESET ROLE');await f.db.exec(rollback);
     assert.equal((await f.db.query("SELECT to_regclass('public.person_education_batches') AS n")).rows[0].n,null);
@@ -263,6 +272,42 @@ test('active batches rotate by normalized attempt usage; equal usage stays FIFO 
     await f.db.exec('RESET ROLE');await f.db.exec(fairQueueRollback);await f.db.exec('SET ROLE service_role');
     jobs=(await f.rpc('queue',{},'education-worker')).jobs;
     assert.deepEqual(jobs.map(job=>job.id),[older.batchId,newer.batchId]);
+  }finally{await f.db.close();}
+});
+
+test('recently updated cohort uses updated_at then ID, preserves legacy modes, and rolls back without losing items',async()=>{
+  const f=await fixture();
+  try{
+    const legacy=(await f.db.query(`SELECT request_key,selection_mode FROM public.person_education_batches
+      WHERE actor_uid='legacy' ORDER BY request_key`)).rows;
+    assert.deepEqual(legacy.map(x=>x.selection_mode),['recent_created','selected','all']);
+    await f.db.exec(`RESET ROLE;
+      INSERT INTO public.persons(id,display_name,notes,created_at,updated_at) VALUES
+        (3,'Sample Three','旧资料','2026-01-01T00:00:00Z','2026-03-01T00:00:00Z');
+      UPDATE public.persons SET created_at=CASE id WHEN 1 THEN '2026-03-01T00:00:00Z'::timestamptz
+        WHEN 2 THEN '2026-02-01T00:00:00Z'::timestamptz END,
+        updated_at='2026-03-01T00:00:00Z'::timestamptz WHERE id IN (1,2);
+      SET ROLE service_role;`);
+    const requestKey=(await f.db.query('SELECT gen_random_uuid() AS id')).rows[0].id;
+    const updatedRequest={requestKey,maxCalls:20,sampleSize:2,selectionMode:'recent_updated'};
+    const updated=await f.rpc('create',updatedRequest);
+    assert.equal((await f.rpc('create',updatedRequest)).batchId,updated.batchId);
+    await assert.rejects(f.rpc('create',{...updatedRequest,selectionMode:'recent_created'}),/IDEMPOTENCY_CONFLICT/);
+    const updatedPeople=(await f.db.query('SELECT person_id FROM public.person_education_items WHERE batch_id=$1 ORDER BY person_id',[updated.batchId])).rows.map(x=>Number(x.person_id));
+    assert.deepEqual(updatedPeople,[2,3]);
+    assert.equal((await f.db.query('SELECT selection_mode FROM public.person_education_batches WHERE id=$1',[updated.batchId])).rows[0].selection_mode,'recent_updated');
+
+    const created=await f.rpc('create',{requestKey:(await f.db.query('SELECT gen_random_uuid() AS id')).rows[0].id,
+      maxCalls:20,sampleSize:2,selectionMode:'recent_created'});
+    const createdPeople=(await f.db.query('SELECT person_id FROM public.person_education_items WHERE batch_id=$1 ORDER BY person_id',[created.batchId])).rows.map(x=>Number(x.person_id));
+    assert.deepEqual(createdPeople,[1,2]);
+
+    await f.db.exec('RESET ROLE');await f.db.exec(recentUpdatedRollback);await f.db.exec('SET ROLE service_role');
+    const remaining=(await f.db.query('SELECT count(*)::int AS n FROM public.person_education_items WHERE batch_id=$1',[updated.batchId])).rows[0].n;
+    const column=(await f.db.query(`SELECT count(*)::int AS n FROM information_schema.columns
+      WHERE table_schema='public' AND table_name='person_education_batches' AND column_name='selection_mode'`)).rows[0].n;
+    assert.equal(remaining,2);assert.equal(column,0);
+    assert.deepEqual((await f.rpc('queue',{},'education-worker')).jobs.map(job=>job.id),[updated.batchId,created.batchId]);
   }finally{await f.db.close();}
 });
 

@@ -27,8 +27,11 @@ export async function renderEducationBackfill(ctx) {
   const scope=h('select',{class:'sheet-input','aria-label':t('edu_cohort_mode'),onchange:()=>{
     if(scope.value==='search'&&!peopleRows.length)run(()=>searchPeople(0));
   }},[
-    h('option',{value:'recent'},t('edu_cohort_recent')),h('option',{value:'search'},t('edu_cohort_search')),h('option',{value:'all'},t('edu_cohort_all'))]);
+    h('option',{value:'recent_created'},t('edu_cohort_recent')),
+    h('option',{value:'recent_updated'},t('edu_cohort_recent_updated')),
+    h('option',{value:'search'},t('edu_cohort_search')),h('option',{value:'all'},t('edu_cohort_all'))]);
   const sampleSize=h('input',{class:'sheet-input',type:'number',min:1,max:1500,value:50,'aria-label':t('edu_sample_size')});
+  const sampleLabel=h('span',{},t('edu_sample_size')),sampleField=h('label',{},[sampleLabel,sampleSize]);
   const budget=h('input',{class:'sheet-input',type:'number',min:1,max:5000,value:200,'aria-label':t('edu_budget')});
   const query=h('input',{class:'sheet-input',type:'search',maxlength:100,placeholder:t('edu_search_placeholder'),'aria-label':t('edu_search_placeholder')});
   const peopleList=h('div',{class:'edu-people-list'}),peopleSummary=h('p',{class:'row-sub'});
@@ -207,21 +210,27 @@ export async function renderEducationBackfill(ctx) {
     if(!createPayload){
       if(!Number.isInteger(Number(budget.value))||Number(budget.value)<1||Number(budget.value)>5000){notice.textContent=t('edu_invalid_budget');return;}
       const mode=scope.value,request={requestKey:crypto.randomUUID(),maxCalls:Number(budget.value)};
-      if(mode==='recent'){
+      if(mode==='recent_created'||mode==='recent_updated'){
         if(!Number.isInteger(Number(sampleSize.value))||Number(sampleSize.value)<1||Number(sampleSize.value)>1500){notice.textContent=t('edu_invalid_sample_size');return;}
-        request.sampleSize=Number(sampleSize.value);
+        request.sampleSize=Number(sampleSize.value);request.selectionMode=mode;
       }else if(mode==='search'){
         if(!selectedPeople.size){notice.textContent=t('edu_no_people_selected');return;}
-        request.personIds=[...selectedPeople];
-      }
+        request.personIds=[...selectedPeople];request.selectionMode='selected';
+      }else request.selectionMode='all';
       createPayload=request;
     }
     const created=await call('create',createPayload);createPayload=null;batchId=created.batchId;offset=0;clear();
     await batches();await refresh();notice.textContent=t('edu_batch_created');
   });
-  function updateCohortMode(){sampleSize.hidden=scope.value!=='recent';peoplePanel.hidden=scope.value!=='search';}
+  function updateCohortMode(){
+    const recent=['recent_created','recent_updated'].includes(scope.value);
+    sampleField.hidden=!recent;sampleSize.hidden=false;
+    sampleLabel.textContent=t(scope.value==='recent_updated'?'edu_sample_size_updated':'edu_sample_size');
+    sampleSize.setAttribute('aria-label',sampleLabel.textContent);
+    peoplePanel.hidden=scope.value!=='search';
+  }
   scope.onchange=()=>{updateCohortMode();if(scope.value==='search'&&!peopleRows.length)run(()=>searchPeople(0));};
-  const createPanel=card({body:[scope,sampleSize,h('label',{},[t('edu_budget'),budget]),peoplePanel,create]});
+  const createPanel=card({body:[scope,sampleField,h('label',{},[t('edu_budget'),budget]),peoplePanel,create]});
   root.replaceChildren(pageHead({title:t('edu_title'),sub:t('edu_intro')}),notice,createPanel,
     card({body:[picker,h('div',{class:'head-actions'},[
       button('edu_refresh',async()=>{await batches();await refresh();}),
