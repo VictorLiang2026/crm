@@ -16,6 +16,8 @@ const fairQueueMigration=fs.readFileSync(path.join(root,'cloudbase/migrations/20
 const fairQueueRollback=fs.readFileSync(path.join(root,'cloudbase/migrations/20261118010002_education_batch_fair_queue.rollback.sql'),'utf8');
 const recentUpdatedMigration=fs.readFileSync(path.join(root,'cloudbase/migrations/20261118084800_education_recently_updated_cohort.sql'),'utf8');
 const recentUpdatedRollback=fs.readFileSync(path.join(root,'cloudbase/migrations/20261118084800_education_recently_updated_cohort.rollback.sql'),'utf8');
+const evidenceReviewMigration=fs.readFileSync(path.join(root,'cloudbase/migrations/20261118101000_education_review_evidenced_candidates.sql'),'utf8');
+const evidenceReviewRollback=fs.readFileSync(path.join(root,'cloudbase/migrations/20261118101000_education_review_evidenced_candidates.rollback.sql'),'utf8');
 async function fixture({includeLegacy=true}={}){
   const db=new PGlite();
   await db.exec(`CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role;
@@ -39,6 +41,7 @@ async function fixture({includeLegacy=true}={}){
         ('legacy','00000000-0000-4000-8000-000000000102',20,'["1"]',NULL,'paused'),
         ('legacy','00000000-0000-4000-8000-000000000103',20,'[]',NULL,'paused')`);
     await db.exec(recentUpdatedMigration);
+    await db.exec(evidenceReviewMigration);
   }
   catch(error) { delete error.query; await db.close(); throw error; }
   await db.exec('SET ROLE service_role');
@@ -121,10 +124,40 @@ test('actual SQL: source edits, stale previews, school-major conflict, refusal t
   }finally{await f.db.close();}
 });
 
-test('actual SQL: foreign/ambiguous candidates are never executable; lease, budget and pause enforced',async()=>{
+test('actual SQL: sourced candidates are eligible without a graduation claim and still require confirmed preview',async()=>{
   const f=await fixture();
   try{
-    for(const candidate of [{relationship:'other'},{relationship:'unclear'},{ambiguous:true},{educationType:'training'},
+    const quote='学校：北京大学\n院系：信息管理系\n本科（毕业论文指导）';
+    await f.db.exec('RESET ROLE');
+    await f.db.query('UPDATE public.persons SET notes=$1 WHERE id=1',[quote]);
+    await f.db.exec('SET ROLE service_role');
+    const {batchId}=await f.start();
+    const item=await f.prepare(batchId,{major:'信息管理系',educationType:'studying',
+      evidence:[{table:'persons',id:'1',field:'notes',quote,supports:'both'}]});
+    const preview=await f.preview(batchId,item);
+    assert.deepEqual(preview.rows[0].patch,{graduation_school:'北京大学',department_or_major:'信息管理系'});
+    await assert.rejects(f.rpc('execute',{batchId,previewId:preview.previewId}),/EDUCATION_CONFIRMATION_REQUIRED/);
+    assert.equal((await f.db.query('SELECT graduation_school FROM public.persons WHERE id=1')).rows[0].graduation_school,null);
+    for(const candidate of [{relationship:'other'},{relationship:'unclear',ambiguous:true},{educationType:'unknown'}]){
+      const next=await f.start();
+      const row=await f.prepare(next.batchId,{...candidate,major:'信息管理系',educationType:candidate.educationType||'studying',
+        evidence:[{table:'persons',id:'1',field:'notes',quote,supports:'both'}]});
+      assert.deepEqual((await f.preview(next.batchId,row)).rows[0].patch,preview.rows[0].patch);
+    }
+    await f.execute(batchId,preview);
+    assert.equal((await f.db.query('SELECT department_or_major FROM public.persons WHERE id=1')).rows[0].department_or_major,'信息管理系');
+    const pending=await f.start(20,['2']);
+    const pendingItem=await f.prepare(pending.batchId,{school:'复旦',major:null,educationType:'unknown',
+      evidence:[{table:'persons',id:'2',field:'notes',quote:'朋友在复旦工作。',supports:'school'}]});
+    await f.db.exec('RESET ROLE');await f.db.exec(evidenceReviewRollback);await f.db.exec('SET ROLE service_role');
+    await assert.rejects(f.preview(pending.batchId,pendingItem,'apply',{majorAction:'keep'}),/EDUCATION_CANDIDATE_UNVERIFIED/);
+  }finally{await f.db.close();}
+});
+
+test('actual SQL: missing and invalid evidence are blocked; lease, budget and pause enforced',async()=>{
+  const f=await fixture();
+  try{
+    for(const candidate of [{school:null,major:null},{evidence:[]},
       {evidence:[{table:'persons',id:'2',field:'notes',quote:'北京大学',supports:'both'}]}]){
       const {batchId}=await f.start();const item=await f.prepare(batchId,candidate);
       await assert.rejects(f.preview(batchId,item),/EDUCATION_CANDIDATE_UNVERIFIED|EDUCATION_EVIDENCE_STALE/);

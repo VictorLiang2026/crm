@@ -4,14 +4,14 @@ const assert=require('node:assert/strict');
 const path=require('node:path');
 const {Browser}=require('./browser-fixture.cjs');
 
-async function mount(browser,{currentSchool=null,currentMajor=null,oddNames=false}={}){
+async function mount(browser,{currentSchool=null,currentMajor=null,oddNames=false,educationType='graduated',relationship='self'}={}){
   await browser.evaluate(`(async()=>{
     const {renderEducationBackfill}=await import('/crm/js/modules/console/education-backfill.js');
     const {setLang}=await import('/crm/js/modules/console/i18n.js');setLang('zh-CN');
     const batch='00000000-0000-4000-8000-000000000001',item='00000000-0000-4000-8000-000000000002';
     window.eduCalls=[];window.eduApplied=false;window.eduPreviewKind=null;window.eduCreated=[];window.eduBatchId=batch;
     const candidate={school:${JSON.stringify(oddNames?'机构毕业于？':'北京大学')},major:${JSON.stringify(oddNames?'并非专业名':'经济学')},
-      relationship:'self',educationType:'graduated',ambiguous:false,
+      relationship:${JSON.stringify(relationship)},educationType:${JSON.stringify(educationType)},ambiguous:false,
       evidence:[{table:'persons',id:'7',field:'notes',quote:'本人毕业于北京大学，经济学专业。'}]};
     const callFn=async(name,request)=>{
       window.eduCalls.push(request);const op=request.operation;
@@ -89,6 +89,25 @@ test('iPad: existing values default to keep; different candidate/manual values c
     await mount(browser,{currentSchool:'北大',currentMajor:'经济学'});
     assert.deepEqual(await browser.evaluate("[...window.eduRoot.querySelectorAll('.edu-field select')].map(x=>x.value)"),['keep','keep']);
     assert.equal(await browser.evaluate("window.eduRoot.querySelectorAll('.edu-match-tag').length"),2);
+  }finally{await browser.close();}
+});
+
+test('iPad: currently studying can be previewed, and uncertain attribution requires manual selection',async()=>{
+  const browser=new Browser(path.resolve(__dirname,'../..'));
+  try{
+    await browser.start();await browser.setViewport(820,1180);await mount(browser,{educationType:'studying'});
+    assert.equal(await browser.evaluate("window.eduRoot.querySelector('input[type=radio]').checked"),true);
+    await browser.evaluate("[...window.eduRoot.querySelectorAll('button')].find(b=>b.textContent.includes('核对所选回填')).click()");
+    await browser.wait("window.eduRoot.innerText.includes('回填预览')");
+    assert.equal(await browser.evaluate("window.eduCalls.some(r=>r.operation==='execute')"),false);
+    await mount(browser,{educationType:'unknown',relationship:'other'});
+    assert.match(await browser.evaluate('window.eduRoot.innerText'),/确认这组信息适用于当前人物/);
+    assert.deepEqual(await browser.evaluate("(()=>{const radio=window.eduRoot.querySelector('input[type=radio]');return [radio.checked,radio.disabled]})()"),[false,false]);
+    assert.match(await browser.evaluate("window.eduRoot.querySelector('.edu-candidate').innerText"),/北京大学/);
+    await browser.evaluate("window.eduRoot.querySelector('input[type=radio]').click()");
+    assert.equal(await browser.evaluate("window.eduRoot.querySelector('input[type=radio]').checked"),true);
+    await browser.evaluate("(async()=>{const {setLang}=await import('/crm/js/modules/console/i18n.js');setLang('en');await window.eduRender();})()");
+    assert.match(await browser.evaluate('window.eduRoot.innerText'),/Check the source and select these values/);
   }finally{await browser.close();}
 });
 

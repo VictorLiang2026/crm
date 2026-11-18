@@ -137,8 +137,9 @@ export async function renderEducationBackfill(ctx) {
       }
       const candidates=item.result?.candidates||[];
       if(['ready','needs_review'].includes(item.status))for(const [index,c]of candidates.entries()){
-        const eligible=c.relationship==='self'&&c.educationType==='graduated'&&!c.ambiguous;
-        const auto=candidates.length===1&&eligible;
+        const eligible=(hasValue(c.school)||hasValue(c.major))&&Array.isArray(c.evidence)&&c.evidence.length>0;
+        const needsAttributionReview=c.relationship!=='self'||c.ambiguous!==false;
+        const auto=candidates.length===1&&eligible&&!needsAttributionReview;
         const state=auto?activeState(item,c,index):selected.get(item.id);
         const checked=state?.candidateIndex===index;
         const choose=h('input',{type:'radio',name:`edu-${item.id}`,checked,disabled:!eligible,'aria-label':t('edu_select'),onchange:()=>{
@@ -146,10 +147,12 @@ export async function renderEducationBackfill(ctx) {
         }});
         body.push(card({title:`${t('edu_episode')} ${index+1}`,body:[
           h('label',{class:'edu-episode-choice'},[choose,t('edu_select')]),
-          eligible?h('div',{class:'edu-field-grid'},[
-            fieldControl(item,c,checked?state:null,'school',t('edu_school'),c.school,item.graduation_school,checked),
-            fieldControl(item,c,checked?state:null,'major',t('edu_major'),c.major,item.department_or_major,checked)
-          ]):h('p',{class:'edu-blocked',role:'status'},t('edu_ineligible')),
+          !eligible?h('p',{class:'edu-blocked',role:'status'},t('edu_ineligible')):null,
+          eligible&&needsAttributionReview?h('p',{class:'edu-warning',role:'status'},t('edu_attribution_review')):null,
+          h('div',{class:'edu-field-grid'},[
+            fieldControl(item,c,checked?state:null,'school',t('edu_school'),c.school,item.graduation_school,checked&&eligible),
+            fieldControl(item,c,checked?state:null,'major',t('edu_major'),c.major,item.department_or_major,checked&&eligible)
+          ]),
           h('details',{},[h('summary',{},t('edu_evidence')),...(c.evidence||[]).map(e=>h('div',{},[
             h('p',{class:'row-sub'},`public.${e.table} #${e.id} · ${e.field} · ${e.updatedAt||''}`),h('blockquote',{style:'overflow-wrap:anywhere;white-space:pre-wrap'},e.quote)]))])
         ]}));
