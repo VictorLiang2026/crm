@@ -50,23 +50,31 @@ export function versionSelector({call,onSaved,setState}){
   panel.append(h('p',{class:'ro-selector-help'},t('ro_selector_hint')),body);
   body.append(h('p',{role:'status'},t('ro_selector_loading')));
   document.body.append(panel);button.setAttribute('aria-expanded','true');button.setAttribute('aria-controls',panel.id);
-  let closed=false;
+  let closed=false,frame=0;const viewport=window.visualViewport;
   const close=(focus=false)=>{
    if(closed)return;closed=true;panel.remove();button.setAttribute('aria-expanded','false');button.removeAttribute('aria-controls');
-   document.removeEventListener('pointerdown',outside,true);window.removeEventListener('resize',move);window.removeEventListener('scroll',move,true);observer.disconnect();
+   cancelAnimationFrame(frame);document.removeEventListener('pointerdown',outside,true);window.removeEventListener('resize',move);window.removeEventListener('scroll',move,true);
+   window.removeEventListener('hashchange',routeLeave);viewport?.removeEventListener('resize',move);viewport?.removeEventListener('scroll',move);observer.disconnect();
    if(focus&&button.isConnected)button.focus();
   };
   const outside=e=>{if(!panel.contains(e.target)&&!button.contains(e.target))close();};
-  const move=e=>{if(e.type!=='scroll'||!panel.contains(e.target))close();};
+  const move=e=>{if(e.type==='scroll'&&panel.contains(e.target))return;cancelAnimationFrame(frame);frame=requestAnimationFrame(position);};
+  const routeLeave=()=>close();
   const observer=new MutationObserver(()=>{if(!button.isConnected)close();});observer.observe(document.body,{childList:true,subtree:true});
   document.addEventListener('pointerdown',outside,true);window.addEventListener('resize',move);window.addEventListener('scroll',move,true);
+  window.addEventListener('hashchange',routeLeave);viewport?.addEventListener('resize',move);viewport?.addEventListener('scroll',move);
   closePopup=close;
   const position=()=>{
-   const r=button.getBoundingClientRect(),width=Math.min(340,innerWidth-24);
-   panel.style.width=width+'px';panel.style.left=Math.max(12,Math.min(r.left,innerWidth-width-12))+'px';
-   const spaceBelow=innerHeight-r.bottom-12,spaceAbove=r.top-12,below=spaceBelow>=Math.min(420,spaceAbove);
-   panel.style.maxHeight=Math.max(120,below?spaceBelow:spaceAbove)+'px';
-   panel.style.top=below?(r.bottom+4)+'px':'auto';panel.style.bottom=below?'auto':(innerHeight-r.top+4)+'px';
+   if(closed)return;
+   const r=button.getBoundingClientRect(),left=viewport?.offsetLeft||0,top=viewport?.offsetTop||0;
+   const right=left+(viewport?.width||innerWidth),bottom=top+(viewport?.height||innerHeight);
+   const clip=button.closest('.kg-table-wrap')?.getBoundingClientRect();
+   if(!button.isConnected||r.bottom<=Math.max(top,clip?.top??top)||r.top>=Math.min(bottom,clip?.bottom??bottom)||r.right<=left||r.left>=right){close();return;}
+   const width=Math.min(360,right-left-24),spaceBelow=Math.max(0,bottom-r.bottom-16),spaceAbove=Math.max(0,r.top-top-16);
+   const below=spaceBelow>=Math.min(440,spaceAbove),available=below?spaceBelow:spaceAbove;
+   panel.style.width=width+'px';panel.style.left=Math.max(left+12,Math.min(r.left,right-width-12))+'px';
+   panel.style.maxHeight=available+'px';panel.style.bottom='auto';
+   panel.style.top=(below?r.bottom+4:Math.max(top+12,r.top-4-Math.min(panel.scrollHeight+2,available)))+'px';
   };
   panel.onkeydown=e=>{
    if(e.key==='Escape'){e.preventDefault();close(true);return;}
@@ -87,7 +95,7 @@ export function versionSelector({call,onSaved,setState}){
      ...(version?.id?[h('span',{class:'ro-selector-preview'},version.preview||version.title)]:[])]);
     if(current.selection_mode===mode)choice.setAttribute('aria-current','true');body.append(choice);
    }
-   position();body.querySelector('button:not(:disabled)')?.focus({preventScroll:true});
+   position();if(!closed)body.querySelector('button:not(:disabled)')?.focus({preventScroll:true});
   }catch{
    if(!closed){body.replaceChildren(h('p',{role:'status'},t('ro_selector_load_failed')),h('button',{type:'button',class:'btn btn-ghost',onclick:()=>{close();open(row,button,host);}},t('ro_retry')));position();}
   }

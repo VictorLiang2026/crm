@@ -88,32 +88,36 @@ export function renderCommunicationReferences(ctx){
   const current=list.querySelector(`[data-reference-id="${updated.id}"]`);if(current)current.replaceWith(makeRow(updated));
  },legacyHistory:row=>openKnowledgeHistory(ctx,{...row,table:'playbooks'},load)});
  const makeRow=row=>h('tr',{'data-reference-id':row.id},[
-  h('td',{},[optimization.select(row),String(row.id)]),h('td',{},buttonTitle(row)),h('td',{},text(row.metadata?.kind||'wording')),
-  h('td',{},(row.metadata?.keywords||[]).join('、')),h('td',{},[h('small',{},text(row.metadata?.enabled===false?'disabled':'enabled')),optimization.cell(row)]),
+  h('td',{class:'kr-number'},[optimization.select(row),h('span',{},String(row.id))]),
+  h('td',{},[buttonTitle(row),h('div',{class:'kr-reference-meta'},[
+   h('span',{class:'kr-kind'},text(row.metadata?.kind||'wording')),
+   h('span',{class:'kr-keywords',title:(row.metadata?.keywords||[]).join('、')},(row.metadata?.keywords||[]).join('、'))])]),
+  h('td',{},[h('span',{class:'kr-enabled-state'},text(row.metadata?.enabled===false?'disabled':'enabled')),optimization.cell(row)]),
   h('td',{},optimization.versionCell(row)),
-  h('td',{},[button('edit',()=>edit(ctx,row,load)),button(row.metadata?.enabled===false?'enable':'disable',async()=>{
+  h('td',{},h('div',{class:'kr-row-actions'},[button('edit',()=>edit(ctx,row,load)),button(row.metadata?.enabled===false?'enable':'disable',async()=>{
    try{await toggleKnowledgeEnabled(ctx,{...row,table:'playbooks'},load);}catch(_){status.textContent=text('save_failed');}}),
-   h('button',{type:'button',class:'btn btn-ghost',onclick:()=>optimization.versions(row).catch(()=>{status.textContent=text('load_failed');})},t('ro_versions'))])]);
+   h('button',{type:'button',class:'btn btn-ghost',onclick:()=>optimization.versions(row).catch(()=>{status.textContent=text('load_failed');})},t('ro_versions'))]))]);
  const draw=()=>{
   const q=query.trim().toLowerCase(),filtered=rows.filter(r=>(!kind||r.metadata?.kind===kind)&&
    (enabled==='all'||(enabled==='enabled')===(r.metadata?.enabled!==false))&&
    (!q||`${r.scenario} ${r.response_logic} ${(r.metadata?.keywords||[]).join(' ')}`.toLowerCase().includes(q)));
   const pages=Math.max(1,Math.ceil(filtered.length/20));page=Math.min(page,pages);
   list.replaceChildren(h('table',{class:'kg-table kr-table'},[
-   h('thead',{},h('tr',{},['number','title','kind','keywords','state','version','actions'].map(v=>h('th',{},v==='version'?t('ro_selector_heading'):text(v))))),
+   h('thead',{},h('tr',{},['number','reference_info','state_optimization','version','actions'].map(v=>h('th',{},v==='version'?t('ro_selector_heading'):text(v))))),
    h('tbody',{},filtered.slice((page-1)*20,page*20).map(makeRow)),
   ]),h('div',{class:'kg-pager'},[button('previous',()=>{page=Math.max(1,page-1);draw();}),
    h('span',{},`${page} / ${pages} · ${filtered.length}`),button('next',()=>{page=Math.min(pages,page+1);draw();})]));
  };
- const buttonTitle=row=>h('button',{type:'button',class:'btn btn-ghost',onclick:()=>{
+ const buttonTitle=row=>h('button',{type:'button',class:'kr-reference-title',title:row.scenario,onclick:()=>{
   const {panel}=dialog(row.scenario);panel.append(h('pre',{},row.response_logic),h('p',{},row.metadata?.origin||''));}},row.scenario);
  const search=h('input',{'aria-label':text('search'),placeholder:text('search')});
  root.replaceChildren(h('section',{class:'card kr-page'},[
   h('h1',{},text('heading')),h('p',{},text('scope')),
-  h('div',{class:'kg-list-tools'},[
+  h('div',{class:'kr-primary-tools'},[
    h('a',{class:'btn btn-ghost',href:'#/knowledge-library'},text('back')),
    button('new',()=>edit(ctx,null,load)),button('import',()=>importManuals(ctx,load)),
-   h('form',{onsubmit:e=>{e.preventDefault();query=search.value;page=1;draw();}},[search,h('button',{type:'submit',class:'btn btn-ghost'},text('search'))]),
+  ]),h('div',{class:'kg-list-tools'},[
+   h('form',{class:'kr-search',onsubmit:e=>{e.preventDefault();query=search.value;page=1;draw();}},[search,h('button',{type:'submit',class:'btn btn-ghost',title:text('search')},text('search_action'))]),
    h('select',{'aria-label':text('kind'),onchange:e=>{kind=e.target.value;page=1;draw();}},['','wording','objection'].map(v=>h('option',{value:v},text(v||'all')))),
    h('select',{'aria-label':text('state'),onchange:e=>{enabled=e.target.value;page=1;draw();}},['enabled','disabled','all'].map(v=>h('option',{value:v},text(v)))),
   ]),optimization.tools,status,list]));load();

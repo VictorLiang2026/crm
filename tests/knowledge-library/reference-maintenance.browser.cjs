@@ -1,7 +1,7 @@
 'use strict';
 const {test}=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
 const {Browser}=require('../regression/browser.cjs');
-test('iPad bilingual communication table has seven columns with version selection and enabled filtering',async()=>{
+test('iPad bilingual communication table has five columns with version selection and enabled filtering',async()=>{
  const b=new Browser(path.resolve(__dirname,'../..'));
  try{
   await b.start();await b.send('Emulation.setDeviceMetricsOverride',{width:1024,height:768,deviceScaleFactor:1,mobile:false});
@@ -29,7 +29,7 @@ test('iPad bilingual communication table has seven columns with version selectio
    const main=document.querySelector('.console-main'),checks=[];
    for(const code of ['zh-CN','en']){
     lang.setLang(code);renderCommunicationReferences({main,toast(){}});await new Promise(r=>setTimeout(r,25));
-    checks.push(main.querySelectorAll('thead th').length===7&&main.querySelectorAll('tbody tr').length===1&&main.querySelector('thead').textContent.includes(lang.t('ro_selector_heading')));
+    checks.push(main.querySelectorAll('thead th').length===5&&main.querySelectorAll('tbody tr').length===1&&main.querySelector('thead').textContent.includes(lang.t('ro_selector_heading')));
     const selects=main.querySelectorAll('select');selects[1].value='disabled';selects[1].dispatchEvent(new Event('change'));
     checks.push(main.querySelector('tbody').textContent.includes('Disabled reference')&&!main.querySelector('tbody').textContent.includes('Budget reference'));
     checks.push(document.documentElement.scrollWidth<=innerWidth+2);
