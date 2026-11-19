@@ -197,9 +197,9 @@ function enterApp(appRoot) {
     appRoot,
     operator: CONFIG.operator || {},
     // WP2 写入闭环：快速记录走生产链路（AI 只读解析 → 服务端身份解析 → 人工确认 → 提交）
-    onQuickCapture: () => openQuickCapture(
+    onQuickCapture: event => openQuickCapture(
       { api, callFn, toast, operator: CONFIG.operator || {} },
-      { onDone: () => route() },
+      { onDone: () => route(), trigger: event?.currentTarget },
     ),
   });
   if (!hashBound) {

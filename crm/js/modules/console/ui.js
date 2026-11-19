@@ -4,6 +4,10 @@ import { h } from './dom.js';
 import { ic } from './icons.js';
 import { t } from './i18n.js';
 
+export function isCompactViewport() {
+  return window.matchMedia('(max-width: 767px), (max-height: 520px) and (pointer: coarse)').matches;
+}
+
 // ---------- 结构件（沿用 WP0 约定） ----------
 export function wpTag(text, hot) {
   return h('span', { class: 'wp-tag' + (hot ? ' hot' : '') }, text);
@@ -38,6 +42,54 @@ export function card({ title, icon, tag, body, foot, cls }) {
 export function emptyNote(title, note) {
   return h('div', { class: 'empty' }, [h('b', {}, title), note]);
 }
+export function responsiveTable(table, { className = '', titleColumn = 0 } = {}) {
+  table.setAttribute('role', 'table');
+  table.tHead?.setAttribute('role', 'rowgroup');
+  for (const row of table.tHead?.rows || []) {
+    row.setAttribute('role', 'row');
+    for (const header of row.cells) header.setAttribute('role', 'columnheader');
+  }
+  const headers = [...(table.tHead?.rows[0]?.cells || [])];
+  for (const body of table.tBodies) {
+    body.setAttribute('role', 'rowgroup');
+    for (const row of body.rows) {
+      row.setAttribute('role', 'row');
+      if (row.cells.length !== headers.length) continue;
+      for (const [index, cell] of [...row.cells].entries()) {
+        cell.setAttribute('role', cell.scope === 'row' ? 'rowheader' : 'cell');
+        const label = headers[index].textContent.replace(/\s*[▲▼]\s*$/, '').trim();
+        cell.dataset.mobileLabel = index === titleColumn ? '' : label;
+        if (index === titleColumn) cell.classList.add('mobile-table-title');
+      }
+    }
+  }
+  const key = `${location.hash}:${table.dataset.compareKey || table.className}`;
+  const wrap = h('div', { class: `table-scroll ${className}`.trim() }, table);
+  const button = h('button', { type: 'button', class: 'btn mobile-compare-toggle' }, t('mobile_compare_table'));
+  const host = h('div', { class: 'responsive-table' }, [button, wrap]);
+  function setCompare(enabled) {
+    host.classList.toggle('is-comparing', enabled);
+    button.setAttribute('aria-pressed', String(enabled));
+    if (enabled && isCompactViewport()) {
+      wrap.tabIndex = 0;
+      wrap.setAttribute('role', 'region');
+      wrap.setAttribute('aria-label', t('mobile_compare_table'));
+    } else {
+      wrap.removeAttribute('tabindex');
+      wrap.removeAttribute('role');
+      wrap.removeAttribute('aria-label');
+    }
+  }
+  setCompare(comparedTable === key);
+  button.addEventListener('click', () => {
+    const enabled = !host.classList.contains('is-comparing');
+    comparedTable = enabled ? key : '';
+    setCompare(enabled);
+  });
+  return host;
+}
+let comparedTable = '';
+
 export function errorBox(err, onRetry) {
   return h('div', { class: 'error-box' }, [
     h('b', {}, t('data_load_failed')),

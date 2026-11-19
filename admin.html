@@ -454,6 +454,15 @@
     .btn-recruit:hover{background:var(--pri-hover);border-color:var(--pri-hover)}
     tr:hover{background:#faf6f7}
   }
+  @media (max-width:767px), (max-height:520px) and (pointer:coarse) {
+    #view .btn, .modal .btn { min-height:44px; }
+    #view :is(input[type=text],input[type=search],input[type=email],input[type=tel],select,textarea),
+    .modal :is(input:not([type=checkbox],[type=radio],[type=hidden]),select,textarea) {
+      max-width:100%;min-width:0;min-height:44px;font-size:16px;
+    }
+    .modal { max-height:88dvh; overscroll-behavior:contain; }
+    .modal-footer { flex-wrap:wrap; }
+  }
 </style>
 <link rel="stylesheet" href="/crm/css/phase14-navigation.css">
 </head>

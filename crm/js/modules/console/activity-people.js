@@ -4,7 +4,7 @@ import { openSheet } from './write.js';
 import { t, translateEnum } from './i18n.js';
 import { renderSpeakerRecommendations } from './activity-speaker-recommend.js';
 import { renderTopicRecommendations } from './activity-topic-recommend.js';
-import { bdg, emptyNote, sectionTitle, pageHead } from './ui.js';
+import { bdg, emptyNote, sectionTitle, pageHead, responsiveTable } from './ui.js';
 
 const SPEAKER_STAGES = ['new', 'contacted', 'cooperated', 'stable', 'deep', 'inactive'];
 const dateOnly = value => String(value || '').slice(0, 10);
@@ -427,7 +427,7 @@ function renderSeparateResourceDirectory(ctx, kind) {
       h('td', {}, t(row.status === 'active' ? 'act_resource_active' : 'act_resource_inactive')),
       h('td', {}, topicActions(row)),
     ])));
-    return h('div', { class: 'table-scroll' }, h('table', { class: 'people-table resource-directory-table' }, [head, body]));
+    return responsiveTable(h('table', { class: 'people-table resource-directory-table' }, [head, body]), { titleColumn: 1 });
   }
   async function load() {
     const version = ++request;

@@ -2,6 +2,8 @@
 const DEFAULT = 'zh-CN';
 
 const DICT = {
+  mobile_compare_table: {"zh-CN":"表格对照","en":"Compare in table"},
+  mobile_record: {"zh-CN":"记录","en":"Record"},
   ro_selector_heading: {"zh-CN":"使用版本","en":"Version in use"},
   ro_selector_gpt: {"zh-CN":"GPT最新","en":"Latest GPT"},
   ro_selector_system: {"zh-CN":"系统最新","en":"Latest system"},

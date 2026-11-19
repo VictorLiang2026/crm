@@ -910,7 +910,7 @@ export function renderPerson(ctx, id, initialSection) {
         }, [ic('gear'), t('btn_edit_profile')]),
         h('button', {
           class: 'btn btn-soft', type: 'button',
-          onclick: () => openQuickCapture(wctx, { personId: String(id), onDone: wctx.onWriteDone }),
+          onclick: event => openQuickCapture(wctx, { personId: String(id), onDone: wctx.onWriteDone, trigger: event.currentTarget }),
           title: t('btn_record_comm_full'),
         }, [ic('mic'), t('btn_record_comm')]),
         h('button', {

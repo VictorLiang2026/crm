@@ -3,7 +3,7 @@ import { h } from '../dom.js';
 import { ic } from '../icons.js';
 import { data } from '../data.js';
 import { openSheet } from '../write.js';
-import { pageHead, emptyNote, loadInto } from '../ui.js';
+import { pageHead, emptyNote, loadInto, responsiveTable } from '../ui.js';
 import { t } from '../i18n.js';
 
 const PAGE_SIZE = 20;
@@ -95,7 +95,7 @@ export function renderPeopleTrash(ctx) {
           }, [ic('refresh'), t('btn_restore')])),
         ]);
       }));
-      return h('div', { class: 'table-scroll' }, h('table', { class: 'people-table recycle-table' }, [thead, tbody]));
+      return responsiveTable(h('table', { class: 'people-table recycle-table' }, [thead, tbody]));
     });
   }
 

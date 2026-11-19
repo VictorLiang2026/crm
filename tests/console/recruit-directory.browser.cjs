@@ -90,6 +90,9 @@ test('Recruit directory renders sortable 30-row pages and applies name, stage, a
     await b.send('Emulation.setDeviceMetricsOverride', { width: 1024, height: 768, deviceScaleFactor: 1, mobile: false });
     assert.equal(await b.evaluate("getComputedStyle(document.querySelector('.recruit-layout')).gridTemplateColumns.split(' ').at(-1)"), '250px');
     await b.send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+    assert.equal(await b.evaluate("document.querySelector('.recruit-directory-scroll').scrollWidth <= document.querySelector('.recruit-directory-scroll').clientWidth + 1"), true);
+    await b.evaluate("document.querySelector('.recruit-directory .mobile-compare-toggle').click()");
+    assert.equal(await b.evaluate("document.querySelector('.recruit-directory .mobile-compare-toggle').getAttribute('aria-pressed')"), 'true');
     assert.equal(await b.evaluate("document.querySelector('.recruit-directory-scroll').scrollWidth > document.querySelector('.recruit-directory-scroll').clientWidth"), true);
     assert.deepEqual(b.runtimeErrors, []);
   } finally { await b.close(); }

@@ -1,5 +1,5 @@
 import { h } from './dom.js';
-import { pageHead, emptyNote } from './ui.js';
+import { pageHead, emptyNote, responsiveTable } from './ui.js';
 import {openKnowledgeHistory,toggleKnowledgeEnabled} from './communication-references.js';
 import { t } from './i18n.js';
 import { data } from './data.js';
@@ -212,18 +212,19 @@ export function renderKnowledgeGovernance(ctx) {
       const head=groupHeader(ctx,row,open,()=>{if(open)expanded.delete(row.id);else expanded.add(row.id);draw();});
       return open?[head,overviewRow(ctx,row.id),...row.children.map(itemRow)]:[head];
     });
-    const table=h('div',{class:'kg-table-wrap'},h('table',{class:'kg-table'},[
+    const table=responsiveTable(h('table',{class:'kg-table'},[
       h('thead',{},h('tr',{},[header('id',text('number')),header('title',text('title_column')),header('category',text('category')),
         header('summary',t('kc_original')),h('th',{},text('gpt_content')),header('status',text('status')),header('updated_at',text('updated_at')),h('th',{},text('actions'))])),
       h('tbody',{},bodyRows.length?bodyRows:h('tr',{},h('td',{colspan:'8',class:'kg-empty-cell'},text('no_results')))),
-    ]));
+    ]), { className: 'kg-table-wrap', titleColumn: 1 });
+    table.classList.add('kg-responsive-table');
     const pager=h('div',{class:'kg-pager'},[
       h('span',{},text('result_count').replace('{count}',String(filtered.length))),
       h('button',{class:'btn btn-ghost btn-sm',type:'button',disabled:page<=1,onclick:()=>{page--;draw();}},text('previous')),
       h('span',{},`${page} / ${totalPages}`),
       h('button',{class:'btn btn-ghost btn-sm',type:'button',disabled:page>=totalPages,onclick:()=>{page++;draw();}},text('next')),
     ]);
-    main.querySelector('.kg-table-wrap')?.replaceWith(table);
+    main.querySelector('.kg-responsive-table, .kg-table-wrap')?.replaceWith(table);
     main.querySelector('.kg-pager')?.replaceWith(pager);
     main.querySelector('.kg-category-filter')?.replaceWith(categoryFilterNode());
     main.querySelector('.kg-status-filter')?.replaceWith(statusNode());

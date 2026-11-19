@@ -184,13 +184,15 @@ export function renderPersonListTransfer(ctx) {
     const mapBtn = h('button', { class: 'btn btn-soft', type: 'button', disabled: busy, onclick: runAiMapping }, [ic('sparkle'), t('plt_ai_map')]);
     const rows = fileData.headers.map((header, index) => {
       const sample = fileData.rows.slice(0, 3).map(row => row.values[header]).find(value => value) || '';
-      const select = h('select', { class: 'plt-select', value: mappings[index] || SKIP,
+      const select = h('select', { class: 'plt-select', value: mappings[index] || SKIP, 'aria-label': header,
         onchange: event => { mappings[index] = event.target.value; aiConfidence[index] = 100; render(); } }, fieldOptions(mappings[index]));
       select.value = mappings[index] || SKIP;
       const level = aiConfidence[index] >= 80 ? 'plt-confidence high' : aiConfidence[index] >= 50 ? 'plt-confidence medium' : 'plt-confidence low';
       const confidence = aiConfidence[index] ? `${aiConfidence[index]}%` : t('plt_not_mapped');
-      return h('tr', {}, [h('td', {}, header), h('td', {}, select), h('td', { class: 'plt-sample-cell' }, sample),
-        h('td', { class: level }, confidence)]);
+      return h('tr', {}, [h('th', { scope: 'row' }, header),
+        h('td', { 'data-mobile-label': t('plt_target_field') }, select),
+        h('td', { class: 'plt-sample-cell', 'data-mobile-label': t('plt_sample') }, sample),
+        h('td', { class: level, 'data-mobile-label': t('plt_confidence') }, confidence)]);
     });
     const nameHeader = fileData.headers[mappings.findIndex(field => field === 'display_name')];
     const unnamedCount = nameHeader ? fileData.rows.filter(row => !String(row.values[nameHeader] || '').trim()).length : 0;

@@ -3,7 +3,7 @@ import { h } from '../dom.js';
 import { ic } from '../icons.js';
 import { data } from '../data.js';
 import { openSheet } from '../write.js';
-import { pageHead, emptyNote, loadInto } from '../ui.js';
+import { pageHead, emptyNote, loadInto, responsiveTable } from '../ui.js';
 import { t } from '../i18n.js';
 import { createRecycleBatch } from '../recycle-batch.js';
 
@@ -182,7 +182,7 @@ function renderTrash(ctx, kind) {
         );
         return h('tr', {}, cells);
       }));
-      return h('div', { class: 'table-scroll' }, h('table', { class: 'people-table recycle-table' }, [head, body]));
+      return responsiveTable(h('table', { class: 'people-table recycle-table' }, [head, body]), { titleColumn: 1 });
     });
   }
 

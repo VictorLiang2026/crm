@@ -4,7 +4,7 @@ import { h } from '../dom.js';
 import { ic } from '../icons.js';
 import { data } from '../data.js';
 import { openRecruitCandidateCreate } from '../recruit-write.js';
-import { wpTag, pageHead, emptyNote, loadInto, bdg, fmtDate, dayDiffFromToday, textOf } from '../ui.js';
+import { wpTag, pageHead, emptyNote, loadInto, bdg, fmtDate, dayDiffFromToday, textOf, responsiveTable } from '../ui.js';
 import { t, translateEnum } from '../i18n.js';
 
 // 服务端固定返回中文 key 数组，用于保证列顺序一致
@@ -153,8 +153,9 @@ function listNode(ctx) {
       cells.forEach((cell, index) => cell.setAttribute('data-label', RECRUIT_COLUMNS[index].label()));
       return h('tr', { onclick: () => openPerson(row) }, cells);
     }));
-    return h('div', { class: 'table-scroll recruit-directory-scroll' },
-      h('table', { class: 'people-table recruit-directory-table' }, [head, body]));
+    return responsiveTable(h('table', { class: 'people-table recruit-directory-table' }, [head, body]), {
+      className: 'recruit-directory-scroll',
+    });
   }
 
   function runQuery() {

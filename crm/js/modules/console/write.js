@@ -8,7 +8,7 @@
 //     → 人工点选候选 → 完整服务端预览 → 人工确认 → 单事务执行。
 import { h } from './dom.js';
 import { ic } from './icons.js';
-import { bdg, fmtDate, dueLabel, textOf } from './ui.js';
+import { bdg, fmtDate, dueLabel, textOf, isCompactViewport } from './ui.js';
 import { t, getLang, translateEnum } from './i18n.js';
 import { data } from './data.js';
 
@@ -74,10 +74,12 @@ function dateToIso(dateStr) {
 }
 
 // ---------- Bottom Sheet 骨架 ----------
-export function openSheet({ title, sub, body }) {
-  const errBox = h('div', { class: 'sheet-err', style: 'display:none' });
+let inertSheetBackground = null;
+
+export function openSheet({ title, sub, body, trigger = document.activeElement }) {
+  const errBox = h('div', { class: 'sheet-err', role: 'alert', style: 'display:none' });
   const bodyEl = h('div', {}, [body, errBox]);
-  const sheetEl = h('div', { class: 'sheet', role: 'dialog', 'aria-label': title }, [
+  const sheetEl = h('div', { class: 'sheet', role: 'dialog', 'aria-modal': 'true', 'aria-label': title, tabindex: '-1' }, [
     h('div', { class: 'sheet-handle', 'aria-hidden': 'true' }),
     h('div', { class: 'sheet-head' }, [
       h('b', { class: 'sheet-title' }, title),
@@ -90,6 +92,62 @@ export function openSheet({ title, sub, body }) {
     bodyEl,
   ]);
   const overlay = h('div', { class: 'sheet-overlay' }, [sheetEl]);
+  const viewport = window.visualViewport;
+  const focusable = () => [...sheetEl.querySelectorAll(
+    'a[href],input,select,textarea,button,[tabindex]',
+  )].filter(node => node.tabIndex >= 0 && !node.matches(':disabled') && node.getClientRects().length);
+  overlay.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && !event.defaultPrevented) {
+      event.preventDefault();
+      closeSheet();
+    }
+    if (event.key !== 'Tab' || event.defaultPrevented) return;
+    const controls = focusable();
+    const boundary = event.shiftKey ? controls.at(-1) : controls[0];
+    const edge = event.shiftKey ? controls[0] : controls.at(-1);
+    if (document.activeElement === edge || !controls.includes(document.activeElement)) {
+      event.preventDefault();
+      (boundary || sheetEl).focus();
+    }
+  });
+  const updateViewport = () => {
+    if (!viewport) return;
+    sheetEl.style.maxHeight = `${viewport.height * 0.88}px`;
+    if (isCompactViewport() && viewport.scale === 1) {
+      overlay.style.bottom = `${Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop)}px`;
+    } else {
+      overlay.style.removeProperty('bottom');
+    }
+  };
+  queueMicrotask(() => {
+    if (!overlay.isConnected) return;
+    viewport?.addEventListener('resize', updateViewport);
+    viewport?.addEventListener('scroll', updateViewport);
+    updateViewport();
+    if (!sheetEl.contains(document.activeElement)) sheetEl.focus({ preventScroll: true });
+    const app = document.querySelector('#app');
+    if (app && !app.contains(overlay) && !app.inert) {
+      app.inert = true;
+      inertSheetBackground = app;
+    }
+    // Callers can remove an overlay directly after a successful write or navigation.
+    const observer = new MutationObserver(() => {
+      if (overlay.isConnected) return;
+      observer.disconnect();
+      viewport?.removeEventListener('resize', updateViewport);
+      viewport?.removeEventListener('scroll', updateViewport);
+      const remaining = [...document.querySelectorAll('.sheet-overlay > .sheet[aria-modal=true]')].at(-1);
+      if (!remaining && inertSheetBackground) {
+        inertSheetBackground.inert = false;
+        inertSheetBackground = null;
+      }
+      if (document.activeElement === document.body) {
+        const target = trigger?.isConnected && (!remaining || remaining.contains(trigger)) ? trigger : remaining;
+        target?.focus({ preventScroll: true });
+      }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+  });
 
   // ---- 下滑关闭（仅移动端 handle 区域触发） ----
   let startY = 0, dragY = 0, dragging = false;
@@ -119,16 +177,14 @@ export function openSheet({ title, sub, body }) {
     dragY = 0;
   });
 
-  // ---- 键盘避让：visualViewport 变化时限制 sheet 最大高度 ----
-  let vpHandler = null;
-  if (window.visualViewport) {
-    vpHandler = () => { sheetEl.style.maxHeight = `${window.visualViewport.height * 0.88}px`; };
-    window.visualViewport.addEventListener('resize', vpHandler);
-    vpHandler();
-  }
-
+  let closing = false;
   function closeSheet() {
-    if (vpHandler && window.visualViewport) window.visualViewport.removeEventListener('resize', vpHandler);
+    if (closing) return;
+    closing = true;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      overlay.remove();
+      return;
+    }
     sheetEl.style.transition = 'transform .25s ease';
     sheetEl.style.transform = 'translateY(100%)';
     overlay.style.background = 'rgba(24,28,34,0)';
@@ -141,7 +197,12 @@ export function openSheet({ title, sub, body }) {
       errBox.textContent = String(msg || '操作未完成').slice(0, 200);
       errBox.style.display = '';
     },
-    swap(node) { errBox.style.display = 'none'; bodyEl.replaceChildren(node, errBox); },
+    swap(node) {
+      const restoreFocus = bodyEl.contains(document.activeElement);
+      errBox.style.display = 'none';
+      bodyEl.replaceChildren(node, errBox);
+      if (restoreFocus) sheetEl.focus({ preventScroll: true });
+    },
   };
 }
 function busy(btn, on, label) {
@@ -795,7 +856,7 @@ export function openCandidate(ctx, { row, onDone }) {
 }
 
 // ---------- 快速记录（Quick Capture，生产链路） ----------
-export function openQuickCapture(ctx, { personId, onDone } = {}) {
+export function openQuickCapture(ctx, { personId, onDone, trigger } = {}) {
   async function parseFocused(text, selected = null) {
     let workContext = {};
     if (selected) {
@@ -828,12 +889,14 @@ export function openQuickCapture(ctx, { personId, onDone } = {}) {
   }
   const ta = h('textarea', {
     class: 'sheet-textarea', style: 'min-height:96px', maxlength: 10000,
+    'aria-label': t('quick_record'),
     placeholder: t('quick_capture_placeholder'),
   });
   const parseBtn = h('button', { class: 'btn btn-primary', type: 'button', onclick: (e) => doParse(e.currentTarget) }, t('ai_parse'));
   const sheet = openSheet({
     title: t('quick_record'),
     sub: t('capture_focus_intro'),
+    trigger,
     body: h('div', {}, [ta, h('div', { class: 'sheet-actions' }, [parseBtn])]),
   });
   document.body.appendChild(sheet.overlay);
@@ -1234,6 +1297,7 @@ export function openQuickCapture(ctx, { personId, onDone } = {}) {
         }, t('confirm_save')),
       ]),
     ]);
+    sheet.overlay.classList.add('capture-review-overlay');
     sheet.swap(sheetBody);
     parseBtn && (parseBtn.disabled = false);
   }

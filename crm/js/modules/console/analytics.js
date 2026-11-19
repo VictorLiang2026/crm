@@ -2,7 +2,7 @@ import { businessAnalytics } from './business-report.js';
 import { h } from './dom.js';
 import { data } from './data.js';
 import { t, translateEnum, getLang } from './i18n.js';
-import { card, errorBox, pageHead, wpTag } from './ui.js';
+import { card, errorBox, pageHead, wpTag, responsiveTable } from './ui.js';
 
 const KINDS = ['customer', 'opportunity', 'recruit'];
 const ENUMS = { customer: 'customer_stage', opportunity: 'opportunity_stage', recruit: 'recruit_stage' };
@@ -28,7 +28,7 @@ function stageDetails(key, row) {
     h('p', { class: 'foot-note' }, t('l02_distribution')),
     row.total === 0 ? h('p', { class: 'foot-note' }, t('l02_empty'))
       : !Number.isInteger(row.total) || row.total < 10 ? h('p', { class: 'foot-note' }, t('l02_small')) : null,
-    h('div', { class: 'table-scroll' }, h('table', { class: 'people-table analytics-stage-table' }, [
+    responsiveTable(h('table', { class: 'people-table analytics-stage-table', 'data-compare-key': key }, [
       h('thead', {}, h('tr', {}, [h('th', {}, t('pc21_stage')),
         ...metrics.map(field => h('th', { title: t('l02_' + field + '_full') }, t('l02_' + field)))])),
       h('tbody', {}, (row.stages || []).map(stage => h('tr', { 'data-stage-kind': stage.kind, style: 'cursor:default' }, [

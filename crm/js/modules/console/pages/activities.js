@@ -14,7 +14,7 @@ import { actionContextPanel } from '../action-center.js';
 import { t, translateEnum } from '../i18n.js';
 import {
   wpTag, pageHead, emptyNote, loadInto, bdg, kvGrid, sectionTitle,
-  fmtDate, weekdayCN,
+  fmtDate, weekdayCN, responsiveTable,
 } from '../ui.js';
 
 const ACT_TABS = ['act_tab_flow', 'roster_title', 'act_tab_acts', 'act_tab_candidates', 'act_tab_photos', 'act_tab_review', 'act_tab_resources'];
@@ -101,7 +101,7 @@ export function renderActivities(ctx) {
         h('td', {}, a.location || '—'),
         h('td', {}, a.status ? bdg(actStatusLabel(a.status), 'gold') : '—'),
       ])));
-      return h('div', { class: 'table-scroll' }, h('table', { class: 'people-table activity-directory-table' }, [header, body]));
+      return responsiveTable(h('table', { class: 'people-table activity-directory-table' }, [header, body]));
     });
   }
 

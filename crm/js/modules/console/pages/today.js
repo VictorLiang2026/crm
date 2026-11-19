@@ -11,7 +11,7 @@ import { renderProactiveCoach } from '../proactive-coach.js';
 import { actionDay } from '../action-center.js';
 import {
   wpTag, sk, pageHead, card, emptyNote, loadInto, bdg, avatar,
-  dueLabel, dayDiffFromToday, textOf,
+  dueLabel, dayDiffFromToday, textOf, isCompactViewport,
 } from '../ui.js';
 
 const settled = (p) => Promise.resolve(p).then((v) => ({ ok: true, v }), (e) => ({ ok: false, e }));
@@ -107,6 +107,12 @@ function actionRow(ctx, item, onDone) {
   const labelMap = { M: [t('must_do'), 'red'], R: [t('should_do'), 'ink'], O: [t('can_do'), 'gray'] };
   const [text, tone] = labelMap[item.level] ||
     [translateEnum('work_status', item.status) || t('fact'), 'gray'];
+  const edit = h('button', { class: 'btn btn-ghost btn-sm', type: 'button',
+    onclick: () => openWorkItemEditor(ctx, { kind: 'action', row: item, personId: item.person_id, personName: name, onDone }) }, t('btn_edit'));
+  const complete = h('button', { class: 'btn btn-ghost btn-sm', type: 'button',
+    onclick: () => openWorkItemTransition(ctx, { row: item, operation: 'complete', onDone }) }, [ic('check'), t('done')]);
+  const cancel = h('button', { class: 'btn btn-ghost btn-sm', type: 'button',
+    onclick: () => openWorkItemTransition(ctx, { row: item, operation: 'cancel', onDone }) }, t('work_cancel'));
   return h('div', { class: 'list-row today-priority-row' }, [
     avatar(name),
     h('div', { class: 'today-action-main', style: 'flex:1;min-width:0' }, [
@@ -118,14 +124,13 @@ function actionRow(ctx, item, onDone) {
         onclick: () => openWorkItemTransition(ctx, { row: item, operation: 'reopen', onDone }) }, t('work_reopen'))
       : h('div', { class: 'today-action-controls' }, [
         bdg(text, tone),
-        h('div', { class: 'row-actions' }, [
-          h('button', { class: 'btn btn-ghost btn-sm', type: 'button',
-            onclick: () => openWorkItemEditor(ctx, { kind: 'action', row: item, personId: item.person_id, personName: name, onDone }) }, t('btn_edit')),
-          h('button', { class: 'btn btn-ghost btn-sm', type: 'button',
-            onclick: () => openWorkItemTransition(ctx, { row: item, operation: 'complete', onDone }) }, [ic('check'), t('done')]),
-          h('button', { class: 'btn btn-ghost btn-sm', type: 'button',
-            onclick: () => openWorkItemTransition(ctx, { row: item, operation: 'cancel', onDone }) }, t('work_cancel')),
-        ]),
+        h('div', { class: 'row-actions' }, isCompactViewport() ? [
+          complete,
+          h('details', { class: 'today-action-menu' }, [
+            h('summary', { class: 'btn btn-ghost btn-sm' }, t('nav_more')),
+            h('div', { class: 'today-action-menu-items' }, [edit, cancel]),
+          ]),
+        ] : [edit, complete, cancel]),
       ]),
   ]);
 }
@@ -348,13 +353,18 @@ export function renderToday(ctx) {
     return briefCard(res.v.sections || {});
   }, briefLoadingCard());
 
+  const compact = isCompactViewport();
+  const reportButton = h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => { location.hash = '#/activity-report'; } },
+    [ic('calendar'), t('pc21_open_report')]);
   ctx.main.replaceChildren(
     pageHead({
       kicker: t('kicker_today'), title: `${t('good_morning')}，${ctx.operator.name || 'Victor'} · ${t('today_first')}`,
       sub: t('today_sub'),
-      actions: [h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => { location.hash = '#/activity-report'; } }, [ic('calendar'), t('pc21_open_report')])],
+      actions: compact ? [] : [reportButton],
     }),
-    h('div', { class: 'today-grid' }, [
+    compact ? h('div', { class: 'today-grid today-mobile-stack' }, [
+      today5El, commitEl, candidateEl, homeFollowups(ctx), briefEl, statsEl, reportButton, rhythmEl, coachEl, oppEl, riskCard,
+    ]) : h('div', { class: 'today-grid' }, [
       h('div', {}, [
         briefEl,
         homeFollowups(ctx),

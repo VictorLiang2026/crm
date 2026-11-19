@@ -20,3 +20,6 @@
 .crm-action-change-snapshot dt{font-weight:600;color:var(--muted,#64748b)}
 .crm-action-change-snapshot dd{margin:0;overflow-wrap:anywhere;white-space:pre-wrap}
 @media (orientation:portrait) and (min-width:768px){.crm-action-change{max-width:820px}.crm-action-change-columns{grid-template-columns:1fr}}
+@media (max-width:767px), (max-height:520px) and (pointer:coarse) {
+  .crm-action-change-columns { grid-template-columns: minmax(0, 1fr); }
+}
