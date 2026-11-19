@@ -83,20 +83,25 @@ export function renderCommunicationReferences(ctx){
  let rows=[],query='',kind='',enabled='enabled',page=1;
  const root=ctx.main,list=h('div',{class:'kg-table-wrap'}),status=h('p',{role:'status'});
  const load=async()=>{try{const [r]=await Promise.all([call(ctx,'list'),optimization.load()]);rows=r.rows;draw();}catch(_){status.textContent=text('load_failed');}};
- const optimization=referenceOptimization(ctx,{dialog,onChange:load,status,legacyHistory:row=>openKnowledgeHistory(ctx,{...row,table:'playbooks'},load)});
+ const optimization=referenceOptimization(ctx,{dialog,onChange:load,status,onRowChange:updated=>{
+  const at=rows.findIndex(row=>String(row.id)===String(updated.id));if(at>=0)rows[at]=updated;
+  const current=list.querySelector(`[data-reference-id="${updated.id}"]`);if(current)current.replaceWith(makeRow(updated));
+ },legacyHistory:row=>openKnowledgeHistory(ctx,{...row,table:'playbooks'},load)});
+ const makeRow=row=>h('tr',{'data-reference-id':row.id},[
+  h('td',{},[optimization.select(row),String(row.id)]),h('td',{},buttonTitle(row)),h('td',{},text(row.metadata?.kind||'wording')),
+  h('td',{},(row.metadata?.keywords||[]).join('、')),h('td',{},[h('small',{},text(row.metadata?.enabled===false?'disabled':'enabled')),optimization.cell(row)]),
+  h('td',{},optimization.versionCell(row)),
+  h('td',{},[button('edit',()=>edit(ctx,row,load)),button(row.metadata?.enabled===false?'enable':'disable',async()=>{
+   try{await toggleKnowledgeEnabled(ctx,{...row,table:'playbooks'},load);}catch(_){status.textContent=text('save_failed');}}),
+   h('button',{type:'button',class:'btn btn-ghost',onclick:()=>optimization.versions(row).catch(()=>{status.textContent=text('load_failed');})},t('ro_versions'))])]);
  const draw=()=>{
   const q=query.trim().toLowerCase(),filtered=rows.filter(r=>(!kind||r.metadata?.kind===kind)&&
    (enabled==='all'||(enabled==='enabled')===(r.metadata?.enabled!==false))&&
    (!q||`${r.scenario} ${r.response_logic} ${(r.metadata?.keywords||[]).join(' ')}`.toLowerCase().includes(q)));
   const pages=Math.max(1,Math.ceil(filtered.length/20));page=Math.min(page,pages);
   list.replaceChildren(h('table',{class:'kg-table kr-table'},[
-   h('thead',{},h('tr',{},['number','title','kind','keywords','state','actions'].map(v=>h('th',{},text(v))))),
-   h('tbody',{},filtered.slice((page-1)*20,page*20).map(row=>h('tr',{},[
-    h('td',{},[optimization.select(row),String(row.id)]),h('td',{},buttonTitle(row)),h('td',{},text(row.metadata?.kind||'wording')),
-    h('td',{},(row.metadata?.keywords||[]).join('、')),h('td',{},[h('small',{},text(row.metadata?.enabled===false?'disabled':'enabled')),optimization.cell(row)]),
-    h('td',{},[button('edit',()=>edit(ctx,row,load)),button(row.metadata?.enabled===false?'enable':'disable',async()=>{
-     try{await toggleKnowledgeEnabled(ctx,{...row,table:'playbooks'},load);}catch(_){status.textContent=text('save_failed');}}),
-     h('button',{type:'button',class:'btn btn-ghost',onclick:()=>optimization.versions(row).catch(()=>{status.textContent=text('load_failed');})},t('ro_versions'))])]))),
+   h('thead',{},h('tr',{},['number','title','kind','keywords','state','version','actions'].map(v=>h('th',{},v==='version'?t('ro_selector_heading'):text(v))))),
+   h('tbody',{},filtered.slice((page-1)*20,page*20).map(makeRow)),
   ]),h('div',{class:'kg-pager'},[button('previous',()=>{page=Math.max(1,page-1);draw();}),
    h('span',{},`${page} / ${pages} · ${filtered.length}`),button('next',()=>{page=Math.min(pages,page+1);draw();})]));
  };

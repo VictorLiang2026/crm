@@ -3,17 +3,27 @@ const {randomUUID}=require('node:crypto');
 const skillRegistry=require('./reference-optimization-skills');
 const fail=code=>{throw Object.assign(new Error(code),{code});};
 const uuid=value=>typeof value==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
-const publicOps=new Set(['states','versions','flags','instruction','preferences','start','jobs','retry','edit','select','adoptPreview','adoptConfirm']);
+const publicOps=new Set(['states','versions','flags','instruction','preferences','start','jobs','retry','edit','select','selectMode','adoptPreview','adoptConfirm']);
 const gptOps=new Set(['gptStart','gptPackage','gptSave','gptStatus']);
 function createReferenceOptimization({rpc,gateway,parseStep,check}){
  async function db(operation,actor,input={}){
   if(typeof actor!=='string'||!actor.trim())fail('UNAUTHORIZED');
   const r=await rpc('crm_reference_workflow_v1',{p_operation:operation,p_actor_uid:actor,p_data:input});
-  if(r?.error||!r?.data?.ok)fail('REFERENCE_STORAGE_FAILED');return r.data;
+  if(r?.error||!r?.data?.ok){
+   const known=operation==='selectMode'&&String(r?.error?.message||'').match(/\b(REFERENCE_STALE|REFERENCE_SELECTION_CHANGED)\b/);
+   fail(known?known[1]:'REFERENCE_STORAGE_FAILED');
+  }return r.data;
  }
  async function run(operation,input,actor,{mcp=false}={}){
   if(!input||typeof input!=='object'||Array.isArray(input))fail('INVALID_INPUT');
   if(mcp?!gptOps.has(operation):!publicOps.has(operation))fail('INVALID_OPERATION');
+  if(operation==='select'&&Object.hasOwn(input,'selectionMode'))fail('INVALID_INPUT');
+  if(operation==='selectMode'){
+   const fields=new Set(['id','mode','versionId','expectedCurrentId','expectedUpdatedAt']);
+   if(Object.keys(input).some(key=>!fields.has(key))||!['current','gpt','system'].includes(input.mode)||
+    ['id','versionId','expectedCurrentId'].some(key=>!/^[1-9]\d*$/.test(String(input[key])))||
+    typeof input.expectedUpdatedAt!=='string'||!Number.isFinite(Date.parse(input.expectedUpdatedAt)))fail('INVALID_INPUT');
+  }
   if(operation==='gptStart'){if(!uuid(input.requestId))fail('INVALID_INPUT');return db('start',actor,{lane:'gpt',requestId:input.requestId});}
   if(operation==='gptStatus'){
    if(!uuid(input.batchId))fail('INVALID_INPUT');

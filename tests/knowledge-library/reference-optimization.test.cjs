@@ -2,7 +2,7 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const {randomUUID}=require('node:crypto'),{PGlite}=require('@electric-sql/pglite');
 const root=path.resolve(__dirname,'../..'),sql=name=>fs.readFileSync(path.join(root,'cloudbase/migrations',name),'utf8');
-async function database(){
+async function database(selector=true){
  const db=new PGlite();await db.exec('CREATE ROLE anon;CREATE ROLE authenticated;CREATE ROLE service_role;');
  for(const name of ['20260929230400_knowledge_items.sql','20260929234300_playbooks.sql','20261016150001_knowledge_governance.sql','20261016150002_knowledge_review_guards.sql'])await db.exec(sql(name));
  await db.exec(`ALTER TABLE public.knowledge_items ADD COLUMN source_id bigint,ADD COLUMN deleted_at timestamptz,ADD COLUMN content_state jsonb DEFAULT '{}',ADD COLUMN gpt_summary text,ADD COLUMN selected_content_source text DEFAULT 'original';
@@ -13,6 +13,7 @@ async function database(){
  await db.exec(sql('20261117010000_knowledge_reference_maintenance.sql'));
  await db.exec(sql('20261117103000_private_docx_import.sql'));
  await db.exec(sql('20261118010000_reference_optimization.sql'));
+ if(selector)await db.exec(sql('20261119003900_reference_version_selector.sql'));
  await db.exec('SET ROLE service_role');return db;
 }
 const invoke=async(db,op,data={},actor='staff')=>(await db.query('SELECT public.crm_reference_workflow_v1($1,$2,$3::jsonb) r',[op,actor,JSON.stringify(data)])).rows[0].r;
@@ -40,6 +41,55 @@ test('two opt-in queues save independent candidates, preserve current content an
   assert.equal((await invoke(db,'adoptConfirm',{previewId:preview.previewId,ids:[g.versionId]})).adopted,1);
   const current=(await db.query('SELECT * FROM public.playbooks WHERE id=$1',[entry.id])).rows[0];assert.equal(current.response_logic,'Ask permission before continuing.');
   await assert.rejects(db.exec(sql('20261118010000_reference_optimization.rollback.sql')),/Export reference/);await db.exec('ROLLBACK');
+ }finally{await db.close();}
+});
+
+test('row selector remembers manual choice, explicitly adopts latest source and never follows future AI automatically',async()=>{
+ const db=await database(true);try{
+  const entry=await seed(db),base=(await invoke(db,'versions',{id:entry.id})).state.current_id;
+  const state=async()=>(await invoke(db,'states',{id:entry.id})).rows[0];
+  const pick=async mode=>{const s=await state(),v=s[mode==='current'?'manual_version':mode+'_version'];return invoke(db,'selectMode',{id:entry.id,mode,versionId:v.id,expectedCurrentId:s.current_id,expectedUpdatedAt:s.updated_at});};
+  assert.equal((await state()).selection_mode,'current');assert.equal((await state()).manual_version_id,base);
+  const g=await candidate(db,entry.id),sys=await candidate(db,entry.id,'system','A system response.');
+  assert.equal((await pick('gpt')).row.response_logic,'Ask permission before continuing.');
+  assert.equal((await state()).manual_version_id,base);
+  await pick('system');assert.equal((await state()).current_id,sys.versionId);
+  await pick('current');assert.equal((await state()).current_id,base);assert.equal((await state()).pinned,true);
+  const edit=await invoke(db,'edit',{versionId:g.versionId,expectedCurrentId:base,title:entry.scenario,content:'Human revision.'});
+  assert.equal((await state()).manual_version_id,edit.versionId);assert.equal((await state()).selection_mode,'current');
+  await pick('gpt');const selected=(await state()).current_id;
+  const newer=await candidate(db,entry.id,'gpt','A newer candidate.');
+  assert.equal((await state()).current_id,selected);assert.equal((await state()).gpt_version.id,newer.versionId);
+  assert.equal((await invoke(db,'adoptPreview')).rows.length,0);
+  await pick('gpt');assert.equal((await state()).current_id,newer.versionId);
+  await pick('current');assert.equal((await state()).current_id,edit.versionId);
+  const before=(await db.query('SELECT version_no FROM public.playbooks WHERE id=$1',[entry.id])).rows[0].version_no;
+  await pick('current');assert.equal((await db.query('SELECT version_no FROM public.playbooks WHERE id=$1',[entry.id])).rows[0].version_no,before);
+ }finally{await db.close();}
+});
+
+test('selector rejects missing, foreign, stale and replaced targets atomically; legacy edits and rollback preserve content',async()=>{
+ const db=await database(true);try{
+  const a=await seed(db),b=await seed(db,'Other fixture');
+  const state=async()=>(await invoke(db,'states',{id:a.id})).rows[0];let s=await state();
+  const request=(mode,versionId)=>({id:a.id,mode,versionId,expectedCurrentId:s.current_id,expectedUpdatedAt:s.updated_at});
+  await assert.rejects(invoke(db,'selectMode',request('gpt',s.current_id)),/REFERENCE_SELECTION_CHANGED/);
+  const g=await candidate(db,a.id),foreign=await candidate(db,b.id);s=await state();
+  await assert.rejects(invoke(db,'selectMode',request('gpt',foreign.versionId)),/REFERENCE_SELECTION_CHANGED/);
+  const oldRequest=request('gpt',g.versionId);await candidate(db,a.id,'gpt','Another candidate.');
+  s=await state();await assert.rejects(invoke(db,'selectMode',{...oldRequest,expectedUpdatedAt:s.updated_at}),/REFERENCE_SELECTION_CHANGED/);
+  const valid=request('gpt',s.gpt_version.id);await invoke(db,'select',{versionId:s.current_id,expectedCurrentId:s.current_id,pin:true});
+  await assert.rejects(invoke(db,'selectMode',valid),/REFERENCE_STALE/);
+  s=await state();assert.equal(s.selection_mode,'current');assert.equal(s.current_id,s.manual_version_id);
+  const record=(await db.query('SELECT * FROM public.playbooks WHERE id=$1',[a.id])).rows[0];
+  await db.query("SELECT public.crm_knowledge_maintain_v1('saveReference','staff',$1::jsonb)",[JSON.stringify({table:'playbooks',id:a.id,expectedUpdatedAt:record.updated_at,title:record.scenario,content:'Legacy manual edit.',kind:'wording',keywords:[]})]);
+  s=await state();assert.equal(s.current_id,s.manual_version_id);assert.equal(s.selection_mode,'current');assert.equal(s.pinned,true);
+  await db.exec('RESET ROLE');await db.exec(sql('20261119003900_reference_version_selector.rollback.sql'));await db.exec('SET ROLE service_role');
+  assert.equal((await db.query('SELECT response_logic FROM public.playbooks WHERE id=$1',[a.id])).rows[0].response_logic,'Legacy manual edit.');
+  assert.ok((await invoke(db,'versions',{id:a.id})).rows.length>=4);
+  await db.exec('RESET ROLE');await db.exec(sql('20261119003900_reference_version_selector.sql'));await db.exec('SET ROLE service_role');
+  assert.equal((await state()).manual_version_id,s.manual_version_id);
+  await db.exec('SET ROLE authenticated');await assert.rejects(invoke(db,'selectMode',valid),/permission denied/);
  }finally{await db.close();}
 });
 test('manual revisions branch without erasing history, pin excludes bulk adoption and stale preview fails atomically',async()=>{

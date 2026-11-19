@@ -2,6 +2,22 @@
 const DEFAULT = 'zh-CN';
 
 const DICT = {
+  ro_selector_heading: {"zh-CN":"使用版本","en":"Version in use"},
+  ro_selector_gpt: {"zh-CN":"GPT最新","en":"Latest GPT"},
+  ro_selector_system: {"zh-CN":"系统最新","en":"Latest system"},
+  ro_selector_current: {"zh-CN":"当前版本","en":"Current version"},
+  ro_selector_unavailable: {"zh-CN":"版本信息待刷新","en":"Refresh version details"},
+  ro_selector_missing_gpt: {"zh-CN":"暂无 GPT 优化版本","en":"No GPT revision yet"},
+  ro_selector_missing_system: {"zh-CN":"暂无系统优化版本","en":"No system revision yet"},
+  ro_selector_missing_current: {"zh-CN":"暂无可选版本","en":"No version available"},
+  ro_selector_new: {"zh-CN":"有新版，选择后采用","en":"New revision available"},
+  ro_selector_saving: {"zh-CN":"正在切换…","en":"Switching…"},
+  ro_selector_loading: {"zh-CN":"正在读取可选版本…","en":"Loading available versions…"},
+  ro_selector_hint: {"zh-CN":"点击选项即保存并使用该版本。当前版本保留人工选择；后续 AI 新版需再次选择采用。","en":"Choosing an option saves and adopts that version. Current version remembers your manual choice. Future AI revisions need another explicit selection."},
+  ro_selector_load_failed: {"zh-CN":"版本读取失败，请重试。","en":"Could not load versions. Retry."},
+  ro_selector_failed: {"zh-CN":"未能确认保存结果，请重新展开核对后重试。","en":"Save could not be confirmed. Reopen to check and retry."},
+  ro_selector_stale: {"zh-CN":"该话术或可选版本已有更新，请重新选择。","en":"This entry or its available versions changed. Please select again."},
+  ro_selector_leave: {"zh-CN":"仍有话术版本正在保存。离开后请重新打开核对保存结果。确定离开？","en":"Some wording versions are still saving. Reopen later to verify the result. Leave this page?"},
   ro_scope_read: {"zh-CN":"读取勾选待 GPT 优化的话术正文、原始依据及表达偏好。","en":"Read selected private wording, original basis and expression preferences."},
   ro_scope_write: {"zh-CN":"保存 GPT 候选版本并清除对应待办；采用版本仍由您在 CRM 确认。","en":"Save GPT candidates and clear their pending flags. You adopt versions in CRM."},
   ro_working: {"zh-CN":"处理中…","en":"Working…"},

@@ -4,6 +4,19 @@ const {createReferenceOptimization}=require('../../cloudfunctions/assistant/refe
 const {createParseStep}=require('../../cloudfunctions/assistant/reference-manual-parser');
 const registry=require('../../cloudfunctions/assistant/reference-optimization-skills');
 const uuid='11111111-1111-1111-1111-111111111111';
+
+test('row selector validates scoped inputs, rejects MCP writes and exposes only safe conflict errors',async()=>{
+ const calls=[];let error;
+ const svc=createReferenceOptimization({rpc:async(_,{p_operation,p_data})=>{calls.push({p_operation,p_data});return error?{error:{message:error}}:{data:{ok:true}};}});
+ const input={id:7,mode:'gpt',versionId:12,expectedCurrentId:9,expectedUpdatedAt:'2026-11-19T01:00:00Z'};
+ await svc.run('selectMode',input,'staff');assert.equal(calls.length,1);
+ for(const bad of [{...input,mode:'auto'},{...input,versionId:null},{...input,expectedUpdatedAt:'never'},{...input,confirmed:true}])await assert.rejects(svc.run('selectMode',bad,'staff'),/INVALID_INPUT/);
+ await assert.rejects(svc.run('selectMode',input,'staff',{mcp:true}),/INVALID_OPERATION/);
+ await assert.rejects(svc.run('select',{versionId:12,selectionMode:'gpt'},'staff'),/INVALID_INPUT/);
+ assert.equal(calls.length,1);error='REFERENCE_STALE';await assert.rejects(svc.run('selectMode',input,'staff'),/REFERENCE_STALE/);
+ error='REFERENCE_SELECTION_CHANGED';await assert.rejects(svc.run('selectMode',input,'staff'),/REFERENCE_SELECTION_CHANGED/);
+ error='unexpected internal database detail';await assert.rejects(svc.run('selectMode',input,'staff'),/REFERENCE_STORAGE_FAILED/);
+});
 test('reference worker sends full version basis to configured Gateway and persists only a candidate',async()=>{
  const input={basis:{title:'Budget',content:'Respect refusal.'},original:{content:'Original nuance.'},edits:[{content:'Human nuance.'}],preferences:'Be concise.',instruction:'Use a question.'};
  const calls=[],svc=createReferenceOptimization({rpc:async(_,{p_operation,p_data})=>{

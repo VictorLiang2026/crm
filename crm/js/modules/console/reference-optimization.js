@@ -1,10 +1,12 @@
 import {h} from './dom.js';
 import {t} from './i18n.js';
 import {data} from './data.js';
+import {versionSelector} from './reference-version-selector.js';
 const label=key=>t('ro_'+key);
-export function referenceOptimization(ctx,{dialog,onChange,status,legacyHistory}){
+export function referenceOptimization(ctx,{dialog,onChange,onRowChange,status,legacyHistory}){
  const call=(op,payload={})=>data.knowledgeLibrary(ctx,'referenceOptimization',{referenceOperation:op,data:payload});
  let states=new Map(),selected=new Set();
+ const selector=versionSelector({call,onSaved:onRowChange,setState:s=>states.set(String(s.entry_id),s)});
  const action=(key,work,primary=false)=>h('button',{type:'button',class:'btn '+(primary?'btn-primary':'btn-ghost'),title:label(key),onclick:async e=>{
   const btn=e.currentTarget,prior=btn.textContent;btn.disabled=true;btn.textContent=label('working');
   try{await work();}catch{status.textContent=label('error');}finally{btn.disabled=false;btn.textContent=prior;}
@@ -89,5 +91,5 @@ export function referenceOptimization(ctx,{dialog,onChange,status,legacyHistory}
   const r=await call('start',{lane:'system',requestId:crypto.randomUUID()});status.textContent=label('started').replace('{n}',r.selected);await onChange();
  },true),action('review',review),action('jobs',jobs),h('details',{class:'ro-options'},[h('summary',{},label('options')),
   action('preferences',preferences),h('p',{},label('gpt_hint'))]),bulk]);
-  return {load,tools,cell,select,versions:row=>versions(row)};
+  return {load,tools,cell,select,versionCell:row=>selector.cell(row,state(row)),versions:row=>versions(row)};
 }
