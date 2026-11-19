@@ -89,12 +89,12 @@ export function renderCommunicationReferences(ctx){
  },legacyHistory:row=>openKnowledgeHistory(ctx,{...row,table:'playbooks'},load)});
  const makeRow=row=>h('tr',{'data-reference-id':row.id},[
   h('td',{class:'kr-number'},[optimization.select(row),h('span',{},String(row.id))]),
-  h('td',{},[buttonTitle(row),h('div',{class:'kr-reference-meta'},[
+  h('td',{class:'kr-info-cell'},[buttonTitle(row),h('div',{class:'kr-reference-meta'},[
    h('span',{class:'kr-kind'},text(row.metadata?.kind||'wording')),
    h('span',{class:'kr-keywords',title:(row.metadata?.keywords||[]).join('、')},(row.metadata?.keywords||[]).join('、'))])]),
-  h('td',{},[h('span',{class:'kr-enabled-state'},text(row.metadata?.enabled===false?'disabled':'enabled')),optimization.cell(row)]),
-  h('td',{},optimization.versionCell(row)),
-  h('td',{},h('div',{class:'kr-row-actions'},[button('edit',()=>edit(ctx,row,load)),button(row.metadata?.enabled===false?'enable':'disable',async()=>{
+  h('td',{class:'kr-state-cell'},[h('span',{class:'kr-enabled-state'},text(row.metadata?.enabled===false?'disabled':'enabled')),optimization.cell(row)]),
+  h('td',{class:'kr-version-cell','data-label':t('ro_selector_heading')},optimization.versionCell(row)),
+  h('td',{class:'kr-actions-cell'},h('div',{class:'kr-row-actions'},[button('edit',()=>edit(ctx,row,load)),button(row.metadata?.enabled===false?'enable':'disable',async()=>{
    try{await toggleKnowledgeEnabled(ctx,{...row,table:'playbooks'},load);}catch(_){status.textContent=text('save_failed');}}),
    h('button',{type:'button',class:'btn btn-ghost',onclick:()=>optimization.versions(row).catch(()=>{status.textContent=text('load_failed');})},t('ro_versions'))]))]);
  const draw=()=>{

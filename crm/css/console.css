@@ -1622,3 +1622,45 @@ body:has(.login), body.is-login { padding-top: env(safe-area-inset-top); }
 .kr-field input,.kr-field select,.kr-field textarea{width:100%;box-sizing:border-box;padding:10px;font:inherit}
 .kr-dialog pre,.kr-wording pre{white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;line-height:1.6}.kr-dialog details{margin:12px 0}
 .kr-wording{padding:12px;grid-column:1/-1}.kr-wording input{padding:10px;min-width:260px;max-width:100%;box-sizing:border-box}
+
+
+/* Communication references on iPhone: keep the same controls and callbacks in readable cards. */
+@media (max-width:700px), (max-height:520px) and (pointer:coarse){
+ .kr-page{padding:14px;border:0;background:transparent;box-shadow:none}
+ .kr-page h1{font-size:24px;line-height:1.35}.kr-page>p{margin-top:8px;font-size:14px;line-height:1.6}
+ .kr-primary-tools{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:12px 0}
+ .kr-primary-tools>a{grid-column:1/-1;justify-self:start;min-height:32px;padding:0;border:0;background:transparent;color:var(--ink-2)}
+ .kr-page .btn{min-width:0;max-width:100%;white-space:normal;overflow-wrap:break-word;line-height:1.4}
+ .kr-page .kg-list-tools{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+ .kr-search{grid-column:1/-1;width:100%;min-width:0}.kr-search input{font-size:16px;min-height:44px;padding:10px 12px}
+ .kr-search input,.kr-page .kg-list-tools select{border:1px solid var(--line);border-radius:var(--radius-sm);background:var(--card);color:var(--ink)}
+ .kr-page .kg-list-tools select{width:100%;min-width:0;font-size:16px;padding:8px}
+ .kr-page .ro-tools{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:12px 0 16px}
+ .kr-page .ro-tools>.btn:first-child{grid-column:1/-1}
+ .kr-page .ro-options{grid-column:1/-1;min-width:0}.kr-page .ro-options summary{padding:8px 0}
+ .kr-page .ro-options p{overflow-wrap:anywhere}
+ .kr-page .ro-bulk{grid-column:1/-1;gap:8px;margin:12px 0}.kr-page .ro-bulk>span{flex-basis:100%}
+ .kr-page .ro-bulk>.btn{flex:1 1 120px}
+ .kr-page .kg-table-wrap{overflow:visible;border:0;border-radius:0;background:transparent}
+ .kr-table{display:block;width:100%;max-width:100%}
+ .kr-table thead{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+ .kr-table tbody{display:grid;gap:14px;width:100%}
+ .kr-table tbody tr{display:grid;grid-template-columns:36px minmax(0,1fr);grid-template-areas:'number info' 'state state' 'version version' 'actions actions';gap:12px 8px;padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--card)}
+ .kr-table td{display:block;width:auto!important;min-width:0;max-width:100%;padding:0;border:0;font-size:15px;line-height:1.5}
+ .kr-table .kr-number{grid-area:number;display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--muted);font-size:13px}
+ .kr-table .kr-number input{width:22px;height:22px;margin:8px 0 4px}
+ .kr-info-cell{grid-area:info}.kr-reference-title{font-size:17px;line-height:1.5;min-height:44px}
+ .kr-reference-meta{gap:6px;margin-top:6px;font-size:14px}.kr-kind{font-size:13px}.kr-keywords:empty{display:none}
+ .kr-state-cell{grid-area:state;padding-top:12px!important;border-top:1px solid var(--line)!important}
+ .kr-enabled-state{display:inline-block;padding:2px 8px;border-radius:5px;background:var(--bg);font-size:13px}
+ .kr-page .ro-flags{grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 8px;margin-top:6px}
+ .kr-page .ro-flag{min-height:44px;font-size:14px;line-height:1.4}.kr-page .ro-flag input{width:20px;height:20px}
+ .kr-page .ro-flags small{grid-column:1/-1}
+ .kr-version-cell{grid-area:version}.kr-version-cell::before{content:attr(data-label);display:block;margin-bottom:6px;color:var(--ink-2);font-size:13px}
+ .kr-page .ro-selector-toggle{font-size:16px;min-height:46px;padding:10px 12px}
+ .kr-page .ro-selector-meta{font-size:13px}.kr-actions-cell{grid-area:actions;padding-top:12px!important;border-top:1px solid var(--line)!important}
+ .kr-row-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+ .kr-row-actions .btn{width:100%;font-size:15px;min-height:44px;padding:8px 4px;white-space:nowrap;word-break:normal;overflow-wrap:normal}
+ .kr-page .kg-pager{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;padding:14px 0;font-size:13px}
+ .kr-page .kg-pager .btn{padding:8px 6px}.kr-page .kg-pager span{white-space:nowrap;text-align:center}
+}
