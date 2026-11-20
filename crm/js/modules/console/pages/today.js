@@ -102,11 +102,12 @@ function rankActions(rows) {
     .slice(0, 5);
 }
 
-function actionRow(ctx, item, onDone) {
+function actionRow(ctx, item, onDone, compact) {
   const name = item.person_name || t('unnamed');
   const labelMap = { M: [t('must_do'), 'red'], R: [t('should_do'), 'ink'], O: [t('can_do'), 'gray'] };
   const [text, tone] = labelMap[item.level] ||
     [translateEnum('work_status', item.status) || t('fact'), 'gray'];
+  const closed = item.status === 'completed' || item.status === 'cancelled';
   const edit = h('button', { class: 'btn btn-ghost btn-sm', type: 'button',
     onclick: () => openWorkItemEditor(ctx, { kind: 'action', row: item, personId: item.person_id, personName: name, onDone }) }, t('btn_edit'));
   const complete = h('button', { class: 'btn btn-ghost btn-sm', type: 'button',
@@ -116,15 +117,18 @@ function actionRow(ctx, item, onDone) {
   return h('div', { class: 'list-row today-priority-row' }, [
     avatar(name),
     h('div', { class: 'today-action-main', style: 'flex:1;min-width:0' }, [
-      h('a', { class: 'row-title', href:'#/actions/'+item.id }, item.title || t('unnamed_action')),
+      h('div', { class: 'today-action-title' }, [
+        h('a', { class: 'row-title', href:'#/actions/'+item.id }, item.title || t('unnamed_action')),
+        compact && !closed ? bdg(text, tone) : null,
+      ]),
       h('div', { class: 'row-sub' }, `${name} · ${dueLabel(item._due)}`),
     ]),
-    item.status === 'completed' || item.status === 'cancelled'
+    closed
       ? h('button', { class: 'btn btn-ghost btn-sm', type: 'button',
         onclick: () => openWorkItemTransition(ctx, { row: item, operation: 'reopen', onDone }) }, t('work_reopen'))
       : h('div', { class: 'today-action-controls' }, [
-        bdg(text, tone),
-        h('div', { class: 'row-actions' }, isCompactViewport() ? [
+        compact ? null : bdg(text, tone),
+        h('div', { class: 'row-actions' }, compact ? [
           complete,
           h('details', { class: 'today-action-menu' }, [
             h('summary', { class: 'btn btn-ghost btn-sm' }, t('nav_more')),
@@ -176,6 +180,7 @@ function describeCandidate(row) {
 }
 
 export function renderToday(ctx) {
+  const compact = isCompactViewport();
   // 一次并发拉取，多张卡片共享同一批 Promise；失败隔离到单卡，可单独重试。
   const pools = {
     work: settled(data.todayWorkItems(ctx)),
@@ -231,22 +236,31 @@ export function renderToday(ctx) {
     const closed = rows.filter((r) => r.kind === 'action' && ['completed', 'cancelled'].includes(r.status))
       .sort((a, b) => String(b.completed_at || b.updated_at || '').localeCompare(String(a.completed_at || a.updated_at || '')))
       .slice(0, 3);
+    const actionCenter = h('a', {
+      class: compact ? 'btn btn-soft btn-sm today-action-center' : 'btn btn-soft',
+      href:'#/actions', title: t('ac_title'), 'aria-label': t('ac_title'),
+    }, t(compact ? 'ac_title_mobile' : 'ac_title'));
+    const factTag = wpTag(t('fact'));
+    const createAction = h('div', { class: compact ? 'sheet-actions today-create-action' : 'sheet-actions' }, [
+      h('button', { class: 'btn btn-primary btn-sm', type: 'button',
+        onclick: () => openWorkItemEditor(ctx, { kind: 'action', onDone: reload }) }, t('create_action')),
+    ]);
     return card({
-      title: t('priority_actions'), icon: 'chevron', tag: wpTag(t('fact')),
+      cls: compact ? 'today-priority-compact' : undefined,
+      title: t('priority_actions'), icon: 'chevron',
+      tag: compact ? h('div', { class: 'today-priority-tools' }, [factTag, actionCenter]) : factTag,
       body: [
-        h('a',{class:'btn btn-soft',href:'#/actions'},t('ac_title')),
-        h('div', { class: 'sheet-actions' }, [
-          h('button', { class: 'btn btn-primary btn-sm', type: 'button',
-            onclick: () => openWorkItemEditor(ctx, { kind: 'action', onDone: reload }) }, t('create_action')),
-        ]),
-        ...(picks.length ? picks.map((r) => actionRow(ctx, r, reload)) : [emptyNote(t('no_actions_today'), t('no_actions_note'))]),
+        compact ? null : actionCenter,
+        compact ? null : createAction,
+        ...(picks.length ? picks.map((r) => actionRow(ctx, r, reload, compact)) : [emptyNote(t('no_actions_today'), t('no_actions_note'))]),
         closed.length ? h('details', {}, [
           h('summary', { class: 'row-sub' }, `${t('work_recent_closed')} (${closed.length})`),
-          ...closed.map((r) => actionRow(ctx, r, reload)),
+          ...closed.map((r) => actionRow(ctx, r, reload, compact)),
         ]) : null,
       ],
       foot: [
         h('span', { class: 'foot-note' }, t('today_foot')),
+        compact ? createAction : null,
       ],
     });
   });
@@ -353,7 +367,6 @@ export function renderToday(ctx) {
     return briefCard(res.v.sections || {});
   }, briefLoadingCard());
 
-  const compact = isCompactViewport();
   const reportButton = h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => { location.hash = '#/activity-report'; } },
     [ic('calendar'), t('pc21_open_report')]);
   ctx.main.replaceChildren(
@@ -363,7 +376,7 @@ export function renderToday(ctx) {
       actions: compact ? [] : [reportButton],
     }),
     compact ? h('div', { class: 'today-grid today-mobile-stack' }, [
-      today5El, commitEl, candidateEl, homeFollowups(ctx), briefEl, statsEl, reportButton, rhythmEl, coachEl, oppEl, riskCard,
+      briefEl, today5El, commitEl, candidateEl, homeFollowups(ctx), statsEl, reportButton, rhythmEl, coachEl, oppEl, riskCard,
     ]) : h('div', { class: 'today-grid' }, [
       h('div', {}, [
         briefEl,

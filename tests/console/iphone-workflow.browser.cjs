@@ -5,7 +5,7 @@ const path = require('node:path');
 const test = require('node:test');
 const { Browser } = require('../regression/browser.cjs');
 
-test('iPhone 15 Pro Max prioritizes actions, restores capture focus, and keeps table comparison available', async () => {
+test('iPhone 15 Pro Max starts with the briefing and compact actions, restores capture focus, and retains table comparison', async () => {
   const browser = new Browser(path.resolve(__dirname, '../..'));
   try {
     await browser.start();
@@ -15,8 +15,47 @@ test('iPhone 15 Pro Max prioritizes actions, restores capture focus, and keeps t
     await browser.send('Emulation.setTouchEmulationEnabled', { enabled: true });
     await browser.openConsole('#/today');
     await browser.wait("document.querySelector('.today-priority-row')");
-    assert.equal(await browser.evaluate("Boolean(document.querySelector('.today-mobile-stack > :first-child .today-priority-row'))"), true);
+    assert.equal(await browser.evaluate("Boolean(document.querySelector('.today-mobile-stack > :first-child .brief'))"), true);
+    assert.equal(await browser.evaluate("Boolean(document.querySelector('.today-mobile-stack > :nth-child(2) .today-priority-row'))"), true);
+    assert.equal(await browser.evaluate("document.querySelector('.today-priority-tools .wp-tag + a').hash"), '#/actions');
+    assert.equal(await browser.evaluate("Boolean(document.querySelector('.today-priority-compact .card-foot > :last-child.today-create-action button'))"), true);
+    for (const lang of ['zh-CN', 'en']) {
+      await browser.evaluate(`localStorage.setItem('crm_lang', '${lang}')`);
+      await browser.openConsole('#/today');
+      await browser.wait("document.querySelector('.today-priority-compact .today-action-controls button')");
+      const layout = await browser.evaluate(`(() => {
+        const row = document.querySelector('.today-priority-compact .today-action-main');
+        const title = row.querySelector('.row-title');
+        title.textContent = 'VeryLongUnbrokenTitle'.repeat(8);
+        const badge = title.nextElementSibling;
+        const complete = row.nextElementSibling.querySelector('.row-actions > button');
+        const more = row.nextElementSibling.querySelector('summary');
+        const rect = node => node.getBoundingClientRect();
+        return {
+          titleWraps: title.getClientRects().length > 1,
+          badgeInline: badge.matches('.bdg'),
+          sameRow: Math.abs(rect(complete).top - rect(more).top) < 1 &&
+            Math.abs(rect(complete).top - rect(row).top) < 1,
+          rightAligned: rect(more).right > rect(complete).right && rect(complete).left > rect(title).left,
+          hitTargets: rect(complete).height >= 44 && rect(more).height >= 44,
+          fits: document.documentElement.scrollWidth <= innerWidth,
+          actionCenter: document.querySelector('.today-action-center').title,
+        };
+      })()`);
+      assert.deepEqual(layout, {
+        titleWraps: true, badgeInline: true, sameRow: true, rightAligned: true, hitTargets: true, fits: true,
+        actionCenter: lang === 'en' ? 'Action Center' : '行动中心',
+      });
+    }
     assert.equal(await browser.evaluate("document.querySelector('.today-action-menu summary').getBoundingClientRect().height >= 44"), true);
+    await browser.evaluate("document.querySelector('.today-action-menu summary').click()");
+    assert.equal(await browser.evaluate("document.querySelector('.today-action-menu[open] .today-action-menu-items').childElementCount"), 2);
+    await browser.evaluate("document.querySelector('.today-action-menu summary').click()");
+    await browser.evaluate("document.querySelector('.today-priority-compact .today-action-controls button').click()");
+    await browser.wait("document.querySelector('.sheet[aria-modal=true]')");
+    assert.equal(await browser.evaluate("window.__crmTest.calls.some(c => c.action === 'executeWorkItem')"), false);
+    await browser.evaluate("document.querySelector('.sheet-head button').click()");
+    await browser.wait("!document.querySelector('.sheet-overlay')");
 
     await browser.evaluate("document.querySelector('.fab').click()");
     await browser.wait("document.activeElement.matches('.sheet[aria-modal=true]')");
@@ -34,6 +73,12 @@ test('iPhone 15 Pro Max prioritizes actions, restores capture focus, and keeps t
     assert.equal(await browser.evaluate("document.querySelector('.mobile-compare-toggle').getAttribute('aria-pressed')"), 'true');
     assert.equal(await browser.evaluate("document.querySelector('.resource-directory-table').parentElement.scrollWidth > document.querySelector('.resource-directory-table').parentElement.clientWidth"), true);
     assert.equal(await browser.evaluate("document.documentElement.scrollWidth"), 430);
+    await browser.send('Emulation.setTouchEmulationEnabled', { enabled: false });
+    await browser.send('Emulation.setDeviceMetricsOverride', { width: 820, height: 1180, deviceScaleFactor: 2, mobile: false });
+    await browser.openConsole('#/today');
+    await browser.wait("document.querySelector('.today-priority-row')");
+    assert.equal(await browser.evaluate("Boolean(document.querySelector('.today-priority-compact'))"), false);
+    assert.equal(await browser.evaluate("Boolean(document.querySelector('.card-body > a[href=\"#/actions\"] + .sheet-actions button'))"), true);
     await browser.healthy();
   } finally {
     await browser.close();

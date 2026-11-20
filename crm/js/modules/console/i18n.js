@@ -2188,6 +2188,7 @@ const DICT = {
   'pipeline_stage_暂不推进': { 'zh-CN': '暂不推进', 'en': 'On Hold' },
   'ac_review_again': { 'zh-CN': '预览已过期或记录已变更，请刷新后重新预览。', 'en': 'The preview expired or the record changed. Refresh and preview again.' },
   'ac_title': { 'zh-CN': '行动中心', 'en': 'Action Center' },
+  'ac_title_mobile': { 'zh-CN': '行动中心', 'en': 'Actions' },
   'ac_today': { 'zh-CN': '今天', 'en': 'Today' },
   'ac_week': { 'zh-CN': '本周', 'en': 'This Week' },
   'ac_overdue': { 'zh-CN': '逾期', 'en': 'Overdue' },

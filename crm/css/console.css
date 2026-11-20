@@ -1712,21 +1712,39 @@ body:has(.login), body.is-login { padding-top: env(safe-area-inset-top); }
   .console-main :is(.page-head-row, .head-actions, .sheet-stack) { flex-wrap: wrap; }
   .console-main .page-title { font-size: clamp(24px, 6vw, 28px); overflow-wrap: anywhere; }
   .console-main .head-actions > * { max-width: 100%; }
-  .crm-iphone-layout .today-action-controls .btn { min-height: 44px; height: auto; font-size: 13px; }
-  .today-mobile-stack .today-action-controls {
+  .today-priority-compact .card-head { padding-block: 4px; gap: 6px; }
+  .today-priority-compact .card-head > b { min-width: 0; line-height: 1.3; }
+  .today-priority-tools {
     display: flex;
-    flex-wrap: wrap;
-    justify-content: space-between;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
   }
-  .today-mobile-stack .today-priority-row {
+  .today-priority-tools .today-action-center { white-space: nowrap; padding-inline: 8px; }
+  .today-priority-compact .today-priority-row {
     display: grid;
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 8px;
+    padding: 5px 0;
   }
-  .today-mobile-stack .today-priority-row > .pavatar { display: none; }
-  .today-mobile-stack .today-action-controls .row-actions { display: flex; }
-  .today-mobile-stack .today-action-controls .btn { width: auto; padding: 6px 10px; }
+  .today-priority-compact .today-priority-row > .pavatar { display: none; }
+  .today-priority-compact .today-action-main { padding-top: 2px; }
+  .today-priority-compact .today-action-title { line-height: 1.35; overflow-wrap: anywhere; }
+  .today-priority-compact .today-action-title .row-title { display: inline; }
+  .today-priority-compact .today-action-title .bdg { margin-inline-start: 4px; vertical-align: baseline; white-space: nowrap; }
+  .today-priority-compact .today-action-main .row-sub { font-size: 12px; overflow-wrap: anywhere; }
+  .today-priority-compact .today-action-controls { display: block; }
+  .today-priority-compact .today-action-controls .row-actions { display: flex; flex-wrap: nowrap; gap: 4px; }
+  .today-priority-compact .today-action-controls .btn {
+    width: auto;
+    min-width: 44px;
+    min-height: 44px;
+    height: auto;
+    padding: 4px 7px;
+    font-size: 13px;
+    white-space: nowrap;
+  }
+  .today-priority-compact .today-create-action { flex: 1 0 100%; margin: 0; }
   .today-action-menu { position: relative; }
   .today-action-menu summary { display: inline-flex; list-style: none; }
   .today-action-menu summary::-webkit-details-marker { display: none; }
