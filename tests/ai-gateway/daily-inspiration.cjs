@@ -42,6 +42,51 @@ test('quote validation rejects unsupported themes and non-HTTPS citations',()=>{
   assert.throws(()=>service.validateQuote({...input,theme:'unclassified'}),error=>error.code==='INVALID_INPUT');
 });
 
+test('missing recommendation score is deterministic and bounded',()=>{
+  const quote={quoteZh:'先理解客户，再帮助客户行动。',quoteEn:'Listen first, then help clients act.',
+    theme:'customer_trust',sourceOrg:'LIMRA',sourceTitle:'Research summary',sourceUrl:'https://www.limra.com/research',editorialRewrite:true};
+  assert.equal(service.validateQuote(quote).recommendationScore,null);
+  const score=service.autoRecommendationScore(quote);
+  assert.ok(Number.isInteger(score)&&score>=0&&score<=10);
+  assert.equal(service.validateBatchImport({quotes:[quote],fillMissingScores:[]}).quotes[0].recommendationScore,score);
+  assert.throws(()=>service.validateQuote({...quote,recommendationScore:11}),error=>error.code==='INVALID_INPUT');
+});
+
+test('batch import skips bilingual duplicates and fills only null existing scores',async()=>{
+  const quote={quoteZh:'先理解客户，再帮助客户行动。',quoteEn:'Listen first, then help clients act.',
+    theme:'customer_trust',sourceOrg:'LIMRA',sourceTitle:'Research summary',sourceUrl:'https://www.limra.com/research',editorialRewrite:true,recommendationScore:8};
+  const calls=[];
+  const db={async rpc(name,args){
+    calls.push(args);
+    if(args.p_operation==='library_list')return {data:{quotes:[
+      {id:1,quote_zh:quote.quoteZh,quote_en:quote.quoteEn,recommendation_score:null},
+      {id:2,quote_zh:'另一个已有句子',quote_en:'Another existing line',recommendation_score:7},
+    ],settings}};
+    if(args.p_operation==='scores_save')return {data:{updated:1}};
+    if(args.p_operation==='quote_save')return {data:{quote:{id:3,...args.p_data}}};
+  }};
+  const result=await service.handleDailyInspiration({operation:'quoteBatchImport',data:{
+    quotes:[quote,{...quote,quoteZh:'另一种中文翻译',quoteEn:'Another new English line.'}],
+    fillMissingScores:[{id:'1',recommendationScore:9},{id:'2',recommendationScore:10},{id:'999',recommendationScore:8}],
+  }},'verified-uid',{db});
+  assert.deepEqual(result,{ok:true,addedCount:1,duplicateCount:1,scoreUpdatedCount:1});
+  assert.equal(calls.find(call=>call.p_operation==='scores_save').p_data.scores.length,1);
+  assert.equal(calls.filter(call=>call.p_operation==='quote_save').length,1);
+  assert.ok(calls.every(call=>call.p_actor_uid==='verified-uid'));
+});
+
+test('batch import reports safe-to-retry partial progress when a save fails',async()=>{
+  const base={quoteZh:'持续培养团队能力。',quoteEn:'Build the team over time.',theme:'team_growth',
+    sourceOrg:'GAMA Global',sourceTitle:'Leadership',sourceUrl:'https://gamaglobal.org/leadership',editorialRewrite:true};
+  let writes=0;
+  const db={async rpc(name,args){
+    if(args.p_operation==='library_list')return {data:{quotes:[],settings}};
+    if(args.p_operation==='quote_save'){writes++;if(writes===2)return {error:{code:'FAILED'}};return {data:{quote:{id:10,...args.p_data}}};}
+  }};
+  const result=await service.handleDailyInspiration({operation:'quoteBatchImport',data:{quotes:[base,{...base,quoteZh:'成就来自持续学习。',quoteEn:'Progress comes from learning.'}],fillMissingScores:[]}},'uid',{db});
+  assert.deepEqual(result,{ok:false,partial:true,addedCount:1,duplicateCount:0,scoreUpdatedCount:0});
+});
+
 test('current stable slot is served without a model call',async()=>{
   const quote={id:5,quote_zh:'先理解真实需要',quote_en:'Understand the real need first.',theme:'customer_trust',
     source_org:'LIMRA',source_title:'Research',source_url:'https://www.limra.com/research',

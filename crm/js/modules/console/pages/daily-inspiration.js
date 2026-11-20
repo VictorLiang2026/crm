@@ -92,6 +92,8 @@ function quoteEditor(ctx, existing, onSaved) {
       theme:String(fields.get('theme')||''),sourceOrg:String(fields.get('sourceOrg')||''),
       sourceTitle:String(fields.get('sourceTitle')||''),sourceUrl:String(fields.get('sourceUrl')||''),
       editorialRewrite:rewrite.checked};
+    const scoreValue=String(fields.get('recommendationScore')||'');
+    if(scoreValue!=='')payload.recommendationScore=Number(scoreValue);
     if(row.id)payload.id=row.id;
     try {await data.dailyInspiration(ctx,'quoteSave',payload);status.textContent=t('di_saved');onSaved();}
     catch(error){status.classList.add('error');status.textContent=failureText(error);submit.disabled=false;}
@@ -103,6 +105,7 @@ function quoteEditor(ctx, existing, onSaved) {
     inputField('di_source_org','sourceOrg',row.sourceOrg,{required:true,maxlength:'120'}),
     inputField('di_source_title','sourceTitle',row.sourceTitle,{required:true,maxlength:'240'}),
     inputField('di_source_url','sourceUrl',row.sourceUrl,{required:true,type:'url',pattern:'https://.*',maxlength:'1000'}),
+    inputField('di_recommendation_score','recommendationScore',row.recommendationScore ?? '',{type:'number',min:'0',max:'10',step:'1'}),
     h('label',{class:'di-checkbox'},[rewrite,h('span',{},t('di_editorial_rewrite'))]),
     h('div',{class:'di-form-actions'},[
       h('button',{class:'btn btn-primary',type:'submit'},[ic('check'),t('di_save_quote')]),
@@ -112,7 +115,91 @@ function quoteEditor(ctx, existing, onSaved) {
   return form;
 }
 
-export async function renderDailyInspirationLibrary(ctx) {
+function quoteKey(value) { return String(value||'').normalize('NFKC').toLowerCase().replace(/\s+/g,' ').trim(); }
+
+function importPanel(ctx, existingQuotes, refresh, initialStatus='') {
+  const status=h('p',{class:'form-msg','aria-live':'polite'});
+  status.textContent=initialStatus;
+  const preview=h('div',{class:'di-import-preview'});
+  const submit=h('button',{class:'btn btn-primary',type:'button',disabled:true});
+  let prepared=null;
+  const renderPreview=()=>{
+    if(!prepared){preview.replaceChildren();submit.disabled=true;return;}
+    const {quotes,scores,duplicates,autoScored}=prepared;
+    preview.replaceChildren(h('div',{class:'di-import-summary'},[
+      h('span',{},`${t('di_import_new')}: ${quotes.length}`),
+      h('span',{},`${t('di_import_duplicates')}: ${duplicates}`),
+      h('span',{},`${t('di_import_backfill')}: ${scores.length}`),
+      h('span',{},`${t('di_import_auto_scores')}: ${autoScored}`),
+    ]),h('ul',{class:'di-import-list'},quotes.slice(0,8).map(quote=>h('li',{},[
+      h('span',{},quote.quoteZh),h('span',{},`${quote.quoteEn} · ${t('di_recommendation_score')} ${quote.recommendationScore ?? t('di_auto_score')}`),
+    ])),quotes.length>8?h('p',{class:'foot-note'},`${t('di_import_more')}: ${quotes.length-8}`):null));
+    submit.disabled=!quotes.length&&!scores.length;
+  };
+  const fileInput=h('input',{class:'input',type:'file',accept:'application/json,.json',onchange:async event=>{
+    prepared=null;status.classList.remove('error');status.textContent='';
+    const file=event.currentTarget.files?.[0];
+    if(!file){renderPreview();return;}
+    try {
+      if(file.size>2*1024*1024)throw new Error(t('di_import_file_too_large'));
+      const bundle=JSON.parse(await file.text());
+      if(!bundle||bundle.formatVersion!==1||!Array.isArray(bundle.quotes)||!Array.isArray(bundle.fillMissingScores)||
+        bundle.quotes.length>80||bundle.fillMissingScores.length>80)throw new Error(t('di_import_invalid_file'));
+      const themes=new Set(THEMES), seenZh=new Set(), seenEn=new Set();
+      const existingZh=new Set(existingQuotes.map(row=>quoteKey(row.quoteZh)).filter(Boolean));
+      const existingEn=new Set(existingQuotes.map(row=>quoteKey(row.quoteEn)).filter(Boolean));
+      const quotes=[];let duplicates=0,autoScored=0;
+      for(const item of bundle.quotes){
+        if(!item||typeof item!=='object'||typeof item.quoteZh!=='string'||item.quoteZh.trim().length<4||item.quoteZh.length>300||
+          typeof item.quoteEn!=='string'||item.quoteEn.trim().length<4||item.quoteEn.length>500||!themes.has(item.theme)||
+          typeof item.sourceOrg!=='string'||!item.sourceOrg.trim()||item.sourceOrg.length>120||
+          typeof item.sourceTitle!=='string'||!item.sourceTitle.trim()||item.sourceTitle.length>240||
+          typeof item.sourceUrl!=='string'||!/^https:\/\//.test(item.sourceUrl)||item.sourceUrl.length>1000||
+          typeof item.editorialRewrite!=='boolean'||(item.recommendationScore!=null&&(!Number.isInteger(item.recommendationScore)||item.recommendationScore<0||item.recommendationScore>10)))
+          throw new Error(t('di_import_invalid_quote'));
+        const zh=quoteKey(item.quoteZh),en=quoteKey(item.quoteEn);
+        if(existingZh.has(zh)||existingEn.has(en)||seenZh.has(zh)||seenEn.has(en)){duplicates++;continue;}
+        seenZh.add(zh);seenEn.add(en);
+        const quote={quoteZh:item.quoteZh,quoteEn:item.quoteEn,theme:item.theme,sourceOrg:item.sourceOrg,
+          sourceTitle:item.sourceTitle,sourceUrl:item.sourceUrl,editorialRewrite:item.editorialRewrite};
+        if(item.recommendationScore!=null)quote.recommendationScore=item.recommendationScore;else autoScored++;
+        quotes.push(quote);
+      }
+      const existingById=new Map(existingQuotes.map(row=>[String(row.id),row]));
+      const scoreSeen=new Set();
+      const scores=bundle.fillMissingScores.filter(item=>{
+        if(!item||typeof item.id!=='string'||!Number.isInteger(item.recommendationScore)||item.recommendationScore<0||item.recommendationScore>10||scoreSeen.has(item.id))
+          throw new Error(t('di_import_invalid_file'));
+        scoreSeen.add(item.id);
+        return existingById.has(item.id)&&existingById.get(item.id).recommendationScore==null;
+      });
+      prepared={quotes,scores,duplicates,autoScored};renderPreview();status.textContent=t('di_import_preview_ready');
+    } catch(error){prepared=null;renderPreview();status.classList.add('error');status.textContent=error.message||t('di_import_invalid_file');}
+  }});
+  submit.textContent=t('di_import_confirm');
+  submit.addEventListener('click',async()=>{
+    if(!prepared||submit.disabled)return;
+    submit.disabled=true;status.classList.remove('error');status.textContent=t('di_import_saving');
+    try {
+      const result=await data.dailyInspiration(ctx,'quoteBatchImport',{quotes:prepared.quotes,fillMissingScores:prepared.scores});
+      if(!result.ok)throw Object.assign(new Error(t('di_import_partial')), {partial:result});
+      const message=`${t('di_import_done')}: ${result.addedCount} · ${t('di_import_duplicates')} ${result.duplicateCount} · ${t('di_import_backfill')} ${result.scoreUpdatedCount}`;
+      prepared=null;fileInput.value='';renderPreview();refresh(message);
+    } catch(error){
+      const partial=error.partial;
+      status.classList.add('error');status.textContent=partial?
+        `${t('di_import_partial')}: ${partial.addedCount} / ${prepared.quotes.length} · ${t('di_import_backfill')} ${partial.scoreUpdatedCount}`:
+        (error.code==='DAILY_INSPIRATION_FAILED'||error.code==='DAILY_INSPIRATION_PERSISTENCE_ERROR'?t('di_import_failed'):failureText(error));
+      submit.disabled=false;
+    }
+  });
+  return card({title:t('di_import_title'),icon:'file',body:[
+    h('p',{class:'foot-note'},t('di_import_desc')),
+    h('label',{class:'di-field'},[h('span',{},t('di_import_file')),fileInput]),preview,submit,status,
+  ]});
+}
+
+export async function renderDailyInspirationLibrary(ctx, importStatus='') {
   ctx.main.replaceChildren(pageHead({kicker:t('kicker_more'),title:t('di_library_title'),sub:t('di_library_desc')}),
     card({title:t('di_loading'),icon:'sparkle',body:emptyNote(t('di_loading'),t('di_loading_note'))}));
   let result;
@@ -120,7 +207,7 @@ export async function renderDailyInspirationLibrary(ctx) {
   catch(error){ctx.main.replaceChildren(pageHead({kicker:t('kicker_more'),title:t('di_library_title')}),
     card({title:t('di_load_failed'),icon:'bell',body:emptyNote(failureText(error),t('di_load_failed'))}));return;}
   const settings=result.settings||{timezone:'Asia/Shanghai',firstPeriodStart:'01:00',secondPeriodStart:'12:00'};
-  const refresh=()=>renderDailyInspirationLibrary(ctx);
+  const refresh=(notice='')=>renderDailyInspirationLibrary(ctx,notice);
   const editor=h('div',{class:'di-editor-slot'});
   const settingsStatus=h('p',{class:'form-msg','aria-live':'polite'});
   const timeZone=inputField('di_timezone','timezone',settings.pendingTimezone||settings.timezone,{required:true,maxlength:'80'});
@@ -145,7 +232,7 @@ export async function renderDailyInspirationLibrary(ctx) {
     const themeLabel=t(`di_theme_${row.theme}`);
     return h('article',{class:'di-library-row'},[
       h('div',{class:'di-library-copy'},[
-        h('div',{class:'di-library-topline'},[h('b',{},themeLabel),status]),
+        h('div',{class:'di-library-topline'},[h('b',{},themeLabel),wpTag(row.recommendationScore==null?t('di_unrated'):`${t('di_recommendation_score')} ${row.recommendationScore}/10`),status]),
         h('p',{class:'di-library-quote'},row.quoteZh),
         h('p',{class:'di-library-english'},row.quoteEn),
         h('a',{href:row.sourceUrl,target:'_blank',rel:'noopener noreferrer'},`${row.sourceOrg} · ${row.sourceTitle}${row.editorialRewrite?` · ${t('di_edited_source')}`:''}`),
@@ -166,6 +253,7 @@ export async function renderDailyInspirationLibrary(ctx) {
       h('button',{class:'btn btn-primary',type:'button',onclick:()=>editor.replaceChildren(quoteEditor(ctx,null,closed=>{editor.replaceChildren();if(!closed)refresh();}))},[ic('plus'),t('di_add_quote')]),
     ]}),
     card({title:t('di_settings_title'),icon:'gear',body:[settingsForm]}),
+    importPanel(ctx,quotes,refresh,importStatus),
     h('section',{class:'di-library-section'},[editor,h('div',{class:'di-library-heading'},[
       h('h2',{},t('di_quotes_title')),wpTag(String(quotes.length)),
     ]),list]),

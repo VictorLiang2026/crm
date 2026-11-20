@@ -14,7 +14,8 @@ function mapQuote(row) {
   if (!row) return null;
   return { id:String(row.id), quoteZh:row.quote_zh, quoteEn:row.quote_en, theme:row.theme,
     sourceOrg:row.source_org, sourceTitle:row.source_title, sourceUrl:row.source_url,
-    editorialRewrite:row.editorial_rewrite, enabled:row.enabled, updatedAt:row.updated_at };
+    editorialRewrite:row.editorial_rewrite, recommendationScore:row.recommendation_score ?? null,
+    enabled:row.enabled, updatedAt:row.updated_at };
 }
 
 function database() {
@@ -99,7 +100,8 @@ async function rpc(db, operation, actorUid, data = {}) {
 }
 
 function validateQuote(data) {
-  const allowed = ['id','quoteZh','quoteEn','theme','sourceOrg','sourceTitle','sourceUrl','editorialRewrite'];
+  const allowed = ['id','quoteZh','quoteEn','theme','sourceOrg','sourceTitle','sourceUrl','editorialRewrite','recommendationScore'];
+  const score = data?.recommendationScore === undefined ? null : data.recommendationScore;
   if (!record(data) || Object.keys(data).some(key => !allowed.includes(key)) ||
       (data.id !== undefined && !/^[1-9][0-9]{0,17}$/.test(String(data.id))) ||
       typeof data.quoteZh !== 'string' || data.quoteZh.trim().length < 4 || data.quoteZh.length > 300 ||
@@ -107,8 +109,95 @@ function validateQuote(data) {
       !THEMES.has(data.theme) || typeof data.sourceOrg !== 'string' || !data.sourceOrg.trim() || data.sourceOrg.length > 120 ||
       typeof data.sourceTitle !== 'string' || !data.sourceTitle.trim() || data.sourceTitle.length > 240 ||
       typeof data.sourceUrl !== 'string' || !/^https:\/\//.test(data.sourceUrl) || data.sourceUrl.length > 1000 ||
-      typeof data.editorialRewrite !== 'boolean') fail('INVALID_INPUT');
-  return { ...data, ...(data.id === undefined ? {} : {id:String(data.id)}) };
+      typeof data.editorialRewrite !== 'boolean' ||
+      (score !== null && (!Number.isInteger(score) || score < 0 || score > 10))) fail('INVALID_INPUT');
+  return { ...data, recommendationScore:score, ...(data.id === undefined ? {} : {id:String(data.id)}) };
+}
+
+function autoRecommendationScore(quote) {
+  const english=quote.quoteEn.toLowerCase();
+  const chinese=quote.quoteZh;
+  const practical=/\b(listen|ask|explain|plan|develop|recruit|serve|support|deliver|lead|build|act|learn|help|understand)\w*/.test(english) ||
+    /倾听|提问|解释|规划|培养|招聘|服务|支持|兑现|领导|建设|行动|学习|帮助|理解/.test(chinese) ? 4 :
+    /\b(client|customer|advisor|team|relationship|trust|insurance|retirement)\w*/.test(english) ||
+    /客户|顾问|团队|关系|信任|保险|退休/.test(chinese) ? 3 : 2;
+  const insight=/\b(because|rather|instead|not|without|depends|means|suggests|result|leads)\b/.test(english) ||
+    /因为|而非|而不是|不是|取决于|意味着|表明|因此|带来/.test(chinese) ? 3 :
+    /\b(trust|relationship|growth|purpose|value|confidence|success)\w*/.test(english) ||
+    /信任|关系|成长|目标|价值|信心|成功/.test(chinese) ? 2 : 1;
+  const englishWords=(english.match(/[a-z0-9]+(?:['’][a-z]+)?/g)||[]).length;
+  const chineseChars=chinese.replace(/\s/g,'').length;
+  const memorable=englishWords<=12 && chineseChars<=36 ? 2 : englishWords<=24 && chineseChars<=72 ? 1 : 0;
+  const source=quote.sourceOrg.trim() && /^https:\/\//.test(quote.sourceUrl) ? 1 : 0;
+  return Math.max(0,Math.min(10,practical+insight+memorable+source));
+}
+
+function validateScores(data) {
+  if (!record(data) || Object.keys(data).length !== 1 || !Array.isArray(data.scores) ||
+      data.scores.length < 1 || data.scores.length > 80) fail('INVALID_INPUT');
+  const seen = new Set();
+  return data.scores.map(item => {
+    if (!record(item) || Object.keys(item).length !== 2 || typeof item.id !== 'string' ||
+        !/^[1-9][0-9]{0,17}$/.test(item.id) || !Number.isInteger(item.recommendationScore) ||
+        item.recommendationScore < 0 || item.recommendationScore > 10 || seen.has(item.id)) fail('INVALID_INPUT');
+    seen.add(item.id);
+    return {id:item.id,recommendationScore:item.recommendationScore};
+  });
+}
+
+function normalizeQuoteText(value) {
+  return String(value || '').normalize('NFKC').toLowerCase().replace(/\s+/g,' ').trim();
+}
+
+function validateBatchImport(data) {
+  if (!record(data) || Object.keys(data).length !== 2 || !Array.isArray(data.quotes) ||
+      !Array.isArray(data.fillMissingScores) || data.quotes.length > 80 || data.fillMissingScores.length > 80 ||
+      (!data.quotes.length && !data.fillMissingScores.length)) fail('INVALID_INPUT');
+  const quotes = data.quotes.map(row => {
+    const quote = validateQuote(row);
+    if (quote.id !== undefined) fail('INVALID_INPUT');
+    if (quote.recommendationScore === null) quote.recommendationScore=autoRecommendationScore(quote);
+    return quote;
+  });
+  return {quotes,fillMissingScores:data.fillMissingScores.length ? validateScores({scores:data.fillMissingScores}) : []};
+}
+
+async function importQuotes(db, actorUid, data) {
+  const input = validateBatchImport(data);
+  const library = await rpc(db,'library_list',actorUid);
+  const existing = Array.isArray(library.quotes) ? library.quotes : [];
+  const existingEnglish = new Set(existing.map(row=>normalizeQuoteText(row.quote_en)).filter(Boolean));
+  const existingChinese = new Set(existing.map(row=>normalizeQuoteText(row.quote_zh)).filter(Boolean));
+  const seenEnglish = new Set(), seenChinese = new Set(), additions = [];
+  let duplicateCount = 0;
+  for (const quote of input.quotes) {
+    const english = normalizeQuoteText(quote.quoteEn), chinese = normalizeQuoteText(quote.quoteZh);
+    if (existingEnglish.has(english) || existingChinese.has(chinese) || seenEnglish.has(english) || seenChinese.has(chinese)) {
+      duplicateCount++;
+      continue;
+    }
+    seenEnglish.add(english); seenChinese.add(chinese); additions.push(quote);
+  }
+
+  const existingById = new Map(existing.map(row=>[String(row.id),row]));
+  const scores = input.fillMissingScores.filter(item=>existingById.has(item.id) &&
+    existingById.get(item.id).recommendation_score == null);
+  let scoreUpdatedCount = 0;
+  if (scores.length) {
+    const result = await rpc(db,'scores_save',actorUid,{scores});
+    scoreUpdatedCount = Number(result.updated) || 0;
+  }
+
+  let addedCount = 0;
+  for (const quote of additions) {
+    try {
+      await rpc(db,'quote_save',actorUid,quote);
+      addedCount++;
+    } catch (_) {
+      return {ok:false,partial:addedCount > 0 || scoreUpdatedCount > 0,addedCount,duplicateCount,scoreUpdatedCount};
+    }
+  }
+  return {ok:true,addedCount,duplicateCount,scoreUpdatedCount};
 }
 
 async function currentOrChoose(db, actorUid, now = new Date()) {
@@ -129,7 +218,7 @@ async function currentOrChoose(db, actorUid, now = new Date()) {
 async function handleDailyInspiration(event, actorUid, options = {}) {
   const db = options.db || database();
   const action = event?.operation;
-  if (!['current','replace','libraryList','quoteSave','quoteToggle','settingsSave'].includes(action) ||
+  if (!['current','replace','libraryList','quoteSave','quoteToggle','settingsSave','scoresSave','quoteBatchImport'].includes(action) ||
       Object.keys(event || {}).some(key => !['action','operation','data'].includes(key))) fail('INVALID_INPUT');
   if (action === 'libraryList') {
     if (event.data !== undefined) fail('INVALID_INPUT');
@@ -137,9 +226,16 @@ async function handleDailyInspiration(event, actorUid, options = {}) {
     return {ok:true,settings:result.settings,quotes:(result.quotes||[]).map(mapQuote)};
   }
   if (action === 'quoteSave') {
-    const result=await rpc(db,'quote_save',actorUid,validateQuote(event.data));
+    const quote=validateQuote(event.data);
+    if (quote.recommendationScore === null) quote.recommendationScore=autoRecommendationScore(quote);
+    const result=await rpc(db,'quote_save',actorUid,quote);
     return {ok:true,quote:mapQuote(result.quote)};
   }
+  if (action === 'scoresSave') {
+    const scores=validateScores(event.data);
+    return {ok:true,...await rpc(db,'scores_save',actorUid,{scores})};
+  }
+  if (action === 'quoteBatchImport') return importQuotes(db,actorUid,event.data);
   if (action === 'quoteToggle') {
     const data=event.data;
     if (!record(data)||Object.keys(data).length!==2||!/^[1-9][0-9]{0,17}$/.test(String(data.id))||typeof data.enabled!=='boolean') fail('INVALID_INPUT');
@@ -170,4 +266,5 @@ async function handleDailyInspiration(event, actorUid, options = {}) {
   }
 }
 
-module.exports={handleDailyInspiration,localClock,segmentFor,avoidPool,deterministicChoice,validateQuote,mapQuote};
+module.exports={handleDailyInspiration,localClock,segmentFor,avoidPool,deterministicChoice,validateQuote,
+  validateScores,validateBatchImport,normalizeQuoteText,autoRecommendationScore,mapQuote};

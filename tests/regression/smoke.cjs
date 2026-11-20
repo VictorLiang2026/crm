@@ -311,6 +311,7 @@ module.exports = async function smoke(root, test, options = {}) {
     });
     await check('person360.details', 'Person 360 显示已确认成员与重要家庭事实', async () => {
       await open('#/person/980001', 'Person 360', 'mode=family');
+      await b.wait("document.querySelector('.person360-facts')");
       assert.equal(await b.evaluate("document.querySelector('.person360-facts').value"), '[CRM_TEST_ONLY]周末一起探望父母');
       assert.equal(await b.evaluate("document.querySelector('.person360-member').innerText.includes('[CRM_TEST_ONLY]家人乙')"), true);
       await open('#/customer/910001', '[CRM_TEST_ONLY]预约沟通');

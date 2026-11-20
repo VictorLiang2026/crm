@@ -51,6 +51,8 @@ function installFixtures() {
     if(data.operation==='replace') { dailyQuote=dailyQuotes.find(row=>row.id!==dailyQuote.id)||dailyQuote; return {ok:true,quote:dailyQuote,settings:{timezone:'Asia/Shanghai'}}; }
     if(data.operation==='libraryList') return {ok:true,quotes:dailyQuotes,settings:{timezone:'Asia/Shanghai',firstPeriodStart:'01:00',secondPeriodStart:'12:00'}};
     if(data.operation==='quoteSave') return {ok:true,quote:{...data.data,id:'991003',enabled:true}};
+      if(data.operation==='scoresSave') return {ok:true,updated:data.data.scores.length};
+      if(data.operation==='quoteBatchImport') return {ok:true,addedCount:data.data.quotes.length,duplicateCount:0,scoreUpdatedCount:data.data.fillMissingScores.length};
     if(data.operation==='quoteToggle') return {ok:true,quote:{...dailyQuotes.find(row=>row.id===data.data.id),enabled:data.data.enabled}};
     if(data.operation==='settingsSave') return {ok:true,settings:{...data.data,effectiveDate:'2026-11-21'}};
     return fail('UNEXPECTED_DAILY_INSPIRATION_OPERATION');

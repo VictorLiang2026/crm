@@ -2179,21 +2179,29 @@ body:has(.login), body.is-login { padding-top: env(safe-area-inset-top); }
   .kg-home-card .kg-filters { flex-wrap: nowrap; gap: 8px; }
   .kg-home-card .kg-filters > select { flex: 0 0 142px; width: 142px; }
   .kg-home-card .kg-table-wrap, .kg-home-card .kg-pager { grid-column: 1 / -1; }
+  /* responsiveTable wraps .kg-table-wrap, so span and stretch the actual grid item. */
+  .kg-home-card .kg-responsive-table { grid-column: 1 / -1; width: 100%; min-width: 0; }
+  .kg-home-card .kg-responsive-table .kg-table-wrap { width: 100%; min-width: 0; }
 
-  /* Two actions per row reduce the knowledge table action stack to three rows. */
+  /* Give the title and content columns enough room while keeping actions touchable. */
+  .kg-home-card .kg-table th, .kg-home-card .kg-table td { padding: 8px 9px; }
+  .kg-home-card .kg-table th:nth-child(1), .kg-home-card .kg-table td:nth-child(1) { width: 5%; }
+  .kg-home-card .kg-table th:nth-child(2), .kg-home-card .kg-table td:nth-child(2) { width: 18%; }
+  .kg-home-card .kg-table th:nth-child(3), .kg-home-card .kg-table td:nth-child(3) { width: 9%; }
   .kg-home-card .kg-table th:nth-child(4), .kg-home-card .kg-table td:nth-child(4),
-  .kg-home-card .kg-table th:nth-child(5), .kg-home-card .kg-table td:nth-child(5) { width: 18.5%; }
-  .kg-home-card .kg-table th:nth-child(8), .kg-home-card .kg-table td:nth-child(8) { width: 15%; }
-  .kg-home-card .kg-table-actions {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    align-items: start;
-    gap: 5px;
-  }
+  .kg-home-card .kg-table th:nth-child(5), .kg-home-card .kg-table td:nth-child(5) { width: 17%; }
+  .kg-home-card .kg-table th:nth-child(6), .kg-home-card .kg-table td:nth-child(6) { width: 8%; }
+  .kg-home-card .kg-table th:nth-child(7), .kg-home-card .kg-table td:nth-child(7) { width: 8%; }
+  .kg-home-card .kg-table th:nth-child(8), .kg-home-card .kg-table td:nth-child(8) { width: 18%; }
+  /* Keep the table cell in the table formatting context; grid directly on TD
+     collapsed the button tracks in the current iPad-width Chromium layout. */
+  .kg-home-card .kg-table-actions { white-space: normal; }
   .kg-home-card .kg-table-actions .btn {
-    width: 100%;
+    display: inline-flex;
+    vertical-align: top;
+    width: calc(50% - 4px);
     min-height: 44px;
-    margin: 0;
+    margin: 0 3px 5px 0;
     padding: 5px 4px;
     font-size: 12px;
     line-height: 1.25;
