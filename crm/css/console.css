@@ -1931,6 +1931,46 @@ body:has(.login), body.is-login { padding-top: env(safe-area-inset-top); }
   .console-main { max-width: 1320px; padding: 28px 32px 56px; }
 
   .today-grid { grid-template-columns: minmax(0, 1.8fr) minmax(320px, .9fr); gap: 20px; }
+  .pc30-candidate {
+    position: relative;
+    display: block;
+    padding: 12px;
+  }
+  .pc30-candidate-content { gap: 8px; }
+  .pc30-candidate-heading {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+    gap: 6px;
+    padding-inline-end: 232px;
+  }
+  .pc30-candidate-heading > .pavatar { display: none; }
+  .pc30-candidate-heading > .bdg:last-child { justify-self: start; }
+  .pc30-person-title {
+    overflow: visible;
+    overflow-wrap: anywhere;
+    text-overflow: clip;
+    white-space: normal;
+  }
+  .pc30-candidate-actions {
+    position: absolute;
+    top: 10px;
+    right: 12px;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: auto;
+  }
+  .pc30-candidate-actions > .btn,
+  .pc30-more > summary {
+    flex: 0 0 auto;
+    width: auto;
+    min-height: 44px;
+    padding-inline: 6px;
+    font-size: 12px;
+    white-space: nowrap;
+  }
   .page-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .people-directory-toolbar, .activity-date-filters, .recruit-directory-toolbar,
   .resource-directory-filters { align-items: end; gap: 12px; }
