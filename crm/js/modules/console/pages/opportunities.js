@@ -216,27 +216,49 @@ export function renderOpportunities(ctx) {
   const queryInput = h('input',{class:'opp-query-input',type:'search',placeholder:t('opp_filter_query_placeholder')});
   const personInput = h('input',{class:'opp-query-input',type:'search',placeholder:t('opp_filter_person_placeholder')});
   const personResults = h('div',{class:'opp-person-results'});
+  const personSearchButton = h('button',{type:'button',class:'btn btn-ghost',onclick:searchPerson},t('opp_filter_person'));
+  const queryFeedback = h('span',{class:'opp-query-feedback',role:'status','aria-live':'polite'});
+  const querySearchButton = h('button',{type:'button',class:'btn btn-ghost',onclick:()=>search()},t('opp_filter_search'));
   const stages = selectControl([['active',t('opp_filter_active')],['terminal',t('opp_filter_history')],
     ['all',t('opp_filter_all_status')],['review',t('pipeline_review')]],state.status,t('opp_filter_status'));
   const typeControl = selectControl([['',t('opp_filter_all_types')],['source_referral',t('pipeline_referral_source')],
     ...FILTER_TYPES.map(type=>[type,typeLabel(type)])],'',t('pipeline_type_source'));
   let cancel = () => {};
-  function loadDirectory() {
+  let directoryRequest = 0;
+  let querySearchPending = false;
+  function resetQuerySearch() {
+    querySearchPending = false;
+    querySearchButton.disabled = false;
+    queryInput.disabled = false;
+    querySearchButton.textContent = t('opp_filter_search');
+  }
+  function loadDirectory(querySearch = false) {
+    if (!querySearch && querySearchPending) { resetQuerySearch(); queryFeedback.textContent=''; }
+    const request = ++directoryRequest;
     cancel();
     cancel = loadInto(directoryEl,async()=>{
-      const res=await data.opportunityDirectory(ctx,{...state,pageSize:PAGE_SIZE,status:state.status==='all'?null:state.status,
-        type:typeControl.querySelector('select').value || null,query:state.query || null});
-      const rows=res.rows || [];
-      return h('div',{class:'opp-directory-list'},[
-        ...(rows.length ? rows.map(row=>pipelineRow(ctx,row,loadDirectory)) : [emptyNote(t('opp_empty_directory'),'')]),
-        h('div',{class:'opp-pagination'},[
-          h('span',{},t('opp_total_count')+' '+res.total+' · '+t('opp_page')+' '+res.page),
-          h('div',{},[
-            h('button',{type:'button',class:'btn btn-ghost',disabled:res.page<=1,onclick:()=>{state.page--;loadDirectory();}},t('btn_prev')),
-            h('button',{type:'button',class:'btn btn-ghost',disabled:!res.hasMore,onclick:()=>{state.page++;loadDirectory();}},t('btn_next')),
+      try {
+        const res=await data.opportunityDirectory(ctx,{...state,pageSize:PAGE_SIZE,status:state.status==='all'?null:state.status,
+          type:typeControl.querySelector('select').value || null,query:state.query || null});
+        if(querySearch && request===directoryRequest){
+          resetQuerySearch();
+          queryFeedback.textContent=`${t('opp_filter_search_complete')} · ${t('opp_total_count')} ${res.total}`;
+        }
+        const rows=res.rows || [];
+        return h('div',{class:'opp-directory-list'},[
+          ...(rows.length ? rows.map(row=>pipelineRow(ctx,row,loadDirectory)) : [emptyNote(t('opp_empty_directory'),'')]),
+          h('div',{class:'opp-pagination'},[
+            h('span',{},t('opp_total_count')+' '+res.total+' · '+t('opp_page')+' '+res.page),
+            h('div',{},[
+              h('button',{type:'button',class:'btn btn-ghost',disabled:res.page<=1,onclick:()=>{state.page--;loadDirectory();}},t('btn_prev')),
+              h('button',{type:'button',class:'btn btn-ghost',disabled:!res.hasMore,onclick:()=>{state.page++;loadDirectory();}},t('btn_next')),
+            ]),
           ]),
-        ]),
-      ]);
+        ]);
+      } catch(error) {
+        if(querySearch && request===directoryRequest){resetQuerySearch();queryFeedback.textContent=t('try_later');}
+        throw error;
+      }
     });
   }
   function changeView(kind) {
@@ -254,15 +276,26 @@ export function renderOpportunities(ctx) {
   }
   for(const kind of VIEWS) tabs.append(h('button',{type:'button',class:'btn btn-soft','data-view':kind,
     onclick:()=>changeView(kind)},t('pipeline_'+kind)));
-  const search=()=>{state.query=queryInput.value.trim();state.page=1;loadDirectory();};
+  const search=()=>{
+    const query=queryInput.value.trim();
+    if(!query){queryFeedback.textContent=t('opp_filter_query_empty');queryInput.focus();return;}
+    state.query=query;state.page=1;querySearchPending=true;queryInput.disabled=true;querySearchButton.disabled=true;
+    querySearchButton.textContent=t('searching');queryFeedback.textContent=t('searching');loadDirectory(true);
+  };
+  queryInput.oninput=()=>{if(!querySearchPending)queryFeedback.textContent='';};
   queryInput.onkeydown=e=>{if(e.key==='Enter')search();};
   stages.querySelector('select').onchange=e=>{state.status=e.target.value;state.page=1;loadDirectory();};
   typeControl.querySelector('select').onchange=()=>{state.page=1;loadDirectory();};
   function clearPerson() { state.personId=null;personInput.value='';personResults.replaceChildren();state.page=1;loadDirectory(); }
   async function searchPerson() {
     const query=personInput.value.trim();
-    if(!query){personResults.replaceChildren();return;}
-    personResults.replaceChildren(h('div',{class:'sheet-note'},t('searching')));
+    if(!query){
+      const feedback=h('span',{class:'opp-filter-empty',role:'status','aria-live':'polite'},t('opp_filter_person_empty'));
+      if(state.personId)personResults.prepend(feedback);else personResults.replaceChildren(feedback);
+      personInput.focus();return;
+    }
+    personInput.disabled=true;personSearchButton.disabled=true;personSearchButton.textContent=t('searching');
+    personResults.replaceChildren(h('span',{class:'opp-filter-empty',role:'status','aria-live':'polite'},t('searching')));
     try{
       const result=await data.searchPeopleForOpportunities(ctx,query);
       const candidates=(result.candidates||[]).slice(0,8);
@@ -273,10 +306,12 @@ export function renderOpportunities(ctx) {
             h('button',{class:'btn btn-ghost btn-sm',type:'button',onclick:clearPerson},t('opp_filter_clear_person')));loadDirectory();
         },
       },`${candidate.display_name||candidate.displayName||t('unnamed')} · #${candidate.id}`)):
-        [h('span',{class:'opp-filter-empty'},t('no_person_found'))]));
-    }catch(error){personResults.replaceChildren(h('span',{class:'opp-filter-empty'},error.message||t('try_later')));}
+        [h('span',{class:'opp-filter-empty',role:'status','aria-live':'polite'},t('no_person_found'))]));
+    }catch(error){personResults.replaceChildren(h('span',{class:'opp-filter-empty',role:'status','aria-live':'polite'},error.message||t('try_later')));}
+    finally{personInput.disabled=false;personSearchButton.disabled=false;personSearchButton.textContent=t('opp_filter_person');}
   }
   personInput.onkeydown=e=>{if(e.key==='Enter')searchPerson();};
+  personInput.oninput=()=>{if(personResults.querySelector('.opp-filter-empty'))personResults.replaceChildren();};
   let cancelPending=()=>{};
   function loadPending() {
     cancelPending();
@@ -296,8 +331,8 @@ export function renderOpportunities(ctx) {
   ctx.main.replaceChildren(
     pageHead({title:t('nav_opportunities'),actions:[newProtection,newRecruit]}),
     tabs,h('div',{class:'opp-filter-bar'},[typeControl,stages,
-      h('div',{class:'opp-person-filter'},[personInput,h('button',{type:'button',class:'btn btn-ghost',onclick:searchPerson},t('opp_filter_person')),personResults]),
-      h('div',{class:'opp-text-filter'},[queryInput,h('button',{type:'button',class:'btn btn-ghost',onclick:search},t('opp_filter_search'))]),
+      h('div',{class:'opp-person-filter'},[personInput,personSearchButton,personResults]),
+      h('div',{class:'opp-text-filter'},[queryInput,querySearchButton,queryFeedback]),
     ]),directoryEl,pendingEl,h('button',{class:'btn btn-ghost',onclick:()=>openIdentityExceptions(ctx,loadDirectory)},t('opp_identity_title')),
   );
   changeView('protection');

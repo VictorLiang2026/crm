@@ -21,10 +21,14 @@ test('iPad landscape keeps opportunity, recruit, knowledge and reference toolbar
         lifecycle_status:'verified',updated_at:'2026-11-20T00:00:00Z',metadata:{categories:['other'],summary:'Fixture summary'}};
       const reference={id:'CRM_LAYOUT_FIXTURE_2',scenario:'[Fixture] Reference',response_logic:'Fixture response',
         metadata:{kind:'wording',enabled:true,keywords:[]}};
+      const calls=[];
       const ctx={main,toast(){},api:{call:async(name,args={})=>{
+        calls.push({name,args});
         if(name==='person_360'){
           if(args.action==='listPendingOpportunityCandidates')return {rows:[]};
           if(args.action==='listOpportunityDirectory')return {rows:[],total:0,page:1};
+          if(args.action==='search')return {candidates:args.name==='[Fixture] Person'?
+            [{id:'CRM_LAYOUT_PERSON_1',display_name:'[Fixture] Person'}]:[]};
           if(args.action==='listRecruitDirectory')return {rows:[{candidate_id:'CRM_LAYOUT_FIXTURE_3',customer_name:'[Fixture] Recruit',
             stage:'新增人才',recruitment_priority:'A',potential_score:75,next_action_date:'2026-11-21',idle_days:0,
             updated_at:'2026-11-20T00:00:00Z',person_id:'CRM_LAYOUT_FIXTURE_4'}],page:1,total:1,totalPages:1,hasMore:false};
@@ -39,7 +43,7 @@ test('iPad landscape keeps opportunity, recruit, knowledge and reference toolbar
         }
         return {};
       }}};
-      window.ipadLayoutFixture={ctx,main};
+      window.ipadLayoutFixture={ctx,main,calls};
       const {renderOpportunities}=await import('/crm/js/modules/console/pages/opportunities.js');
       renderOpportunities(ctx);
     })()`);
@@ -55,6 +59,50 @@ test('iPad landscape keeps opportunity, recruit, knowledge and reference toolbar
     assert.equal(opportunityRows.coarse, true, 'iPad touch breakpoint should be active');
     assert.equal(new Set(opportunityRows.rows).size, 1, 'opportunity filters should share one row: ' + JSON.stringify(opportunityRows));
     assert.ok(opportunityRows.width <= opportunityRows.inner + 1, 'opportunity page should not overflow horizontally');
+    const personInput=await browser.evaluate(`(()=>{const p=document.querySelector('.opp-person-filter'),i=p.querySelector('input'),r=p.querySelector('.opp-person-results');return {
+      inputWidth:Math.round(i.getBoundingClientRect().width),resultDisplay:getComputedStyle(r).display,
+      emptySearches:window.ipadLayoutFixture.calls.filter(c=>c.name==='person_360'&&c.args.action==='search').length};})()`);
+    assert.ok(personInput.inputWidth>=160,'person search input should retain a usable touch width: '+JSON.stringify(personInput));
+    assert.equal(personInput.resultDisplay,'none','empty person results should not occupy toolbar layout');
+    await browser.evaluate("document.querySelector('.opp-person-filter button').click()");
+    await browser.wait("document.querySelector('.opp-person-results .opp-filter-empty')?.textContent.includes('请输入姓名')");
+    const blankPerson=await browser.evaluate(`(()=>({focused:document.activeElement===document.querySelector('.opp-person-filter input'),
+      resultPosition:getComputedStyle(document.querySelector('.opp-person-results')).position,
+      searchCalls:window.ipadLayoutFixture.calls.filter(c=>c.name==='person_360'&&c.args.action==='search').length}))()`);
+    assert.equal(blankPerson.focused,true,'empty person search should focus the name input');
+    assert.equal(blankPerson.resultPosition,'absolute','person feedback should float below the toolbar');
+    assert.equal(blankPerson.searchCalls,0,'empty person search should not call the API');
+    await browser.evaluate(`(()=>{const i=document.querySelector('.opp-person-filter input');i.value='[Fixture] Person';i.dispatchEvent(new Event('input',{bubbles:true}));
+      document.querySelector('.opp-person-filter button').click()})()`);
+    await browser.wait("document.querySelector('.opp-person-results .opp-person-result')?.textContent.includes('[Fixture] Person')");
+    await browser.evaluate("document.querySelector('.opp-person-results .opp-person-result').click()");
+    await browser.wait("document.querySelector('.opp-person-results .opp-person-selected')");
+    assert.equal(await browser.evaluate(`window.ipadLayoutFixture.calls.filter(c=>c.args.action==='listOpportunityDirectory').at(-1).args.personId`),'CRM_LAYOUT_PERSON_1',
+      'selecting a person should apply its exact ID to the opportunity list');
+    await browser.evaluate(`(()=>{const i=document.querySelector('.opp-person-filter input');i.value='';i.dispatchEvent(new Event('input',{bubbles:true}));
+      document.querySelector('.opp-person-filter button').click()})()`);
+    await browser.wait("document.querySelector('.opp-person-results .opp-filter-empty')?.textContent.includes('请输入姓名')");
+    assert.equal(await browser.evaluate("!!document.querySelector('.opp-person-results .opp-person-selected')"),true,
+      'empty lookup should keep an already-applied person filter and its clear action visible');
+    await browser.evaluate("document.querySelector('.opp-person-results .btn').click()");
+    await browser.wait("window.ipadLayoutFixture.calls.filter(c=>c.args.action==='listOpportunityDirectory').at(-1).args.personId===null");
+    const blankQueryCalls=await browser.evaluate("window.ipadLayoutFixture.calls.filter(c=>c.args.action==='listOpportunityDirectory').length");
+    await browser.evaluate("document.querySelector('.opp-text-filter button').click()");
+    await browser.wait("document.querySelector('.opp-query-feedback')?.textContent==='请输入搜索关键词'");
+    assert.equal(await browser.evaluate("document.activeElement===document.querySelector('.opp-text-filter input')"),true,
+      'empty keyword search should focus its input');
+    assert.equal(await browser.evaluate("window.ipadLayoutFixture.calls.filter(c=>c.args.action==='listOpportunityDirectory').length"),blankQueryCalls,
+      'empty keyword search should not reload the directory');
+    await browser.evaluate(`(()=>{const i=document.querySelector('.opp-text-filter input');i.value='fixture keyword';i.dispatchEvent(new Event('input',{bubbles:true}));
+      document.querySelector('.opp-text-filter button').click()})()`);
+    await browser.wait("document.querySelector('.opp-query-feedback')?.textContent.includes('搜索完成')");
+    assert.equal(await browser.evaluate(`window.ipadLayoutFixture.calls.filter(c=>c.args.action==='listOpportunityDirectory').at(-1).args.query`),'fixture keyword');
+    await browser.evaluate(`(async()=>{const {setLang}=await import('/crm/js/modules/console/i18n.js');setLang('en');
+      const {renderOpportunities}=await import('/crm/js/modules/console/pages/opportunities.js');renderOpportunities(window.ipadLayoutFixture.ctx)})()`);
+    await browser.wait("document.querySelector('.opp-person-filter button')?.textContent==='Find Person'");
+    await browser.evaluate("document.querySelector('.opp-person-filter button').click()");
+    await browser.wait("document.querySelector('.opp-person-results .opp-filter-empty')?.textContent==='Enter a name to find a person'");
+    assert.equal(await browser.evaluate("document.querySelector('.opp-query-feedback').getAttribute('aria-live')"),'polite');
 
     await browser.evaluate(`(async()=>{const {renderRecruit}=await import('/crm/js/modules/console/pages/recruit.js');renderRecruit(window.ipadLayoutFixture.ctx)})()`);
     await browser.wait("document.querySelector('.recruit-directory-table tbody tr')&&document.querySelector('.funnel-row')");
