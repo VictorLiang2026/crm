@@ -32,7 +32,7 @@ const RECRUIT_COLUMNS = [
   { key: 'candidate_id', field: 'candidate_id', label: () => t('col_id') },
 ];
 
-function listNode(ctx) {
+function listNode(ctx, toolbarActions = []) {
   const state = { page: 1, keyword: '', sortField: 'next_action_date', sortDir: 'desc',
     stages: [], priorities: [], pendingStages: [], pendingPriorities: [] };
   let currentRequest = 0;
@@ -53,7 +53,8 @@ function listNode(ctx) {
   const cardFoot = h('div', { class: 'card-foot' }, [totalLabel, statusLabel,
     h('div', { class: 'pager', style: 'margin-left:auto' }, [previousButton, pageLabel, nextButton])]);
   toolbar.append(h('div', { class: 'searchbox' }, [ic('search'), searchInput, searchButton]), filterAnchor);
-  root.append(toolbar, tableHost, cardFoot);
+  toolbar.append(...toolbarActions);
+  root.append(tableHost, cardFoot);
 
   function updateFilterButton() {
     const count = state.stages.length + state.priorities.length;
@@ -192,7 +193,7 @@ function listNode(ctx) {
   searchInput.addEventListener('keydown', ev => { if (ev.key === 'Enter') search(); });
   updateFilterButton();
   runQuery();
-  return root;
+  return { root, toolbar };
 }
 function sideNode(ctx) {
   const month = (() => {
@@ -248,24 +249,31 @@ function sideNode(ctx) {
 }
 
 export function renderRecruit(ctx) {
-  const listEl = h('div', {});
+  const directory = listNode(ctx, [
+    h('button', { class: 'btn btn-ghost recruit-landscape-action', type: 'button', title: t('recruit_analysis_entry'), onclick: () => { location.hash = '#/recruit/goals'; } }, [ic('calendar'), t('recruit_analysis_entry')]),
+    h('button', { class: 'btn btn-primary recruit-landscape-action', type: 'button', title: t('new_recruit'), onclick: () => openRecruitCandidateCreate(ctx, {
+      onDone: personId => { location.hash = `#/person/${personId}`; },
+    }) }, [ic('plus'), t('new_recruit_short')]),
+  ]);
   const sideEl = h('div', {});
-  loadInto(listEl, () => listNode(ctx));
   loadInto(sideEl, () => sideNode(ctx));
 
+  const head = pageHead({
+    kicker: t('kicker_recruit'), title: t('title_recruit'),
+    sub: t('sub_recruit'),
+    actions: [
+      h('button', { class: 'btn btn-ghost', type: 'button', title: t('recruit_analysis_entry'), onclick: () => { location.hash = '#/recruit/goals'; } }, [ic('calendar'), t('recruit_analysis_entry')]),
+      h('button', { class: 'btn btn-primary', type: 'button', title: t('new_recruit'), onclick: () => openRecruitCandidateCreate(ctx, {
+        onDone: personId => { location.hash = `#/person/${personId}`; },
+      }) }, [ic('plus'), t('new_recruit_short')]),
+    ],
+  });
+  head.classList.add('recruit-page-head');
   ctx.main.replaceChildren(
-    pageHead({
-      kicker: t('kicker_recruit'), title: t('title_recruit'),
-      sub: t('sub_recruit'),
-      actions: [
-        h('button', { class: 'btn btn-ghost', type: 'button', title: t('recruit_analysis_entry'), onclick: () => { location.hash = '#/recruit/goals'; } }, [ic('calendar'), t('recruit_analysis_entry')]),
-          h('button', { class: 'btn btn-primary', type: 'button', title: t('new_recruit'), onclick: () => openRecruitCandidateCreate(ctx, {
-          onDone: personId => { location.hash = `#/person/${personId}`; },
-        }) }, [ic('plus'), t('new_recruit_short')]),
-      ],
-    }),
+    head,
+    h('div', { class: 'recruit-page-toolbar' }, directory.toolbar),
     h('div', { class: 'today-grid recruit-layout' }, [
-      h('section', { class: 'card' }, [listEl]),
+      h('section', { class: 'card' }, [directory.root]),
       sideEl,
     ]),
   );

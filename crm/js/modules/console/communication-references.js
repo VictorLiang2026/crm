@@ -111,16 +111,18 @@ export function renderCommunicationReferences(ctx){
  const buttonTitle=row=>h('button',{type:'button',class:'kr-reference-title',title:row.scenario,onclick:()=>{
   const {panel}=dialog(row.scenario);panel.append(h('pre',{},row.response_logic),h('p',{},row.metadata?.origin||''));}},row.scenario);
  const search=h('input',{'aria-label':text('search'),placeholder:text('search')});
+ const primaryTools=h('div',{class:'kr-primary-tools'},[
+  h('a',{class:'btn btn-ghost',href:'#/knowledge-library'},text('back')),
+  button('new',()=>edit(ctx,null,load)),button('import',()=>importManuals(ctx,load)),
+ ]);
+ const listTools=h('div',{class:'kg-list-tools'},[
+  h('form',{class:'kr-search',onsubmit:e=>{e.preventDefault();query=search.value;page=1;draw();}},[search,h('button',{type:'submit',class:'btn btn-ghost',title:text('search')},text('search_action'))]),
+  h('select',{'aria-label':text('kind'),onchange:e=>{kind=e.target.value;page=1;draw();}},['','wording','objection'].map(v=>h('option',{value:v},text(v||'all')))),
+  h('select',{'aria-label':text('state'),onchange:e=>{enabled=e.target.value;page=1;draw();}},['enabled','disabled','all'].map(v=>h('option',{value:v},text(v)))),
+ ]);
  root.replaceChildren(h('section',{class:'card kr-page'},[
   h('h1',{},text('heading')),h('p',{},text('scope')),
-  h('div',{class:'kr-primary-tools'},[
-   h('a',{class:'btn btn-ghost',href:'#/knowledge-library'},text('back')),
-   button('new',()=>edit(ctx,null,load)),button('import',()=>importManuals(ctx,load)),
-  ]),h('div',{class:'kg-list-tools'},[
-   h('form',{class:'kr-search',onsubmit:e=>{e.preventDefault();query=search.value;page=1;draw();}},[search,h('button',{type:'submit',class:'btn btn-ghost',title:text('search')},text('search_action'))]),
-   h('select',{'aria-label':text('kind'),onchange:e=>{kind=e.target.value;page=1;draw();}},['','wording','objection'].map(v=>h('option',{value:v},text(v||'all')))),
-   h('select',{'aria-label':text('state'),onchange:e=>{enabled=e.target.value;page=1;draw();}},['enabled','disabled','all'].map(v=>h('option',{value:v},text(v)))),
-  ]),optimization.tools,status,list]));load();
+  h('div',{class:'kr-control-area'},[primaryTools,listTools]),optimization.tools,status,list]));load();
 }
 export function communicationDraftControl(ctx,row){
  if(!['ready','manual'].includes(row.system?.status))return null;

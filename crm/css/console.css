@@ -202,6 +202,7 @@ button.btn[aria-pressed="true"] { background: var(--red); border-color: var(--re
 .today-grid.recruit-layout { grid-template-columns: minmax(0, 1fr) 250px; gap: 14px; }
 .recruit-layout > section.card, .recruit-directory { min-width: 0; }
 .recruit-directory-toolbar { margin: 0; padding: 14px 16px 0; }
+.recruit-directory-toolbar .recruit-landscape-action { display: none; }
 .recruit-directory-toolbar .searchbox { flex: 1 1 280px; min-width: 220px; }
 .recruit-directory-toolbar .searchbox input { min-width: 0; }
 .recruit-directory-table-host { padding: 10px 0 0; }
@@ -2089,6 +2090,85 @@ body:has(.login), body.is-login { padding-top: env(safe-area-inset-top); }
   .console-main :is(.btn-sm, .pager button, .people-filter-check) { min-height: 44px; }
   .console-main .head-actions { align-items: center; }
   .console-main :is(input:not([type=checkbox],[type=radio],[type=hidden]), select, textarea) { min-height: 44px; }
+
+  /* Keep opportunity filters on one touch-friendly landscape row. */
+  .console-main .opp-filter-bar { grid-template-columns: repeat(4, minmax(0, 1fr)); align-items: end; }
+  .console-main .opp-filter-bar:has(> .opp-filter[hidden]) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .console-main .opp-filter-bar > * { min-width: 0; }
+  .console-main .opp-person-filter, .console-main .opp-text-filter { flex-wrap: nowrap; }
+  .console-main .opp-person-filter .opp-query-input,
+  .console-main .opp-text-filter .opp-query-input { flex: 1 1 0; min-width: 0; }
+  .console-main .opp-person-filter .btn,
+  .console-main .opp-text-filter .btn { flex: 0 0 auto; min-height: 44px; white-space: nowrap; }
+
+  /* Recruit tools span above the directory and funnel so both results start level. */
+  .recruit-page-head .head-actions { display: none; }
+  .recruit-page-toolbar { margin-bottom: 12px; }
+  .recruit-page-toolbar .recruit-directory-toolbar {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: end;
+    gap: 10px;
+    margin: 0;
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: var(--card);
+  }
+  .recruit-page-toolbar .recruit-directory-toolbar .searchbox { flex: 1 1 320px; min-width: 280px; }
+  .recruit-page-toolbar .recruit-directory-toolbar .recruit-landscape-action {
+    display: inline-flex;
+    flex: 0 0 auto;
+    min-height: 44px;
+    white-space: nowrap;
+  }
+  .recruit-layout { align-items: start; }
+  .recruit-directory-table-host { padding-top: 10px; }
+
+  /* Knowledge search and filters share a single row; keep the table below it. */
+  .kg-home-card .kg-list-tools {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) max-content;
+    align-items: center;
+    gap: 10px 14px;
+  }
+  .kg-home-card .kg-search { display: flex; flex-wrap: nowrap; align-items: center; min-width: 0; }
+  .kg-home-card .kg-search input[type=search] { flex: 1 1 260px; width: auto; min-width: 260px; }
+  .kg-home-card .kg-full-search { flex: 0 0 auto; white-space: nowrap; }
+  .kg-home-card .kg-filters { flex-wrap: nowrap; gap: 8px; }
+  .kg-home-card .kg-filters > select { flex: 0 0 142px; width: 142px; }
+  .kg-home-card .kg-table-wrap, .kg-home-card .kg-pager { grid-column: 1 / -1; }
+
+  /* Two actions per row reduce the knowledge table action stack to three rows. */
+  .kg-home-card .kg-table th:nth-child(4), .kg-home-card .kg-table td:nth-child(4),
+  .kg-home-card .kg-table th:nth-child(5), .kg-home-card .kg-table td:nth-child(5) { width: 18.5%; }
+  .kg-home-card .kg-table th:nth-child(8), .kg-home-card .kg-table td:nth-child(8) { width: 15%; }
+  .kg-home-card .kg-table-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+    gap: 5px;
+  }
+  .kg-home-card .kg-table-actions .btn {
+    width: 100%;
+    min-height: 44px;
+    margin: 0;
+    padding: 5px 4px;
+    font-size: 12px;
+    line-height: 1.25;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  /* Communication reference controls use at most two rows above the list. */
+  .kr-control-area { display: flex; flex-wrap: nowrap; align-items: center; gap: 8px; min-width: 0; }
+  .kr-control-area .kr-primary-tools, .kr-control-area .kg-list-tools { display: contents; }
+  .kr-control-area .kr-search { flex: 1 1 320px; min-width: 280px; }
+  .kr-control-area .kr-search input { min-width: 0; width: 100%; }
+  .kr-control-area .kg-list-tools select { flex: 0 0 145px; width: 145px; }
+  .kr-page .ro-tools { flex-wrap: nowrap; max-width: 100%; overflow-x: auto; overscroll-behavior-inline: contain; }
+  .kr-page .ro-tools > * { flex: 0 0 auto; }
+  .kr-page .ro-bulk { flex-wrap: nowrap; }
 }
 
 .chart-selection { color: var(--ink-2); font-weight: 650; margin-bottom: 8px; }
