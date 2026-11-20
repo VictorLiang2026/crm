@@ -1896,6 +1896,143 @@ body:has(.login), body.is-login { padding-top: env(safe-area-inset-top); }
   .console-main { padding-inline: 10px; }
 }
 
+/* iPad Pro 12.9-inch landscape workspace. Keep this separate from narrow-device
+   rules so iPad touch input does not trigger the phone layout. */
+@media (orientation: landscape) and (min-width: 1200px) and (min-height: 700px) and (any-pointer: coarse) {
+  :root { --topbar-h: 64px; }
+
+  .console-topbar {
+    gap: 16px;
+    padding-inline: max(28px, env(safe-area-inset-left)) max(28px, env(safe-area-inset-right));
+  }
+  .brand { flex: none; }
+  .brand small { display: none; }
+  .console-nav { min-width: 0; justify-content: center; gap: 2px; }
+  .nav-item { min-width: 44px; padding-inline: 9px; gap: 5px; font-size: 13px; }
+  .topbar-right { gap: 10px; }
+  .console-main { max-width: 1320px; padding: 28px 32px 56px; }
+
+  .today-grid { grid-template-columns: minmax(0, 1.8fr) minmax(320px, .9fr); gap: 20px; }
+  .page-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .people-directory-toolbar, .activity-date-filters, .recruit-directory-toolbar,
+  .resource-directory-filters { align-items: end; gap: 12px; }
+  .people-filter-panel { max-height: min(72dvh, 680px); }
+
+  .table-scroll, .kg-table-wrap, .phase14-table-scroll {
+    scrollbar-gutter: stable;
+    overscroll-behavior-inline: contain;
+  }
+  .people-directory-table th:first-child,
+  .people-directory-table td:first-child,
+  .recruit-directory-table th:first-child,
+  .recruit-directory-table td:first-child,
+  .activity-directory-table th:first-child,
+  .activity-directory-table td:first-child,
+  .recycle-table th:first-child,
+  .recycle-table td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    background: var(--card);
+    box-shadow: 5px 0 9px -9px rgba(20, 24, 32, .5);
+  }
+  .people-directory-table thead th:first-child,
+  .recruit-directory-table thead th:first-child,
+  .activity-directory-table thead th:first-child,
+  .recycle-table thead th:first-child { z-index: 4; background: #f8fafc; }
+  .people-directory-table tbody tr:hover td:first-child,
+  .recruit-directory-table tbody tr:hover td:first-child,
+  .activity-directory-table tbody tr:hover td:first-child,
+  .recycle-table tbody tr:hover td:first-child { background: #f8fbff; }
+  .console-main .tabs .tab { min-height: 46px; }
+  .people-sort-button { display: flex; align-items: center; min-height: 44px; }
+
+  .person-workspace {
+    display: grid;
+    grid-template-columns: minmax(196px, 220px) minmax(0, 1fr);
+    gap: 18px;
+    align-items: start;
+  }
+  .person-navigation-panel {
+    position: sticky;
+    top: calc(var(--topbar-h) + 12px);
+    display: grid;
+    gap: 10px;
+    min-width: 0;
+    max-height: calc(100dvh - var(--topbar-h) - 24px);
+    overflow: auto;
+    overscroll-behavior: contain;
+  }
+  .person-sections {
+    display: grid;
+    gap: 4px;
+    padding: 7px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--card);
+    box-shadow: var(--shadow);
+    mask-image: none;
+    -webkit-mask-image: none;
+  }
+  .person-sections .tab {
+    width: 100%;
+    min-height: 46px;
+    padding: 10px 12px;
+    border: 0;
+    border-radius: 9px;
+    text-align: left;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .person-content-panel { min-width: 0; }
+  .person-subsections {
+    position: sticky;
+    top: calc(var(--topbar-h) + 8px);
+    z-index: 10;
+    flex-wrap: wrap;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+  }
+  .person-content-panel .tabs-body { min-width: 0; }
+
+  .sheet-overlay { align-items: center; padding: 24px; }
+  .sheet {
+    width: min(760px, calc(100vw - 96px));
+    max-width: calc(100vw - 96px);
+    max-height: min(88dvh, 920px);
+    padding: 18px 24px 24px;
+    border-radius: 18px;
+    overscroll-behavior: contain;
+    scroll-padding-block: 64px 28px;
+  }
+  .sheet-handle { display: none; }
+  .sheet-head {
+    position: sticky;
+    top: -18px;
+    z-index: 2;
+    justify-content: space-between;
+    padding: 12px 0 8px;
+    background: var(--card);
+  }
+  .sheet-head .btn, .sheet-actions .btn, .sheet .btn-sm { min-height: 44px; }
+  .sheet-inspector-overlay { justify-content: flex-end; padding: 0; }
+  .sheet-inspector-overlay .sheet {
+    align-self: stretch;
+    width: min(540px, 44vw);
+    max-width: 540px;
+    max-height: 100dvh;
+    margin: 0;
+    border-radius: 18px 0 0 18px;
+    padding: max(20px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom)) 24px;
+  }
+  .sheet-inspector-overlay .sheet-head { top: -20px; }
+
+  .console-main :is(.btn-sm, .pager button, .people-filter-check) { min-height: 44px; }
+  .console-main .head-actions { align-items: center; }
+  .console-main :is(input:not([type=checkbox],[type=radio],[type=hidden]), select, textarea) { min-height: 44px; }
+}
+
 .chart-selection { color: var(--ink-2); font-weight: 650; margin-bottom: 8px; }
 .chart-bars { display: grid; gap: 4px; max-height: 340px; overflow: auto; padding: 4px; }
 .chart-bar {

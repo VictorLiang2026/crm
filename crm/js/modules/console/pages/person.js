@@ -517,6 +517,10 @@ export function renderPerson(ctx, id, initialSection) {
   const subnav = h('div', { class: 'toolbar person-subsections' });
   const content = h('section', { class: 'card tabs-body' });
   const roleStatus = h('div', {});
+  const workspace = h('div', { class: 'person-workspace' }, [
+    h('aside', { class: 'person-navigation-panel' }, [navigation, roleStatus]),
+    h('div', { class: 'person-content-panel' }, [subnav, content]),
+  ]);
   const speakerRole = h('span');
   let profileRequest, profile, activePart, pendingPart = initialSection;
   let cancelContent = () => {};
@@ -938,7 +942,7 @@ export function renderPerson(ctx, id, initialSection) {
     }),
     compact ? h('a', { class: 'btn btn-ghost person-mobile-back', href: ctx.peopleBackHash || '#/people' },
       t('nav_people')) : null,
-    navigation, roleStatus, subnav, content,
+    workspace,
   );
   if (visible(sectionOf(initialSection))) {
     pendingPart = null;

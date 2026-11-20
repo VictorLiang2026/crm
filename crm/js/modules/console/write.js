@@ -76,7 +76,7 @@ function dateToIso(dateStr) {
 // ---------- Bottom Sheet 骨架 ----------
 let inertSheetBackground = null;
 
-export function openSheet({ title, sub, body, trigger = document.activeElement, canDismiss = () => true, protectDraft = false }) {
+export function openSheet({ title, sub, body, trigger = document.activeElement, canDismiss = () => true, protectDraft = false, variant = '' }) {
   const errBox = h('div', { class: 'sheet-err', role: 'alert', style: 'display:none' });
   const bodyEl = h('div', {}, [body, errBox]);
   const sheetEl = h('div', { class: 'sheet', role: 'dialog', 'aria-modal': 'true', 'aria-label': title, tabindex: '-1' }, [
@@ -91,7 +91,7 @@ export function openSheet({ title, sub, body, trigger = document.activeElement, 
     sub ? h('p', { class: 'sheet-sub' }, sub) : null,
     bodyEl,
   ]);
-  const overlay = h('div', { class: 'sheet-overlay' }, [sheetEl]);
+  const overlay = h('div', { class: `sheet-overlay${variant === 'inspector' ? ' sheet-inspector-overlay' : ''}` }, [sheetEl]);
   const markDraft = () => {
     if (protectDraft && isCompactViewport()) overlay.classList.add('sheet-draft-active');
   };
