@@ -17,6 +17,7 @@ export function openUnifiedInteraction(ctx, { personId, customerId = null, inter
   const editing = interactionId != null;
   const requestKey = crypto.randomUUID();
   const sheet = openSheet({ title: t(editing ? 'ui_interaction_edit' : 'ui_interaction_add'),
+    protectDraft: true,
     body: h('p', { class: 'sheet-note' }, t('edit_loading')) });
   document.body.appendChild(sheet.overlay);
   const call = async (action, data) => {
@@ -43,6 +44,7 @@ export function openUnifiedInteraction(ctx, { personId, customerId = null, inter
       const originalNextDate = nextDate.value;
       let clearNextDate = false;
       const clearNext = h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => {
+        sheet.markDraft();
         clearNextDate = !clearNextDate;
         nextDate.value = clearNextDate ? '' : originalNextDate;
         nextDate.disabled = clearNextDate;
@@ -70,7 +72,7 @@ export function openUnifiedInteraction(ctx, { personId, customerId = null, inter
         field('interaction_raw_note_label',note),field('followup_activity_label',activity),
         h('div', { class: 'sheet-field' }, [field('followup_next_date_label',nextDate), clearNext]),sales,
         h('div', { class: 'sheet-actions' }, [followup.Id ? h('button', { class: 'btn btn-ghost', type: 'button', onclick: confirmRemove }, t('delete_followup')) : null,
-          h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => sheet.overlay.remove() }, t('cancel')),save])]);
+          h('button', { class: 'btn btn-ghost', type: 'button', onclick: sheet.dismiss }, t('cancel')),save])]);
       sheet.swap(form);
       async function persist() {
         if (save.disabled) return;

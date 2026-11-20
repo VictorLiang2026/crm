@@ -45,6 +45,7 @@ test('Console More keeps only uncovered gaps bilingual and preserves legacy URLs
   const browser = new Browser(path.resolve(__dirname, '../..'));
   try {
     await browser.start();
+    await browser.send('Emulation.setDeviceMetricsOverride', { width: 1180, height: 820, deviceScaleFactor: 1, mobile: false });
     await browser.openConsole('#/more', 'authCase=1');
     await browser.evaluate("localStorage.setItem('crm_lang', 'en')");
     await browser.openConsole('#/more', 'authCase=1');

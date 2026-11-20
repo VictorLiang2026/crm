@@ -295,7 +295,9 @@ test('iPhone 15 people table keeps the toolbar width across pages and truncates 
       window.renderPeopleForViewport=()=>renderPeople(window.peopleTestCtx);
       window.renderPeopleForViewport();
     })()`);
-    await b.wait("document.querySelectorAll('.people-directory-table tbody tr').length===30");
+    await b.wait("document.querySelectorAll('.people-summary-list li').length===30");
+    assert.equal(await b.evaluate("document.querySelector('.people-directory-scroll').hidden"), true);
+    await b.evaluate("document.querySelector('.people-summary-toggle').click()");
     await b.evaluate("document.head.insertAdjacentHTML('beforeend','<link rel=stylesheet href=/crm/css/console.css>')");
     await b.wait("!!document.querySelector('link[href=\"/crm/css/console.css\"]')?.sheet");
     const first = await b.evaluate(`(()=>{

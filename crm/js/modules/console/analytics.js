@@ -2,7 +2,7 @@ import { businessAnalytics } from './business-report.js';
 import { h } from './dom.js';
 import { data } from './data.js';
 import { t, translateEnum, getLang } from './i18n.js';
-import { card, errorBox, pageHead, wpTag, responsiveTable } from './ui.js';
+import { card, errorBox, pageHead, wpTag, responsiveTable, selectableBars } from './ui.js';
 
 const KINDS = ['customer', 'opportunity', 'recruit'];
 const ENUMS = { customer: 'customer_stage', opportunity: 'opportunity_stage', recruit: 'recruit_stage' };
@@ -44,10 +44,10 @@ function funnelCard(key, row) {
     provenance(row?.testData),
     h('p', { class: 'foot-note', 'data-analytics-scope': key }, t('m16_scope_' + key)),
     row ? h('div', { class: 'stat', 'data-analytics-total': key }, [h('b', {}, count(row.total)), h('span', {}, t('m16_total'))]) : null,
-    row ? h('div', { class: 'tab-stack' }, (row.stages || []).map(stage => h('div', { class: 'list-row' }, [
-      h('span', { style: 'flex:1;min-width:0;overflow-wrap:anywhere' }, stage.kind === 'unclassified' ? t('m16_unclassified') : translateEnum(ENUMS[key], stage.stage)),
-      h('b', {}, count(stage.count)),
-    ]))) : h('p', { class: 'foot-note' }, t('m16_missing')),
+    row ? selectableBars((row.stages || []).map(stage => ({
+      label: stage.kind === 'unclassified' ? t('m16_unclassified') : translateEnum(ENUMS[key], stage.stage),
+      value: Number.isInteger(stage.count) && stage.count >= 0 ? stage.count : null,
+    })), t('m16_' + key)) : h('p', { class: 'foot-note' }, t('m16_missing')),
     row ? stageDetails(key, row) : null,
     row ? h('details', {}, [
       h('summary', {}, t('m16_source_notes')),

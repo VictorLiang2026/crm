@@ -21,7 +21,7 @@ import { openWorkItemEditor, openWorkItemTransition, openQuickCapture, openPerso
   openPersonInteraction, openPersonFollowup, openPersonCustomerRemove, openReferrerRoleAction } from '../write.js';
 import {
   pageHead, emptyNote, loadInto, bdg, kvGrid, sectionTitle,
-  fmtDate, weekdayCN, dueLabel, toneByDue, textOf,
+  fmtDate, weekdayCN, dueLabel, toneByDue, textOf, isCompactViewport,
 } from '../ui.js';
 import { t, translateEnum } from '../i18n.js';
 
@@ -580,8 +580,18 @@ export function renderPerson(ctx, id, initialSection) {
   }
   function drawNavigation() {
     const current = sectionOf(activePart);
-    navigation.replaceChildren(...PERSON_SECTIONS.filter(visible).map(section =>
-      navButton(section.key, section.label, current === section, true)));
+    const compact = isCompactViewport();
+    const sections = PERSON_SECTIONS.filter(visible);
+    const button = section => navButton(section.key, section.label, current === section, true);
+    const groups = sections.slice(2);
+    navigation.classList.toggle('person-mobile-navigation', compact);
+    navigation.replaceChildren(...(compact ? [
+      ...sections.slice(0, 2).map(button),
+      h('details', { class: 'person-mobile-business', open: groups.includes(current) }, [
+        h('summary', { class: 'btn btn-ghost' }, t('mobile_business')),
+        h('div', { class: 'person-mobile-business-links' }, groups.map(button)),
+      ]),
+    ] : sections.map(button)));
     subnav.replaceChildren(...(current.parts.length > 1 ? current.parts.map(part =>
       navButton(part, parts[part][0], activePart === part, false)) : []));
     subnav.hidden = !subnav.childElementCount;
@@ -902,26 +912,32 @@ export function renderPerson(ctx, id, initialSection) {
     gifts: ['care_gifts_title', (context, personId) => careMaterialsNode(context, personId, { giftsOnly: true })],
     ocr: ['tab_ocr_review', renderOcrReview],
   };
-  ctx.main.replaceChildren(
-    pageHead({ kicker: t('kicker_person'), title: titleNode, sub: t('person_sub'), actions: [
-        h('button', {
-          class: 'btn btn-soft', type: 'button',
-          onclick: () => openPersonEdit(wctx, { personId: String(id), onDone: wctx.onWriteDone }),
-        }, [ic('gear'), t('btn_edit_profile')]),
-        h('button', {
-          class: 'btn btn-soft', type: 'button',
-          onclick: event => openQuickCapture(wctx, { personId: String(id), onDone: wctx.onWriteDone, trigger: event.currentTarget }),
-          title: t('btn_record_comm_full'),
-        }, [ic('mic'), t('btn_record_comm')]),
-        h('button', {
-          class: 'btn btn-ghost', type: 'button', style: 'color:var(--red)',
-          onclick: () => openPersonDelete(wctx, {
-            personId: String(id), displayName: titleNode.textContent,
-            onDone: () => { location.hash = '#/people'; },
-          }),
-        }, [ic('trash'), t('btn_delete_person')]),
-      ],
+  const compact = isCompactViewport();
+  const editProfile = h('button', {
+    class: 'btn btn-soft', type: 'button',
+    onclick: () => openPersonEdit(wctx, { personId: String(id), onDone: wctx.onWriteDone }),
+  }, [ic('gear'), t('btn_edit_profile')]);
+  const record = h('button', {
+    class: compact ? 'btn btn-primary' : 'btn btn-soft', type: 'button',
+    onclick: event => openQuickCapture(wctx, { personId: String(id), onDone: wctx.onWriteDone, trigger: event.currentTarget }),
+    title: t('btn_record_comm_full'),
+  }, [ic('mic'), t('btn_record_comm')]);
+  const removePerson = h('button', {
+    class: 'btn btn-ghost', type: 'button', style: 'color:var(--red)',
+    onclick: () => openPersonDelete(wctx, {
+      personId: String(id), displayName: titleNode.textContent,
+      onDone: () => { location.hash = '#/people'; },
     }),
+  }, [ic('trash'), t('btn_delete_person')]);
+  const actions = compact ? [record, h('details', { class: 'person-mobile-actions' }, [
+    h('summary', { class: 'btn btn-ghost' }, t('nav_more')),
+    h('div', { class: 'person-mobile-actions-menu' }, [editProfile, removePerson]),
+  ])] : [editProfile, record, removePerson];
+  ctx.main.replaceChildren(
+    pageHead({ kicker: t('kicker_person'), title: titleNode, sub: t('person_sub'), actions,
+    }),
+    compact ? h('a', { class: 'btn btn-ghost person-mobile-back', href: ctx.peopleBackHash || '#/people' },
+      t('nav_people')) : null,
     navigation, roleStatus, subnav, content,
   );
   if (visible(sectionOf(initialSection))) {

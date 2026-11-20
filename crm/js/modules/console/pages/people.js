@@ -3,7 +3,7 @@ import { h } from '../dom.js';
 import { ic } from '../icons.js';
 import { data } from '../data.js';
 import { openPersonNew, openPersonRoleConversion } from '../write.js';
-import { pageHead, emptyNote, loadInto, bdg, textOf, dueLabel } from '../ui.js';
+import { pageHead, emptyNote, loadInto, bdg, textOf, dueLabel, isCompactViewport } from '../ui.js';
 import { t, translateEnum } from '../i18n.js';
 
 const DESKTOP_PAGE_SIZE = 20;
@@ -226,9 +226,29 @@ export function renderPeople(ctx,initialPolicyFilter) {
       const iphoneView = iphoneLayout
         ? participantView ? 'participant' : customerView ? 'customer' : 'default'
         : undefined;
-      return h('div', { class: 'table-scroll people-directory-scroll' }, h('table', {
+      const table = h('div', { class: 'table-scroll people-directory-scroll' }, h('table', {
         class: 'people-table people-directory-table', 'data-iphone-view': iphoneView,
       }, [thead, tbody]));
+      if (!iphoneLayout || !isCompactViewport()) return table;
+      const summary = h('ul', { class: 'people-summary-list' }, rows.map(person => h('li', {}, [
+        h('a', { class: 'people-summary-name', href: `#/person/${person.id}` }, person.display_name || t('unnamed')),
+        h('p', { class: 'muted' }, (person.roles || []).map(role => roleLabels[role] || role).join(' · ')),
+        h('dl', {}, [
+          ...[ ['col_latest_followup', person.latest_followup_date], ['col_next_followup', person.next_followup_date] ].flatMap(([key, value]) =>
+            [h('dt', {}, t(key)), h('dd', {}, value ? fmtDate(value) : '—')]),
+        ]),
+        participantView && person.latest_activity_id ? h('a', { class: 'btn btn-ghost', href: `#/activity/${person.latest_activity_id}` },
+          person.latest_activity_name || t('directory_latest_activity')) : null,
+      ])));
+      const toggle = h('button', { type: 'button', class: 'btn btn-ghost people-summary-toggle',
+        onclick: () => { state.compare = !state.compare; syncView(); } });
+      function syncView() {
+        table.hidden = !state.compare;
+        summary.hidden = Boolean(state.compare);
+        toggle.textContent = t(state.compare ? 'mobile_summary' : 'mobile_compare_table');
+      }
+      syncView();
+      return h('div', { class: 'people-summary-directory' }, [toggle, summary, table]);
     }, undefined, keepSortFocus === true ? 'data-sort-field' : undefined);
   }
 

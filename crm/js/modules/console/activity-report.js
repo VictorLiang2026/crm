@@ -1,7 +1,7 @@
 import { h } from './dom.js';
 import { data } from './data.js';
 import { t, translateEnum } from './i18n.js';
-import { card, emptyNote, errorBox, pageHead, wpTag } from './ui.js';
+import { card, emptyNote, errorBox, pageHead, wpTag, selectableBars } from './ui.js';
 
 const CUSTOMER_GROUPS = [
   ['pc21_customer_growth', ['newCustomers', 'firstContacts']],
@@ -73,7 +73,19 @@ function renderDaily(report, type) {
   const dailyKeys = type === 'customer'
     ? ['newCustomers', 'followups', 'customersTouched', 'gifts', 'photos', 'ocrParses', 'aiSuggestions', 'policyReviews']
     : ['newCandidates', 'rcFollowups', 'candidatesTouched', 'warm', 'firstInterview', 'event', 'deepInterview', 'apply', 'hired'];
+  const chart = h('div');
+  const metric = h('select', { 'aria-label': t('mobile_chart_metric'), onchange: () => drawChart() },
+    dailyKeys.map(key => h('option', { value: key }, t(METRIC_KEYS[key]))));
+  function drawChart() {
+    const key = metric.value;
+    chart.replaceChildren(selectableBars(dateLabels.map(day => ({
+      label: day.date, value: day[key] ?? 0, detail: t(METRIC_KEYS[key]),
+    })), t('pc21_daily_trend')));
+  }
+  if (report.mode === 'range' && dateLabels.length) drawChart();
   const dailyTable = report.mode === 'range' ? card({ title: t('pc21_daily_trend'), icon: 'chart', body: [
+    dateLabels.length ? h('label', { class: 'chart-metric' }, [t('mobile_chart_metric'), metric]) : null,
+    chart,
     h('div', { style: 'overflow-x:auto' }, h('table', { class: 'data-table' }, [
       h('thead', {}, h('tr', {}, [h('th', {}, t('pc21_date')), ...dailyKeys.map(key => h('th', {}, t(METRIC_KEYS[key])))])),
       h('tbody', {}, dateLabels.map(day => h('tr', {}, [h('th', { scope: 'row' }, day.date), ...dailyKeys.map(key => h('td', {}, String(day[key] || 0)))]))),

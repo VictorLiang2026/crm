@@ -8,6 +8,7 @@ import { renderLogin, renderReloginOverlay } from './login.js';
 import { mountShell } from './shell.js';
 import { navHashFor, dispatch } from './router.js';
 import { openQuickCapture } from './write.js';
+import { confirmDiscardDraft } from './ui.js';
 
 const CONFIG = window.APP_CONFIG || {};
 const SESSION_TIMEOUT = 5 * 60 * 1000; // 与 admin.html 一致
@@ -90,6 +91,8 @@ function forceReLogin() {
 async function signOutCurrentAccount() {
   checkAuthResult(await authInst.signOut());
   loginReady = false;
+  if (activeVisit) delete activeVisit.draftChanged;
+  document.querySelectorAll('.sheet-draft-active').forEach(sheet => sheet.remove());
   try { localStorage.removeItem(LAST_KEY); } catch (e) { console.warn(e); }
   const url = new URL(location.href);
   url.hash = '#/today';
@@ -112,6 +115,8 @@ async function changeCurrentPassword(oldPassword, newPassword) {
 const visits = new Map();
 let activeVisit = null;
 let stopTracking = () => {};
+let visitOrder = 0;
+let restoringVisit = false;
 function visitFor(hash) {
   const entry = history.state?.crmVisit;
   let visit = visits.get(entry);
@@ -119,9 +124,9 @@ function visitFor(hash) {
     const key = crypto.randomUUID();
     const fromPerson = activeVisit?.hash.startsWith('#/person/');
     const source = fromPerson ? activeVisit.directory : activeVisit;
-    visit = { hash };
-    if (hash.startsWith('#/person/') && source?.hash.startsWith('#/people')) visit.directory = source;
-    if (hash === '#/people' && fromPerson && source?.list) visit.list = structuredClone(source.list);
+    visit = { hash, order: ++visitOrder };
+    if (hash.startsWith('#/person/') && source?.list) visit.directory = source;
+    if (fromPerson && hash === source?.hash && source.list) visit.list = structuredClone(source.list);
     visits.set(key, visit);
     if (visits.size > 150) visits.delete(visits.keys().next().value);
     history.replaceState({ ...history.state, crmVisit: key }, '');
@@ -132,14 +137,38 @@ function visitFor(hash) {
 function route() {
   if (!loginReady || !shell) return;
   const raw = location.hash || '#/today';
+  if (restoringVisit && activeVisit?.hash === raw) {
+    restoringVisit = false;
+    return;
+  }
+  restoringVisit = false;
+  if (activeVisit && activeVisit.hash !== raw) {
+    const draftSheets = document.querySelectorAll('.sheet-draft-active');
+    if (activeVisit.draftChanged?.() || draftSheets.length) {
+      if (!confirmDiscardDraft()) {
+        const destination = visits.get(history.state?.crmVisit);
+        restoringVisit = true;
+        if (destination && destination.order < activeVisit.order) history.forward();
+        else history.back();
+        return;
+      }
+      draftSheets.forEach(sheet => sheet.remove());
+    }
+  }
   stopTracking();
+  const previousVisit = activeVisit;
   const visit = visitFor(raw);
+  if (previousVisit && visit !== previousVisit) delete previousVisit.draftChanged;
   const main = shell.main.cloneNode(false);
   shell.main.replaceWith(main);
   shell.main = main;
   shell.setActive(navHashFor(raw));
   dispatch(raw, {
     main,
+    peopleBackHash: visit.directory?.hash,
+    guardDraft(changed) {
+      visit.draftChanged = () => main.isConnected && changed();
+    },
     restoredList: Boolean(visit.list),
     listContext(state, scrollSelector) {
       const saved = visit.list;
@@ -204,6 +233,23 @@ function enterApp(appRoot) {
   });
   if (!hashBound) {
     hashBound = true;
+    window.addEventListener('beforeunload', event => {
+      if (activeVisit?.draftChanged?.() || document.querySelector('.sheet-draft-active')) {
+        event.preventDefault();
+        event.returnValue = '';
+      }
+    });
+    appRoot.addEventListener('click', event => {
+      if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      const link = event.target.closest('a[href^="#/"]');
+      if (link && link.hash !== activeVisit?.hash && activeVisit?.draftChanged?.()) {
+        event.preventDefault();
+        if (confirmDiscardDraft()) {
+          delete activeVisit.draftChanged;
+          location.hash = link.hash;
+        }
+      }
+    }, true);
     window.addEventListener('hashchange', event => {
       if (!event.newURL || event.newURL === location.href) route();
     });

@@ -8,7 +8,7 @@
 //     → 人工点选候选 → 完整服务端预览 → 人工确认 → 单事务执行。
 import { h } from './dom.js';
 import { ic } from './icons.js';
-import { bdg, fmtDate, dueLabel, textOf, isCompactViewport } from './ui.js';
+import { bdg, fmtDate, dueLabel, textOf, isCompactViewport, confirmDiscardDraft } from './ui.js';
 import { t, getLang, translateEnum } from './i18n.js';
 import { data } from './data.js';
 
@@ -76,7 +76,7 @@ function dateToIso(dateStr) {
 // ---------- Bottom Sheet 骨架 ----------
 let inertSheetBackground = null;
 
-export function openSheet({ title, sub, body, trigger = document.activeElement }) {
+export function openSheet({ title, sub, body, trigger = document.activeElement, canDismiss = () => true, protectDraft = false }) {
   const errBox = h('div', { class: 'sheet-err', role: 'alert', style: 'display:none' });
   const bodyEl = h('div', {}, [body, errBox]);
   const sheetEl = h('div', { class: 'sheet', role: 'dialog', 'aria-modal': 'true', 'aria-label': title, tabindex: '-1' }, [
@@ -92,6 +92,13 @@ export function openSheet({ title, sub, body, trigger = document.activeElement }
     bodyEl,
   ]);
   const overlay = h('div', { class: 'sheet-overlay' }, [sheetEl]);
+  const markDraft = () => {
+    if (protectDraft && isCompactViewport()) overlay.classList.add('sheet-draft-active');
+  };
+  if (protectDraft) {
+    overlay.addEventListener('input', markDraft);
+    overlay.addEventListener('change', markDraft);
+  }
   const viewport = window.visualViewport;
   const focusable = () => [...sheetEl.querySelectorAll(
     'a[href],input,select,textarea,button,[tabindex]',
@@ -180,6 +187,11 @@ export function openSheet({ title, sub, body, trigger = document.activeElement }
   let closing = false;
   function closeSheet() {
     if (closing) return;
+    if (!canDismiss() || protectDraft && overlay.classList.contains('sheet-draft-active') && !confirmDiscardDraft()) {
+      sheetEl.style.transform = '';
+      overlay.style.background = '';
+      return;
+    }
     closing = true;
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
       overlay.remove();
@@ -193,6 +205,8 @@ export function openSheet({ title, sub, body, trigger = document.activeElement }
 
   return {
     overlay,
+    dismiss: closeSheet,
+    markDraft,
     showErr(msg) {
       errBox.textContent = String(msg || '操作未完成').slice(0, 200);
       errBox.style.display = '';
@@ -857,6 +871,8 @@ export function openCandidate(ctx, { row, onDone }) {
 
 // ---------- 快速记录（Quick Capture，生产链路） ----------
 export function openQuickCapture(ctx, { personId, onDone, trigger } = {}) {
+  const protectDraft = isCompactViewport();
+  let savedCapture = false;
   async function parseFocused(text, selected = null) {
     let workContext = {};
     if (selected) {
@@ -897,7 +913,11 @@ export function openQuickCapture(ctx, { personId, onDone, trigger } = {}) {
     title: t('quick_record'),
     sub: t('capture_focus_intro'),
     trigger,
+    canDismiss: () => !protectDraft || savedCapture || !ta.value.trim() || confirmDiscardDraft(),
     body: h('div', {}, [ta, h('div', { class: 'sheet-actions' }, [parseBtn])]),
+  });
+  if (protectDraft) ta.addEventListener('input', () => {
+    sheet.overlay.classList.toggle('sheet-draft-active', Boolean(ta.value.trim()));
   });
   document.body.appendChild(sheet.overlay);
   async function doParse(btn) {
@@ -1110,6 +1130,8 @@ export function openQuickCapture(ctx, { personId, onDone, trigger } = {}) {
       ])) : [h('div', { class: 'sheet-note' }, t('capture_no_next'))]),
     ]);
     function afterSave(savedPersonId, savedName) {
+      savedCapture = true;
+      sheet.overlay.classList.remove('sheet-draft-active');
       ctx.toast(t('interaction_saved'), 'ok');
       if (onDone) onDone();
       if (recordOnly.checked || !nextItems.length) { sheet.overlay.remove(); return; }
@@ -1160,7 +1182,7 @@ export function openQuickCapture(ctx, { personId, onDone, trigger } = {}) {
       extras,
       nextReview,
       h('div', { class: 'sheet-actions' }, [
-        h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => sheet.overlay.remove() }, t('cancel')),
+        h('button', { class: 'btn btn-ghost', type: 'button', onclick: sheet.dismiss }, t('cancel')),
         h('button', {
           class: 'btn btn-primary', type: 'button',
           onclick: async (e) => {
@@ -1223,7 +1245,7 @@ export function openQuickCapture(ctx, { personId, onDone, trigger } = {}) {
                     h('div', { class: 'sheet-note', style: 'margin-top:8px' }, t('capture_atomic_note')),
                   ]),
                   h('div', { class: 'sheet-actions' }, [
-                    h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => sheet.overlay.remove() }, t('cancel')),
+                    h('button', { class: 'btn btn-ghost', type: 'button', onclick: sheet.dismiss }, t('cancel')),
                     h('button', {
                       class: 'btn btn-primary', type: 'button',
                       onclick: async (ev) => {
@@ -1272,7 +1294,7 @@ export function openQuickCapture(ctx, { personId, onDone, trigger } = {}) {
                   h('div', { class: 'sheet-note', style: 'margin-top:8px' }, t('capture_existing_atomic_note')),
                 ]),
                 h('div', { class: 'sheet-actions' }, [
-                  h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => sheet.overlay.remove() }, t('cancel')),
+                  h('button', { class: 'btn btn-ghost', type: 'button', onclick: sheet.dismiss }, t('cancel')),
                   h('button', { class: 'btn btn-primary', type: 'button',
                     onclick: async (ev) => {
                       const bb = ev.currentTarget;
@@ -1966,12 +1988,12 @@ export function openPersonInteraction(ctx, { personId, onDone } = {}) {
   const summary = h('textarea', { class: 'sheet-textarea', maxlength: '2000', required: true });
   const rawNote = h('textarea', { class: 'sheet-textarea', maxlength: '10000' });
   const submit = h('button', { class: 'btn btn-primary', type: 'button', onclick: save }, t('btn_save'));
-  const sheet = openSheet({ title: t('interaction_create_title'), sub: `Person #${personId}`, body: h('div', {}, [
+  const sheet = openSheet({ title: t('interaction_create_title'), sub: `Person #${personId}`, protectDraft: true, body: h('div', {}, [
     fieldRow(t('interaction_type_label'), type), fieldRow(t('interaction_at_label'), at),
     fieldRow(t('interaction_channel_label'), channel), fieldRow(t('followup_summary_label'), summary),
     fieldRow(t('interaction_raw_note_label'), rawNote),
     h('div', { class: 'sheet-actions' }, [
-      h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => sheet.overlay.remove() }, t('cancel')),
+      h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => sheet.dismiss() }, t('cancel')),
       submit,
     ]),
   ]) });
@@ -2000,7 +2022,7 @@ export function openPersonFollowup(ctx, { personId, customerId, followupId = nul
   if (!/^[1-9]\d*$/.test(String(personId || '')) || !/^[1-9]\d*$/.test(String(customerId || ''))) return;
   const editing = followupId != null;
   const title = editing ? t('followup_edit_title') : t('followup_create_title');
-  const sheet = openSheet({ title, sub: `Person #${personId} · Customer #${customerId}`,
+  const sheet = openSheet({ title, sub: `Person #${personId} · Customer #${customerId}`, protectDraft: true,
     body: h('div', { class: 'muted' }, t('edit_loading')) });
   document.body.appendChild(sheet.overlay);
   (async () => {
@@ -2048,7 +2070,7 @@ export function openPersonFollowup(ctx, { personId, customerId, followupId = nul
         h('div', { class: 'sheet-actions' }, [
           editing ? h('button', { class: 'btn btn-ghost', type: 'button', style: 'color:var(--red)',
             onclick: confirmDelete }, t('delete_followup')) : null,
-          h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => sheet.overlay.remove() }, t('cancel')),
+          h('button', { class: 'btn btn-ghost', type: 'button', onclick: sheet.dismiss }, t('cancel')),
           saveButton,
         ]),
       ]);

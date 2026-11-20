@@ -1,5 +1,5 @@
 import { h } from './dom.js';
-import { pageHead, emptyNote } from './ui.js';
+import { pageHead, emptyNote, isCompactViewport, workflowSteps } from './ui.js';
 import { getLang, t } from './i18n.js';
 import { archivePdf } from './knowledge-document.js';
 import { data } from './data.js';
@@ -55,11 +55,23 @@ export function renderKnowledgeEditor(ctx,{mode='new',table='knowledge_items',id
   const formStatus=h('p',{class:'foot-note',role:'status'});
   const categoryNode=categoryChooser(isPlaybook?['conversation_strategy']:[]);
   const basicInfoEdit=mode==='edit'&&!isPlaybook;
+  const compact = isCompactViewport();
+  let dirty = false;
+  let step = 0;
+  if (compact) ctx.guardDraft?.(() => dirty);
+  function finish() {
+    dirty = false;
+    if (ctx.main.isConnected) location.hash = '#/knowledge-governance';
+  }
   const form=h('form',{class:`kg-form kg-page-form${basicInfoEdit?' kg-basic-info-form':''}`,onsubmit:async event=>{
-    event.preventDefault();const current=event.currentTarget,values=Object.fromEntries(new FormData(current).entries());
+    event.preventDefault();
+    if (compact && step !== 2) { advance(); return; }
+    const current=event.currentTarget,values=Object.fromEntries(new FormData(current).entries());
     values.categories=selectedCategories(current);
     if(!values.categories.length){formStatus.textContent=text('category_required');return;}
-    const submit=current.querySelector('[type="submit"]');submit.disabled=true;
+    const submit=current.querySelector('[type="submit"]');
+    if (submit.disabled) return;
+    submit.disabled=true;
     try{
       let queuedUpload=false;
       if(isUpload){
@@ -121,7 +133,7 @@ export function renderKnowledgeEditor(ctx,{mode='new',table='knowledge_items',id
             if(result.split){
               formStatus.textContent=replaceCount(text('pdf_volumes_queued'),result.parts);
               ctx.toast(replaceCount(text('pdf_volumes_queued'),result.parts),'ok');
-              location.hash='#/knowledge-governance';
+              finish();
               return;
             }
           }else await uploadPart(file,{split:false});
@@ -148,7 +160,7 @@ export function renderKnowledgeEditor(ctx,{mode='new',table='knowledge_items',id
           confidence:values.confidence===''?0.8:Number(values.confidence)}});
         if(!result?.ok)throw new Error(result?.error?.message||text('save_failed'));
       }
-      ctx.toast(text(isUpload?(queuedUpload?'ocr_queued':'upload_success'):'save_success'),'ok');location.hash='#/knowledge-governance';
+      ctx.toast(text(isUpload?(queuedUpload?'ocr_queued':'upload_success'):'save_success'),'ok');finish();
     }catch(error){formStatus.textContent=error.message||text('save_failed');submit.disabled=false;}
   }},[]);
   const elements=[];
@@ -204,10 +216,64 @@ export function renderKnowledgeEditor(ctx,{mode='new',table='knowledge_items',id
     }
   }
   if(mode==='edit')elements.push(h('input',{type:'hidden',name:'expectedUpdatedAt',value:''}));
-  form.replaceChildren(...elements,h('div',{class:'kg-form-actions'},[
+  const submitButton = h('button',{class:'btn btn-primary',type:'submit'},text(isUpload?'upload_button':mode==='edit'?'save_changes':'save_knowledge'));
+  const actions = h('div',{class:'kg-form-actions'},[
     h('a',{class:'btn btn-ghost',href:'#/knowledge-governance'},text('cancel')),
-    h('button',{class:'btn btn-primary',type:'submit'},text(isUpload?'upload_button':mode==='edit'?'save_changes':'save_knowledge')),
-  ]),formStatus);
+    submitButton,
+  ]);
+  const labels = ['mobile_step_content', 'mobile_step_source', 'mobile_step_review'].map(t);
+  let panels, stepList, nextStep, previousStep;
+  if (compact) {
+    const sourceFields = ['publisher', 'sourceUri', 'publishedAt', 'reviewAt', 'confidence'];
+    const groups = [[], []];
+    for (const node of elements) {
+      const name = node.querySelector('input,textarea')?.name;
+      groups[Number(node === categoryNode || node.classList.contains('kg-basic-info-grid') || sourceFields.includes(name))].push(node);
+    }
+    panels = [...groups, []].map((group, index) => h('section', {
+      class: 'kg-mobile-step', tabindex: '-1', 'aria-label': labels[index], inert: mode === 'edit',
+    }, group));
+    stepList = h('div');
+    previousStep = h('button', { type: 'button', class: 'btn btn-ghost', onclick: () => showStep(step - 1, true) }, t('mobile_step_back'));
+    nextStep = h('button', { type: 'button', class: 'btn btn-primary', onclick: advance, disabled: mode === 'edit' }, t('mobile_step_next'));
+    actions.prepend(previousStep);
+    actions.append(nextStep);
+    form.noValidate = true;
+    form.replaceChildren(stepList, ...panels, actions, formStatus);
+    showStep(0);
+  } else form.replaceChildren(...elements, actions, formStatus);
+  form.addEventListener('input', () => { dirty = true; });
+  form.addEventListener('change', () => { dirty = true; });
+  function showStep(index, focus = false) {
+    step = index;
+    panels.forEach((panel, position) => { panel.hidden = position !== step; });
+    stepList.replaceChildren(workflowSteps(labels, step));
+    previousStep.hidden = step === 0;
+    submitButton.hidden = step !== 2;
+    nextStep.hidden = step === 2;
+    if (step === 2) {
+      const title = form.elements.title?.value || form.elements.scenario?.value || '';
+      const category = selectedCategories(form).map(key => text(`category_${key}`)).join(' · ');
+      const details = [...form.querySelectorAll('.kg-field')].flatMap(field => {
+        const control = field.querySelector('input,textarea');
+        const value = control?.type === 'file' ? control.files[0]?.name : control?.value;
+        return value && !['title', 'scenario'].includes(control.name)
+          ? [h('dt', {}, field.querySelector('span')?.textContent || ''), h('dd', {}, value)] : [];
+      });
+      panels[2].replaceChildren(h('h2', {}, title), h('p', {}, category), h('dl', { class: 'kg-mobile-review' }, details));
+    }
+    formStatus.textContent = '';
+    if (focus) panels[step].focus();
+  }
+  function advance() {
+    if (nextStep.disabled) return;
+    const invalid = [...panels[step].querySelectorAll('input,textarea,select')].find(node => !node.validity.valid);
+    if (invalid) { invalid.reportValidity(); return; }
+    if (step === 1 && !selectedCategories(form).length) {
+      formStatus.textContent = text('category_required'); return;
+    }
+    showStep(step + 1, true);
+  }
   const pageTitle=isUpload?'upload_page_title':isPlaybook?(mode==='edit'?'edit_playbook':'new_playbook_button'):
     mode==='edit'?'basic_info':'new_knowledge_button';
   ctx.main.replaceChildren(pageHead({kicker:text('kicker'),title:text(pageTitle),sub:text(isUpload?'upload_page_note':'editor_page_note'),actions:[backLink()]}),
@@ -257,6 +323,10 @@ export function renderKnowledgeEditor(ctx,{mode='new',table='knowledge_items',id
         ]);
         const metadataGrid=form.querySelector('.kg-basic-info-grid');
         if(metadataGrid)metadataGrid.after(previews);
+      }
+      if (nextStep) {
+        panels.forEach(panel => { panel.inert = false; });
+        nextStep.disabled = false;
       }
     }).catch(error=>{formStatus.textContent=error.message||text('edit_not_found');});
   }

@@ -1,7 +1,7 @@
 import { h } from './dom.js';
 import { ic } from './icons.js';
 import { data } from './data.js';
-import { pageHead, emptyNote } from './ui.js';
+import { pageHead, emptyNote, isCompactViewport, workflowSteps, confirmDiscardDraft } from './ui.js';
 import { getLang, t } from './i18n.js';
 import { PERSON_EXPORT_COLUMNS, mapMappedValues, mergeContinuationRows, readRosterFile, toCsv, toXlsx } from './person-list-transfer-file.js';
 
@@ -85,6 +85,8 @@ function conflictRows(preview, decisions, fieldPolicy) {
 }
 
 export function renderPersonListTransfer(ctx) {
+  const compact = isCompactViewport();
+  let importStep = 0;
   let tab = 'import';
   let fileData = null;
   let mappings = [];
@@ -102,6 +104,7 @@ export function renderPersonListTransfer(ctx) {
   let statusMessage = '';
   let statusError = false;
   let busy = false;
+  if (compact) ctx.guardDraft?.(() => Boolean(!results?.ok && (fileData || busy && tab === 'import')));
   ctx.main.replaceChildren();
 
   function setStatus(message, error = false) {
@@ -113,7 +116,7 @@ export function renderPersonListTransfer(ctx) {
     node.classList.toggle('is-error', statusError);
   }
 
-  function render() {
+  function render(focus = false) {
     const importTab = h('button', { class: 'plt-tab' + (tab === 'import' ? ' is-active' : ''), type: 'button',
       'aria-pressed': String(tab === 'import'), onclick: () => { tab = 'import'; render(); } }, t('plt_tab_import'));
     const exportTab = h('button', { class: 'plt-tab' + (tab === 'export' ? ' is-active' : ''), type: 'button',
@@ -124,6 +127,10 @@ export function renderPersonListTransfer(ctx) {
       h('div', { class: 'plt-tabs', role: 'tablist' }, [importTab, exportTab]), status,
       tab === 'import' ? renderImport() : renderExport()];
     ctx.main.replaceChildren(...page);
+    if (focus) {
+      const heading = ctx.main.querySelector('.person-list-transfer h2');
+      if (heading) { heading.tabIndex = -1; heading.focus(); }
+    }
   }
 
   function renderImport() {
@@ -131,6 +138,7 @@ export function renderPersonListTransfer(ctx) {
     const fileInput = h('input', { class: 'plt-file-input', type: 'file', accept: '.csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       'aria-label': t('plt_browse'), onchange: async event => {
         const file = event.target.files?.[0]; if (!file) return;
+        if (compact && fileData && !confirmDiscardDraft()) { event.target.value = ''; return; }
         setStatus('');
         try {
           busy = true; render();
@@ -140,8 +148,8 @@ export function renderPersonListTransfer(ctx) {
           aiConfidence = mappings.map(field => field ? 100 : 0);
           mergeUnnamedRows = false; continuationSummary = null;
           preview = null; previewId = ''; decisions = {}; results = null;
-          busy = false; render();
-        } catch (error) { busy = false; fileData = null; render(); setStatus(errorMessage(error), true); }
+          importStep = 1; busy = false; render(compact);
+        } catch (error) { busy = false; render(); setStatus(errorMessage(error), true); }
       } });
     const drop = h('div', { class: 'plt-drop', ondragover: event => { event.preventDefault(); event.currentTarget.classList.add('is-dragging'); },
       ondragleave: event => event.currentTarget.classList.remove('is-dragging'), ondrop: event => {
@@ -152,20 +160,39 @@ export function renderPersonListTransfer(ctx) {
       h('strong', {}, fileData?.fileName || t('plt_drop_title')),
       h('span', { class: 'foot-note' }, fileData ? `${fileData.rows.length} ${t('plt_rows')}` : t('plt_drop_help')),
     ]), h('label', { class: 'btn btn-ghost' }, [t('plt_browse'), fileInput])]);
+    const upload = h('section', { class: 'card plt-section' }, [h('div', { class: 'plt-section-head' }, [
+      h('div', {}, [h('h2', {}, t('plt_upload_title')), h('p', { class: 'foot-note' }, t('plt_upload_help'))]),
+      h('button', { class: 'btn btn-soft', type: 'button', disabled: busy, onclick: async () => {
+        try { await loadDemo(); } catch { setStatus(t('plt_load_failed'), true); }
+      } }, t('plt_demo_file')),
+    ]), drop, !compact && fileData ? renderMapping() : null,
+      compact && fileData ? h('button', { type: 'button', class: 'btn btn-primary', disabled: busy,
+        onclick: () => { importStep = 1; render(true); } }, t('mobile_step_next')) : null,
+    ]);
+    if (compact) {
+      const stepContent = importStep === 0 ? upload
+        : importStep === 1 ? h('section', { class: 'card plt-section' }, renderMapping()) : renderPreview();
+      return h('div', { class: 'person-list-transfer', 'data-import-step': importStep }, [
+        workflowSteps(['plt_step_upload', 'mobile_step_mapping', 'mobile_step_review'].map(t), importStep),
+        importStep ? h('button', { type: 'button', class: 'btn btn-ghost', disabled: busy, onclick: () => {
+          if (importStep === 2 && !confirmDiscardDraft()) return;
+          if (importStep === 2) { preview = null; previewId = ''; decisions = {}; draftDifferent = {}; }
+          importStep--; setStatus(''); render(true);
+        } }, t('mobile_step_back')) : null,
+        stepContent,
+      ]);
+    }
     const body = [
       h('div', { class: 'plt-step-row' }, [h('span', { class: 'plt-step is-active' }, `1 · ${t('plt_step_upload')}`),
         h('span', { class: 'plt-step' + (preview ? ' is-active' : '') }, `2 · ${t('plt_step_review')}`)]),
-      h('section', { class: 'card plt-section' }, [h('div', { class: 'plt-section-head' }, [
-        h('div', {}, [h('h2', {}, t('plt_upload_title')), h('p', { class: 'foot-note' }, t('plt_upload_help'))]),
-        h('button', { class: 'btn btn-soft', type: 'button', disabled: busy, onclick: async () => { try { await loadDemo(); } catch { setStatus(t('plt_load_failed'), true); } } }, t('plt_demo_file')),
-      ]), drop, fileData ? renderMapping() : null,
-      ]),
+      upload,
     ];
     if (preview) body.push(renderPreview());
     return h('div', { class: 'person-list-transfer' }, body);
   }
 
   async function loadDemo() {
+    if (compact && fileData && !confirmDiscardDraft()) return;
     setStatus('');
     const matrix = [
       ['姓名','电话','机构','备注'],
@@ -177,7 +204,7 @@ export function renderPersonListTransfer(ctx) {
     const { rowsFromMatrix } = await import('./person-list-transfer-file.js');
     fileData = { ...rowsFromMatrix(matrix), fileName: 'people-demo.csv' };
     mappings = fileData.headers.map(localHeaderField); aiConfidence = mappings.map(field => field ? 100 : 0);
-    preview = null; previewId = ''; decisions = {}; results = null; render();
+    preview = null; previewId = ''; decisions = {}; results = null; importStep = 1; render(compact);
   }
 
   function renderMapping() {
@@ -268,6 +295,7 @@ export function renderPersonListTransfer(ctx) {
         }
       }
       setStatus(t('plt_analysis_ready'));
+      importStep = 2;
       busy = false; render();
       const target = preview.rows.some(row => ['needs_identity','needs_activity_roster_review','blocked'].includes(row.status))
         ? ctx.main.querySelector('.plt-review-list, .plt-blocked-help')
@@ -489,7 +517,7 @@ export function renderPersonListTransfer(ctx) {
       h('h2',{},t('plt_import_complete')),
       h('div',{class:'plt-stats'},[stat(successful,'plt_success'),stat(failed,'plt_failed'),stat(results?.counts?.skipped||0,'plt_duplicate')]),
       failed ? h('button',{class:'btn btn-ghost',type:'button',onclick:()=>downloadFile(toCsv(csvColumns,csvRows),'people-import-errors.csv','text/csv;charset=utf-8')},t('plt_download_errors')) : null,
-      h('button',{class:'btn btn-soft',type:'button',onclick:()=>{results=null;preview=null;fileData=null;render();}},t('plt_analyze_again')),
+      h('button',{class:'btn btn-soft',type:'button',onclick:()=>{results=null;preview=null;fileData=null;importStep=0;render(compact);}},t('plt_analyze_again')),
     ]);
   }
 

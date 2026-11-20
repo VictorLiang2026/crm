@@ -8,6 +8,39 @@ export function isCompactViewport() {
   return window.matchMedia('(max-width: 767px), (max-height: 520px) and (pointer: coarse)').matches;
 }
 
+export function confirmDiscardDraft() {
+  return window.confirm(t('mobile_draft_discard'));
+}
+
+export function workflowSteps(labels, current) {
+  return h('ol', { class: 'mobile-workflow-steps' }, labels.map((label, index) =>
+    h('li', { 'aria-current': index === current ? 'step' : undefined }, [String(index + 1), ' · ', label])));
+}
+
+export function selectableBars(entries, label) {
+  const status = h('p', { class: 'chart-selection', role: 'status' });
+  const magnitude = entry => Number.isFinite(entry.value) && entry.value >= 0 ? entry.value : 0;
+  const max = Math.max(1, ...entries.map(magnitude));
+  const buttons = entries.map(entry => h('button', {
+    type: 'button', class: 'chart-bar', 'aria-pressed': 'false',
+    'aria-label': `${entry.label} · ${entry.value ?? '—'}`,
+    onclick: event => select(event.currentTarget, entry),
+  }, [
+    h('span', {}, entry.label),
+    h('span', { class: 'chart-track', 'aria-hidden': 'true' },
+      h('span', { style: `--chart-fill:${100 * magnitude(entry) / max}%` })),
+    h('strong', {}, String(entry.value ?? '—')),
+  ]));
+  function select(button, entry) {
+    buttons.forEach(control => control.setAttribute('aria-pressed', String(control === button)));
+    status.textContent = `${entry.label} · ${entry.value ?? '—'}${entry.detail ? ' · ' + entry.detail : ''}`;
+  }
+  if (entries.length) select(buttons[0], entries[0]);
+  return h('section', { class: 'interactive-chart', 'aria-label': label }, [
+    status, h('div', { class: 'chart-bars', tabindex: '0', 'aria-label': label }, buttons),
+  ]);
+}
+
 // ---------- 结构件（沿用 WP0 约定） ----------
 export function wpTag(text, hot) {
   return h('span', { class: 'wp-tag' + (hot ? ' hot' : '') }, text);

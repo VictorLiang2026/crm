@@ -2,6 +2,16 @@
 const DEFAULT = 'zh-CN';
 
 const DICT = {
+  mobile_summary: {"zh-CN":"摘要列表","en":"Summary list"},
+  mobile_business: {"zh-CN":"业务与资料","en":"Business & records"},
+  mobile_step_content: {"zh-CN":"内容","en":"Content"},
+  mobile_step_source: {"zh-CN":"来源与分类","en":"Source & category"},
+  mobile_step_review: {"zh-CN":"检查并确认","en":"Review & confirm"},
+  mobile_step_mapping: {"zh-CN":"字段映射","en":"Map fields"},
+  mobile_step_back: {"zh-CN":"上一步","en":"Back"},
+  mobile_step_next: {"zh-CN":"下一步","en":"Continue"},
+  mobile_draft_discard: {"zh-CN":"有未保存的内容。确定放弃并离开？","en":"You have unsaved changes. Discard them and leave?"},
+  mobile_chart_metric: {"zh-CN":"图表指标","en":"Chart metric"},
   mobile_compare_table: {"zh-CN":"表格对照","en":"Compare in table"},
   mobile_record: {"zh-CN":"记录","en":"Record"},
   ro_selector_heading: {"zh-CN":"使用版本","en":"Version in use"},
