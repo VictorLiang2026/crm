@@ -5555,6 +5555,162 @@
         "authenticated_read": false,
         "authenticated_usage": false
       }
+    },
+    {
+      "kind": "relation",
+      "name": "daily_inspiration_history",
+      "detail": {
+        "rls": true,
+        "type": "r",
+        "policies": [
+          {
+            "name": "daily_inspiration_history_service_only",
+            "roles": [
+              "service_role"
+            ],
+            "command": "*",
+            "check_hash": "b326b5062b2f0e69046810717534cb09",
+            "permissive": true,
+            "using_hash": "b326b5062b2f0e69046810717534cb09"
+          }
+        ],
+        "force_rls": true,
+        "privileges": {
+          "anon": [],
+          "service_role": [
+            "DELETE",
+            "INSERT",
+            "SELECT"
+          ],
+          "authenticated": []
+        },
+        "security_invoker": false
+      }
+    },
+    {
+      "kind": "relation",
+      "name": "daily_inspiration_quotes",
+      "detail": {
+        "rls": true,
+        "type": "r",
+        "policies": [
+          {
+            "name": "daily_inspiration_quotes_service_only",
+            "roles": [
+              "service_role"
+            ],
+            "command": "*",
+            "check_hash": "b326b5062b2f0e69046810717534cb09",
+            "permissive": true,
+            "using_hash": "b326b5062b2f0e69046810717534cb09"
+          }
+        ],
+        "force_rls": true,
+        "privileges": {
+          "anon": [],
+          "service_role": [
+            "INSERT",
+            "SELECT",
+            "UPDATE"
+          ],
+          "authenticated": []
+        },
+        "security_invoker": false
+      }
+    },
+    {
+      "kind": "relation",
+      "name": "daily_inspiration_settings",
+      "detail": {
+        "rls": true,
+        "type": "r",
+        "policies": [
+          {
+            "name": "daily_inspiration_settings_service_only",
+            "roles": [
+              "service_role"
+            ],
+            "command": "*",
+            "check_hash": "b326b5062b2f0e69046810717534cb09",
+            "permissive": true,
+            "using_hash": "b326b5062b2f0e69046810717534cb09"
+          }
+        ],
+        "force_rls": true,
+        "privileges": {
+          "anon": [],
+          "service_role": [
+            "INSERT",
+            "SELECT",
+            "UPDATE"
+          ],
+          "authenticated": []
+        },
+        "security_invoker": false
+      }
+    },
+    {
+      "kind": "relation",
+      "name": "daily_inspiration_slots",
+      "detail": {
+        "rls": true,
+        "type": "r",
+        "policies": [
+          {
+            "name": "daily_inspiration_slots_service_only",
+            "roles": [
+              "service_role"
+            ],
+            "command": "*",
+            "check_hash": "b326b5062b2f0e69046810717534cb09",
+            "permissive": true,
+            "using_hash": "b326b5062b2f0e69046810717534cb09"
+          }
+        ],
+        "force_rls": true,
+        "privileges": {
+          "anon": [],
+          "service_role": [
+            "INSERT",
+            "SELECT",
+            "UPDATE"
+          ],
+          "authenticated": []
+        },
+        "security_invoker": false
+      }
+    },
+    {
+      "kind": "routine",
+      "name": "crm_daily_inspiration_v1(p_operation text, p_actor_uid text, p_data jsonb)",
+      "detail": {
+        "anon_execute": false,
+        "service_execute": true,
+        "security_definer": false,
+        "authenticated_execute": false
+      }
+    },
+    {
+      "kind": "sequence",
+      "name": "daily_inspiration_history_id_seq",
+      "detail": {
+        "anon_read": false,
+        "anon_usage": false,
+        "service_usage": true,
+        "authenticated_read": false,
+        "authenticated_usage": false
+      }
+    },
+    {
+      "kind": "sequence",
+      "name": "daily_inspiration_quotes_id_seq",
+      "detail": {
+        "anon_read": false,
+        "anon_usage": false,
+        "service_usage": true,
+        "authenticated_read": false,
+        "authenticated_usage": false
+      }
     }
   ]
 }

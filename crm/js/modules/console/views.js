@@ -17,6 +17,7 @@ export { renderAnalytics } from './analytics.js';
 export { renderAI, renderMore } from './pages/misc.js';
 export { renderAiExperience } from './ai-experience.js';
 export { renderSettings } from './pages/settings.js';
+export { renderDailyInspirationLibrary } from './pages/daily-inspiration.js';
 export { renderTestScenario, renderTestAction } from './test-tools.js';
 export { renderKnowledgeGovernance } from './knowledge-governance.js';
 export { renderKnowledgeEditor, renderKnowledgeTrash } from './knowledge-pages.js';

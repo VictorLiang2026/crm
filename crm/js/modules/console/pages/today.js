@@ -1,4 +1,5 @@
 import { homeFollowups } from '../business-report.js';
+import { dailyInspirationCard, dailyInspirationHeading } from './daily-inspiration.js';
 // 今日页（WP2）：统计、Today 5（纯事实规则排序）、今日节奏、双向承诺、机会速览。
 // WP2 写入闭环：行动/承诺「完成」、候选「审核」经 write.js 服务端 preview→人工确认→execute。
 // 晨间简报（WP3 AI）、关系风险（G1 无批量接口）保留骨架。
@@ -371,10 +372,11 @@ export function renderToday(ctx) {
     [ic('calendar'), t('pc21_open_report')]);
   ctx.main.replaceChildren(
     pageHead({
-      kicker: t('kicker_today'), title: `${t('good_morning')}，${ctx.operator.name || 'Victor'} · ${t('today_first')}`,
+      kicker: t('kicker_today'), title: dailyInspirationHeading(),
       sub: t('today_sub'),
       actions: compact ? [] : [reportButton],
     }),
+    dailyInspirationCard(ctx),
     compact ? h('div', { class: 'today-grid today-mobile-stack' }, [
       briefEl, today5El, commitEl, candidateEl, homeFollowups(ctx), statsEl, reportButton, rhythmEl, coachEl, oppEl, riskCard,
     ]) : h('div', { class: 'today-grid' }, [

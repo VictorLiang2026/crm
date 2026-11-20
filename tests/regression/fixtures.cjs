@@ -41,7 +41,22 @@ function installFixtures() {
   addEventListener('securitypolicyviolation', e => violations.push('CSP: ' + e.blockedURI));
   const fail = message => { violations.push(message); throw new Error(message); };
   const rows = value => ({ rows: mode === 'empty' ? [] : value, total: mode === 'empty' ? 0 : value.length, page: 1, pageSize: 50 });
+  const dailyQuotes = [
+    {id:'991001',quoteZh:'先听懂客户，再讨论方案。',quoteEn:'Understand the client before discussing a solution.',theme:'customer_trust',sourceOrg:'LIMRA',sourceTitle:'Test fixture',sourceUrl:'https://www.limra.com/',editorialRewrite:true,enabled:true},
+    {id:'991002',quoteZh:'持续培养团队，才能积累长期能力。',quoteEn:'Develop the team consistently to build long-term capability.',theme:'team_growth',sourceOrg:'GAMA Global',sourceTitle:'Test fixture',sourceUrl:'https://gamaglobal.org/training/',editorialRewrite:true,enabled:true},
+  ];
+  let dailyQuote = dailyQuotes[0];
+  const dailyInspiration = data => {
+    if(data.operation==='current') return {ok:true,quote:dailyQuote,settings:{timezone:'Asia/Shanghai',firstPeriodStart:'01:00',secondPeriodStart:'12:00'},localDate:'2026-11-20',segment:'first'};
+    if(data.operation==='replace') { dailyQuote=dailyQuotes.find(row=>row.id!==dailyQuote.id)||dailyQuote; return {ok:true,quote:dailyQuote,settings:{timezone:'Asia/Shanghai'}}; }
+    if(data.operation==='libraryList') return {ok:true,quotes:dailyQuotes,settings:{timezone:'Asia/Shanghai',firstPeriodStart:'01:00',secondPeriodStart:'12:00'}};
+    if(data.operation==='quoteSave') return {ok:true,quote:{...data.data,id:'991003',enabled:true}};
+    if(data.operation==='quoteToggle') return {ok:true,quote:{...dailyQuotes.find(row=>row.id===data.data.id),enabled:data.data.enabled}};
+    if(data.operation==='settingsSave') return {ok:true,settings:{...data.data,effectiveDate:'2026-11-21'}};
+    return fail('UNEXPECTED_DAILY_INSPIRATION_OPERATION');
+  };
   const replies = {
+    'assistant:dailyInspiration': dailyInspiration,
     'assistant:testSamples': () => ({ok:true,ready:params.get('v2')==='1',
       targets:{personId:'980001',customerId:'910001',activityId:'940001'},
       initialCount:10,derivedCount:2,auditCount:1,marker:'【系统测试·勿联系】'}),

@@ -1,0 +1,22 @@
+# 实施计划
+
+- [x] 1. 对齐需求与设计，并确认生产基线 / 资源点 AI 计费路径
+  - 确认资源点套餐、CloudBase 托管组和现有 Gateway。
+  - 保持原工作区未提交 iPad 改动不受影响。
+  - _Requirement: 1–8_
+- [x] 2. 新增 public schema migration 与安全 rollback
+  - 加入语录、设置、时段槽位和历史表以及 service-role-only RPC。
+  - 应用后核验迁移历史、结构和权限。
+  - _Requirement: 1–6_
+- [x] 3. 接入 AI Gateway 与 assistant 路由
+  - 注册选择语录 Skill；实现候选筛选、稳定选择、更换与确定性回退。
+  - 保持用户身份由服务端解析，AI 只返回候选 ID。
+  - _Requirement: 1–4, 8_
+- [x] 4. 实现 iPad 今日页与更多维护界面
+  - 新增今日卡片、轻量更换菜单、语录库管理与自定义时段表单。
+  - 新增中英字典条目和样式模块。
+  - _Requirement: 1–7_
+- [x] 5. 验证、发布与记录
+  - 执行目标单测、浏览器回归、发布门槛和同步核验。
+  - 只上传本轮静态文件与 `assistant`；提交、推送并打发布标签。
+  - _Requirement: 1–8_

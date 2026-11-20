@@ -270,6 +270,7 @@ export function renderMore(ctx) {
   const primary = [
     { kind: 'native', icon: 'check', key: 'ac_title', descKey: 'ac_desc', hash: '#/actions' },
     { kind: 'native', icon: 'book', key: 'nav_knowledge_library', descKey: 'tile_knowledge_library_desc', hash: '#/knowledge-library' },
+    { kind: 'native', icon: 'sparkle', key: 'di_library_title', descKey: 'di_library_desc', hash: '#/daily-inspiration' },
     { kind: 'native', icon: 'file', key: 'plt_more_title', descKey: 'plt_more_desc', hash: '#/people-list-transfer' },
     { kind: 'native', icon: 'book', key: 'edu_title', descKey: 'edu_intro', hash: '#/people-education' },
     { kind: 'native', icon: 'chart', key: 'm16_title', descKey: 'm16_desc', hash: '#/analytics' },

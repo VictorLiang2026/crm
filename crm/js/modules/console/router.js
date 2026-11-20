@@ -9,6 +9,7 @@ import {
   renderPersonListTransfer,
   renderTestScenario, renderTestAction,
   renderFollowupAdvice, renderFollowupAdviceTasks,
+  renderDailyInspirationLibrary,
   renderKnowledgeEditor, renderKnowledgeTrash,
   renderRoster,
 } from './views.js';
@@ -48,6 +49,7 @@ const EXACT = new Map([
   ['#/ai/followup-tasks', renderFollowupAdviceTasks],
   ['#/ai/experience', ctx => renderAiExperience({ root:ctx.main, callFn:ctx.callFn })],
   ['#/more', renderMore],
+  ['#/daily-inspiration', renderDailyInspirationLibrary],
   ['#/analytics', renderAnalytics],
   ['#/settings', renderSettings],
   ['#/test-scenario', renderTestScenario],
@@ -113,6 +115,7 @@ const NAV_OF = {
   '#/assistant/opportunities/change': '#/ai',
   '#/ai/experience': '#/ai',
   '#/more': '#/more',
+  '#/daily-inspiration': '#/more',
   '#/analytics': '#/more',
   '#/settings': '#/more',
   '#/test-scenario': '#/more',

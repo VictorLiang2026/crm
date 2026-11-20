@@ -53,6 +53,9 @@ export const data = {
   explainFunnels: (ctx, language = 'zh-CN') => call(ctx, 'funnel_insight', { action: 'explain', presentation: 'stage_facts', language }),
   cockpit: (ctx) => call(ctx, 'today_coach', { action: 'cockpit' }),
   morningBrief: (ctx) => call(ctx, 'today_coach', { action: 'daily_review', view: 'morning' }),
+  dailyInspiration: (ctx, operation, data) => call(ctx,'assistant',{
+    action:'dailyInspiration',operation,...(data===undefined?{}:{data}),
+  }),
   aiSearchV2: (ctx, payload) => call(ctx, 'assistant', { action: 'searchV2', ...payload }),
   assistantReadTask: async (ctx, payload) => {
     const initial = await call(ctx, 'assistant', { action: 'assistantReadTask', ...payload });

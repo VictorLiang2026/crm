@@ -429,6 +429,16 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
         return { ok: false, error: { code, message: detail || 'Could not load conversation playbook history' } };
       }
     }
+    if (event?.action === 'dailyInspiration') {
+      try { return await require('./daily-inspiration-service').handleDailyInspiration(event,identity.uid); }
+      catch (error) {
+        const code=['INVALID_INPUT','INVALID_TIMEZONE','INVALID_SETTINGS','DAILY_INSPIRATION_DENIED',
+          'DAILY_INSPIRATION_INVALID','DAILY_INSPIRATION_NOT_FOUND','DAILY_INSPIRATION_NOT_AVAILABLE',
+          'DAILY_INSPIRATION_STALE','DAILY_INSPIRATION_PERSISTENCE_ERROR'].includes(error?.code)
+          ? error.code : 'DAILY_INSPIRATION_FAILED';
+        return {ok:false,error:{code,message:'Daily inspiration could not be loaded'}};
+      }
+    }
     if (event?.action === 'personAIHistory') {
       try { return await require('./person-ai-history-service').getPersonAIHistory(event); }
       catch (error) {
