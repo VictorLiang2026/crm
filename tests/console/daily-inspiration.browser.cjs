@@ -136,64 +136,100 @@ test('home reloads the quote at the scheduled boundary and cancels its refresh o
   } finally {await browser.close();}
 });
 
-test('iPad home keeps TODAY and switches the same quote, its theme and menu between system languages',async()=>{
-  const browser=new Browser(path.resolve(__dirname,'../..'));
-  try {
-    await browser.start();
-    await browser.send('Emulation.setDeviceMetricsOverride',{width:1180,height:820,deviceScaleFactor:1,mobile:false});
-    await browser.openConsole('#/today','authCase=1&diLongQuote=1');
-    const assertHeader = async (quoteStart,theme,period) => {
-      await browser.wait("document.querySelector('.daily-inspiration-quote')?.textContent.startsWith("+JSON.stringify(quoteStart)+")");
-      const head=await browser.evaluate(`(()=>{
-        const header=document.querySelector('.daily-inspiration-header');
-        const text=header.querySelector('.daily-inspiration-quote');
-        const label=header.querySelector('.daily-inspiration-theme');
-        return {kicker:header.querySelector('.kicker').textContent,visible:header.innerText,label:label.textContent,
-          labelLast:label.parentElement.lastElementChild===label && label.previousElementSibling===text,
-          labelColor:getComputedStyle(label).color,quoteColor:getComputedStyle(text).color,
-          fontSize:parseFloat(getComputedStyle(text).fontSize),popoverClosed:!header.querySelector('details').open};
-      })()`);
-      assert.equal(head.kicker,'TODAY');
-      assert.equal(head.label,theme);
-      assert.ok(head.labelLast);
-      assert.equal(head.labelColor,'rgb(121, 95, 48)');
-      assert.notEqual(head.quoteColor,head.labelColor);
-      assert.ok(head.fontSize<=21,head.fontSize);
-      assert.ok(head.popoverClosed);
-      assert.doesNotMatch(head.visible,/每日行业激励|Daily industry inspiration|LIMRA|时段[一二]|Period [12]/i);
-      await browser.evaluate("document.querySelector('.daily-inspiration-menu-trigger').click()");
-      assert.equal(await browser.evaluate("document.querySelector('.daily-inspiration-menu-period').innerText"),period);
-      assert.equal(await browser.evaluate("document.querySelector('.daily-inspiration-source').href"),'https://www.limra.com/');
-      assert.match(await browser.evaluate("document.querySelector('.daily-inspiration-menu').innerText"),/LIMRA/);
-      const bounds=await browser.evaluate(`(()=>{
-        const b=document.querySelector('.daily-inspiration-menu-list').getBoundingClientRect();
-        return b.left>=0 && b.right<=window.innerWidth;
-      })()`);
-      assert.ok(bounds,'the open menu fits the iPad viewport');
-      await browser.evaluate("document.querySelector('.daily-inspiration-menu-trigger').click()");
-    };
-    await assertHeader('先听懂客户','客户信任','时段一');
-    await browser.evaluate("location.hash='#/settings'");
-    await browser.wait("document.querySelectorAll('.lang-btn').length===2");
-    await browser.click('.lang-btn','English');
-    await browser.wait("document.querySelector('.lang-toggle')?.innerText.includes('Simplified Chinese')");
-    await browser.send('Emulation.setDeviceMetricsOverride',{width:820,height:1180,deviceScaleFactor:1,mobile:false});
-    await browser.evaluate("location.hash='#/today'");
-    await assertHeader('Understand the client','Customer trust','Period 1');
-    assert.ok(await browser.evaluate(`(()=>{
-      const quote=document.querySelector('.daily-inspiration-quote');
-      const range=document.createRange();
-      range.selectNodeContents(quote);
-      return range.getClientRects().length>1 &&
-        document.documentElement.scrollWidth<=window.innerWidth;
-    })()`),'long English quote wraps without horizontal overflow');
-    await browser.evaluate("location.hash='#/settings'");
-    await browser.wait("document.querySelector('.lang-toggle')?.innerText.includes('Simplified Chinese')");
-    await browser.click('.lang-btn','Simplified Chinese');
-    await browser.wait("document.querySelector('.lang-toggle')?.innerText.includes('简体中文')");
-    await browser.evaluate("location.hash='#/today'");
-    await assertHeader('先听懂客户','客户信任','时段一');
-    assert.equal(await browser.evaluate("window.__crmTest.calls.filter(call=>call.operation==='replace'&&call.action==='dailyInspiration').length"),0);
-    await browser.healthy();
-  } finally {await browser.close();}
-});
+for (const { device, width, height, phone } of [
+  { device: 'iPad portrait', width: 820, height: 1180, phone: false },
+  { device: 'iPad landscape', width: 1180, height: 820, phone: false },
+  { device: 'iPhone portrait', width: 390, height: 844, phone: true },
+  { device: 'iPhone landscape', width: 844, height: 390, phone: true },
+]) {
+  test(`${device} Today header wraps both languages and keeps the quote menu beside the theme and the report to the right`, async () => {
+    const browser = new Browser(path.resolve(__dirname, '../..'));
+    try {
+      await browser.start();
+      await browser.send('Emulation.setDeviceMetricsOverride', {
+        width, height, deviceScaleFactor: phone ? 3 : 2, mobile: true,
+      });
+      await browser.send('Emulation.setTouchEmulationEnabled', { enabled: true });
+      await browser.send('Emulation.setUserAgentOverride', {
+        userAgent: phone ? 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile/15E148 Safari/604.1' :
+          'Mozilla/5.0 (iPad; CPU OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile/15E148 Safari/604.1',
+      });
+      await browser.openConsole('#/today', 'authCase=1&diLongQuote=1');
+      const assertHeader = async (quoteStart, theme, fullReport, shortReport) => {
+        await browser.wait(`document.querySelector('.daily-inspiration-quote')?.textContent.startsWith(${JSON.stringify(quoteStart)})`);
+        const head = await browser.evaluate(`(() => {
+          const header = document.querySelector('.daily-inspiration-header');
+          const text = header.querySelector('.daily-inspiration-quote');
+          const label = header.querySelector('.daily-inspiration-theme');
+          const trigger = header.querySelector('.daily-inspiration-menu-trigger');
+          const copy = header.querySelector('.daily-inspiration-copy').getBoundingClientRect();
+          const report = header.querySelector('.daily-inspiration-report');
+          const reportRect = report.getBoundingClientRect();
+          const triggerRect = trigger.getBoundingClientRect();
+          const labelRect = label.getBoundingClientRect();
+          const range = document.createRange();
+          range.selectNodeContents(text);
+          const lines = [...range.getClientRects()];
+          return {
+            kicker: header.querySelector('h1').textContent, visible: header.innerText, label: label.textContent,
+            hasSubtitle: Boolean(header.querySelector('.page-sub')), menuClosed: !trigger.parentElement.open,
+            tailJoined: label.nextElementSibling === trigger.parentElement && triggerRect.left >= labelRect.right &&
+              triggerRect.left <= labelRect.right + 6 && triggerRect.top < labelRect.bottom,
+            tailAfterQuote: triggerRect.top >= lines.at(-1).top - 8,
+            labelColor: getComputedStyle(label).color, fontSize: parseFloat(getComputedStyle(text).fontSize),
+            wraps: lines.length > 1 && lines.every(line => line.right <= copy.right + 1),
+            fits: document.documentElement.scrollWidth <= innerWidth,
+            report: report.innerText.trim(), reportName: report.getAttribute('aria-label'),
+            reportAligned: Math.abs(reportRect.top - copy.top) <= 3 && reportRect.left >= copy.right,
+            reportCount: document.querySelectorAll('#console-main a[href="#/activity-report"]').length,
+          };
+        })()`);
+        assert.equal(head.kicker, 'TODAY');
+        assert.equal(head.label, theme);
+        assert.equal(head.labelColor, 'rgb(121, 95, 48)');
+        assert.equal(head.report, phone ? shortReport : fullReport);
+        assert.equal(head.reportName, fullReport);
+        assert.equal(head.reportCount, 1);
+        assert.ok(head.fontSize <= 23, head.fontSize);
+        assert.ok(head.menuClosed && !head.hasSubtitle, JSON.stringify(head));
+        assert.ok(head.tailJoined && head.tailAfterQuote && head.reportAligned, JSON.stringify(head));
+        assert.ok(head.wraps && head.fits, JSON.stringify(head));
+        assert.doesNotMatch(head.visible, /先定要事|Priorities first|每日行业激励|LIMRA|时段[一二]|Period [12]/i);
+      };
+      const verifyMenuAndReport = async (period, keep, fullReport, shortReport, back) => {
+        await browser.click('.daily-inspiration-menu-trigger', '⋯');
+        await browser.wait(`(() => {
+          const menu = document.querySelector('.daily-inspiration-menu[open] .daily-inspiration-menu-list');
+          if (!menu?.style.transform) return false;
+          const box = menu.getBoundingClientRect();
+          return box.left >= 7 && box.right <= innerWidth - 7 && box.top >= 7 && box.bottom <= innerHeight - 7;
+        })()`);
+        assert.equal(await browser.evaluate("document.querySelector('.daily-inspiration-menu-period').innerText"), period);
+        assert.equal(await browser.evaluate("document.querySelector('.daily-inspiration-source').href"), 'https://www.limra.com/');
+        await browser.click('.daily-inspiration-menu-item', keep);
+        await browser.wait("!document.querySelector('.daily-inspiration-menu').open");
+        await browser.click('.daily-inspiration-report', phone ? shortReport : fullReport);
+        await browser.wait("location.hash === '#/activity-report/customer' && document.querySelector('[data-report-coverage=customer]')");
+        assert.match(await browser.evaluate("document.querySelector('#console-main .page-title').innerText"), new RegExp(fullReport));
+        await browser.click('#console-main button', back);
+        await browser.wait("location.hash === '#/today' && document.querySelector('.daily-inspiration-report')");
+      };
+      const switchLanguage = async (option, opposite) => {
+        await browser.evaluate("location.hash='#/settings'");
+        await browser.wait("document.querySelectorAll('.lang-btn').length === 2");
+        await browser.click('.lang-btn', option);
+        await browser.wait(`document.querySelector('.lang-toggle')?.innerText.includes(${JSON.stringify(opposite)})`);
+        await browser.evaluate("location.hash='#/today'");
+      };
+      await assertHeader('先听懂客户', '客户信任', '工作量报表', '报表');
+      await verifyMenuAndReport('时段一', '不变', '工作量报表', '报表', '返回今日');
+      await switchLanguage('English', 'Simplified Chinese');
+      await assertHeader('Understand the client', 'Customer trust', 'Workload Reports', 'Report');
+      await verifyMenuAndReport('Period 1', 'Keep as is', 'Workload Reports', 'Report', 'Back to Today');
+      await switchLanguage('Simplified Chinese', '简体中文');
+      await assertHeader('先听懂客户', '客户信任', '工作量报表', '报表');
+      assert.equal(await browser.evaluate("window.__crmTest.calls.filter(call => call.operation === 'replace' && call.action === 'dailyInspiration').length"), 0);
+      await browser.healthy();
+    } finally { await browser.close(); }
+  });
+}

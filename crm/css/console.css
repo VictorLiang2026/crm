@@ -2316,6 +2316,17 @@ body:has(.login), body.is-login { padding-top: env(safe-area-inset-top); }
 .kg-mobile-review dt { color: var(--muted); font-size: 13px; }
 .kg-mobile-review dd { margin: 0 0 6px; white-space: pre-wrap; }
 .daily-inspiration-header { margin-bottom: 12px; }
+.daily-inspiration-header > .kicker { margin: 0 0 4px; }
+.daily-inspiration-report-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: start; }
+.daily-inspiration-report-row .daily-inspiration-copy { margin: 2px 0; }
+.daily-inspiration-report-row .daily-inspiration-heading { display: inline; }
+.daily-inspiration-report { white-space: nowrap; }
+.daily-inspiration-report-short { display: none; }
+@media (max-width: 767px), (max-height: 520px) and (pointer: coarse) {
+  .daily-inspiration-report { padding-inline: 8px; gap: 4px; }
+  .daily-inspiration-report-full { display: none; }
+  .daily-inspiration-report-short { display: inline; }
+}
 .daily-inspiration-header .page-head-row { gap: 10px; }
 .daily-inspiration-header .page-head-row > :first-child { flex: 1 1 auto; min-width: 0; }
 .daily-inspiration-line { display: flex; align-items: flex-start; gap: 8px; }
@@ -2329,7 +2340,12 @@ body:has(.login), body.is-login { padding-top: env(safe-area-inset-top); }
 .daily-inspiration-menu { position: relative; flex: 0 0 auto; }
 .daily-inspiration-menu-trigger { display: grid; place-items: center; width: 32px; height: 32px; margin-inline-start: auto; border: 1px solid #ded8ca; border-radius: 50%; color: #665a43; font-size: 20px; line-height: 1; cursor: pointer; list-style: none; }
 .daily-inspiration-menu-trigger::-webkit-details-marker { display: none; }
+.daily-inspiration-tools-inline { display: inline-block; max-width: 100%; vertical-align: middle; text-align: start; font-size: 12px; font-weight: 400; letter-spacing: normal; }
+.daily-inspiration-tail { display: flex; align-items: center; gap: 4px; }
+.daily-inspiration-tail .daily-inspiration-theme { margin-inline-start: 0; white-space: normal; }
+.daily-inspiration-tail .daily-inspiration-menu-trigger { border: 0; }
 .daily-inspiration-menu-list { position: absolute; z-index: 5; top: 36px; inset-inline-end: 0; width: min(15rem, calc(100vw - 36px)); padding: 5px; border: 1px solid #ded8ca; border-radius: 8px; background: #fff; box-shadow: 0 8px 20px #2f28151a; text-align: start; }
+.daily-inspiration-tail .daily-inspiration-menu-list { max-height: calc(100vh - 16px); overflow-y: auto; }
 .daily-inspiration-menu-item { display: flex; align-items: center; gap: 7px; width: 100%; padding: 9px 10px; border: 0; border-radius: 5px; background: transparent; color: #37342d; text-align: left; cursor: pointer; }
 .daily-inspiration-menu-item:hover { background: #f7f2e8; }
 .daily-inspiration-menu-item:disabled { opacity: .55; cursor: wait; }

@@ -11,7 +11,7 @@ import { openWorkItemEditor, openWorkItemTransition, openCandidate } from '../wr
 import { renderProactiveCoach } from '../proactive-coach.js';
 import { actionDay } from '../action-center.js';
 import {
-  wpTag, sk, pageHead, card, emptyNote, loadInto, bdg, avatar,
+  wpTag, sk, card, emptyNote, loadInto, bdg, avatar,
   dueLabel, dayDiffFromToday, textOf, isCompactViewport,
 } from '../ui.js';
 
@@ -368,22 +368,29 @@ export function renderToday(ctx) {
     return briefCard(res.v.sections || {});
   }, briefLoadingCard());
 
-  const reportButton = h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => { location.hash = '#/activity-report'; } },
-    [ic('calendar'), t('pc21_open_report')]);
+  const reportTitle = t('pc21_open_report');
+  const reportLink = h('a', {
+    class: 'btn btn-ghost daily-inspiration-report',
+    href: '#/activity-report', title: reportTitle, 'aria-label': reportTitle,
+  }, [
+    ic('calendar'),
+    h('span', { class: 'daily-inspiration-report-full' }, reportTitle),
+    h('span', { class: 'daily-inspiration-report-short' }, t('pc21_open_report_short')),
+  ]);
   const quoteHeading = dailyInspirationHeading();
-  const header = pageHead({
-    kicker: t('kicker_today'), title: quoteHeading,
-    sub: t('today_sub'), actions: compact ? [] : [reportButton],
-  });
-  header.classList.add('daily-inspiration-header');
-  const title = quoteHeading.parentElement;
-  const quoteLine = h('div', { class: 'daily-inspiration-line' });
-  title.replaceWith(quoteLine);
-  quoteLine.append(title, dailyInspirationCard(ctx, quoteHeading));
+  const header = h('header', { class: 'page-head daily-inspiration-header' }, [
+    h('h1', { class: 'kicker' }, t('kicker_today')),
+    h('div', { class: 'daily-inspiration-report-row' }, [
+      h('div', { class: 'page-title daily-inspiration-copy' }, [
+        quoteHeading, ' ', dailyInspirationCard(ctx, quoteHeading, { inline: true }),
+      ]),
+      reportLink,
+    ]),
+  ]);
   ctx.main.replaceChildren(
     header,
     compact ? h('div', { class: 'today-grid today-mobile-stack' }, [
-      briefEl, today5El, commitEl, candidateEl, homeFollowups(ctx), statsEl, reportButton, rhythmEl, coachEl, oppEl, riskCard,
+      briefEl, today5El, commitEl, candidateEl, homeFollowups(ctx), statsEl, rhythmEl, coachEl, oppEl, riskCard,
     ]) : h('div', { class: 'today-grid' }, [
       h('div', {}, [
         briefEl,

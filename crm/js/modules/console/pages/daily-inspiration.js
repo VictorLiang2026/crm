@@ -24,14 +24,25 @@ function failureText(error) {
   return error?.code === 'DAILY_INSPIRATION_DENIED' ? t('di_access_denied') : t('di_load_failed');
 }
 
-export function dailyInspirationCard(ctx, title) {
-  const root = h('div', { class: 'daily-inspiration-tools' });
+export function dailyInspirationCard(ctx, title, { inline = false } = {}) {
+  const root = h('div', { class: inline ? 'daily-inspiration-tools daily-inspiration-tools-inline' : 'daily-inspiration-tools' });
   // The previous homepage can still load this module from a separate cache entry.
   const findHeading = () => title ?? ctx.main.querySelector('[data-daily-inspiration-title]');
   let timer = null;
   let dueAt = null;
   let busy = false;
   let observer;
+  const fitMenu = () => {
+    const panel = root.querySelector('.daily-inspiration-menu[open] .daily-inspiration-menu-list');
+    if (!panel) return;
+    panel.style.transform = '';
+    const { left, right, top, bottom } = panel.getBoundingClientRect();
+    const { clientWidth, clientHeight } = document.documentElement;
+    const inset = 8;
+    const x = Math.max(inset - left, 0) - Math.max(right - clientWidth + inset, 0);
+    const y = Math.max(inset - top, Math.min(0, clientHeight - inset - bottom));
+    panel.style.transform = `translate(${x}px, ${y}px)`;
+  };
   const onVisible = () => {
     if (!document.hidden && dueAt !== null && Date.now() >= dueAt) loadCurrent();
   };
@@ -56,14 +67,15 @@ export function dailyInspirationCard(ctx, title) {
       showEmpty(t(result?.noQuotes ? 'di_empty_home' : 'di_load_failed'));
       return;
     }
-    findHeading()?.replaceChildren(
-      h('span', { class: 'daily-inspiration-quote' }, quoteText(quote)),
-      ' ',
-      h('span', { class: 'daily-inspiration-theme' }, t(`di_theme_${quote.theme}`)),
-    );
+    const heading = findHeading();
+    const text = h('span', { class: 'daily-inspiration-quote' }, quoteText(quote));
+    const theme = h('span', { class: 'daily-inspiration-theme' }, t(`di_theme_${quote.theme}`));
+    heading?.replaceChildren(text);
+    if (!inline) heading?.append(' ', theme);
     const menu=h('details',{class:'daily-inspiration-menu'},[
       h('summary',{class:'daily-inspiration-menu-trigger','aria-label':t('di_actions'),title:t('di_actions')},'⋯'),
     ]);
+    if (inline) menu.addEventListener('toggle', fitMenu);
     const status=h('span',{class:'daily-inspiration-status','aria-live':'polite'});
     const keep=h('button',{class:'daily-inspiration-menu-item',type:'button',onclick:()=>{
       menu.open=false;status.textContent=t('di_kept');
@@ -91,7 +103,8 @@ export function dailyInspirationCard(ctx, title) {
     menu.append(h('div', { class: 'daily-inspiration-menu-list' }, [
       replace, keep, h('div', { class: 'daily-inspiration-menu-meta' }, [period, source]),
     ]));
-    root.replaceChildren(menu, status);
+    const controls = inline ? h('div', { class: 'daily-inspiration-tail' }, [theme, menu]) : menu;
+    root.replaceChildren(controls, status);
   };
   async function loadCurrent() {
     if (!root.isConnected || busy) return;
@@ -114,10 +127,12 @@ export function dailyInspirationCard(ctx, title) {
       if (root.isConnected) return;
       clearTimeout(timer);
       document.removeEventListener('visibilitychange', onVisible);
+      if (inline) window.removeEventListener('resize', fitMenu);
       observer.disconnect();
     });
     observer.observe(ctx.main, {childList:true});
     document.addEventListener('visibilitychange', onVisible);
+    if (inline) window.addEventListener('resize', fitMenu);
     loadCurrent();
   });
   return root;

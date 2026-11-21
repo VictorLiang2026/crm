@@ -3889,6 +3889,7 @@ const DICT = {
   'pc21_goal_progress': { 'zh-CN': '招募目标进度', 'en': 'Recruit Goal Progress' },
   'pc21_open_goals': { 'zh-CN': '查看月度目标', 'en': 'View Monthly Goals' },
   'pc21_open_report': { 'zh-CN': '工作量报表', 'en': 'Workload Reports' },
+  'pc21_open_report_short': { 'zh-CN': '报表', 'en': 'Report' },
 
   'knowledge_governance': { 'zh-CN': '知识库', 'en': 'Knowledge Library' },
   'knowledge_governance_desc': { 'zh-CN': '查找、维护知识与沟通策略；仅当前有效且未删除的内容会用于 AI 建议。', 'en': 'Find and manage knowledge and communication strategies. Only active, non-deleted items inform AI advice.' },

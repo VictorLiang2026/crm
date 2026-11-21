@@ -47,7 +47,10 @@ function installFixtures() {
   ];
   let dailyQuote = dailyQuotes[0];
   if (params.get('diLongQuote')==='1') {
-    dailyQuote = {...dailyQuote, quoteEn:'Understand the client before discussing a solution. Give them time to explain what matters most, and ask how they would recognize a good outcome before you suggest a next step.'};
+    dailyQuote = { ...dailyQuote,
+      quoteZh: '先听懂客户，再讨论方案。给客户时间说出自己最关心的问题，并请他们说明一个满意的结果是什么样的。当我们听清楚他们的期待和顾虑，才能一起判断接下来怎样做最合适，并把下一步说得具体、清楚、容易执行。',
+      quoteEn: 'Understand the client before discussing a solution. Give them time to explain what matters most, and ask how they would recognize a good outcome and what concerns they still have before you suggest a next step.',
+    };
   }
   let dailyPeriodReads = 0;
   const dailyInspiration = data => {
@@ -78,6 +81,13 @@ function installFixtures() {
   };
   const replies = {
     'assistant:dailyInspiration': dailyInspiration,
+    ...(params.get('diLongQuote') === '1' ? {
+      'activity_reports:customer': data => ({
+        mode: data.mode, range: { start: '2026-11-21', end: '2026-11-21', days: 1 },
+        totals: { followups: 0 }, daily: [], feed: [], feedTotal: 0,
+        testData: { status: 'verified', containsTestData: false, recordCount: 0 },
+      }),
+    } : {}),
     'assistant:testSamples': () => ({ok:true,ready:params.get('v2')==='1',
       targets:{personId:'980001',customerId:'910001',activityId:'940001'},
       initialCount:10,derivedCount:2,auditCount:1,marker:'【系统测试·勿联系】'}),
