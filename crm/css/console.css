@@ -2200,11 +2200,11 @@ body:has(.login), body.is-login { padding-top: env(safe-area-inset-top); }
     display: inline-flex;
     vertical-align: top;
     width: calc(50% - 4px);
-    min-height: 44px;
-    margin: 0 3px 5px 0;
-    padding: 5px 4px;
+    min-height: 36px;
+    margin: 0 3px 3px 0;
+    padding: 2px 3px;
     font-size: 12px;
-    line-height: 1.25;
+    line-height: 1.1;
     white-space: normal;
     overflow-wrap: anywhere;
   }
