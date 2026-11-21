@@ -1200,6 +1200,36 @@ body:has(.login), body.is-login { padding-top: env(safe-area-inset-top); }
 .kg-home-card .kg-table-actions .kg-action-activate{background:#eaf6ee;border-color:#cbe7d3;color:#286b41}
 .kg-home-card .kg-table-actions .kg-action-invalidate{background:#fff4e5;border-color:#f0d8ae;color:#805414}
 .kg-home-card .kg-table-actions .kg-action-delete{background:#fff0f0;border-color:#efcece;color:#963f45}
+@media (min-width: 981px) {
+  .kg-home-card .kg-table th:nth-child(1), .kg-home-card .kg-table td:nth-child(1) { width: 5%; }
+  .kg-home-card .kg-table th:nth-child(2), .kg-home-card .kg-table td:nth-child(2) { width: 18%; }
+  .kg-home-card .kg-table th:nth-child(3), .kg-home-card .kg-table td:nth-child(3) { width: 9%; }
+  .kg-home-card .kg-table th:nth-child(4), .kg-home-card .kg-table td:nth-child(4),
+  .kg-home-card .kg-table th:nth-child(5), .kg-home-card .kg-table td:nth-child(5) { width: 18%; }
+  .kg-home-card .kg-table th:nth-child(6), .kg-home-card .kg-table td:nth-child(6) { width: 8%; }
+  .kg-home-card .kg-table th:nth-child(7), .kg-home-card .kg-table td:nth-child(7) { width: 8%; }
+  .kg-home-card .kg-table th:nth-child(8), .kg-home-card .kg-table td:nth-child(8) { width: 16%; }
+  .kg-home-card .kg-home-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+    gap: 2px;
+  }
+  .kg-home-card .kg-home-actions .btn {
+    display: inline-flex;
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    min-height: 30px;
+    margin: 0;
+    padding: 1px 3px;
+    font-size: 11px;
+    line-height: 1.05;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .kg-home-card .kg-home-actions .btn svg { width: 10px; height: 10px; flex: 0 0 10px; }
+}
 @media(max-width:1100px){.kg-home-card .kg-table th,.kg-home-card .kg-table td{padding:8px 7px;font-size:12px}}
 .kg-category-tags{min-width:210px}.kg-category-chip{display:inline-block;margin:0 5px 5px 0;padding:3px 7px;border:1px solid var(--line,#e3e5e9);border-radius:999px;background:#f7f8fa;color:var(--ink-600,#565e6b);font-size:11px;white-space:nowrap}
 .kg-categories-field{min-width:0;margin:0;padding:12px;border:1px solid var(--line,#e3e5e9);border-radius:10px}
@@ -2199,22 +2229,22 @@ body:has(.login), body.is-login { padding-top: env(safe-area-inset-top); }
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     align-items: start;
-    gap: 3px;
+    gap: 2px;
   }
   .kg-home-card .kg-table-actions .btn {
     display: inline-flex;
     box-sizing: border-box;
     width: 100%;
     min-width: 0;
-    min-height: 36px;
+    min-height: 32px;
     margin: 0;
-    padding: 2px 3px;
+    padding: 1px 3px;
     font-size: 12px;
     line-height: 1.1;
     white-space: normal;
     overflow-wrap: anywhere;
   }
-  .kg-home-card .kg-table-actions .btn svg { width: 12px; height: 12px; flex: 0 0 12px; }
+  .kg-home-card .kg-table-actions .btn svg { width: 10px; height: 10px; flex: 0 0 10px; }
 
   /* Communication reference controls use at most two rows above the list. */
   .kr-control-area { display: flex; flex-wrap: nowrap; align-items: center; gap: 8px; min-width: 0; }

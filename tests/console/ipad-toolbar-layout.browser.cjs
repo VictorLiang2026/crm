@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 const { Browser } = require('../regression/browser.cjs');
 
-test('iPad landscape keeps opportunity, recruit, knowledge and reference toolbars compact', async () => {
+test('desktop and iPad landscape keep opportunity, recruit, knowledge and reference toolbars compact', async () => {
   const browser = new Browser(path.resolve(__dirname, '../..'));
   try {
     await browser.start();
@@ -157,8 +157,32 @@ test('iPad landscape keeps opportunity, recruit, knowledge and reference toolbar
       'both knowledge content columns should retain useful width');
     assert.ok(knowledge.columns[7] >= knowledge.tableWidth * 0.15, 'knowledge actions should have enough horizontal room');
     assert.ok(knowledge.rowHeight <= 150, 'knowledge action buttons should keep iPad table rows compact: ' + JSON.stringify(knowledge));
-    assert.ok(knowledge.actionButtons.every(button=>button.height>=36&&button.height<=40&&button.width>=64), 'knowledge actions should use compact iPad rows');
+    assert.ok(knowledge.actionButtons.every(button=>button.height>=32&&button.height<=36&&button.width>=64), 'knowledge actions should use compact iPad rows');
     assert.ok(knowledge.width <= knowledge.inner + 1, 'knowledge page should not overflow horizontally');
+
+    await browser.send('Emulation.setTouchEmulationEnabled', { enabled: false });
+    await browser.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
+    await browser.wait('innerWidth === 1440');
+    await browser.evaluate(`(async()=>{const {renderKnowledgeGovernance}=await import('/crm/js/modules/console/knowledge-governance.js');
+      renderKnowledgeGovernance(window.ipadLayoutFixture.ctx)})()`);
+    await browser.wait("document.querySelector('.kg-home-card .kg-home-actions .btn')");
+    const desktopKnowledge=await browser.evaluate(`(() => {
+      const actionsGrid=document.querySelector('.kg-home-card .kg-home-actions');
+      const actions=[...actionsGrid.querySelectorAll('.btn')];
+      const row=actionsGrid.closest('tr');
+      return {columns:getComputedStyle(actionsGrid).gridTemplateColumns.trim().split(/\\s+/).length,
+        rows:new Set(actions.map(node=>Math.round(node.getBoundingClientRect().top))).size,
+        buttons:actions.map(node=>({height:Math.round(node.getBoundingClientRect().height),width:Math.round(node.getBoundingClientRect().width)})),
+        rowHeight:Math.round(row.getBoundingClientRect().height)};
+    })()`);
+    assert.equal(desktopKnowledge.columns, 2, 'desktop knowledge actions should use two columns');
+    assert.equal(desktopKnowledge.rows, 3, 'desktop knowledge actions should occupy three rows');
+    assert.ok(desktopKnowledge.buttons.every(button=>button.height>=30&&button.height<=36&&button.width>=48),
+      'desktop knowledge actions should stay compact and readable: ' + JSON.stringify(desktopKnowledge));
+    assert.ok(desktopKnowledge.rowHeight <= 150, 'desktop knowledge rows should remain compact: ' + JSON.stringify(desktopKnowledge));
+
+    await browser.send('Emulation.setDeviceMetricsOverride', { width: 1366, height: 1024, deviceScaleFactor: 2, mobile: false });
+    await browser.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
 
     await browser.evaluate(`(async()=>{const {renderKnowledgeEditor}=await import('/crm/js/modules/console/knowledge-pages.js');
       renderKnowledgeEditor(window.ipadLayoutFixture.ctx,{mode:'upload'})})()`);
