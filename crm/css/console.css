@@ -2035,6 +2035,10 @@ body:has(.login), body.is-login { padding-top: env(safe-area-inset-top); }
   .recycle-table tbody tr:hover td:first-child { background: #f8fbff; }
   .console-main .tabs .tab { min-height: 46px; }
   .people-sort-button { display: flex; align-items: center; min-height: 44px; }
+  .people-directory-table th,
+  .people-directory-table td { text-align: center; }
+  .people-directory-table td.people-col-name a { display: flex; align-items: center; width: 100%; justify-content: center; }
+  .people-directory-table .people-sort-button { justify-content: center; text-align: center; }
 
   .person-workspace {
     display: grid;

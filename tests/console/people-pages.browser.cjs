@@ -217,6 +217,28 @@ test('People directory uses 30-row pages on phone and iPad with an unlocked cont
     assert.equal(await b.evaluate("document.querySelector('.people-directory-table th.people-col-updated_at .people-header-full').textContent"), '最近更新日期');
     assert.equal(await b.evaluate("document.querySelector('.people-directory-table td.people-col-updated_at .people-date-full').textContent"), '2026-10-12');
 
+    await b.send('Emulation.setDeviceMetricsOverride', { width: 1366, height: 1024, deviceScaleFactor: 2, mobile: false });
+    await b.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
+    await b.evaluate('document.body.replaceChildren();window.renderPeopleForViewport()');
+    await b.wait("window.peopleRequests.at(-1)?.args.pageSize===30 && document.querySelectorAll('.people-directory-table tbody tr').length===30");
+    const ipadLandscapeAlignment = await b.evaluate(`(()=>{
+      const table=document.querySelector('.people-directory-table');
+      const cells=[...table.querySelectorAll('thead th,tbody td')];
+      const nameLink=table.querySelector('tbody td.people-col-name a');
+      const sortButton=table.querySelector('thead .people-sort-button');
+      return {coarse:matchMedia('(any-pointer: coarse)').matches,orientation:screen.orientation.type,
+        uncentered:cells.filter(cell=>getComputedStyle(cell).textAlign!=='center').map(cell=>cell.className),
+        nameLinkDisplay:getComputedStyle(nameLink).display,nameLinkJustify:getComputedStyle(nameLink).justifyContent,
+        sortDisplay:getComputedStyle(sortButton).display,sortJustify:getComputedStyle(sortButton).justifyContent};
+    })()`);
+    assert.equal(ipadLandscapeAlignment.coarse, true, 'iPad Pro touch emulation activates the iPad layout');
+    assert.match(ipadLandscapeAlignment.orientation, /^landscape/);
+    assert.deepEqual(ipadLandscapeAlignment.uncentered, [], `all People list fields are centered: ${JSON.stringify(ipadLandscapeAlignment)}`);
+    assert.equal(ipadLandscapeAlignment.nameLinkDisplay, 'flex');
+    assert.equal(ipadLandscapeAlignment.nameLinkJustify, 'center');
+    assert.equal(ipadLandscapeAlignment.sortDisplay, 'flex');
+    assert.equal(ipadLandscapeAlignment.sortJustify, 'center');
+
     await b.send('Emulation.setDeviceMetricsOverride', { width: 1366, height: 900, deviceScaleFactor: 1, mobile: false });
     await b.send('Emulation.setTouchEmulationEnabled', { enabled: false });
     await b.evaluate('document.body.replaceChildren();window.renderPeopleForViewport()');
