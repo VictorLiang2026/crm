@@ -150,3 +150,18 @@ test('current stable slot is served without a model call',async()=>{
   assert.equal(calls.length,2);
   assert.ok(calls.every(call=>call.args.p_actor_uid==='verified-uid'));
 });
+
+test('overnight period keeps the previous date until the next configured start',()=>{
+  const slot = utc => service.displaySlot(settings,new Date(utc));
+  const evening = slot('2026-11-21T15:59:00Z');
+  const midnight = slot('2026-11-21T16:00:00Z');
+  assert.deepEqual(midnight,evening);
+  assert.equal(midnight.localDate,'2026-11-21');
+  assert.equal(midnight.segment,'second');
+  assert.equal(midnight.nextRefreshAt,Date.parse('2026-11-21T17:00:00Z'));
+  assert.equal(slot('2026-11-21T17:00:00Z').segment,'first');
+  assert.equal(slot('2026-11-22T04:00:00Z').segment,'second');
+  assert.equal(slot('2026-11-22T04:00:00Z').localDate,'2026-11-22');
+  const pending=service.displaySlot({...settings,effectiveDate:'2026-11-22'},new Date('2026-11-21T15:59:00Z'));
+  assert.equal(pending.nextRefreshAt,Date.parse('2026-11-21T16:00:00Z'));
+});

@@ -61,6 +61,60 @@ test('daily inspiration RPC accepts scored imports, validates adjacent operation
     assert.equal((await rpc('quote_toggle',{id:String(saved.id),enabled:false})).quote.enabled,false);
 
     await db.exec('RESET ROLE');
+    const baselineWithScores = await definition();
+    const cycleFix = '20261121211500_daily_inspiration_cycle_boundaries';
+    await db.exec(readMigration(cycleFix));
+    await db.exec("INSERT INTO public.crm_access_members VALUES ('rotation-fixture',true)");
+    await db.exec('SET ROLE service_role');
+    const actor = 'rotation-fixture';
+    const run = (operation,data) => rpc(operation,data,actor);
+    const readCycle = async () => (await db.query(
+      'SELECT quote_id::text FROM public.daily_inspiration_rotation_used WHERE uid=$1 ORDER BY quote_id',
+      [actor])).rows.map(row=>row.quote_id);
+    const nowSettings = (await run('library_list',{})).settings;
+    const thresholdSettings = {timezone:nowSettings.timezone,firstPeriodStart:nowSettings.firstPeriodStart,
+      secondPeriodStart:nowSettings.secondPeriodStart,minRecommendationScore:8,allowRepeatBeforeAllUsed:false};
+    await run('settings_save',thresholdSettings);
+    const at = i => ({localDate:`2026-11-${String(20+Math.floor(i/2)).padStart(2,'0')}`,segment:i%2?'second':'first'});
+    const eligible = new Set((await run('current',at(0))).candidates.map(row=>String(row.id)));
+    assert.ok(eligible.size>2);
+    const firstChoice = [...eligible][0];
+    const used = new Set();
+    for (let i=0; i<eligible.size; i++) {
+      const position = at(i);
+      const {candidates} = await run('current',position);
+      assert.equal(candidates.length,eligible.size-i);
+      if (i===1) await assert.rejects(run('select',{...position,quoteId:firstChoice}), /DAILY_INSPIRATION_ROTATION_USED/);
+      const id = String(candidates[0].id);
+      assert.ok(eligible.has(id) && !used.has(id));
+      assert.equal(String((await run('select',{...position,quoteId:id})).quote.id),id);
+      used.add(id);
+    }
+    const last = at(eligible.size-1);
+    const stateAfterFull = await readCycle();
+    assert.equal(stateAfterFull.length,eligible.size);
+    await run('current',last);
+    const existing = await run('select',{...last,quoteId:firstChoice});
+    assert.equal(String(existing.quote.id),[...used].at(-1));
+    const newPosition = at(eligible.size);
+    assert.equal((await run('current',newPosition)).candidates.length,eligible.size);
+    assert.deepEqual(await readCycle(),stateAfterFull);
+    await run('select',{...newPosition,quoteId:firstChoice});
+    assert.deepEqual(await readCycle(),[firstChoice]);
+    const replacement = (await run('current',newPosition)).candidates[0];
+    assert.ok(String(replacement.id)!==firstChoice);
+    await run('replace',{...newPosition,expectedQuoteId:firstChoice,quoteId:String(replacement.id)});
+    assert.equal((await readCycle()).length,2);
+    await assert.rejects(run('replace',{...newPosition,expectedQuoteId:String(replacement.id),quoteId:firstChoice}),
+      /DAILY_INSPIRATION_ROTATION_USED/);
+    await run('settings_save',{...thresholdSettings,minRecommendationScore:10});
+    const filtered = await run('current',newPosition);
+    assert.equal(filtered.quote,null);
+    assert.deepEqual(filtered.candidates,[]);
+
+    await db.exec('RESET ROLE');
+    await db.exec(readMigration(cycleFix+'.rollback'));
+    assert.equal(await definition(),baselineWithScores);
     await db.exec(readMigration(fix+'.rollback'));
     assert.equal(await definition(),previous);
     assert.equal((await db.query('SELECT count(*)::int AS total FROM public.daily_inspiration_quotes')).rows[0].total,7);

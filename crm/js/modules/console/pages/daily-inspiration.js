@@ -24,6 +24,23 @@ export function dailyInspirationCard(ctx) {
   const root=h('section',{class:'daily-inspiration-strip','aria-label':t('di_home_title')},[
     h('div',{class:'daily-inspiration-loading',role:'status'},t('di_loading')),
   ]);
+  let timer = null;
+  let dueAt = null;
+  let busy = false;
+  let observer;
+  const onVisible = () => {
+    if (!document.hidden && dueAt !== null && Date.now() >= dueAt) loadCurrent();
+  };
+  const schedule = () => {
+    clearTimeout(timer);
+    if (root.isConnected && !busy && dueAt !== null) {
+      timer = setTimeout(loadCurrent, Math.max(50, dueAt - Date.now()));
+    }
+  };
+  const setDeadline = result => {
+    const delay = result?.refreshInMs;
+    dueAt = Number.isFinite(delay) && delay >= 0 ? Date.now() + delay : null;
+  };
   const showQuote = result => {
     const heading=root.parentElement?.querySelector('[data-daily-inspiration-title]');
     const quote=result?.quote;
@@ -45,12 +62,20 @@ export function dailyInspirationCard(ctx) {
       menu.open=false;status.textContent=t('di_kept');
     }},t('di_keep'));
     const replace=h('button',{class:'daily-inspiration-menu-item',type:'button',onclick:async event=>{
+      if (busy) return;
+      busy = true;
+      clearTimeout(timer);
       const button=event.currentTarget;button.disabled=true;status.textContent=t('di_replacing');
       try {
         const next=await data.dailyInspiration(ctx,'replace',{expectedQuoteId:quote.id});
         if (!next.ok) throw next.error;
-        if (next.quote) showQuote(next); else status.textContent=t('di_no_alternative');
-      } catch(error) { status.textContent=failureText(error);button.disabled=false; }
+        setDeadline(next);
+        if (root.isConnected) {
+          if (next.noAlternative) status.textContent=t('di_no_alternative');
+          else showQuote(next);
+        }
+      } catch(error) { status.textContent=failureText(error); }
+      finally { busy=false;button.disabled=false;schedule(); }
     }},[ic('refresh'),t('di_replace')]);
     menu.append(h('div',{class:'daily-inspiration-menu-list'},[replace,keep]));
     const source=h('a',{class:'daily-inspiration-source',href:quote.sourceUrl,target:'_blank',rel:'noopener noreferrer'},
@@ -64,12 +89,36 @@ export function dailyInspirationCard(ctx) {
       ]),menu,
     );
   };
-  data.dailyInspiration(ctx,'current').then(showQuote).catch(error=>{
-    const heading=root.parentElement?.querySelector('[data-daily-inspiration-title]');
-    if(heading)heading.textContent=t('di_home_title');
-    root.replaceChildren(h('div',{class:'daily-inspiration-empty'},[
-      h('span',{role:'status'},failureText(error)),h('a',{href:'#/daily-inspiration'},t('di_manage_link')),
-    ]));
+  async function loadCurrent() {
+    if (!root.isConnected || busy) return;
+    busy = true;
+    clearTimeout(timer);
+    try {
+      const result = await data.dailyInspiration(ctx,'current');
+      setDeadline(result);
+      if (root.isConnected) showQuote(result);
+    } catch(error) {
+      if (!root.isConnected) return;
+      dueAt = Date.now() + 30000;
+      const heading=root.parentElement?.querySelector('[data-daily-inspiration-title]');
+      if(heading)heading.textContent=t('di_home_title');
+      root.replaceChildren(h('div',{class:'daily-inspiration-empty'},[
+        h('span',{role:'status'},failureText(error)),h('a',{href:'#/daily-inspiration'},t('di_manage_link')),
+      ]));
+    } finally { busy = false; schedule(); }
+  }
+  // renderToday attaches the card after this function returns.
+  queueMicrotask(() => {
+    if (!root.isConnected) return;
+    observer = new MutationObserver(() => {
+      if (root.isConnected) return;
+      clearTimeout(timer);
+      document.removeEventListener('visibilitychange', onVisible);
+      observer.disconnect();
+    });
+    observer.observe(ctx.main, {childList:true});
+    document.addEventListener('visibilitychange', onVisible);
+    loadCurrent();
   });
   return root;
 }

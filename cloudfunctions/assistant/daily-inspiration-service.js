@@ -23,12 +23,15 @@ function database() {
     key: process.env.CRM_ASSISTANT_DB_API_KEY }).auditRdb;
 }
 
-function localClock(timeZone, now = new Date()) {
-  let parts;
+function clockFormatter(timeZone) {
   try {
-    parts = new Intl.DateTimeFormat('en-CA', { timeZone, year:'numeric', month:'2-digit', day:'2-digit',
-      hour:'2-digit', minute:'2-digit', hourCycle:'h23' }).formatToParts(now);
+    return new Intl.DateTimeFormat('en-CA', { timeZone, year:'numeric', month:'2-digit', day:'2-digit',
+      hour:'2-digit', minute:'2-digit', hourCycle:'h23' });
   } catch (_) { fail('INVALID_TIMEZONE'); }
+}
+
+function localClock(timeZone, now = new Date(), formatter = clockFormatter(timeZone)) {
+  const parts = formatter.formatToParts(now);
   const value = Object.fromEntries(parts.filter(item => item.type !== 'literal').map(item => [item.type,item.value]));
   return { date: `${value.year}-${value.month}-${value.day}`, minute: Number(value.hour)*60+Number(value.minute) };
 }
@@ -44,6 +47,31 @@ function segmentFor(localMinute, settings) {
   const second = minutes(settings.secondPeriodStart);
   if (first >= second) fail('INVALID_SETTINGS');
   return localMinute >= first && localMinute < second ? 'first' : 'second';
+}
+
+function displaySlot(settings, now) {
+  const formatter = clockFormatter(settings.timezone);
+  const first = minutes(settings.firstPeriodStart);
+  const second = minutes(settings.secondPeriodStart);
+  if (first >= second) fail('INVALID_SETTINGS');
+  const clock = localClock(settings.timezone, now, formatter);
+  const segment = segmentFor(clock.minute, settings);
+  const slotDate = point => point.minute < first
+    ? new Date(Date.parse(point.date + 'T00:00:00Z') - 86400000).toISOString().slice(0, 10)
+    : point.date;
+  const localDate = slotDate(clock);
+
+  // Walk real minute boundaries so the timer follows the application's IANA clock,
+  // including transitions where a local hour is skipped or repeated.
+  const end = now.getTime() + 48 * 60 * 60000;
+  let next = Math.floor(now.getTime() / 60000) * 60000 + 60000;
+  for (; next < end; next += 60000) {
+    const point = localClock(settings.timezone, new Date(next), formatter);
+    if (settings.effectiveDate && point.date >= settings.effectiveDate) break;
+    const nextSegment = point.minute >= first && point.minute < second ? 'first' : 'second';
+    if (nextSegment !== segment || slotDate(point) !== localDate) break;
+  }
+  return {localDate, segment, nextRefreshAt:next};
 }
 
 function avoidPool(candidates, currentQuoteId, now = Date.now()) {
@@ -98,7 +126,10 @@ async function rpc(db, operation, actorUid, data = {}) {
   });
   if (response?.error) {
     const code=String(response.error.code||'');
-    if(['DAILY_INSPIRATION_ROTATION_USED','DAILY_INSPIRATION_NOT_AVAILABLE','DAILY_INSPIRATION_STALE'].includes(code))fail(code);
+    const message=String(response.error.message||'');
+    const recognized=['DAILY_INSPIRATION_ROTATION_USED','DAILY_INSPIRATION_NOT_AVAILABLE','DAILY_INSPIRATION_STALE']
+      .find(value => code === value || new RegExp(`\\b${value}\\b`).test(message));
+    if(recognized)fail(recognized);
     fail('DAILY_INSPIRATION_PERSISTENCE_ERROR');
   }
   if(!record(response?.data))fail('DAILY_INSPIRATION_PERSISTENCE_ERROR');
@@ -277,21 +308,21 @@ async function previewImport(db,actorUid,data){
 async function currentOrChoose(db, actorUid, now = new Date(), retries = 0) {
   const library = await rpc(db,'library_list',actorUid);
   const settings = library.settings;
-  const time = localClock(settings.timezone, now);
-  const segment = segmentFor(time.minute, settings);
-  const initial = await rpc(db,'current',actorUid,{localDate:time.date,segment});
-  if (initial.quote) return {ok:true,quote:mapQuote(initial.quote),settings:initial.settings,localDate:time.date,segment};
-  if (!initial.candidates?.length) return {ok:true,quote:null,settings:initial.settings,localDate:time.date,segment,noQuotes:true};
-  const selected = await invokeSelection({date:time.date,segment,candidates:initial.candidates,
+  const slot = displaySlot(settings, now);
+  const {localDate, segment} = slot;
+  const initial = await rpc(db,'current',actorUid,{localDate,segment});
+  if (initial.quote) return {ok:true,quote:mapQuote(initial.quote),settings:initial.settings,...slot};
+  if (!initial.candidates?.length) return {ok:true,quote:null,settings:initial.settings,...slot,noQuotes:true};
+  const selected = await invokeSelection({date:localDate,segment,candidates:initial.candidates,
     currentQuoteId:initial.slot?.quoteId,actorUid});
-  if (!selected) return {ok:true,quote:null,settings:initial.settings,localDate:time.date,segment,noQuotes:true};
+  if (!selected) return {ok:true,quote:null,settings:initial.settings,...slot,noQuotes:true};
   let stored;
-  try {stored=await rpc(db,'select',actorUid,{localDate:time.date,segment,quoteId:String(selected.id)});}
+  try {stored=await rpc(db,'select',actorUid,{localDate,segment,quoteId:String(selected.id)});}
   catch(error){
-    if(retries<1&&['DAILY_INSPIRATION_ROTATION_USED','DAILY_INSPIRATION_STALE'].includes(error?.code))return currentOrChoose(db,actorUid,now,retries+1);
+    if(retries<2&&['DAILY_INSPIRATION_ROTATION_USED','DAILY_INSPIRATION_STALE','DAILY_INSPIRATION_NOT_AVAILABLE'].includes(error?.code))return currentOrChoose(db,actorUid,now,retries+1);
     throw error;
   }
-  return {ok:true,quote:mapQuote(stored.quote),settings:stored.settings,localDate:time.date,segment};
+  return {ok:true,quote:mapQuote(stored.quote),settings:stored.settings,...slot};
 }
 
 async function handleDailyInspiration(event, actorUid, options = {}) {
@@ -333,23 +364,28 @@ async function handleDailyInspiration(event, actorUid, options = {}) {
     if (minutes(data.firstPeriodStart)>=minutes(data.secondPeriodStart)) fail('INVALID_INPUT');
     return {ok:true,...await rpc(db,'settings_save',actorUid,data)};
   }
-  const current=await currentOrChoose(db,actorUid,options.now || new Date());
-  if (action === 'current' || !current.quote) return current;
+  const started = Date.now();
+  const now = options.now || new Date(started);
+  const withRefresh = ({nextRefreshAt,...result}) => ({
+    ...result, refreshInMs:Math.max(0, nextRefreshAt - now.getTime() - (Date.now() - started)),
+  });
+  const current=await currentOrChoose(db,actorUid,now);
+  if (action === 'current' || !current.quote) return withRefresh(current);
   if (!record(event.data)||Object.keys(event.data).length!==1||String(event.data.expectedQuoteId)!==String(current.quote.id)) fail('INVALID_INPUT');
   const snapshot=await rpc(db,'current',actorUid,{localDate:current.localDate,segment:current.segment});
   const selected=await invokeSelection({date:current.localDate,segment:current.segment,
     candidates:snapshot.candidates || [],currentQuoteId:current.quote.id,actorUid});
-  if (!selected) return {...current,noAlternative:true};
+  if (!selected) return withRefresh({...current,noAlternative:true});
   try {
     const stored=await rpc(db,'replace',actorUid,{localDate:current.localDate,segment:current.segment,
       quoteId:String(selected.id),expectedQuoteId:String(current.quote.id)});
-    return {ok:true,quote:mapQuote(stored.quote),settings:stored.settings,localDate:current.localDate,segment:current.segment};
+    return withRefresh({...current,quote:mapQuote(stored.quote),settings:stored.settings});
   } catch (error) {
-    if (['DAILY_INSPIRATION_STALE','DAILY_INSPIRATION_ROTATION_USED'].includes(error?.code)) return currentOrChoose(db,actorUid,options.now || new Date());
+    if (['DAILY_INSPIRATION_STALE','DAILY_INSPIRATION_ROTATION_USED','DAILY_INSPIRATION_NOT_AVAILABLE'].includes(error?.code)) return withRefresh(await currentOrChoose(db,actorUid,now));
     throw error;
   }
 }
 
-module.exports={handleDailyInspiration,localClock,segmentFor,avoidPool,deterministicChoice,validateQuote,
+module.exports={handleDailyInspiration,localClock,segmentFor,displaySlot,avoidPool,deterministicChoice,validateQuote,
   validateScores,validateBatchImport,normalizeQuoteText,autoRecommendationScore,mapQuote,
   similarity,nearDuplicateScore,compareBatchQuotes};

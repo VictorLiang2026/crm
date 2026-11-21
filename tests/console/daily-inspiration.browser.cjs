@@ -116,3 +116,22 @@ test('Daily inspiration renders, swaps and keeps a stable home quote, then manag
     await browser.healthy();
   } finally {await browser.close();}
 });
+
+test('home reloads the quote at the scheduled boundary and cancels its refresh on navigation',async()=>{
+  const browser=new Browser(path.resolve(__dirname,'../..'));
+  try {
+    await browser.start();
+    await browser.openConsole('#/today','authCase=1&diBoundary=1');
+    await browser.wait("document.querySelector('.daily-inspiration-heading')?.innerText.includes('先听懂客户')");
+    assert.match(await browser.evaluate("document.querySelector('.daily-inspiration-strip').innerText"),/时段二/);
+    await browser.wait("document.querySelector('.daily-inspiration-heading')?.innerText.includes('持续培养团队')");
+    assert.match(await browser.evaluate("document.querySelector('.daily-inspiration-strip').innerText"),/时段一/);
+    const reads="window.__crmTest.calls.filter(call=>call.operation==='current'&&call.action==='dailyInspiration').length";
+    assert.equal(await browser.evaluate(reads),2);
+    await browser.evaluate("location.hash='#/more'");
+    await browser.wait("!document.querySelector('.daily-inspiration-strip')");
+    await browser.evaluate("new Promise(resolve=>setTimeout(resolve,1100))");
+    assert.equal(await browser.evaluate(reads),2);
+    await browser.healthy();
+  } finally {await browser.close();}
+});

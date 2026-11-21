@@ -46,7 +46,13 @@ function installFixtures() {
     {id:'991002',quoteZh:'持续培养团队，才能积累长期能力。',quoteEn:'Develop the team consistently to build long-term capability.',theme:'team_growth',sourceOrg:'GAMA Global',sourceTitle:'Test fixture',sourceUrl:'https://gamaglobal.org/training/',editorialRewrite:true,enabled:true},
   ];
   let dailyQuote = dailyQuotes[0];
+  let dailyPeriodReads = 0;
   const dailyInspiration = data => {
+    if(data.operation==='current' && params.get('diBoundary')==='1') {
+      const first = dailyPeriodReads++ === 0;
+      return {ok:true,quote:dailyQuotes[first?0:1],segment:first?'second':'first',
+        refreshInMs:first?2000:800};
+    }
     if(data.operation==='current') return {ok:true,quote:dailyQuote,settings:{timezone:'Asia/Shanghai',firstPeriodStart:'01:00',secondPeriodStart:'12:00'},localDate:'2026-11-20',segment:'first'};
     if(data.operation==='replace') { dailyQuote=dailyQuotes.find(row=>row.id!==dailyQuote.id)||dailyQuote; return {ok:true,quote:dailyQuote,settings:{timezone:'Asia/Shanghai'}}; }
     if(data.operation==='libraryList') return {ok:true,quotes:dailyQuotes,settings:{timezone:'Asia/Shanghai',firstPeriodStart:'01:00',secondPeriodStart:'12:00',minRecommendationScore:0,allowRepeatBeforeAllUsed:false}};
