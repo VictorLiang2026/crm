@@ -46,6 +46,9 @@ function installFixtures() {
     {id:'991002',quoteZh:'持续培养团队，才能积累长期能力。',quoteEn:'Develop the team consistently to build long-term capability.',theme:'team_growth',sourceOrg:'GAMA Global',sourceTitle:'Test fixture',sourceUrl:'https://gamaglobal.org/training/',editorialRewrite:true,enabled:true},
   ];
   let dailyQuote = dailyQuotes[0];
+  if (params.get('diLongQuote')==='1') {
+    dailyQuote = {...dailyQuote, quoteEn:'Understand the client before discussing a solution. Give them time to explain what matters most, and ask how they would recognize a good outcome before you suggest a next step.'};
+  }
   let dailyPeriodReads = 0;
   const dailyInspiration = data => {
     if(data.operation==='current' && params.get('diBoundary')==='1') {

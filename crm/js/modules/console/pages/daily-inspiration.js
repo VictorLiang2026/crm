@@ -9,7 +9,11 @@ const THEMES = ['team_leadership','business_development','customer_service','cus
   'protection','long_term','team_growth'];
 
 export function dailyInspirationHeading() {
-  return h('span',{class:'daily-inspiration-heading','data-daily-inspiration-title':''},t('di_loading'));
+  return h('span', {
+    class: 'daily-inspiration-heading',
+    'data-daily-inspiration-title': '',
+    'aria-live': 'polite',
+  }, t('di_loading'));
 }
 
 function quoteText(quote) {
@@ -20,10 +24,10 @@ function failureText(error) {
   return error?.code === 'DAILY_INSPIRATION_DENIED' ? t('di_access_denied') : t('di_load_failed');
 }
 
-export function dailyInspirationCard(ctx) {
-  const root=h('section',{class:'daily-inspiration-strip','aria-label':t('di_home_title')},[
-    h('div',{class:'daily-inspiration-loading',role:'status'},t('di_loading')),
-  ]);
+export function dailyInspirationCard(ctx, title) {
+  const root = h('div', { class: 'daily-inspiration-tools' });
+  // The previous homepage can still load this module from a separate cache entry.
+  const findHeading = () => title ?? ctx.main.querySelector('[data-daily-inspiration-title]');
   let timer = null;
   let dueAt = null;
   let busy = false;
@@ -41,24 +45,27 @@ export function dailyInspirationCard(ctx) {
     const delay = result?.refreshInMs;
     dueAt = Number.isFinite(delay) && delay >= 0 ? Date.now() + delay : null;
   };
+  const showEmpty = message => {
+    const heading = findHeading();
+    if (heading) heading.textContent = message;
+    root.replaceChildren(h('a', { class: 'btn btn-ghost btn-sm', href: '#/daily-inspiration' }, t('di_manage_link')));
+  };
   const showQuote = result => {
-    const heading=root.parentElement?.querySelector('[data-daily-inspiration-title]');
-    const quote=result?.quote;
+    const quote = result?.quote;
     if (!quote) {
-      if(heading)heading.textContent=t('di_home_title');
-      root.replaceChildren(h('div',{class:'daily-inspiration-empty'},[
-        h('div',{class:'daily-inspiration-empty-main'},[ic('sparkle'),h('div',{},[
-          h('b',{},t('di_home_title')),h('span',{},result?.noQuotes?t('di_empty_home'):t('di_load_failed')),
-        ])]),h('a',{class:'btn btn-ghost btn-sm',href:'#/daily-inspiration'},t('di_manage_link')),
-      ]));
+      showEmpty(t(result?.noQuotes ? 'di_empty_home' : 'di_load_failed'));
       return;
     }
-    if(heading)heading.textContent=quoteText(quote);
+    findHeading()?.replaceChildren(
+      h('span', { class: 'daily-inspiration-quote' }, quoteText(quote)),
+      ' ',
+      h('span', { class: 'daily-inspiration-theme' }, t(`di_theme_${quote.theme}`)),
+    );
     const menu=h('details',{class:'daily-inspiration-menu'},[
       h('summary',{class:'daily-inspiration-menu-trigger','aria-label':t('di_actions'),title:t('di_actions')},'⋯'),
     ]);
     const status=h('span',{class:'daily-inspiration-status','aria-live':'polite'});
-    const keep=h('button',{class:'daily-inspiration-menu-item',type:'button',onclick:event=>{
+    const keep=h('button',{class:'daily-inspiration-menu-item',type:'button',onclick:()=>{
       menu.open=false;status.textContent=t('di_kept');
     }},t('di_keep'));
     const replace=h('button',{class:'daily-inspiration-menu-item',type:'button',onclick:async event=>{
@@ -77,17 +84,14 @@ export function dailyInspirationCard(ctx) {
       } catch(error) { status.textContent=failureText(error); }
       finally { busy=false;button.disabled=false;schedule(); }
     }},[ic('refresh'),t('di_replace')]);
-    menu.append(h('div',{class:'daily-inspiration-menu-list'},[replace,keep]));
     const source=h('a',{class:'daily-inspiration-source',href:quote.sourceUrl,target:'_blank',rel:'noopener noreferrer'},
       `${quote.sourceOrg} · ${quote.sourceTitle}${quote.editorialRewrite?` · ${t('di_edited_source')}`:''}`);
-    root.replaceChildren(
-      h('div',{class:'daily-inspiration-main'},[
-        h('div',{class:'daily-inspiration-kicker'},[ic('sparkle'),t('di_home_title'),wpTag(t(result.segment==='first'?'di_period_first':'di_period_second'))]),
-        h('div',{class:'daily-inspiration-meta'},[
-          h('span',{},t(`di_theme_${quote.theme}`)),source,
-        ]),status,
-      ]),menu,
-    );
+    const period = h('p', { class: 'daily-inspiration-menu-period' },
+      t(result.segment === 'first' ? 'di_period_first' : 'di_period_second'));
+    menu.append(h('div', { class: 'daily-inspiration-menu-list' }, [
+      replace, keep, h('div', { class: 'daily-inspiration-menu-meta' }, [period, source]),
+    ]));
+    root.replaceChildren(menu, status);
   };
   async function loadCurrent() {
     if (!root.isConnected || busy) return;
@@ -100,11 +104,7 @@ export function dailyInspirationCard(ctx) {
     } catch(error) {
       if (!root.isConnected) return;
       dueAt = Date.now() + 30000;
-      const heading=root.parentElement?.querySelector('[data-daily-inspiration-title]');
-      if(heading)heading.textContent=t('di_home_title');
-      root.replaceChildren(h('div',{class:'daily-inspiration-empty'},[
-        h('span',{role:'status'},failureText(error)),h('a',{href:'#/daily-inspiration'},t('di_manage_link')),
-      ]));
+      showEmpty(failureText(error));
     } finally { busy = false; schedule(); }
   }
   // renderToday attaches the card after this function returns.

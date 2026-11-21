@@ -370,13 +370,18 @@ export function renderToday(ctx) {
 
   const reportButton = h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => { location.hash = '#/activity-report'; } },
     [ic('calendar'), t('pc21_open_report')]);
+  const quoteHeading = dailyInspirationHeading();
+  const header = pageHead({
+    kicker: t('kicker_today'), title: quoteHeading,
+    sub: t('today_sub'), actions: compact ? [] : [reportButton],
+  });
+  header.classList.add('daily-inspiration-header');
+  const title = quoteHeading.parentElement;
+  const quoteLine = h('div', { class: 'daily-inspiration-line' });
+  title.replaceWith(quoteLine);
+  quoteLine.append(title, dailyInspirationCard(ctx, quoteHeading));
   ctx.main.replaceChildren(
-    pageHead({
-      kicker: t('kicker_today'), title: dailyInspirationHeading(),
-      sub: t('today_sub'),
-      actions: compact ? [] : [reportButton],
-    }),
-    dailyInspirationCard(ctx),
+    header,
     compact ? h('div', { class: 'today-grid today-mobile-stack' }, [
       briefEl, today5El, commitEl, candidateEl, homeFollowups(ctx), statsEl, reportButton, rhythmEl, coachEl, oppEl, riskCard,
     ]) : h('div', { class: 'today-grid' }, [

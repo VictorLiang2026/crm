@@ -123,15 +123,77 @@ test('home reloads the quote at the scheduled boundary and cancels its refresh o
     await browser.start();
     await browser.openConsole('#/today','authCase=1&diBoundary=1');
     await browser.wait("document.querySelector('.daily-inspiration-heading')?.innerText.includes('先听懂客户')");
-    assert.match(await browser.evaluate("document.querySelector('.daily-inspiration-strip').innerText"),/时段二/);
+    assert.equal(await browser.evaluate("document.querySelector('.daily-inspiration-menu-period').textContent"),'时段二');
     await browser.wait("document.querySelector('.daily-inspiration-heading')?.innerText.includes('持续培养团队')");
-    assert.match(await browser.evaluate("document.querySelector('.daily-inspiration-strip').innerText"),/时段一/);
+    assert.equal(await browser.evaluate("document.querySelector('.daily-inspiration-menu-period').textContent"),'时段一');
     const reads="window.__crmTest.calls.filter(call=>call.operation==='current'&&call.action==='dailyInspiration').length";
     assert.equal(await browser.evaluate(reads),2);
     await browser.evaluate("location.hash='#/more'");
-    await browser.wait("!document.querySelector('.daily-inspiration-strip')");
+    await browser.wait("!document.querySelector('.daily-inspiration-header')");
     await browser.evaluate("new Promise(resolve=>setTimeout(resolve,1100))");
     assert.equal(await browser.evaluate(reads),2);
+    await browser.healthy();
+  } finally {await browser.close();}
+});
+
+test('iPad home keeps TODAY and switches the same quote, its theme and menu between system languages',async()=>{
+  const browser=new Browser(path.resolve(__dirname,'../..'));
+  try {
+    await browser.start();
+    await browser.send('Emulation.setDeviceMetricsOverride',{width:1180,height:820,deviceScaleFactor:1,mobile:false});
+    await browser.openConsole('#/today','authCase=1&diLongQuote=1');
+    const assertHeader = async (quoteStart,theme,period) => {
+      await browser.wait("document.querySelector('.daily-inspiration-quote')?.textContent.startsWith("+JSON.stringify(quoteStart)+")");
+      const head=await browser.evaluate(`(()=>{
+        const header=document.querySelector('.daily-inspiration-header');
+        const text=header.querySelector('.daily-inspiration-quote');
+        const label=header.querySelector('.daily-inspiration-theme');
+        return {kicker:header.querySelector('.kicker').textContent,visible:header.innerText,label:label.textContent,
+          labelLast:label.parentElement.lastElementChild===label && label.previousElementSibling===text,
+          labelColor:getComputedStyle(label).color,quoteColor:getComputedStyle(text).color,
+          fontSize:parseFloat(getComputedStyle(text).fontSize),popoverClosed:!header.querySelector('details').open};
+      })()`);
+      assert.equal(head.kicker,'TODAY');
+      assert.equal(head.label,theme);
+      assert.ok(head.labelLast);
+      assert.equal(head.labelColor,'rgb(121, 95, 48)');
+      assert.notEqual(head.quoteColor,head.labelColor);
+      assert.ok(head.fontSize<=21,head.fontSize);
+      assert.ok(head.popoverClosed);
+      assert.doesNotMatch(head.visible,/每日行业激励|Daily industry inspiration|LIMRA|时段[一二]|Period [12]/i);
+      await browser.evaluate("document.querySelector('.daily-inspiration-menu-trigger').click()");
+      assert.equal(await browser.evaluate("document.querySelector('.daily-inspiration-menu-period').innerText"),period);
+      assert.equal(await browser.evaluate("document.querySelector('.daily-inspiration-source').href"),'https://www.limra.com/');
+      assert.match(await browser.evaluate("document.querySelector('.daily-inspiration-menu').innerText"),/LIMRA/);
+      const bounds=await browser.evaluate(`(()=>{
+        const b=document.querySelector('.daily-inspiration-menu-list').getBoundingClientRect();
+        return b.left>=0 && b.right<=window.innerWidth;
+      })()`);
+      assert.ok(bounds,'the open menu fits the iPad viewport');
+      await browser.evaluate("document.querySelector('.daily-inspiration-menu-trigger').click()");
+    };
+    await assertHeader('先听懂客户','客户信任','时段一');
+    await browser.evaluate("location.hash='#/settings'");
+    await browser.wait("document.querySelectorAll('.lang-btn').length===2");
+    await browser.click('.lang-btn','English');
+    await browser.wait("document.querySelector('.lang-toggle')?.innerText.includes('Simplified Chinese')");
+    await browser.send('Emulation.setDeviceMetricsOverride',{width:820,height:1180,deviceScaleFactor:1,mobile:false});
+    await browser.evaluate("location.hash='#/today'");
+    await assertHeader('Understand the client','Customer trust','Period 1');
+    assert.ok(await browser.evaluate(`(()=>{
+      const quote=document.querySelector('.daily-inspiration-quote');
+      const range=document.createRange();
+      range.selectNodeContents(quote);
+      return range.getClientRects().length>1 &&
+        document.documentElement.scrollWidth<=window.innerWidth;
+    })()`),'long English quote wraps without horizontal overflow');
+    await browser.evaluate("location.hash='#/settings'");
+    await browser.wait("document.querySelector('.lang-toggle')?.innerText.includes('Simplified Chinese')");
+    await browser.click('.lang-btn','Simplified Chinese');
+    await browser.wait("document.querySelector('.lang-toggle')?.innerText.includes('简体中文')");
+    await browser.evaluate("location.hash='#/today'");
+    await assertHeader('先听懂客户','客户信任','时段一');
+    assert.equal(await browser.evaluate("window.__crmTest.calls.filter(call=>call.operation==='replace'&&call.action==='dailyInspiration').length"),0);
     await browser.healthy();
   } finally {await browser.close();}
 });
