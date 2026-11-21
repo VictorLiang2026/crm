@@ -155,3 +155,23 @@ test('Person list transfer objects are public-only, service-role-only, and rever
   assert.match(rollback, /DROP TABLE public\.crm_person_list_transfer_commands/);
   assert.match(createRollback, /DROP FUNCTION public\.crm_person_list_transfer_create_v1/);
 });
+
+test('daily inspiration rotation log is service-only in the live baseline and ACL migration', () => {
+  const row = object(copy(), 'daily_inspiration_rotation_used');
+  assert.ok(row);
+  assert.equal(row.detail.rls, true);
+  assert.equal(row.detail.force_rls, true);
+  assert.deepEqual(row.detail.privileges.anon, []);
+  assert.deepEqual(row.detail.privileges.authenticated, []);
+  assert.deepEqual(row.detail.policies.map(policy => policy.roles), [['service_role']]);
+  const root = path.resolve(__dirname, '../..');
+  const migration = fs.readFileSync(path.join(root, 'cloudbase/migrations/20261121190300_daily_inspiration_rotation_acl.sql'), 'utf8');
+  const rollback = fs.readFileSync(path.join(root, 'cloudbase/migrations/20261121190300_daily_inspiration_rotation_acl.rollback.sql'), 'utf8');
+  assert.match(migration, /REVOKE ALL ON TABLE public\.daily_inspiration_rotation_used FROM PUBLIC, anon, authenticated/);
+  assert.match(migration, /GRANT SELECT,INSERT,UPDATE,DELETE ON TABLE public\.daily_inspiration_rotation_used TO service_role|GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public\.daily_inspiration_rotation_used TO service_role/);
+  assert.match(rollback, /REVOKE ALL ON TABLE public\.daily_inspiration_rotation_used FROM PUBLIC, anon, authenticated/);
+  for (const sql of [migration, rollback]) {
+    assert.doesNotMatch(sql, /(?:\bpr\.|\bpr_[a-z0-9_]+)/i);
+    assert.doesNotMatch(sql, /\bCASCADE\b/i);
+  }
+});

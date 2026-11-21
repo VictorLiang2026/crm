@@ -1,22 +1,18 @@
-# 实施计划
+# Implementation Plan
 
-- [x] 1. 对齐需求与设计，并确认生产基线 / 资源点 AI 计费路径
-  - 确认资源点套餐、CloudBase 托管组和现有 Gateway。
-  - 保持原工作区未提交 iPad 改动不受影响。
+- [x] 1. Confirm requirements, approved design, local/remote baseline, schema and RPC drift
+  - Preserve existing worktree changes and inspect the applied production migration/RPC.
   - _Requirement: 1–8_
-- [x] 2. 新增 public schema migration 与安全 rollback
-  - 加入语录、设置、时段槽位和历史表以及 service-role-only RPC。
-  - 应用后核验迁移历史、结构和权限。
+- [x] 2. Add reversible `public` migration
+  - Persist score threshold and repeat policy, add rotation state with service-role-only RLS and explicit client-grant revocation, update RPC checks and provide guarded rollback.
+  - _Requirement: 1–3, 8_
+- [x] 3. Implement server selection and import preview/commit
+  - Enforce eligible score server-side, record full rotation cycles and preserve legacy slot/history behavior.
+  - Support multi-format batch data, exact dedupe, near-duplicate human decisions and safe retries.
   - _Requirement: 1–6_
-- [x] 3. 接入 AI Gateway 与 assistant 路由
-  - 注册选择语录 Skill；实现候选筛选、稳定选择、更换与确定性回退。
-  - 保持用户身份由服务端解析，AI 只返回候选 ID。
-  - _Requirement: 1–4, 8_
-- [x] 4. 实现 iPad 今日页与更多维护界面
-  - 新增今日卡片、轻量更换菜单、语录库管理与自定义时段表单。
-  - 新增中英字典条目和样式模块。
-  - _Requirement: 1–7_
-- [x] 5. 验证、发布与记录
-  - 执行目标单测、浏览器回归、发布门槛和同步核验。
-  - 只上传本轮静态文件与 `assistant`；提交、推送并打发布标签。
+- [x] 4. Implement iPad bilingual management UI
+  - Add two-column settings/import panel, file parsing/header mapping, preview decisions and score threshold/repeat controls.
+  - _Requirement: 1, 4–7_
+- [ ] 5. Run targeted + adjacent regression, review, publish and record evidence
+  - Deploy only migration, `assistant`, affected console JS/CSS; push/tag and verify local, GitHub and CloudBase consistency.
   - _Requirement: 1–8_

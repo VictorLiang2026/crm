@@ -49,9 +49,19 @@ function installFixtures() {
   const dailyInspiration = data => {
     if(data.operation==='current') return {ok:true,quote:dailyQuote,settings:{timezone:'Asia/Shanghai',firstPeriodStart:'01:00',secondPeriodStart:'12:00'},localDate:'2026-11-20',segment:'first'};
     if(data.operation==='replace') { dailyQuote=dailyQuotes.find(row=>row.id!==dailyQuote.id)||dailyQuote; return {ok:true,quote:dailyQuote,settings:{timezone:'Asia/Shanghai'}}; }
-    if(data.operation==='libraryList') return {ok:true,quotes:dailyQuotes,settings:{timezone:'Asia/Shanghai',firstPeriodStart:'01:00',secondPeriodStart:'12:00'}};
+    if(data.operation==='libraryList') return {ok:true,quotes:dailyQuotes,settings:{timezone:'Asia/Shanghai',firstPeriodStart:'01:00',secondPeriodStart:'12:00',minRecommendationScore:0,allowRepeatBeforeAllUsed:false}};
     if(data.operation==='quoteSave') return {ok:true,quote:{...data.data,id:'991003',enabled:true}};
       if(data.operation==='scoresSave') return {ok:true,updated:data.data.scores.length};
+      if(data.operation==='quoteBatchPreview') {
+        const quotes=data.data.quotes.map(row=>({...row,recommendationScore:row.recommendationScore??8}));
+        const exactDuplicates=[],nearDuplicates=[];
+        quotes.forEach((quote,index)=>{
+          const match=dailyQuotes.find(row=>row.quoteZh===quote.quoteZh||row.quoteEn===quote.quoteEn);
+          if(match)exactDuplicates.push({index,existing:match});
+          else if(quote.quoteZh.startsWith('先听懂客户，再讨论方案'))nearDuplicates.push({index,matches:[{score:.7,existing:dailyQuotes[0]}]});
+        });
+        return {ok:true,quotes,exactDuplicates,nearDuplicates,autoScored:quotes.filter(row=>row.recommendationScore===8).length,existingScoreIds:['991001']};
+      }
       if(data.operation==='quoteBatchImport') return {ok:true,addedCount:data.data.quotes.length,duplicateCount:0,scoreUpdatedCount:data.data.fillMissingScores.length};
     if(data.operation==='quoteToggle') return {ok:true,quote:{...dailyQuotes.find(row=>row.id===data.data.id),enabled:data.data.enabled}};
     if(data.operation==='settingsSave') return {ok:true,settings:{...data.data,effectiveDate:'2026-11-21'}};
@@ -583,7 +593,7 @@ function installFixtures() {
         sortField: data.sortField, sortDir: data.sortDir,
         candidateId:data.candidateId, personId: data.personId || data.data?.personId, version: data.version,
         previewId:data.previewId || data.data?.previewId,
-        payload: ['assistant:mapPersonListFields','assistant:quickCaptureV2', 'person_360:commitQuickCaptureV2', 'person_360:addCanonicalParticipant', 'person_360:recordActivityInteraction', 'person_360:createOpportunity',
+        payload: ['assistant:mapPersonListFields','assistant:quickCaptureV2','assistant:dailyInspiration', 'person_360:commitQuickCaptureV2', 'person_360:addCanonicalParticipant', 'person_360:recordActivityInteraction', 'person_360:createOpportunity',
           'person_360:updateOpportunity', 'person_360:createSpeakerProfile',
           'person_360:previewPersonListTransfer','person_360:savePersonListTransferDecisions','person_360:executePersonListTransfer',
           'person_360:previewOpportunity','person_360:previewWorkItem','person_360:executeWorkItem',

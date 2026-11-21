@@ -3,6 +3,7 @@ import { ic } from '../icons.js';
 import { data } from '../data.js';
 import { t, getLang } from '../i18n.js';
 import { pageHead, card, emptyNote, wpTag } from '../ui.js';
+import { parseDailyInspirationFile } from '../daily-inspiration-import.js';
 
 const THEMES = ['team_leadership','business_development','customer_service','customer_trust',
   'protection','long_term','team_growth'];
@@ -74,7 +75,7 @@ export function dailyInspirationCard(ctx) {
 }
 
 function inputField(labelKey, name, value, attrs={}) {
-  const input=h('input',{class:'input',name,value:value||'',...attrs});
+  const input=h('input',{class:'input',name,value:value??'',...attrs});
   return h('label',{class:'di-field'},[h('span',{},t(labelKey)),input]);
 }
 
@@ -115,8 +116,6 @@ function quoteEditor(ctx, existing, onSaved) {
   return form;
 }
 
-function quoteKey(value) { return String(value||'').normalize('NFKC').toLowerCase().replace(/\s+/g,' ').trim(); }
-
 function importPanel(ctx, existingQuotes, refresh, initialStatus='') {
   const status=h('p',{class:'form-msg','aria-live':'polite'});
   status.textContent=initialStatus;
@@ -125,63 +124,67 @@ function importPanel(ctx, existingQuotes, refresh, initialStatus='') {
   let prepared=null;
   const renderPreview=()=>{
     if(!prepared){preview.replaceChildren();submit.disabled=true;return;}
-    const {quotes,scores,duplicates,autoScored}=prepared;
+    const {quotes,scores,exactDuplicates,nearDuplicates,decisions,autoScored}=prepared;
+    const skippedNear=nearDuplicates.filter(item=>decisions.get(item.index)==='keep_existing').length;
+    const imported=quotes.length-exactDuplicates.length-skippedNear;
+    const decisionRows=nearDuplicates.map(item=>{
+      const quote=quotes[item.index],match=item.matches[0]?.existing;
+      return h('li',{class:'di-import-near-row'},[
+        h('div',{class:'di-import-pair'},[
+          h('div',{},[h('b',{},t('di_import_incoming')),h('p',{},quote.quoteZh),h('small',{},quote.quoteEn)]),
+          h('div',{},[h('b',{},t('di_import_existing')),h('p',{},match?.quoteZh||''),h('small',{},match?.quoteEn||'')]),
+        ]),
+        h('label',{class:'di-radio'},[h('input',{type:'radio',name:`near-${item.index}`,value:'keep_existing',...(decisions.get(item.index)==='keep_existing'?{checked:true}:{}),onchange:()=>{decisions.set(item.index,'keep_existing');renderPreview();}}),t('di_import_keep_existing')]),
+        h('label',{class:'di-radio'},[h('input',{type:'radio',name:`near-${item.index}`,value:'import_new',...(decisions.get(item.index)==='import_new'?{checked:true}:{}),onchange:()=>{decisions.set(item.index,'import_new');renderPreview();}}),t('di_import_new_anyway')]),
+      ]);
+    });
     preview.replaceChildren(h('div',{class:'di-import-summary'},[
-      h('span',{},`${t('di_import_new')}: ${quotes.length}`),
-      h('span',{},`${t('di_import_duplicates')}: ${duplicates}`),
+      h('span',{},`${t('di_import_new')}: ${imported}`),
+      h('span',{},`${t('di_import_duplicates')}: ${exactDuplicates.length+skippedNear}`),
+      h('span',{},`${t('di_import_near')}: ${nearDuplicates.length}`),
       h('span',{},`${t('di_import_backfill')}: ${scores.length}`),
       h('span',{},`${t('di_import_auto_scores')}: ${autoScored}`),
-    ]),h('ul',{class:'di-import-list'},quotes.slice(0,8).map(quote=>h('li',{},[
+    ]),
+    exactDuplicates.length?h('p',{class:'di-import-exact'},`${t('di_import_exact_skipped')}: ${exactDuplicates.length}`):null,
+    decisionRows.length?h('div',{class:'di-import-near'},[h('h4',{},t('di_import_near_review')),h('ul',{class:'di-import-list'},decisionRows)]):null,
+    h('ul',{class:'di-import-list'},quotes.filter((_,index)=>!exactDuplicates.some(item=>item.index===index)&&!nearDuplicates.some(item=>item.index===index)).slice(0,6).map(quote=>h('li',{},[
       h('span',{},quote.quoteZh),h('span',{},`${quote.quoteEn} · ${t('di_recommendation_score')} ${quote.recommendationScore ?? t('di_auto_score')}`),
-    ])),quotes.length>8?h('p',{class:'foot-note'},`${t('di_import_more')}: ${quotes.length-8}`):null));
-    submit.disabled=!quotes.length&&!scores.length;
+    ]))));
+    submit.disabled=(!imported&&!scores.length&&!nearDuplicates.length)||nearDuplicates.some(item=>!decisions.has(item.index));
   };
-  const fileInput=h('input',{class:'input',type:'file',accept:'application/json,.json',onchange:async event=>{
+  const fileInput=h('input',{class:'input',type:'file',accept:'.json,.xlsx,.csv,.tsv,application/json,text/csv,text/tab-separated-values,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',onchange:async event=>{
     prepared=null;status.classList.remove('error');status.textContent='';
     const file=event.currentTarget.files?.[0];
     if(!file){renderPreview();return;}
     try {
-      if(file.size>2*1024*1024)throw new Error(t('di_import_file_too_large'));
-      const bundle=JSON.parse(await file.text());
-      if(!bundle||bundle.formatVersion!==1||!Array.isArray(bundle.quotes)||!Array.isArray(bundle.fillMissingScores)||
-        bundle.quotes.length>80||bundle.fillMissingScores.length>80)throw new Error(t('di_import_invalid_file'));
-      const themes=new Set(THEMES), seenZh=new Set(), seenEn=new Set();
-      const existingZh=new Set(existingQuotes.map(row=>quoteKey(row.quoteZh)).filter(Boolean));
-      const existingEn=new Set(existingQuotes.map(row=>quoteKey(row.quoteEn)).filter(Boolean));
-      const quotes=[];let duplicates=0,autoScored=0;
-      for(const item of bundle.quotes){
-        if(!item||typeof item!=='object'||typeof item.quoteZh!=='string'||item.quoteZh.trim().length<4||item.quoteZh.length>300||
-          typeof item.quoteEn!=='string'||item.quoteEn.trim().length<4||item.quoteEn.length>500||!themes.has(item.theme)||
-          typeof item.sourceOrg!=='string'||!item.sourceOrg.trim()||item.sourceOrg.length>120||
-          typeof item.sourceTitle!=='string'||!item.sourceTitle.trim()||item.sourceTitle.length>240||
-          typeof item.sourceUrl!=='string'||!/^https:\/\//.test(item.sourceUrl)||item.sourceUrl.length>1000||
-          typeof item.editorialRewrite!=='boolean'||(item.recommendationScore!=null&&(!Number.isInteger(item.recommendationScore)||item.recommendationScore<0||item.recommendationScore>10)))
-          throw new Error(t('di_import_invalid_quote'));
-        const zh=quoteKey(item.quoteZh),en=quoteKey(item.quoteEn);
-        if(existingZh.has(zh)||existingEn.has(en)||seenZh.has(zh)||seenEn.has(en)){duplicates++;continue;}
-        seenZh.add(zh);seenEn.add(en);
-        const quote={quoteZh:item.quoteZh,quoteEn:item.quoteEn,theme:item.theme,sourceOrg:item.sourceOrg,
-          sourceTitle:item.sourceTitle,sourceUrl:item.sourceUrl,editorialRewrite:item.editorialRewrite};
-        if(item.recommendationScore!=null)quote.recommendationScore=item.recommendationScore;else autoScored++;
-        quotes.push(quote);
-      }
-      const existingById=new Map(existingQuotes.map(row=>[String(row.id),row]));
-      const scoreSeen=new Set();
-      const scores=bundle.fillMissingScores.filter(item=>{
-        if(!item||typeof item.id!=='string'||!Number.isInteger(item.recommendationScore)||item.recommendationScore<0||item.recommendationScore>10||scoreSeen.has(item.id))
-          throw new Error(t('di_import_invalid_file'));
-        scoreSeen.add(item.id);
-        return existingById.has(item.id)&&existingById.get(item.id).recommendationScore==null;
-      });
-      prepared={quotes,scores,duplicates,autoScored};renderPreview();status.textContent=t('di_import_preview_ready');
-    } catch(error){prepared=null;renderPreview();status.classList.add('error');status.textContent=error.message||t('di_import_invalid_file');}
+      const bundle=await parseDailyInspirationFile(file);
+      if(!Array.isArray(bundle.quotes)||!Array.isArray(bundle.fillMissingScores))throw new Error(t('di_import_invalid_file'));
+      const themeAliases=new Map(THEMES.flatMap(key=>[[key,key],[t(`di_theme_${key}`).toLocaleLowerCase(),key]]));
+      const quotes=bundle.quotes.map(item=>({...item,theme:themeAliases.get(String(item.theme||'').toLocaleLowerCase())||item.theme}));
+      const previewResult=await data.dailyInspiration(ctx,'quoteBatchPreview',{quotes,fillMissingScores:bundle.fillMissingScores});
+      const existingIds=new Set(previewResult.existingScoreIds||[]);
+      const scores=bundle.fillMissingScores.filter(item=>existingIds.has(String(item.id)));
+      prepared={quotes:previewResult.quotes,scores,exactDuplicates:previewResult.exactDuplicates||[],
+        nearDuplicates:previewResult.nearDuplicates||[],decisions:new Map(),autoScored:previewResult.autoScored||0};
+      renderPreview();status.textContent=t('di_import_preview_ready');
+    } catch(error){prepared=null;renderPreview();status.classList.add('error');
+      const parseErrors={FILE_SIZE_LIMIT:'di_import_file_size',FILE_TYPE_UNSUPPORTED:'di_import_unsupported',
+        FILE_HEADER_REQUIRED:'di_import_invalid_file',FILE_EMPTY_WORKBOOK:'di_import_invalid_file',
+        FILE_ROW_LIMIT:'di_import_invalid_file',FILE_COLUMN_LIMIT:'di_import_invalid_file',FILE_BLANK_HEADER:'di_import_invalid_file',
+        FILE_DUPLICATE_HEADER:'di_import_invalid_file',CSV_UNCLOSED_QUOTE:'di_import_invalid_file',
+        MISSING_BILINGUAL_TEXT:'di_import_missing_text',INVALID_SCORE:'di_import_bad_score',
+        INVALID_JSON_BUNDLE:'di_import_invalid_file'};
+      status.textContent=error.code==='DAILY_INSPIRATION_REVIEW_REQUIRED'?t('di_import_review_required'):
+        parseErrors[error.message]?t(parseErrors[error.message]):error.code==='DAILY_INSPIRATION_FAILED'||error.code==='INVALID_INPUT'?
+          t('di_import_invalid_file'):error.message||t('di_import_invalid_file');}
   }});
   submit.textContent=t('di_import_confirm');
   submit.addEventListener('click',async()=>{
     if(!prepared||submit.disabled)return;
     submit.disabled=true;status.classList.remove('error');status.textContent=t('di_import_saving');
     try {
-      const result=await data.dailyInspiration(ctx,'quoteBatchImport',{quotes:prepared.quotes,fillMissingScores:prepared.scores});
+      const result=await data.dailyInspiration(ctx,'quoteBatchImport',{quotes:prepared.quotes,fillMissingScores:prepared.scores,
+        decisions:Array.from(prepared.decisions,([index,choice])=>({index,choice}))});
       if(!result.ok)throw Object.assign(new Error(t('di_import_partial')), {partial:result});
       const message=`${t('di_import_done')}: ${result.addedCount} · ${t('di_import_duplicates')} ${result.duplicateCount} · ${t('di_import_backfill')} ${result.scoreUpdatedCount}`;
       prepared=null;fileInput.value='';renderPreview();refresh(message);
@@ -206,24 +209,29 @@ export async function renderDailyInspirationLibrary(ctx, importStatus='') {
   try {result=await data.dailyInspiration(ctx,'libraryList');}
   catch(error){ctx.main.replaceChildren(pageHead({kicker:t('kicker_more'),title:t('di_library_title')}),
     card({title:t('di_load_failed'),icon:'bell',body:emptyNote(failureText(error),t('di_load_failed'))}));return;}
-  const settings=result.settings||{timezone:'Asia/Shanghai',firstPeriodStart:'01:00',secondPeriodStart:'12:00'};
+  const settings=result.settings||{timezone:'Asia/Shanghai',firstPeriodStart:'01:00',secondPeriodStart:'12:00',minRecommendationScore:0,allowRepeatBeforeAllUsed:false};
   const refresh=(notice='')=>renderDailyInspirationLibrary(ctx,notice);
   const editor=h('div',{class:'di-editor-slot'});
   const settingsStatus=h('p',{class:'form-msg','aria-live':'polite'});
   const timeZone=inputField('di_timezone','timezone',settings.pendingTimezone||settings.timezone,{required:true,maxlength:'80'});
   const first=inputField('di_first_start','firstPeriodStart',settings.pendingFirstPeriodStart||settings.firstPeriodStart,{required:true,type:'time'});
   const second=inputField('di_second_start','secondPeriodStart',settings.pendingSecondPeriodStart||settings.secondPeriodStart,{required:true,type:'time'});
+  const minScore=inputField('di_min_score','minRecommendationScore',settings.minRecommendationScore??0,{required:true,type:'number',min:'0',max:'10',step:'1'});
+  const allowRepeat=h('input',{type:'checkbox',name:'allowRepeatBeforeAllUsed',...(settings.allowRepeatBeforeAllUsed?{checked:true}:{})});
   const settingsForm=h('form',{class:'di-settings-form',onsubmit:async event=>{
     event.preventDefault();const submit=settingsForm.querySelector('[type="submit"]');submit.disabled=true;
     settingsStatus.textContent=t('di_saving');
     try {const fields=new FormData(settingsForm);const saved=await data.dailyInspiration(ctx,'settingsSave',{
       timezone:String(fields.get('timezone')||''),firstPeriodStart:String(fields.get('firstPeriodStart')||''),
       secondPeriodStart:String(fields.get('secondPeriodStart')||''),
+      minRecommendationScore:Number(fields.get('minRecommendationScore')),
+      allowRepeatBeforeAllUsed:allowRepeat.checked,
     });settingsStatus.textContent=saved.settings?.effectiveDate?`${t('di_scheduled')} · ${saved.settings.effectiveDate}`:t('di_saved');}
     catch(error){settingsStatus.classList.add('error');settingsStatus.textContent=failureText(error);}
     finally {submit.disabled=false;}
   }},[
-    timeZone,first,second,h('p',{class:'foot-note'},t('di_period_help')),
+    timeZone,first,second,minScore,h('label',{class:'di-checkbox di-repeat-setting'},[allowRepeat,h('span',{},t('di_allow_repeat'))]),
+    h('p',{class:'foot-note'},t('di_period_help')),
     h('button',{class:'btn btn-primary',type:'submit'},[ic('check'),t('di_save_settings')]),settingsStatus,
   ]);
   const quotes=result.quotes||[];
@@ -252,8 +260,10 @@ export async function renderDailyInspirationLibrary(ctx, importStatus='') {
     pageHead({kicker:t('kicker_more'),title:t('di_library_title'),sub:t('di_library_desc'),actions:[
       h('button',{class:'btn btn-primary',type:'button',onclick:()=>editor.replaceChildren(quoteEditor(ctx,null,closed=>{editor.replaceChildren();if(!closed)refresh();}))},[ic('plus'),t('di_add_quote')]),
     ]}),
-    card({title:t('di_settings_title'),icon:'gear',body:[settingsForm]}),
-    importPanel(ctx,quotes,refresh,importStatus),
+    h('div',{class:'di-settings-import-grid'},[
+      card({title:t('di_settings_title'),icon:'gear',body:[settingsForm]}),
+      importPanel(ctx,quotes,refresh,importStatus),
+    ]),
     h('section',{class:'di-library-section'},[editor,h('div',{class:'di-library-heading'},[
       h('h2',{},t('di_quotes_title')),wpTag(String(quotes.length)),
     ]),list]),

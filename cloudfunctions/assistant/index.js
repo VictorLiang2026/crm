@@ -434,7 +434,8 @@ function createMain(getIdentity, searchRunner = event => require('./search-servi
       catch (error) {
         const code=['INVALID_INPUT','INVALID_TIMEZONE','INVALID_SETTINGS','DAILY_INSPIRATION_DENIED',
           'DAILY_INSPIRATION_INVALID','DAILY_INSPIRATION_NOT_FOUND','DAILY_INSPIRATION_NOT_AVAILABLE',
-          'DAILY_INSPIRATION_STALE','DAILY_INSPIRATION_PERSISTENCE_ERROR'].includes(error?.code)
+          'DAILY_INSPIRATION_STALE','DAILY_INSPIRATION_ROTATION_USED','DAILY_INSPIRATION_PERSISTENCE_ERROR',
+          'DAILY_INSPIRATION_REVIEW_REQUIRED'].includes(error?.code)
           ? error.code : 'DAILY_INSPIRATION_FAILED';
         return {ok:false,error:{code,message:'Daily inspiration could not be loaded'}};
       }

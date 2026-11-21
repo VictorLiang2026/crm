@@ -73,7 +73,8 @@ function deterministicChoice(rows, date, segment, actorUid = '') {
 async function invokeSelection({ date, segment, candidates, currentQuoteId, actorUid = '' }) {
   if (!candidates.length) return null;
   if (currentQuoteId && !candidates.some(row => String(row.id) !== String(currentQuoteId))) return null;
-  const pool = avoidPool(candidates, currentQuoteId);
+  const unshown=candidates.filter(row=>row.rotationUsed!==true);
+  const pool = avoidPool(unshown.length?unshown:candidates, currentQuoteId);
   if (!pool.length) return null;
   try {
     const gateway = createAIGateway({ app:require('./db').app, rdb: database(), timeoutMs: 25000, maxAttempts: 1 });
@@ -95,7 +96,12 @@ async function rpc(db, operation, actorUid, data = {}) {
   const response = await db.rpc('crm_daily_inspiration_v1', {
     p_operation: operation, p_actor_uid: actorUid, p_data: data,
   });
-  if (response?.error || !record(response?.data)) fail('DAILY_INSPIRATION_PERSISTENCE_ERROR');
+  if (response?.error) {
+    const code=String(response.error.code||'');
+    if(['DAILY_INSPIRATION_ROTATION_USED','DAILY_INSPIRATION_NOT_AVAILABLE','DAILY_INSPIRATION_STALE'].includes(code))fail(code);
+    fail('DAILY_INSPIRATION_PERSISTENCE_ERROR');
+  }
+  if(!record(response?.data))fail('DAILY_INSPIRATION_PERSISTENCE_ERROR');
   return response.data;
 }
 
@@ -146,12 +152,63 @@ function validateScores(data) {
 }
 
 function normalizeQuoteText(value) {
-  return String(value || '').normalize('NFKC').toLowerCase().replace(/\s+/g,' ').trim();
+  return String(value || '').normalize('NFKC').toLowerCase()
+    .replace(/[\p{P}\p{S}\s]+/gu,'').trim();
 }
 
-function validateBatchImport(data) {
-  if (!record(data) || Object.keys(data).length !== 2 || !Array.isArray(data.quotes) ||
-      !Array.isArray(data.fillMissingScores) || data.quotes.length > 80 || data.fillMissingScores.length > 80 ||
+function shingles(value, width=3) {
+  const text=normalizeQuoteText(value);
+  if(!text)return new Set();
+  const chars=Array.from(text);
+  if(chars.length<=width)return new Set([text]);
+  const result=new Set();
+  for(let index=0;index<=chars.length-width;index++)result.add(chars.slice(index,index+width).join(''));
+  return result;
+}
+
+function similarity(left,right) {
+  const a=shingles(left),b=shingles(right);
+  if(!a.size||!b.size)return 0;
+  let shared=0;
+  for(const item of a)if(b.has(item))shared++;
+  return 2*shared/(a.size+b.size);
+}
+
+function nearDuplicateScore(incoming,existing) {
+  return Math.max(similarity(incoming.quoteZh,existing.quoteZh),
+    similarity(incoming.quoteEn,existing.quoteEn));
+}
+
+function compareBatchQuotes(quotes,existing) {
+  const exact=[],near=[];
+  const zh=new Map(),en=new Map();
+  const seenZh=new Set(),seenEn=new Set();
+  for(const row of existing){
+    const keyZh=normalizeQuoteText(row.quoteZh??row.quote_zh),keyEn=normalizeQuoteText(row.quoteEn??row.quote_en);
+    if(keyZh)zh.set(keyZh,row);
+    if(keyEn)en.set(keyEn,row);
+  }
+  for(let index=0;index<quotes.length;index++){
+    const quote=quotes[index], keyZh=normalizeQuoteText(quote.quoteZh), keyEn=normalizeQuoteText(quote.quoteEn);
+    const match=zh.get(keyZh)||en.get(keyEn);
+    if(match||seenZh.has(keyZh)||seenEn.has(keyEn)){exact.push({index,existing:match?mapQuote(match):null});continue;}
+    seenZh.add(keyZh);seenEn.add(keyEn);
+    const matches=existing.map(row=>({row,score:nearDuplicateScore(quote,{
+      quoteZh:row.quoteZh??row.quote_zh,quoteEn:row.quoteEn??row.quote_en,
+    })}))
+      .filter(item=>item.score>=0.55).sort((a,b)=>b.score-a.score).slice(0,3)
+      .map(item=>({score:Number(item.score.toFixed(3)),existing:mapQuote(item.row)}));
+    if(matches.length)near.push({index,matches});
+  }
+  return {exact,near};
+}
+
+function validateBatchImport(data,allowDecisions=false) {
+  const allowed=allowDecisions?['quotes','fillMissingScores','decisions']:['quotes','fillMissingScores'];
+  if (!record(data) || Object.keys(data).some(key=>!allowed.includes(key)) ||
+      !Array.isArray(data.quotes) || !Array.isArray(data.fillMissingScores) ||
+      (data.decisions!==undefined&&!Array.isArray(data.decisions)) ||
+      data.quotes.length > 80 || data.fillMissingScores.length > 80 ||
       (!data.quotes.length && !data.fillMissingScores.length)) fail('INVALID_INPUT');
   const quotes = data.quotes.map(row => {
     const quote = validateQuote(row);
@@ -159,24 +216,29 @@ function validateBatchImport(data) {
     if (quote.recommendationScore === null) quote.recommendationScore=autoRecommendationScore(quote);
     return quote;
   });
-  return {quotes,fillMissingScores:data.fillMissingScores.length ? validateScores({scores:data.fillMissingScores}) : []};
+  const decisions=(data.decisions||[]).map(item=>{
+    if(!record(item)||Object.keys(item).length!==2||!Number.isInteger(item.index)||item.index<0||
+      item.index>=quotes.length||!['keep_existing','import_new'].includes(item.choice))fail('INVALID_INPUT');
+    return item;
+  });
+  if(new Set(decisions.map(item=>item.index)).size!==decisions.length)fail('INVALID_INPUT');
+  return {quotes,fillMissingScores:data.fillMissingScores.length ? validateScores({scores:data.fillMissingScores}) : [],decisions};
 }
 
 async function importQuotes(db, actorUid, data) {
-  const input = validateBatchImport(data);
+  const input = validateBatchImport(data,true);
   const library = await rpc(db,'library_list',actorUid);
   const existing = Array.isArray(library.quotes) ? library.quotes : [];
-  const existingEnglish = new Set(existing.map(row=>normalizeQuoteText(row.quote_en)).filter(Boolean));
-  const existingChinese = new Set(existing.map(row=>normalizeQuoteText(row.quote_zh)).filter(Boolean));
-  const seenEnglish = new Set(), seenChinese = new Set(), additions = [];
-  let duplicateCount = 0;
-  for (const quote of input.quotes) {
-    const english = normalizeQuoteText(quote.quoteEn), chinese = normalizeQuoteText(quote.quoteZh);
-    if (existingEnglish.has(english) || existingChinese.has(chinese) || seenEnglish.has(english) || seenChinese.has(chinese)) {
-      duplicateCount++;
-      continue;
-    }
-    seenEnglish.add(english); seenChinese.add(chinese); additions.push(quote);
+  const comparison=compareBatchQuotes(input.quotes,existing);
+  const exactIndexes=new Set(comparison.exact.map(item=>item.index));
+  const nearIndexes=new Set(comparison.near.map(item=>item.index));
+  const choices=new Map(input.decisions.map(item=>[item.index,item.choice]));
+  for(const index of nearIndexes)if(!choices.has(index))fail('DAILY_INSPIRATION_REVIEW_REQUIRED');
+  const additions=[];let duplicateCount=exactIndexes.size;
+  for(let index=0;index<input.quotes.length;index++){
+    if(exactIndexes.has(index))continue;
+    if(nearIndexes.has(index)&&choices.get(index)==='keep_existing'){duplicateCount++;continue;}
+    additions.push(input.quotes[index]);
   }
 
   const existingById = new Map(existing.map(row=>[String(row.id),row]));
@@ -200,7 +262,19 @@ async function importQuotes(db, actorUid, data) {
   return {ok:true,addedCount,duplicateCount,scoreUpdatedCount};
 }
 
-async function currentOrChoose(db, actorUid, now = new Date()) {
+async function previewImport(db,actorUid,data){
+  const input=validateBatchImport(data);
+  const library=await rpc(db,'library_list',actorUid);
+  const existing=Array.isArray(library.quotes)?library.quotes:[];
+  const comparison=compareBatchQuotes(input.quotes,existing);
+  return {ok:true,quotes:input.quotes,exactDuplicates:comparison.exact,
+    nearDuplicates:comparison.near,autoScored:input.quotes.filter(row=>data.quotes.some(source=>
+      source.recommendationScore==null&&source.quoteZh===row.quoteZh&&source.quoteEn===row.quoteEn)).length,
+    scores:input.fillMissingScores,
+    existingScoreIds:existing.filter(row=>(row.recommendationScore??row.recommendation_score)==null).map(row=>String(row.id))};
+}
+
+async function currentOrChoose(db, actorUid, now = new Date(), retries = 0) {
   const library = await rpc(db,'library_list',actorUid);
   const settings = library.settings;
   const time = localClock(settings.timezone, now);
@@ -211,14 +285,19 @@ async function currentOrChoose(db, actorUid, now = new Date()) {
   const selected = await invokeSelection({date:time.date,segment,candidates:initial.candidates,
     currentQuoteId:initial.slot?.quoteId,actorUid});
   if (!selected) return {ok:true,quote:null,settings:initial.settings,localDate:time.date,segment,noQuotes:true};
-  const stored = await rpc(db,'select',actorUid,{localDate:time.date,segment,quoteId:String(selected.id)});
+  let stored;
+  try {stored=await rpc(db,'select',actorUid,{localDate:time.date,segment,quoteId:String(selected.id)});}
+  catch(error){
+    if(retries<1&&['DAILY_INSPIRATION_ROTATION_USED','DAILY_INSPIRATION_STALE'].includes(error?.code))return currentOrChoose(db,actorUid,now,retries+1);
+    throw error;
+  }
   return {ok:true,quote:mapQuote(stored.quote),settings:stored.settings,localDate:time.date,segment};
 }
 
 async function handleDailyInspiration(event, actorUid, options = {}) {
   const db = options.db || database();
   const action = event?.operation;
-  if (!['current','replace','libraryList','quoteSave','quoteToggle','settingsSave','scoresSave','quoteBatchImport'].includes(action) ||
+  if (!['current','replace','libraryList','quoteSave','quoteToggle','settingsSave','scoresSave','quoteBatchPreview','quoteBatchImport'].includes(action) ||
       Object.keys(event || {}).some(key => !['action','operation','data'].includes(key))) fail('INVALID_INPUT');
   if (action === 'libraryList') {
     if (event.data !== undefined) fail('INVALID_INPUT');
@@ -236,6 +315,7 @@ async function handleDailyInspiration(event, actorUid, options = {}) {
     return {ok:true,...await rpc(db,'scores_save',actorUid,{scores})};
   }
   if (action === 'quoteBatchImport') return importQuotes(db,actorUid,event.data);
+  if (action === 'quoteBatchPreview') return previewImport(db,actorUid,event.data);
   if (action === 'quoteToggle') {
     const data=event.data;
     if (!record(data)||Object.keys(data).length!==2||!/^[1-9][0-9]{0,17}$/.test(String(data.id))||typeof data.enabled!=='boolean') fail('INVALID_INPUT');
@@ -244,7 +324,11 @@ async function handleDailyInspiration(event, actorUid, options = {}) {
   }
   if (action === 'settingsSave') {
     const data=event.data;
-    if (!record(data)||Object.keys(data).length!==3||typeof data.timezone!=='string'||data.timezone.length>80) fail('INVALID_INPUT');
+    if (!record(data)||![3,5].includes(Object.keys(data).length)||Object.keys(data).some(key=>!['timezone','firstPeriodStart','secondPeriodStart','minRecommendationScore','allowRepeatBeforeAllUsed'].includes(key))||
+      typeof data.timezone!=='string'||data.timezone.length>80||
+      (Object.hasOwn(data,'minRecommendationScore')&&(!Number.isInteger(data.minRecommendationScore)||data.minRecommendationScore<0||data.minRecommendationScore>10))||
+      (Object.hasOwn(data,'allowRepeatBeforeAllUsed')&&typeof data.allowRepeatBeforeAllUsed!=='boolean')||
+      (Object.hasOwn(data,'minRecommendationScore')!==Object.hasOwn(data,'allowRepeatBeforeAllUsed'))) fail('INVALID_INPUT');
     minutes(data.firstPeriodStart); minutes(data.secondPeriodStart);
     if (minutes(data.firstPeriodStart)>=minutes(data.secondPeriodStart)) fail('INVALID_INPUT');
     return {ok:true,...await rpc(db,'settings_save',actorUid,data)};
@@ -261,10 +345,11 @@ async function handleDailyInspiration(event, actorUid, options = {}) {
       quoteId:String(selected.id),expectedQuoteId:String(current.quote.id)});
     return {ok:true,quote:mapQuote(stored.quote),settings:stored.settings,localDate:current.localDate,segment:current.segment};
   } catch (error) {
-    if (error?.code==='DAILY_INSPIRATION_STALE') return currentOrChoose(db,actorUid,options.now || new Date());
+    if (['DAILY_INSPIRATION_STALE','DAILY_INSPIRATION_ROTATION_USED'].includes(error?.code)) return currentOrChoose(db,actorUid,options.now || new Date());
     throw error;
   }
 }
 
 module.exports={handleDailyInspiration,localClock,segmentFor,avoidPool,deterministicChoice,validateQuote,
-  validateScores,validateBatchImport,normalizeQuoteText,autoRecommendationScore,mapQuote};
+  validateScores,validateBatchImport,normalizeQuoteText,autoRecommendationScore,mapQuote,
+  similarity,nearDuplicateScore,compareBatchQuotes};

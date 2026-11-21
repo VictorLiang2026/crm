@@ -52,6 +52,50 @@ test('missing recommendation score is deterministic and bounded',()=>{
   assert.throws(()=>service.validateQuote({...quote,recommendationScore:11}),error=>error.code==='INVALID_INPUT');
 });
 
+test('batch comparison separates exact and near duplicates from new content',()=>{
+  const existing=[{id:12,quote_zh:'建立持久的客户关系',quote_en:'Build lasting client relationships.',
+    theme:'customer_trust',source_org:'LIMRA',source_title:'Research',source_url:'https://limra.com',recommendation_score:8}];
+  const quotes=[
+    {quoteZh:'建立持久的客户关系。',quoteEn:'Build lasting client relationships!',recommendationScore:8},
+    {quoteZh:'建立持久的客户关系，并持续提供支持。',quoteEn:'Build lasting client relationships and support them.',recommendationScore:8},
+    {quoteZh:'持续培养团队能力。',quoteEn:'Develop team capability over time.',recommendationScore:8},
+  ];
+  const compared=service.compareBatchQuotes(quotes,existing);
+  assert.deepEqual(compared.exact.map(item=>item.index),[0]);
+  assert.ok(compared.near.some(item=>item.index===1));
+  assert.ok(!compared.near.some(item=>item.index===2));
+});
+
+test('near duplicate imports require a human choice and can keep or import explicitly',async()=>{
+  const existing={id:12,quote_zh:'建立持久的客户关系',quote_en:'Build lasting client relationships.',
+    theme:'customer_trust',source_org:'LIMRA',source_title:'Research',source_url:'https://limra.com',recommendation_score:8};
+  const incoming={quoteZh:'建立持久的客户关系，并持续提供支持。',quoteEn:'Build lasting client relationships and support them.',
+    theme:'customer_trust',sourceOrg:'LIMRA',sourceTitle:'New edition',sourceUrl:'https://limra.com/new',editorialRewrite:true,recommendationScore:8};
+  const db={async rpc(name,args){
+    if(args.p_operation==='library_list')return {data:{quotes:[existing],settings}};
+    if(args.p_operation==='quote_save')return {data:{quote:{id:13,...args.p_data}}};
+  }};
+  await assert.rejects(()=>service.handleDailyInspiration({operation:'quoteBatchImport',data:{quotes:[incoming],fillMissingScores:[]}},'uid',{db}),
+    error=>error.code==='DAILY_INSPIRATION_REVIEW_REQUIRED');
+  const keep=await service.handleDailyInspiration({operation:'quoteBatchImport',data:{quotes:[incoming],fillMissingScores:[],decisions:[{index:0,choice:'keep_existing'}]}},'uid',{db});
+  assert.deepEqual(keep,{ok:true,addedCount:0,duplicateCount:1,scoreUpdatedCount:0});
+  const add=await service.handleDailyInspiration({operation:'quoteBatchImport',data:{quotes:[incoming],fillMissingScores:[],decisions:[{index:0,choice:'import_new'}]}},'uid',{db});
+  assert.deepEqual(add,{ok:true,addedCount:1,duplicateCount:0,scoreUpdatedCount:0});
+});
+
+test('settings preserve legacy period-only saves and validate expanded controls',async()=>{
+  const calls=[];
+  const db={async rpc(name,args){calls.push(args);return {data:{settings:{timezone:'Asia/Shanghai'}}};}};
+  const legacy={timezone:'Asia/Shanghai',firstPeriodStart:'01:00',secondPeriodStart:'12:00'};
+  await service.handleDailyInspiration({operation:'settingsSave',data:legacy},'uid',{db});
+  assert.deepEqual(calls[0].p_data,legacy);
+  await service.handleDailyInspiration({operation:'settingsSave',data:{...legacy,minRecommendationScore:8,allowRepeatBeforeAllUsed:true}},'uid',{db});
+  assert.equal(calls[1].p_data.minRecommendationScore,8);
+  assert.equal(calls[1].p_data.allowRepeatBeforeAllUsed,true);
+  await assert.rejects(()=>service.handleDailyInspiration({operation:'settingsSave',data:{...legacy,minRecommendationScore:11,allowRepeatBeforeAllUsed:false}},'uid',{db}),
+    error=>error.code==='INVALID_INPUT');
+});
+
 test('batch import skips bilingual duplicates and fills only null existing scores',async()=>{
   const quote={quoteZh:'先理解客户，再帮助客户行动。',quoteEn:'Listen first, then help clients act.',
     theme:'customer_trust',sourceOrg:'LIMRA',sourceTitle:'Research summary',sourceUrl:'https://www.limra.com/research',editorialRewrite:true,recommendationScore:8};
