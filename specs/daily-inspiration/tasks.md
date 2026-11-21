@@ -13,6 +13,6 @@
 - [x] 4. Implement iPad bilingual management UI
   - Add two-column settings/import panel, file parsing/header mapping, preview decisions and score threshold/repeat controls.
   - _Requirement: 1, 4–7_
-- [ ] 5. Run targeted + adjacent regression, review, publish and record evidence
+- [x] 5. Run targeted + adjacent regression, review, publish and record evidence
   - Deploy only migration, `assistant`, affected console JS/CSS; push/tag and verify local, GitHub and CloudBase consistency.
   - _Requirement: 1–8_
