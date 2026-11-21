@@ -203,7 +203,7 @@ export function renderKnowledgeGovernance(ctx) {
           ...contentCells(row),
           h('td',{},h('span',{class:`kg-status ${live?'kg-verified':'kg-invalidated'}`},(row.metadata?.enabled===false?t('kr_disabled')+' · ':'')+text(sourceFailed?'status_extraction_failed':sourceProcessing?'status_processing':live?'status_active':pending?'status_pending_review':'status_invalid'))),
           h('td',{},row.updated_at?String(row.updated_at).slice(0,10):'—'),
-          h('td',{class:'kg-table-actions'},actions),
+          h('td',{class:'kg-table-actions'},h('div',{class:'kg-home-actions'},actions)),
         ]);
       };
     const bodyRows=pageRows.flatMap(row=>{

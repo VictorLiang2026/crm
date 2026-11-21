@@ -132,11 +132,13 @@ test('iPad landscape keeps opportunity, recruit, knowledge and reference toolbar
       const search=document.querySelector('.kg-home-card .kg-search').getBoundingClientRect();
       const filters=document.querySelector('.kg-home-card .kg-filters').getBoundingClientRect();
       const actions=[...document.querySelectorAll('.kg-home-card .kg-table-actions .btn')];
+      const actionsGrid=document.querySelector('.kg-home-card .kg-home-actions');
       const wrap=document.querySelector('.kg-home-card .kg-table-wrap');
       const table=wrap.querySelector('.kg-table');
       const row=table.querySelector('tbody tr');
       const body=document.querySelector('.kg-home-card .card-body');
       return {rowDelta:Math.abs(search.top-filters.top),actionCount:actions.length,
+        actionColumns:getComputedStyle(actionsGrid).gridTemplateColumns.trim().split(/\\s+/).length,
         actionRows:new Set(actions.map(node=>Math.round(node.getBoundingClientRect().top))).size,
         bodyWidth:Math.round(body.getBoundingClientRect().width),
         wrapWidth:Math.round(wrap.getBoundingClientRect().width),tableWidth:Math.round(table.getBoundingClientRect().width),
@@ -147,12 +149,13 @@ test('iPad landscape keeps opportunity, recruit, knowledge and reference toolbar
     })()`);
     assert.ok(knowledge.rowDelta < 2, 'knowledge search and filters should share one row');
     assert.equal(knowledge.actionCount, 6);
+    assert.equal(knowledge.actionColumns, 2, 'knowledge actions should use two columns');
     assert.equal(knowledge.actionRows, 3, 'six knowledge actions should occupy three rows');
     assert.ok(knowledge.tableWidth >= knowledge.bodyWidth * 0.94, 'knowledge table should use nearly all available card width: ' + JSON.stringify(knowledge));
     assert.ok(knowledge.tableWidth >= knowledge.wrapWidth * 0.98, 'knowledge table should fill its scroll frame');
-    assert.ok(knowledge.columns[3] >= knowledge.tableWidth * 0.16 && knowledge.columns[4] >= knowledge.tableWidth * 0.16,
+    assert.ok(knowledge.columns[3] >= knowledge.tableWidth * 0.17 && knowledge.columns[4] >= knowledge.tableWidth * 0.17,
       'both knowledge content columns should retain useful width');
-    assert.ok(knowledge.columns[7] >= knowledge.tableWidth * 0.17, 'knowledge actions should have enough horizontal room');
+    assert.ok(knowledge.columns[7] >= knowledge.tableWidth * 0.15, 'knowledge actions should have enough horizontal room');
     assert.ok(knowledge.rowHeight <= 150, 'knowledge action buttons should keep iPad table rows compact: ' + JSON.stringify(knowledge));
     assert.ok(knowledge.actionButtons.every(button=>button.height>=36&&button.height<=40&&button.width>=64), 'knowledge actions should use compact iPad rows');
     assert.ok(knowledge.width <= knowledge.inner + 1, 'knowledge page should not overflow horizontally');

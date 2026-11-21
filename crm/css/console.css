@@ -2183,31 +2183,38 @@ body:has(.login), body.is-login { padding-top: env(safe-area-inset-top); }
   .kg-home-card .kg-responsive-table { grid-column: 1 / -1; width: 100%; min-width: 0; }
   .kg-home-card .kg-responsive-table .kg-table-wrap { width: 100%; min-width: 0; }
 
-  /* Give the title and content columns enough room while keeping actions touchable. */
+  /* Keep actions in a compact two-column grid so the text columns can stay wider. */
   .kg-home-card .kg-table th, .kg-home-card .kg-table td { padding: 8px 9px; }
   .kg-home-card .kg-table th:nth-child(1), .kg-home-card .kg-table td:nth-child(1) { width: 5%; }
   .kg-home-card .kg-table th:nth-child(2), .kg-home-card .kg-table td:nth-child(2) { width: 18%; }
   .kg-home-card .kg-table th:nth-child(3), .kg-home-card .kg-table td:nth-child(3) { width: 9%; }
   .kg-home-card .kg-table th:nth-child(4), .kg-home-card .kg-table td:nth-child(4),
-  .kg-home-card .kg-table th:nth-child(5), .kg-home-card .kg-table td:nth-child(5) { width: 17%; }
+  .kg-home-card .kg-table th:nth-child(5), .kg-home-card .kg-table td:nth-child(5) { width: 18%; }
   .kg-home-card .kg-table th:nth-child(6), .kg-home-card .kg-table td:nth-child(6) { width: 8%; }
   .kg-home-card .kg-table th:nth-child(7), .kg-home-card .kg-table td:nth-child(7) { width: 8%; }
-  .kg-home-card .kg-table th:nth-child(8), .kg-home-card .kg-table td:nth-child(8) { width: 18%; }
-  /* Keep the table cell in the table formatting context; grid directly on TD
-     collapsed the button tracks in the current iPad-width Chromium layout. */
+  .kg-home-card .kg-table th:nth-child(8), .kg-home-card .kg-table td:nth-child(8) { width: 16%; }
+  /* Keep the cell as a table cell; a dedicated child grid reliably forms two tracks. */
   .kg-home-card .kg-table-actions { white-space: normal; }
+  .kg-home-card .kg-home-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+    gap: 3px;
+  }
   .kg-home-card .kg-table-actions .btn {
     display: inline-flex;
-    vertical-align: top;
-    width: calc(50% - 4px);
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
     min-height: 36px;
-    margin: 0 3px 3px 0;
+    margin: 0;
     padding: 2px 3px;
     font-size: 12px;
     line-height: 1.1;
     white-space: normal;
     overflow-wrap: anywhere;
   }
+  .kg-home-card .kg-table-actions .btn svg { width: 12px; height: 12px; flex: 0 0 12px; }
 
   /* Communication reference controls use at most two rows above the list. */
   .kr-control-area { display: flex; flex-wrap: nowrap; align-items: center; gap: 8px; min-width: 0; }
