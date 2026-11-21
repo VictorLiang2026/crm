@@ -32,13 +32,14 @@ test('Daily inspiration renders, swaps and keeps a stable home quote, then manag
     await browser.evaluate(`(()=>{
       const bundle={formatVersion:1,quotes:[
         {quoteZh:'先听懂客户，再讨论方案。',quoteEn:'Understand the client before discussing a solution.',theme:'customer_trust',sourceOrg:'LIMRA',sourceTitle:'Test fixture',sourceUrl:'https://www.limra.com/',editorialRewrite:true,recommendationScore:8},
-        {quoteZh:'帮助客户一步步实现目标。',quoteEn:'Help clients make progress toward their goals.',theme:'customer_service',sourceOrg:'LIMRA',sourceTitle:'Test import',sourceUrl:'https://www.limra.com/research',editorialRewrite:true}
+        {sourceEntryId:'Q002',attribution:'Test author',quoteZh:'帮助客户一步步实现目标。',quoteEn:'Help clients make progress toward their goals.',theme:'customer_service',sourceOrg:'LIMRA',sourceTitle:'Test import',sourceUrl:'https://www.limra.com/research',editorialRewrite:true}
       ],fillMissingScores:[{id:'991001',recommendationScore:8}],skippedDuplicates:[]};
       const transfer=new DataTransfer();transfer.items.add(new File([JSON.stringify(bundle)],'quotes.json',{type:'application/json'}));
       const input=document.querySelector('.di-import-preview')?.parentElement?.querySelector('input[type=file]')||document.querySelector('input[type=file]');
       input.files=transfer.files;input.dispatchEvent(new Event('change',{bubbles:true}));
     })()`);
     await browser.wait("document.querySelector('.di-import-preview')?.innerText.includes('跳过重复')");
+    assert.equal(await browser.evaluate("Object.hasOwn(window.__crmTest.calls.find(call=>call.operation==='quoteBatchPreview').payload.quotes[1],'sourceEntryId')"),false);
     assert.match(await browser.evaluate("document.querySelector('.di-import-preview').innerText"),/自动评分/);
     await browser.evaluate("document.querySelector('.di-import-preview').parentElement.querySelector('button[type=button]').click()");
     await browser.wait("window.__crmTest.calls.some(call=>call.name==='assistant'&&call.operation==='quoteBatchImport')");
@@ -58,14 +59,20 @@ test('Daily inspiration renders, swaps and keeps a stable home quote, then manag
 
     await browser.evaluate("new Promise((resolve,reject)=>{const script=document.createElement('script');script.src='/crm/js/vendor/sheetjs-0.20.3.full.min.js';script.onload=resolve;script.onerror=reject;document.head.appendChild(script)})");
     await browser.evaluate(`(()=>{
-      const rows=[['quoteZh','quoteEn','theme','sourceOrg','sourceTitle','sourceUrl','editorialRewrite','recommendationScore'],
-        ['持续理解客户的长期需要。','Keep understanding clients’ long-term needs.','customer_service','LIMRA','XLSX test','https://www.limra.com/research',true,9]];
+      const rows=[['编号','English Quote','中文译文','讲者/归属','平台/组织','主题','来源标题','来源链接','推荐值（0–10）','引述类型'],
+        ['Q001','Keep understanding clients’ long-term needs.','持续理解客户的长期需要。','Test author','LIMRA','客户沟通','XLSX test','https://www.limra.com/research',9,'转述语录']];
       const sheet=XLSX.utils.aoa_to_sheet(rows),book=XLSX.utils.book_new();XLSX.utils.book_append_sheet(book,sheet,'Quotes');
       const bytes=XLSX.write(book,{bookType:'xlsx',type:'array'}),transfer=new DataTransfer();
       transfer.items.add(new File([bytes],'quotes.xlsx',{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
       const input=document.querySelector('input[type=file]');input.files=transfer.files;input.dispatchEvent(new Event('change',{bubbles:true}));
     })()`);
     await browser.wait("document.querySelector('.di-import-preview')?.innerText.includes('持续理解客户')");
+    assert.deepEqual(await browser.evaluate("window.__crmTest.calls.filter(call=>call.operation==='quoteBatchPreview').at(-1).payload.quotes[0]"),{
+      quoteZh:'持续理解客户的长期需要。',quoteEn:'Keep understanding clients’ long-term needs.',theme:'customer_service',
+      sourceOrg:'LIMRA',sourceTitle:'XLSX test（引述：Test author）',sourceUrl:'https://www.limra.com/research',
+      editorialRewrite:true,recommendationScore:9,
+    });
+    assert.equal(await browser.evaluate("document.querySelector('.di-import-preview').parentElement.querySelector('button[type=button]').disabled"),false);
     await browser.evaluate("document.querySelector('.di-import-preview').parentElement.querySelector('button[type=button]').click()");
     await browser.wait("window.__crmTest.calls.filter(call=>call.name==='assistant'&&call.operation==='quoteBatchImport').length===3");
 
